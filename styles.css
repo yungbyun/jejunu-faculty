@@ -222,7 +222,11 @@ main{min-height:60vh;padding:40px 20px 72px}
 /* ---------- responsive ---------- */
 @media (max-width:720px){
   html{-webkit-text-size-adjust:100%}
-  body{overflow-x:hidden}
+  /* iOS 가로 팬 방지: overflow-x:hidden은 Safari에서 손가락 끌기를 못 막으므로 clip + touch-action 사용 */
+  html,body{max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
+  body{touch-action:pan-y pinch-zoom}
+  main,.topbar,.foot{overflow-x:clip}
+  .filters{touch-action:pan-x pan-y}
   .container{padding:0 16px}
   /* 상단바: 검색창이 남은 폭을 차지하고 버튼은 밀리지 않게 */
   .topbar{padding-top:env(safe-area-inset-top)}
