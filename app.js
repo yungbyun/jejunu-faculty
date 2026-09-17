@@ -257,6 +257,7 @@ function route() {
   if (parts[0] === 'dept' && parts[1]) {
     return { view: 'dept', dept: decodeURIComponent(parts[1]), prof: parts[2] === 'prof' && parts[3] ? decodeURIComponent(parts[3]) : null };
   }
+  if (parts[0] === 'stats') return { view: 'stats' };
   return { view: 'home' };
 }
 
@@ -269,11 +270,158 @@ function render() {
     renderDept(d);
     const p = r.prof ? d.profs.find(x => x.slug === r.prof) : null;
     p ? openDrawer(p, d) : closeDrawer(false);
+  } else if (r.view === 'stats') {
+    renderStats();
+    closeDrawer(false);
   } else {
     renderHome();
     closeDrawer(false);
   }
+  document.querySelectorAll('[data-nav]').forEach(a => a.setAttribute('aria-current', a.dataset.nav === r.view ? 'page' : 'false'));
   window.scrollTo({ top: 0 });
+}
+
+/* ---------- 화면: 분석 (선호도 시각화) ---------- */
+const SCORE = { '상': 3, '중': 2, '하': 1, '부': -1 };
+const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
+const rcls = r => r === '미지정' ? 'none' : rClass(r);
+
+function dist(profs) {
+  const c = Object.fromEntries(RLABELS().map(r => [r, 0]));
+  profs.forEach(p => { c[getRating(p) || '미지정']++; });
+  return c;
+}
+function avgScore(profs) {
+  const rated = profs.filter(getRating);
+  if (!rated.length) return null;
+  return rated.reduce((a, p) => a + SCORE[getRating(p)], 0) / rated.length;
+}
+const fmt1 = n => n == null ? '–' : (Math.round(n * 100) / 100).toFixed(2);
+
+function stackBar(profs, opts = {}) {
+  const c = dist(profs), total = profs.length || 1;
+  return `<div class="sbar" role="img" aria-label="${esc(RLABELS().map(r => `${r} ${c[r]}`).join(', '))}">
+    ${RLABELS().filter(r => c[r]).map(r => {
+      const pct = c[r] / total * 100;
+      const link = opts.deptId ? ` data-go="${esc(opts.deptId)}" data-rating="${esc(r)}" tabindex="0" role="link"` : '';
+      return `<span class="sbar__seg sbar__seg--${rcls(r)}" style="flex:${c[r]} 0 0"${link} title="${esc(r)} ${c[r]}명 (${Math.round(pct)}%)">${pct >= 11 ? c[r] : ''}</span>`;
+    }).join('')}
+  </div>`;
+}
+
+function tagStats() {
+  const m = new Map(); // tag -> {scores:[], n}
+  state.rows.filter(getRating).forEach(p => p.tags.forEach(t => {
+    if (!m.has(t)) m.set(t, []);
+    m.get(t).push(SCORE[getRating(p)]);
+  }));
+  let list = [...m.entries()].map(([tag, arr]) => ({ tag, n: arr.length, avg: arr.reduce((a, b) => a + b, 0) / arr.length }));
+  const minN = list.some(x => x.n >= 2) ? 2 : 1;
+  list = list.filter(x => x.n >= minN).sort((a, b) => b.avg - a.avg || b.n - a.n);
+  return { list, minN };
+}
+
+function renderStats() {
+  const all = state.rows, rated = all.filter(getRating);
+  const c = dist(all);
+  const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
+  const { list: tags, minN } = tagStats();
+  const singles = minN === 2 ? (() => { const seen = new Set(tags.map(t => t.tag)), out = []; state.rows.filter(getRating).forEach(p => p.tags.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ tag: t, r: getRating(p), prof: p.name }); } })); return out.sort((a, b) => SCORE[b.r] - SCORE[a.r]); })() : [];
+  const ranks = Object.keys(RANK_ORDER).map(r => ({ r, profs: all.filter(p => p.rank === r) })).filter(x => x.profs.length);
+  const legend = `<div class="legend" aria-label="범례">${RLABELS().map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(r)}</span>`).join('')}</div>`;
+
+  $app.innerHTML = `
+    <div class="view stats">
+      <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
+      <div class="hero"><div class="eyebrow">Preference analytics</div><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}상·중·하·부 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p></div>
+
+      ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 상·중·하·부 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
+
+      <section class="st-sec">
+        <div class="st-hero">
+          <div class="st-hero__num">${rated.length}<small>/ ${all.length}명 평가</small></div>
+          <div class="meter" aria-label="평가 진행률 ${pct}%"><span style="width:${pct}%"></span></div>
+          <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(상 3 · 중 2 · 하 1 · 부 −1, 미지정 제외)</span></div>
+        </div>
+        <div class="tiles">
+          ${RLABELS().map(r => `<div class="tile tile--${rcls(r)}"><span class="tile__lbl"><i class="sw sw--${rcls(r)}"></i>${esc(r)}${r === '부' ? '<span class="opt"> (부정)</span>' : ''}</span><span class="tile__val">${c[r]}</span><span class="tile__pct">${all.length ? Math.round(c[r] / all.length * 100) : 0}%</span></div>`).join('')}
+        </div>
+      </section>
+
+      <section class="st-sec">
+        <div class="st-head"><h2>학과별 분포</h2>${legend}</div>
+        <div class="st-rows">
+          ${state.depts.map(d => `
+            <div class="st-row" style="--dept-color:${esc(d.color)}">
+              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 평균 ${fmt1(avgScore(d.profs))}</small></div>
+              ${stackBar(d.profs, { deptId: d.id })}
+            </div>`).join('')}
+        </div>
+        <p class="st-note">막대의 구간을 누르면 해당 학과가 그 선호도 필터로 열립니다.</p>
+      </section>
+
+      <section class="st-sec">
+        <div class="st-head"><h2>전공 키워드 × 선호도</h2><span class="muted st-small">키워드별 평균 점수 · 교수 ${minN}명 이상인 키워드</span></div>
+        ${tags.length ? `
+        <div class="dv">
+          <div class="dv__axis"><span></span><div class="dv__axisin"><span>−1 부정</span><span>0</span><span>3 긍정</span></div><span></span></div>
+          ${tags.map(t => `
+            <div class="dv__row" title="${esc(t.tag)} · 평균 ${fmt1(t.avg)} · 교수 ${t.n}명">
+              <div class="dv__lbl">${esc(t.tag)}<small>${t.n}</small></div>
+              <div class="dv__track">
+                <span class="dv__neg" style="width:${t.avg < 0 ? Math.min(100, -t.avg / 1 * 100) : 0}%"></span>
+                <span class="dv__pos" style="width:${t.avg > 0 ? Math.min(100, t.avg / 3 * 100) : 0}%"></span>
+              </div>
+              <div class="dv__val">${fmt1(t.avg)}</div>
+            </div>`).join('')}
+        </div>
+        <p class="st-note">오른쪽(초록)은 내가 높게 본 연구 주제, 왼쪽(빨강)은 낮게 본 주제입니다. 축은 −1(부)에서 3(상)까지입니다.</p>
+        ${singles.length ? `<details class="st-details"><summary>교수 1명뿐인 키워드 ${singles.length}개 보기</summary><div class="kw-cloud">${singles.map(t => `<span class="kw kw--${rcls(t.r)}" title="${esc(t.prof)}"><i class="sw sw--${rcls(t.r)}"></i>${esc(t.tag)}</span>`).join('')}</div></details>` : ''}` : `<div class="empty">평가한 교수가 생기면 키워드 분석이 표시됩니다.</div>`}
+      </section>
+
+      <section class="st-sec st-two">
+        <div>
+          <div class="st-head"><h2>직급별</h2></div>
+          <table class="st-table"><thead><tr><th>직급</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>평균</th></tr></thead>
+          <tbody>${ranks.map(x => { const dc = dist(x.profs); return `<tr><td>${esc(x.r)}</td><td>${x.profs.length}</td><td>${x.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmt1(avgScore(x.profs))}</b></td></tr>`; }).join('')}</tbody></table>
+        </div>
+        <div>
+          <div class="st-head"><h2>학과별</h2></div>
+          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>평균</th></tr></thead>
+          <tbody>${state.depts.map(d => { const dc = dist(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmt1(avgScore(d.profs))}</b></td></tr>`; }).join('')}</tbody></table>
+        </div>
+      </section>
+
+      <section class="st-sec">
+        <div class="st-head"><h2>선호도별 교수 목록</h2><button class="btn" type="button" id="csvBtn">CSV 내보내기</button></div>
+        <div class="st-lists">
+          ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
+            <div class="st-list"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
+              ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">${esc(p.name)}</a><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+            </div>`; }).join('')}
+        </div>
+      </section>
+    </div>`;
+
+  $app.querySelectorAll('[data-go]').forEach(el => {
+    const go = () => { state.ratingFilter = el.dataset.rating; state._keepRating = true; location.hash = `#/dept/${encodeURIComponent(el.dataset.go)}`; };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  $app.querySelector('#csvBtn')?.addEventListener('click', exportCsv);
+}
+
+function exportCsv() {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const head = ['학과', '이름', '영문명', '직급', '연구실', '전공 키워드', '선호도', '점수'];
+  const lines = [head.map(q).join(',')];
+  state.rows.forEach(p => { const r = getRating(p); lines.push([p.dept_name, p.name, p.name_en, p.rank, p.office, p.tags.join('; '), r || '', r ? SCORE[r] : ''].map(q).join(',')); });
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `교수진_선호도_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 /* ---------- 화면: 스켈레톤 ---------- */
@@ -683,7 +831,7 @@ function showGate() {
 }
 
 /* ---------- 시작 ---------- */
-window.addEventListener('hashchange', () => { state.rankFilter = '전체'; render(); });
+window.addEventListener('hashchange', () => { state.rankFilter = '전체'; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
 if (!authEnabled()) {
   enterApp(null);
 } else {
