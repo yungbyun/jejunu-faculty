@@ -157,8 +157,38 @@ function apply(rawRows, source) {
   render();
 }
 
+/* 새로 고침 버튼: 캐시를 지우고 시트에서 다시 읽음 */
+const refreshBtn = document.getElementById('refreshBtn');
+async function refreshNow() {
+  refreshBtn.classList.add('busy');
+  setStatus('loading');
+  try { localStorage.removeItem('jnu-faculty-cache'); } catch {}
+  try {
+    const rows = await fetchSheet();
+    apply(rows, 'sheet');
+    try { localStorage.setItem('jnu-faculty-cache', JSON.stringify({ t: Date.now(), rows })); } catch {}
+    flashStatus(`새로 고침 완료 · ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`);
+  } catch (e) {
+    if (state.rows.length) { setStatus(state.source === 'sheet' ? 'sheet' : 'fallback'); flashStatus('시트를 읽지 못했습니다 — 공개 설정을 확인하세요', true); }
+    else loadData();
+  } finally {
+    setTimeout(() => refreshBtn.classList.remove('busy'), 400);
+  }
+}
+refreshBtn.addEventListener('click', refreshNow);
+
+let flashTimer;
+function flashStatus(msg, warn = false) {
+  clearTimeout(flashTimer);
+  const prevCls = $status.className, prevMsg = $status.textContent;
+  $status.className = 'foot__status ' + (warn ? 'warn' : 'ok');
+  $status.textContent = msg;
+  flashTimer = setTimeout(() => { $status.className = prevCls; $status.textContent = prevMsg; }, 3000);
+}
+
 function setStatus(src) {
   const map = {
+    loading: ['', '시트에서 최신 데이터 불러오는 중…'],
     sheet: ['ok', `Google 시트에서 불러옴 · 교수 ${state.rows.length}명`],
     cache: ['ok', `최근 데이터 표시 중 · 교수 ${state.rows.length}명 (백그라운드 갱신)`],
     fallback: ['warn', `시트를 읽지 못해 백업 데이터를 표시합니다 · 교수 ${state.rows.length}명`],
@@ -211,9 +241,8 @@ function renderHome() {
   $app.innerHTML = `
     <div class="view home">
       <div class="hero">
-        <div class="eyebrow">Jeju National University · College of Engineering</div>
         <h1>교수진 안내</h1>
-        <p>${state.depts.length}개 학과 · 전임교원 ${total}명. 학과를 선택하면 교수진과 세부 연구 분야를 볼 수 있습니다.</p>
+        <p>${state.depts.length}개 학과 · 전임교원 ${total}명</p>
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
       <div class="dept-list">

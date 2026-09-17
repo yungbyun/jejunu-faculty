@@ -61,6 +61,9 @@ img{display:block}
 .iconbtn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;cursor:pointer;transition:background .15s,transform .15s}
 .iconbtn:hover{background:var(--line)}
 .iconbtn:active{transform:scale(.96)}
+.iconbtn.busy .ico-refresh{animation:spin .8s linear infinite}
+.iconbtn.busy{pointer-events:none;opacity:.7}
+@keyframes spin{to{transform:rotate(360deg)}}
 .ico-moon{display:none}
 :root[data-theme="dark"] .ico-sun{display:none}
 :root[data-theme="dark"] .ico-moon{display:block}
