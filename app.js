@@ -31,7 +31,7 @@ const CONFIG = {
   },
   // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
   RATINGS: {
-    API_URL: '',
+    API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
     LABELS: ['상', '중', '하', '부'],
   },
 };
@@ -579,11 +579,24 @@ async function loadRatings() {
   try {
     const r = await ratingsApi('list', {});
     if (r && Array.isArray(r.ratings)) {
-      state.ratings = new Map(r.ratings.map(x => [`${x.dept_id}/${x.slug}`, x.rating]));
+      const server = new Map(r.ratings.map(x => [`${x.dept_id}/${x.slug}`, x.rating]));
+      // 이 기기에만 저장돼 있던(시트 연동 전에 찍은) 선호도는 시트로 올려 합친다
+      const localOnly = [...state.ratings].filter(([k]) => !server.has(k));
+      state.ratings = server;
       saveRatingsCache();
       render();
+      if (localOnly.length) {
+        let n = 0;
+        for (const [key, val] of localOnly) {
+          const [dept_id, slug] = key.split('/');
+          const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
+          if (!p) continue;
+          try { const res = await ratingsApi('set', { dept_id, slug, name: p.name, rating: val }); if (res && res.ok) { state.ratings.set(key, val); n++; } } catch {}
+        }
+        if (n) { saveRatingsCache(); render(); flashStatus(`이 기기의 선호도 ${n}건을 시트로 동기화했습니다`); }
+      }
     }
-  } catch (e) { console.warn('선호도 불러오기 실패:', e.message); }
+  } catch (e) { console.warn('선호도 불러오기 실패:', e.message); flashStatus('선호도 동기화 실패 — 시트 연결을 확인하세요', true); }
 }
 
 async function setRating(key, val) {
