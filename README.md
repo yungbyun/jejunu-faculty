@@ -11,6 +11,7 @@ styles.css          디자인 토큰(색·타이포·간격), 라이트/다크 �
 app.js              데이터 로딩(Google Sheet → CSV 파싱), 해시 라우팅, 렌더링
 data/professors.json  시트를 읽지 못할 때 쓰는 백업 데이터
 data/professors.csv   같은 내용의 CSV (시트 초기 입력용)
+data/photos/          리포지토리에 저장한 교수 사진 (<dept_id>/<영문이름-slug>.jpg) + manifest.json
 ```
 
 ## 데이터 관리 (Google 스프레드시트)
@@ -29,6 +30,10 @@ data/professors.csv   같은 내용의 CSV (시트 초기 입력용)
 | `paper1` … `paper5` | 대표 논문. `제목 | 저널 | 연도` 형식 |
 
 새 학과를 추가하려면 `dept_id`가 새로운 행을 넣기만 하면 첫 화면에 학과 카드가 자동으로 생깁니다.
+
+### 사진
+
+`data/photos/manifest.json`에 적힌 사진(`<dept_id>/<slug>.jpg`, slug는 `name_en`을 소문자·하이픈으로 바꾼 값)이 있으면 시트의 `photo` URL보다 먼저 사용하고, 로컬 사진 로딩에 실패하면 시트 URL로 대체합니다. 학과 홈페이지 사진 링크가 바뀌거나 막혀도 앱이 계속 사진을 보여주도록 하기 위한 장치입니다. 새 교수 사진을 추가하면 `manifest.json`에 `"<dept_id>/<slug>"`를 한 줄 추가하세요.
 
 ### 시트 공개 설정 (앱이 읽을 수 있게)
 

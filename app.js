@@ -15,10 +15,13 @@ const CONFIG = {
   FALLBACK_URL: 'data/professors.json',
   // 브라우저 캐시 시간(분). 시트를 고친 뒤 바로 확인하려면 새로고침 시 ?nocache=1
   CACHE_MINUTES: 30,
+  // 리포지토리에 저장된 사진 목록(data/photos/manifest.json). 있으면 시트의 photo URL보다 우선 사용
+  PHOTO_MANIFEST: 'data/photos/manifest.json',
+  PHOTO_DIR: 'data/photos/',
 };
 
 /* ---------- 상태 ---------- */
-const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체' };
+const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', localPhotos: new Set() };
 const $app = document.getElementById('app');
 const $status = document.getElementById('dataStatus');
 const $q = document.getElementById('q');
@@ -58,15 +61,38 @@ function parseCSV(text) {
 function normalize(rows) {
   return rows
     .filter(r => r.name && r.dept_id)
-    .map(r => ({
+    .map(r => {
+      const slug = slugify(r.name_en || r.name);
+      const key = `${r.dept_id}/${slug}`;
+      const local = state.localPhotos.has(key) ? `${CONFIG.PHOTO_DIR}${key}.jpg` : '';
+      return {
       ...r,
-      slug: slugify(r.name_en || r.name),
+      slug,
+      // 로컬 사진이 있으면 먼저 쓰고, 실패하면 시트의 photo URL로 대체
+      photo: local || r.photo,
+      photo_alt: local && r.photo && r.photo !== local ? r.photo : '',
       order: Number(r.order) || 999,
       tags: splitList(r.tags),
       papers: [r.paper1, r.paper2, r.paper3, r.paper4, r.paper5]
         .filter(Boolean)
         .map(p => { const [t, j, y] = p.split('|').map(s => s.trim()); return { t, j, y }; }),
-    }));
+    }; });
+}
+
+/* 사진 로딩 실패 시: 대체 URL이 있으면 한 번 바꿔 보고, 없으면 mode에 따라 처리 */
+function photoErr(img, mode) {
+  const alt = img.dataset.alt;
+  if (alt) { img.dataset.alt = ''; img.src = alt; return; }
+  if (mode === 'initial') img.parentNode.textContent = img.dataset.initial || '?';
+  else img.remove();
+}
+
+async function loadPhotoManifest() {
+  if (state.localPhotos.size) return;
+  try {
+    const res = await fetch(CONFIG.PHOTO_MANIFEST, { cache: 'no-store' });
+    if (res.ok) state.localPhotos = new Set(await res.json());
+  } catch {}
 }
 
 function buildDepts(rows) {
@@ -110,6 +136,7 @@ async function fetchSheet() {
 }
 
 async function loadData() {
+  await loadPhotoManifest();
   const nocache = new URLSearchParams(location.search).has('nocache');
   const key = 'jnu-faculty-cache';
   if (!nocache) {
@@ -256,7 +283,7 @@ function renderHome() {
             </div>
             <div class="drow__avs" aria-hidden="true">
               ${d.profs.slice(0, 7).map(p => p.photo
-                ? `<i class="av"><img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${esc(initial(p.name))}'"></i>`
+                ? `<i class="av"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')"></i>`
                 : `<i class="av">${esc(initial(p.name))}</i>`).join('')}
               ${d.profs.length > 7 ? `<i class="av av--more">+${d.profs.length - 7}</i>` : ''}
             </div>
@@ -312,7 +339,7 @@ function profCard(p, d, showDept = false) {
     <button class="prof" type="button" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
       <div class="prof__photo">
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
-        ${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">` : ''}
+        ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
       </div>
       <div class="prof__body">
         <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
@@ -345,7 +372,7 @@ function openDrawer(p, d) {
     </div>
     <div class="d-body">
       <div class="d-profile">
-        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" alt="${esc(p.name)} 사진" onerror="this.remove()">` : ''}</div>
+        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}</div>
         <div>
           <span class="d-rank">${esc(p.rank)}</span>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
