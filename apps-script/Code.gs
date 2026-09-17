@@ -97,3 +97,52 @@ function upsert(email, deptId, slug, name, rating) {
 function out(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
+
+/* ==========================================================
+ * 교수 데이터 가져오기 (편집기에서 직접 실행)
+ * GitHub Pages에 올라간 data/professors.json 을 읽어 첫 번째 시트에
+ * (dept_id, name) 기준으로 추가/갱신합니다. 시트에 없는 열은 무시하고,
+ * 시트에서 직접 고친 값은 덮어쓰지 않으려면 OVERWRITE 를 false 로 두세요.
+ * 실행: 편집기 상단 함수 선택 → importProfessorsFromGitHub → ▶ 실행
+ * ========================================================== */
+const PROFESSORS_JSON_URL = 'https://yungbyun.github.io/jejunu-faculty/data/professors.json';
+const OVERWRITE = false; // true 면 이미 있는 교수의 빈 칸이 아닌 값도 JSON 값으로 덮어씀
+
+function importProfessorsFromGitHub() {
+  const res = UrlFetchApp.fetch(PROFESSORS_JSON_URL + '?t=' + Date.now(), { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('JSON을 읽지 못했습니다: HTTP ' + res.getResponseCode());
+  const rows = JSON.parse(res.getContentText());
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheets()[0];
+  const header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const col = name => header.indexOf(name);
+  if (col('dept_id') < 0 || col('name') < 0) throw new Error('첫 번째 시트에 dept_id, name 열이 없습니다');
+  const last = sh.getLastRow();
+  const existing = new Map();
+  if (last >= 2) {
+    const vals = sh.getRange(2, 1, last - 1, header.length).getValues();
+    vals.forEach((r, i) => existing.set(r[col('dept_id')] + '|' + r[col('name')], i + 2));
+  }
+  let added = 0, updated = 0;
+  const toAppend = [];
+  rows.forEach(p => {
+    const key = p.dept_id + '|' + p.name;
+    const line = header.map(h => (p[h] == null ? '' : String(p[h])));
+    if (existing.has(key)) {
+      const rowIdx = existing.get(key);
+      const cur = sh.getRange(rowIdx, 1, 1, header.length).getValues()[0];
+      let changed = false;
+      const merged = cur.map((v, i) => {
+        const nv = line[i];
+        if (nv === '' || header[i] === 'photo') return v;           // 빈 값·photo 열은 유지
+        if (String(v) === '' || OVERWRITE) { if (String(v) !== nv) changed = true; return nv; }
+        return v;
+      });
+      if (changed) { sh.getRange(rowIdx, 1, 1, header.length).setValues([merged]); updated++; }
+    } else { toAppend.push(line); added++; }
+  });
+  if (toAppend.length) sh.getRange(last + 1, 1, toAppend.length, header.length).setValues(toAppend);
+  Logger.log('추가 ' + added + '명, 갱신 ' + updated + '명, 총 ' + (last - 1 + added) + '명');
+  return { added, updated };
+}
