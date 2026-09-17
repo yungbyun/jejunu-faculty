@@ -29,10 +29,15 @@ const CONFIG = {
     // 로그인 유지 시간(시간)
     SESSION_HOURS: 24 * 7,
   },
+  // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
+  RATINGS: {
+    API_URL: '',
+    LABELS: ['상', '중', '하', '부'],
+  },
 };
 
 /* ---------- 상태 ---------- */
-const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', localPhotos: new Set() };
+const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), session: null };
 const $app = document.getElementById('app');
 const $status = document.getElementById('dataStatus');
 const $q = document.getElementById('q');
@@ -299,6 +304,7 @@ function renderHome() {
               <h2 class="drow__name">${esc(d.name)}</h2>
               <div class="drow__en">${esc(d.en || '')}${d.url ? ` · ${esc(d.url.replace(/^https?:\/\//, ''))}` : ''}</div>
               <div class="drow__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+              ${ratingSummary(d)}
             </div>
             <div class="drow__avs" aria-hidden="true">
               ${d.profs.slice(0, 7).map(p => p.photo
@@ -332,7 +338,8 @@ function renderSearch(q) {
 /* ---------- 화면: 학과 교수 목록 ---------- */
 function renderDept(d) {
   const ranks = ['전체', ...Object.keys(RANK_ORDER).filter(r => d.profs.some(p => p.rank === r))];
-  const list = d.profs.filter(p => state.rankFilter === '전체' || p.rank === state.rankFilter);
+  const list = d.profs.filter(p => (state.rankFilter === '전체' || p.rank === state.rankFilter) && matchRating(p));
+  const rf = ['전체', ...CONFIG.RATINGS.LABELS, '미지정'];
   $app.innerHTML = `
     <div class="view" style="--dept-color:${esc(d.color)}">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>${esc(d.name)}</span></div>
@@ -342,20 +349,27 @@ function renderDept(d) {
           <h1>${esc(d.name)}</h1>
           <div class="sub">전임교원 ${d.profs.length}명${d.url ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a>` : ''}</div>
         </div>
-        <div class="filters" role="group" aria-label="직위 필터">
-          ${ranks.map(r => `<button class="chip" type="button" data-rank="${esc(r)}" aria-pressed="${state.rankFilter === r}">${esc(r)}<span class="n">${r === '전체' ? d.profs.length : d.profs.filter(p => p.rank === r).length}</span></button>`).join('')}
+        <div class="filters-wrap">
+          <div class="filters" role="group" aria-label="직위 필터">
+            ${ranks.map(r => `<button class="chip" type="button" data-rank="${esc(r)}" aria-pressed="${state.rankFilter === r}">${esc(r)}<span class="n">${r === '전체' ? d.profs.length : d.profs.filter(p => p.rank === r).length}</span></button>`).join('')}
+          </div>
+          <div class="filters filters--rate" role="group" aria-label="선호도 필터">
+            ${rf.map(r => `<button class="chip chip--rate" type="button" data-rating="${esc(r)}" data-val="${esc(r)}" aria-pressed="${state.ratingFilter === r}">${esc(r)}<span class="n">${countRating(d, r)}</span></button>`).join('')}
+          </div>
         </div>
       </div>
-      ${list.length ? `<div class="prof-grid">${list.map(p => profCard(p, d)).join('')}</div>` : `<div class="empty"><strong>해당 직위의 교수가 없습니다</strong></div>`}
+      ${list.length ? `<div class="prof-grid">${list.map(p => profCard(p, d)).join('')}</div>` : `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong></div>`}
     </div>`;
-  $app.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
+  $app.querySelectorAll('.chip[data-rank]').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
+  $app.querySelectorAll('.chip[data-rating]').forEach(b => b.addEventListener('click', () => { state.ratingFilter = b.dataset.rating; renderDept(d); }));
   bindCards();
 }
 
 function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
   return `
-    <button class="prof" type="button" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
+    <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
+      ${rateChips(p)}
       <div class="prof__photo">
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
         ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
@@ -366,13 +380,108 @@ function profCard(p, d, showDept = false) {
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         ${p.office ? `<div class="prof__office"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</div>` : ''}
       </div>
-    </button>`;
+    </div>`;
+}
+
+/* ---------- 선호도 ---------- */
+const rKey = p => `${p.dept_id}/${p.slug}`;
+const getRating = p => state.ratings.get(rKey(p)) || '';
+const matchRating = p => state.ratingFilter === '전체' || (state.ratingFilter === '미지정' ? !getRating(p) : getRating(p) === state.ratingFilter);
+const countRating = (d, r) => r === '전체' ? d.profs.length : d.profs.filter(p => r === '미지정' ? !getRating(p) : getRating(p) === r).length;
+
+function ratingSummary(d) {
+  const parts = CONFIG.RATINGS.LABELS.map(r => [r, countRating(d, r)]).filter(([, n]) => n);
+  if (!parts.length) return '';
+  return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}</div>`;
+}
+const rClass = r => ({ '상': 'high', '중': 'mid', '하': 'low', '부': 'neg' }[r] || '');
+
+function rateChips(p, big = false) {
+  const cur = getRating(p);
+  return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
+    ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="선호도 ${esc(r)}${r === '부' ? '(부정)' : ''}">${esc(r)}</button>`).join('')}
+  </div>`;
+}
+
+function bindRates(root) {
+  root.querySelectorAll('.rate').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('.rate__b'); if (!b) return;
+    e.stopPropagation(); e.preventDefault();
+    const key = g.dataset.key, val = b.dataset.val;
+    setRating(key, getRatingByKey(key) === val ? '' : val);
+  }));
+}
+const getRatingByKey = k => state.ratings.get(k) || '';
+
+function ratingsCacheKey() { return 'jnu-ratings:' + (state.session ? state.session.email : 'local'); }
+
+function loadRatingsCache() {
+  try {
+    const m = JSON.parse(localStorage.getItem(ratingsCacheKey()) || '{}');
+    state.ratings = new Map(Object.entries(m));
+  } catch { state.ratings = new Map(); }
+}
+function saveRatingsCache() {
+  try { localStorage.setItem(ratingsCacheKey(), JSON.stringify(Object.fromEntries(state.ratings))); } catch {}
+}
+
+async function loadRatings() {
+  loadRatingsCache();
+  if (!CONFIG.RATINGS.API_URL || !state.session) return;
+  try {
+    const r = await ratingsApi('list', {});
+    if (r && Array.isArray(r.ratings)) {
+      state.ratings = new Map(r.ratings.map(x => [`${x.dept_id}/${x.slug}`, x.rating]));
+      saveRatingsCache();
+      render();
+    }
+  } catch (e) { console.warn('선호도 불러오기 실패:', e.message); }
+}
+
+async function setRating(key, val) {
+  if (val) state.ratings.set(key, val); else state.ratings.delete(key);
+  saveRatingsCache();
+  refreshRatingUI(key, val);
+  if (!CONFIG.RATINGS.API_URL || !state.session) return;
+  const [dept_id, slug] = key.split('/');
+  const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
+  try {
+    const r = await ratingsApi('set', { dept_id, slug, name: p ? p.name : '', rating: val });
+    if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
+  } catch (e) {
+    flashStatus('선호도를 시트에 저장하지 못했습니다 — ' + e.message, true);
+  }
+}
+
+/* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */
+function refreshRatingUI(key, val) {
+  document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"] .rate__b`).forEach(b => b.setAttribute('aria-pressed', b.dataset.val === val));
+  document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
+  const r = route();
+  if (r.view === 'dept') {
+    const d = state.depts.find(x => x.id === r.dept);
+    if (d) {
+      $app.querySelectorAll('.chip[data-rating]').forEach(b => { const n = b.querySelector('.n'); if (n) n.textContent = countRating(d, b.dataset.rating); });
+      if (state.ratingFilter !== '전체') renderDept(d); // 필터 중이면 목록이 바뀌므로 다시 그림
+    }
+  }
+}
+
+/* Apps Script 호출 — ID 토큰을 함께 보내 서버가 본인 여부를 확인 */
+async function ratingsApi(action, payload) {
+  const token = await getFreshToken();
+  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify({ action, token, ...payload }), redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
 }
 
 function bindCards() {
-  $app.querySelectorAll('.prof').forEach(b => b.addEventListener('click', () => {
-    location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`;
-  }));
+  const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
+  $app.querySelectorAll('.prof').forEach(b => {
+    b.addEventListener('click', e => { if (e.target.closest('.rate')) return; open(b); });
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate')) { e.preventDefault(); open(b); } });
+  });
+  bindRates($app);
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
 
@@ -397,6 +506,7 @@ function openDrawer(p, d) {
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+          <div class="d-rate"><span class="d-rate__lbl">내 선호도</span>${rateChips(p, true)}</div>
         </div>
       </div>
 
@@ -415,6 +525,7 @@ function openDrawer(p, d) {
 
       ${links.length ? `<div class="d-section"><h3>바로가기</h3><div class="d-links">${links.map(l => `<a class="lnk ${l.primary ? 'primary' : ''}" href="${esc(l.href)}" ${l.href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(l.label)} ↗</a>`).join('')}</div></div>` : ''}
     </div>`;
+  bindRates($panel);
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
   $panel.querySelector('[data-close]').focus();
@@ -484,8 +595,8 @@ function loadSession() {
   return null;
 }
 
-function saveSession(p) {
-  const s = { email: p.email, name: p.name || '', picture: p.picture || '', aud: p.aud, exp: Date.now() + CONFIG.AUTH.SESSION_HOURS * 3600e3 };
+function saveSession(p, credential) {
+  const s = { email: p.email, name: p.name || '', picture: p.picture || '', aud: p.aud, exp: Date.now() + CONFIG.AUTH.SESSION_HOURS * 3600e3, credential: credential || '', tokExp: (p.exp || 0) * 1000 };
   try { localStorage.setItem(AUTH_KEY, JSON.stringify(s)); } catch {}
   return s;
 }
@@ -495,11 +606,44 @@ function gateMessage(msg, warn = false) {
   el.textContent = msg; el.classList.toggle('warn', warn);
 }
 
+let tokenWaiter = null, gisReady = false;
 function onCredential(resp) {
   const p = decodeJwt(resp.credential);
-  if (!p || p.aud !== CONFIG.AUTH.CLIENT_ID || !p.email_verified) { gateMessage('로그인 정보를 확인할 수 없습니다. 다시 시도해 주세요.', true); return; }
-  if (!isAllowed(p.email)) { gateMessage(`${p.email} 계정은 접근이 허용되지 않았습니다.`, true); return; }
-  enterApp(saveSession(p));
+  if (!p || p.aud !== CONFIG.AUTH.CLIENT_ID || !p.email_verified) { if (tokenWaiter) { tokenWaiter.reject(new Error('토큰 확인 실패')); tokenWaiter = null; } gateMessage('로그인 정보를 확인할 수 없습니다. 다시 시도해 주세요.', true); return; }
+  if (!isAllowed(p.email)) { if (tokenWaiter) { tokenWaiter.reject(new Error('허용되지 않은 계정')); tokenWaiter = null; } gateMessage(`${p.email} 계정은 접근이 허용되지 않았습니다.`, true); return; }
+  const s = saveSession(p, resp.credential);
+  if (tokenWaiter) { // 조용한 토큰 갱신 중이었음
+    const w = tokenWaiter; tokenWaiter = null;
+    if (state.session && state.session.email !== s.email) { w.reject(new Error('다른 계정으로 로그인됨')); location.reload(); return; }
+    state.session = s; w.resolve(s.credential); return;
+  }
+  enterApp(s);
+}
+
+function ensureGis() {
+  return new Promise((resolve, reject) => {
+    let tries = 0;
+    const init = () => {
+      if (!window.google || !google.accounts) { if (tries++ < 50) return setTimeout(init, 200); return reject(new Error('Google 로그인 스크립트 없음')); }
+      if (!gisReady) { google.accounts.id.initialize({ client_id: CONFIG.AUTH.CLIENT_ID, callback: onCredential, auto_select: true, ux_mode: 'popup', itp_support: true }); gisReady = true; }
+      resolve();
+    };
+    init();
+  });
+}
+
+/* 저장 API에 보낼 ID 토큰. 만료(약 1시간)됐으면 Google에 조용히 재발급 요청 */
+async function getFreshToken() {
+  const s = state.session;
+  if (!s) throw new Error('로그인 필요');
+  if (s.credential && s.tokExp - Date.now() > 60e3) return s.credential;
+  await ensureGis();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { if (tokenWaiter) { tokenWaiter = null; reject(new Error('로그인 갱신 필요 — 로그아웃 후 다시 로그인해 주세요')); } }, 15000);
+    const done = fn => v => { clearTimeout(timer); fn(v); };
+    tokenWaiter = { resolve: done(resolve), reject: done(reject) };
+    google.accounts.id.prompt(n => { if (n.isNotDisplayed && n.isNotDisplayed() || n.isSkippedMoment && n.isSkippedMoment()) { if (tokenWaiter) { tokenWaiter.reject(new Error('로그인 갱신 필요 — 로그아웃 후 다시 로그인해 주세요')); tokenWaiter = null; } } });
+  });
 }
 
 function renderUser(s) {
@@ -519,11 +663,13 @@ function logout() {
 }
 
 function enterApp(session) {
+  state.session = session;
   document.body.classList.add('authed');
   $gate.hidden = true;
   if (session) renderUser(session);
+  loadRatingsCache();
   render();
-  loadData();
+  loadData().then(loadRatings);
 }
 
 function showGate() {
@@ -531,13 +677,10 @@ function showGate() {
   $gate.hidden = false;
   const btn = $gate.querySelector('.gate__btn');
   let tries = 0;
-  const init = () => {
-    if (!window.google || !google.accounts) { if (tries++ < 50) return setTimeout(init, 200); gateMessage('Google 로그인 스크립트를 불러오지 못했습니다. 네트워크를 확인해 주세요.', true); return; }
-    google.accounts.id.initialize({ client_id: CONFIG.AUTH.CLIENT_ID, callback: onCredential, auto_select: true, ux_mode: 'popup', itp_support: true });
+  ensureGis().then(() => {
     google.accounts.id.renderButton(btn, { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', width: 280, locale: 'ko' });
     google.accounts.id.prompt();
-  };
-  init();
+  }).catch(() => gateMessage('Google 로그인 스크립트를 불러오지 못했습니다. 네트워크를 확인해 주세요.', true));
 }
 
 /* ---------- 시작 ---------- */
