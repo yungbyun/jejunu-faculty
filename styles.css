@@ -84,7 +84,38 @@ main{min-height:60vh;padding:40px 20px 72px}
 .crumbs a:hover{background:var(--surface-2);color:var(--ink)}
 .crumbs .sep{opacity:.6}
 
-/* ---------- department cards ---------- */
+/* ---------- home: editorial department list (시안 C) ---------- */
+.home{max-width:960px}
+.home .hero{margin:16px 0 40px}
+.home .hero h1{font-size:44px;letter-spacing:-1.2px;line-height:1.1}
+.home .hero p{font-size:var(--fs-m)}
+.dept-list{border-top:1px solid var(--line)}
+.drow{display:grid;grid-template-columns:76px 1fr auto 40px;align-items:center;gap:26px;padding:28px 12px;margin:0 -12px;border-bottom:1px solid var(--line);border-radius:14px;transition:background .18s var(--ease),transform .18s var(--ease)}
+.drow:hover{background:var(--surface);transform:translateX(2px)}
+.drow:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent)}
+.drow__num{font-size:36px;font-weight:800;color:var(--dept-color);letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1}
+.drow__num small{font-size:12px;color:var(--ink-3);font-weight:600;margin-left:3px;letter-spacing:0}
+.drow__name{font-size:23px;font-weight:800;letter-spacing:-.5px;margin:0;line-height:1.2}
+.drow__en{font-size:var(--fs-s);color:var(--ink-3);margin:3px 0 10px}
+.drow__tags{display:flex;flex-wrap:wrap;gap:6px}
+.drow__tags .tag{background:var(--surface);border-color:var(--line-2)}
+.drow__avs{display:flex}
+.av{width:40px;height:40px;border-radius:50%;margin-left:-11px;border:2px solid var(--bg);display:grid;place-items:center;overflow:hidden;font-style:normal;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--dept-color),color-mix(in srgb,var(--dept-color) 60%,#000));box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .18s var(--ease)}
+.av:first-child{margin-left:0}
+.av img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
+.av--more{background:var(--surface-2);color:var(--ink-2);font-size:12px}
+.drow:hover .av{border-color:var(--surface)}
+.drow__arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;color:var(--ink-2);transition:all .18s var(--ease)}
+.drow:hover .drow__arrow{background:var(--ink);color:var(--bg);border-color:var(--ink);transform:translateX(3px)}
+@media (max-width:720px){
+  .home .hero h1{font-size:32px}
+  .drow{grid-template-columns:52px 1fr;gap:14px;padding:20px 8px;margin:0 -8px}
+  .drow__num{font-size:28px}
+  .drow__name{font-size:19px}
+  .drow__avs,.drow__arrow{display:none}
+}
+
+/* ---------- department cards (unused after 시안 C, kept for search results) ---------- */
 .dept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
 .dept{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px 26px 22px;box-shadow:var(--shadow);transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s;overflow:hidden;display:flex;flex-direction:column;gap:14px;min-height:210px}
 .dept::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--dept-color,var(--accent))}

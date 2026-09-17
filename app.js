@@ -209,22 +209,29 @@ function renderHome() {
   if (q) return renderSearch(q);
   const total = state.rows.length;
   $app.innerHTML = `
-    <div class="view">
+    <div class="view home">
       <div class="hero">
-        <div class="eyebrow">Jeju National University</div>
-        <h1>학과를 선택하세요</h1>
-        <p>${state.depts.length}개 학과 · 전임교원 ${total}명. 학과를 누르면 교수진과 세부 연구 분야를 볼 수 있습니다.</p>
+        <div class="eyebrow">Jeju National University · College of Engineering</div>
+        <h1>교수진 안내</h1>
+        <p>${state.depts.length}개 학과 · 전임교원 ${total}명. 학과를 선택하면 교수진과 세부 연구 분야를 볼 수 있습니다.</p>
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
-      <div class="dept-grid">
+      <div class="dept-list">
         ${state.depts.map(d => `
-          <a class="dept" href="#/dept/${encodeURIComponent(d.id)}" style="--dept-color:${esc(d.color)}">
-            <div class="dept__head">
-              <div><h2 class="dept__name">${esc(d.name)}</h2><div class="dept__en">${esc(d.en || '')}</div></div>
-              <div class="dept__count">${d.profs.length}<small>명</small></div>
+          <a class="drow" href="#/dept/${encodeURIComponent(d.id)}" style="--dept-color:${esc(d.color)}">
+            <div class="drow__num">${d.profs.length}<small>명</small></div>
+            <div class="drow__main">
+              <h2 class="drow__name">${esc(d.name)}</h2>
+              <div class="drow__en">${esc(d.en || '')}${d.url ? ` · ${esc(d.url.replace(/^https?:\/\//, ''))}` : ''}</div>
+              <div class="drow__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
             </div>
-            <div class="dept__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
-            <span class="dept__arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="drow__avs" aria-hidden="true">
+              ${d.profs.slice(0, 7).map(p => p.photo
+                ? `<i class="av"><img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${esc(initial(p.name))}'"></i>`
+                : `<i class="av">${esc(initial(p.name))}</i>`).join('')}
+              ${d.profs.length > 7 ? `<i class="av av--more">+${d.profs.length - 7}</i>` : ''}
+            </div>
+            <span class="drow__arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </a>`).join('')}
       </div>
     </div>`;
