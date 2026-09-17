@@ -210,6 +210,7 @@ async function refreshNow() {
     const rows = await fetchSheet();
     apply(rows, 'sheet');
     try { localStorage.setItem('jnu-faculty-cache', JSON.stringify({ t: Date.now(), rows })); } catch {}
+    loadRatings(); // 선호도도 시트에서 다시 읽어 합침
     flashStatus(`새로 고침 완료 · ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`);
   } catch (e) {
     if (state.rows.length) { setStatus(state.source === 'sheet' ? 'sheet' : 'fallback'); flashStatus('시트를 읽지 못했습니다 — 공개 설정을 확인하세요', true); }
@@ -567,6 +568,16 @@ function loadRatingsCache() {
   try {
     const m = JSON.parse(localStorage.getItem(ratingsCacheKey()) || '{}');
     state.ratings = new Map(Object.entries(m));
+    // 로그인 기능이 켜지기 전(계정 구분 없이) 이 기기에 저장된 선호도가 있으면 현재 계정으로 합친다
+    if (state.session) {
+      const legacy = JSON.parse(localStorage.getItem('jnu-ratings:local') || 'null');
+      if (legacy && typeof legacy === 'object') {
+        let n = 0;
+        for (const [k, v] of Object.entries(legacy)) if (!state.ratings.has(k)) { state.ratings.set(k, v); n++; }
+        localStorage.removeItem('jnu-ratings:local');
+        if (n) saveRatingsCache();
+      }
+    }
   } catch { state.ratings = new Map(); }
 }
 function saveRatingsCache() {
