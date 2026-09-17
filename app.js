@@ -204,6 +204,14 @@ async function refreshNow() {
 }
 refreshBtn.addEventListener('click', refreshNow);
 
+/* 좌상단 로고(J) 클릭: 첫 화면으로 돌아가면서 시트에서 데이터 새로 고침 */
+document.querySelector('.brand').addEventListener('click', e => {
+  e.preventDefault();
+  $q.value = ''; state.query = ''; state.rankFilter = '전체';
+  if (location.hash && location.hash !== '#/') location.hash = '#/'; else render();
+  refreshNow();
+});
+
 let flashTimer;
 function flashStatus(msg, warn = false) {
   clearTimeout(flashTimer);
