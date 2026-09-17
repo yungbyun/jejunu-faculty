@@ -18,6 +18,17 @@ const CONFIG = {
   // 리포지토리에 저장된 사진 목록(data/photos/manifest.json). 있으면 시트의 photo URL보다 우선 사용
   PHOTO_MANIFEST: 'data/photos/manifest.json',
   PHOTO_DIR: 'data/photos/',
+  // ---- Google 로그인 (비워 두면 로그인 없이 동작) ----
+  AUTH: {
+    // Google Cloud 콘솔 > API 및 서비스 > 사용자 인증 정보 > OAuth 클라이언트 ID(웹 애플리케이션)
+    CLIENT_ID: '626785532501-v1u8fi2n26sgti0ir43stlm9vnnj6ru9.apps.googleusercontent.com',
+    // 허용할 이메일(정확히 일치) — 예: ['yungcheolbyun@gmail.com']
+    ALLOWED_EMAILS: ['yungcheolbyun@gmail.com'],
+    // 허용할 도메인 — 예: ['jejunu.ac.kr'] (이 도메인 메일은 모두 통과). 둘 다 비우면 구글 로그인만 하면 통과
+    ALLOWED_DOMAINS: ['jejunu.ac.kr'],
+    // 로그인 유지 시간(시간)
+    SESSION_HOURS: 24 * 7,
+  },
 };
 
 /* ---------- 상태 ---------- */
@@ -441,7 +452,99 @@ themeBtn.addEventListener('click', () => {
   try { localStorage.setItem('jnu-theme', next); } catch {}
 });
 
+/* ---------- Google 로그인 ---------- */
+const AUTH_KEY = 'jnu-auth';
+const $gate = document.getElementById('gate');
+const $user = document.getElementById('userBox');
+
+function authEnabled() { return !!(CONFIG.AUTH && CONFIG.AUTH.CLIENT_ID); }
+
+function decodeJwt(token) {
+  try {
+    let b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    b += '='.repeat((4 - b.length % 4) % 4);
+    return JSON.parse(decodeURIComponent(atob(b).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')));
+  } catch { return null; }
+}
+
+function isAllowed(email) {
+  const e = String(email || '').toLowerCase();
+  const { ALLOWED_EMAILS = [], ALLOWED_DOMAINS = [] } = CONFIG.AUTH;
+  if (!ALLOWED_EMAILS.length && !ALLOWED_DOMAINS.length) return true;
+  if (ALLOWED_EMAILS.map(x => x.toLowerCase()).includes(e)) return true;
+  const dom = e.split('@')[1] || '';
+  return ALLOWED_DOMAINS.some(d => dom === d.toLowerCase() || dom.endsWith('.' + d.toLowerCase()));
+}
+
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    if (s && s.exp > Date.now() && s.aud === CONFIG.AUTH.CLIENT_ID && isAllowed(s.email)) return s;
+  } catch {}
+  return null;
+}
+
+function saveSession(p) {
+  const s = { email: p.email, name: p.name || '', picture: p.picture || '', aud: p.aud, exp: Date.now() + CONFIG.AUTH.SESSION_HOURS * 3600e3 };
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(s)); } catch {}
+  return s;
+}
+
+function gateMessage(msg, warn = false) {
+  const el = $gate.querySelector('.gate__msg');
+  el.textContent = msg; el.classList.toggle('warn', warn);
+}
+
+function onCredential(resp) {
+  const p = decodeJwt(resp.credential);
+  if (!p || p.aud !== CONFIG.AUTH.CLIENT_ID || !p.email_verified) { gateMessage('로그인 정보를 확인할 수 없습니다. 다시 시도해 주세요.', true); return; }
+  if (!isAllowed(p.email)) { gateMessage(`${p.email} 계정은 접근이 허용되지 않았습니다.`, true); return; }
+  enterApp(saveSession(p));
+}
+
+function renderUser(s) {
+  if (!$user) return;
+  $user.hidden = false;
+  $user.innerHTML = `
+    ${s.picture ? `<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="user__initial">${esc(initial(s.name || s.email))}</span>`}
+    <span class="user__email">${esc(s.email)}</span>
+    <button type="button" class="user__out" id="logoutBtn">로그아웃</button>`;
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+}
+
+function logout() {
+  try { localStorage.removeItem(AUTH_KEY); } catch {}
+  try { google.accounts.id.disableAutoSelect(); } catch {}
+  location.reload();
+}
+
+function enterApp(session) {
+  document.body.classList.add('authed');
+  $gate.hidden = true;
+  if (session) renderUser(session);
+  render();
+  loadData();
+}
+
+function showGate() {
+  document.body.classList.remove('authed');
+  $gate.hidden = false;
+  const btn = $gate.querySelector('.gate__btn');
+  let tries = 0;
+  const init = () => {
+    if (!window.google || !google.accounts) { if (tries++ < 50) return setTimeout(init, 200); gateMessage('Google 로그인 스크립트를 불러오지 못했습니다. 네트워크를 확인해 주세요.', true); return; }
+    google.accounts.id.initialize({ client_id: CONFIG.AUTH.CLIENT_ID, callback: onCredential, auto_select: true, ux_mode: 'popup', itp_support: true });
+    google.accounts.id.renderButton(btn, { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', width: 280, locale: 'ko' });
+    google.accounts.id.prompt();
+  };
+  init();
+}
+
 /* ---------- 시작 ---------- */
 window.addEventListener('hashchange', () => { state.rankFilter = '전체'; render(); });
-render();
-loadData();
+if (!authEnabled()) {
+  enterApp(null);
+} else {
+  const s = loadSession();
+  s ? enterApp(s) : showGate();
+}

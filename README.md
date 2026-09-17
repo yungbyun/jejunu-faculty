@@ -42,6 +42,25 @@ data/photos/          리포지토리에 저장한 교수 사진 (<dept_id>/<영
 
 앱은 30분 동안 브라우저에 데이터를 캐시합니다. 시트를 고친 뒤 즉시 확인하려면 주소 뒤에 `?nocache=1`을 붙여 여세요.
 
+## Google 로그인 (선택)
+
+`app.js`의 `CONFIG.AUTH.CLIENT_ID`에 OAuth 클라이언트 ID를 넣으면 첫 화면에 Google 로그인 게이트가 생깁니다. 비워 두면 로그인 없이 동작합니다.
+
+1. [Google Cloud 콘솔](https://console.cloud.google.com/) → 프로젝트 선택(또는 새로 만들기)
+2. **API 및 서비스 → OAuth 동의 화면**: 사용자 유형 *외부*, 앱 이름·지원 이메일 입력 후 저장. (테스트 상태로 두면 *테스트 사용자*에 등록한 계정만 로그인 가능하니, 여러 사람이 쓰려면 **앱 게시**를 누릅니다.)
+3. **API 및 서비스 → 사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID**
+   - 애플리케이션 유형: *웹 애플리케이션*
+   - 승인된 JavaScript 원본: `https://yungbyun.github.io` (로컬 테스트용으로 `http://localhost:8080` 추가 가능)
+   - 리디렉션 URI는 비워 둠
+4. 만들어진 **클라이언트 ID**(`xxxx.apps.googleusercontent.com`)를 `app.js`의 `CONFIG.AUTH.CLIENT_ID`에 붙여 넣습니다.
+5. 허용 범위를 정합니다.
+   - `ALLOWED_DOMAINS: ['jejunu.ac.kr']` → 해당 도메인 메일은 모두 통과
+   - `ALLOWED_EMAILS: ['someone@gmail.com']` → 특정 계정만 추가 허용
+   - 둘 다 비우면 Google 로그인만 하면 누구나 통과
+6. 로그인 상태는 브라우저에 `SESSION_HOURS`(기본 7일) 동안 유지되며, 우측 상단 **로그아웃**으로 해제합니다.
+
+> 정적 사이트이므로 이 로그인은 *화면 접근*만 막습니다. 데이터(Google 시트, `data/` 폴더)는 URL을 알면 여전히 내려받을 수 있으니, 데이터 자체를 보호해야 하면 백엔드가 필요합니다.
+
 ## GitHub Pages 배포
 
 1. GitHub에서 `jejunu-faculty` 리포지토리를 만들고 이 폴더를 push
