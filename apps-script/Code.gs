@@ -5,14 +5,15 @@
  *       배포 → 새 배포 → 유형 "웹 앱" → 실행 사용자 "나", 액세스 권한 "모든 사용자" → 배포
  *       나온 웹 앱 URL(…/exec)을 app.js 의 CONFIG.RATINGS.API_URL 에 넣습니다.
  *
- * 시트에 'ratings' 탭이 없으면 자동으로 만듭니다. (열: email, dept_id, slug, name, rating, updated_at)
+ * 시트에 'ratings' 탭이 없으면 자동으로 만듭니다. (열: email, dept_id, slug, name, rating, updated_at, met, memo)
+ * 예전 6열 시트에는 met, memo 열을 자동으로 덧붙입니다.
  * 요청마다 Google ID 토큰을 검증하므로, 로그인한 본인의 행만 읽고 쓸 수 있습니다.
  */
 
 // app.js 의 CONFIG.AUTH.CLIENT_ID 와 같은 값
 const CLIENT_ID = '626785532501-v1u8fi2n26sgti0ir43stlm9vnnj6ru9.apps.googleusercontent.com';
 const SHEET_NAME = 'ratings';
-const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at'];
+const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
 // 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(비해당 — 연구년 등으로 평가 제외)
 const RATINGS = ['확', '중', '모', '부', '비'];
 // 예전 값(상/하)이 시트에 남아 있어도 새 값으로 읽습니다
@@ -31,11 +32,13 @@ function doPost(e) {
 
   if (body.action === 'list') return out({ email, ratings: listRatings(email) });
   if (body.action === 'set') {
-    const raw = String(body.rating || '');
-    const rating = norm(raw);
-    if (raw && !rating) return out({ error: 'bad rating' });
     if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
-    upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), rating);
+    // 보낸 필드만 바꿉니다: rating(선호도) / met(만남 횟수) / memo(메모)
+    const fields = {};
+    if (body.rating !== undefined) { const raw = String(body.rating || ''); const rating = norm(raw); if (raw && !rating) return out({ error: 'bad rating' }); fields.rating = rating; }
+    if (body.met !== undefined) fields.met = Math.max(0, Math.min(999, Math.round(Number(body.met) || 0)));
+    if (body.memo !== undefined) fields.memo = String(body.memo == null ? '' : body.memo).slice(0, 2000);
+    upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), fields);
     return out({ ok: true });
   }
   return out({ error: 'bad action' });
@@ -61,6 +64,9 @@ function sheet() {
     sh = ss.insertSheet(SHEET_NAME);
     sh.appendRow(HEADER);
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < HEADER.length) { // 예전 시트: 빠진 열(met, memo) 머리글 추가
+    const have = sh.getLastColumn();
+    sh.getRange(1, have + 1, 1, HEADER.length - have).setValues([HEADER.slice(have)]);
   }
   return sh;
 }
@@ -71,29 +77,35 @@ function listRatings(email) {
   if (last < 2) return [];
   const rows = sh.getRange(2, 1, last - 1, HEADER.length).getValues();
   return rows
-    .filter(r => String(r[0]).toLowerCase() === email && norm(r[4]))
-    .map(r => ({ dept_id: String(r[1]), slug: String(r[2]), name: String(r[3]), rating: norm(r[4]), updated_at: r[5] ? new Date(r[5]).toISOString() : '' }));
+    .filter(r => String(r[0]).toLowerCase() === email && (norm(r[4]) || Number(r[6]) > 0 || String(r[7] || '')))
+    .map(r => ({ dept_id: String(r[1]), slug: String(r[2]), name: String(r[3]), rating: norm(r[4]), updated_at: r[5] ? new Date(r[5]).toISOString() : '', met: Number(r[6]) || 0, memo: String(r[7] == null ? '' : r[7]) }));
 }
 
-function upsert(email, deptId, slug, name, rating) {
+function upsert(email, deptId, slug, name, fields) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     const sh = sheet();
     const last = sh.getLastRow();
     const now = new Date();
+    const merge = cur => ({
+      rating: fields.rating !== undefined ? fields.rating : norm(cur[4]),
+      met: fields.met !== undefined ? fields.met : (Number(cur[6]) || 0),
+      memo: fields.memo !== undefined ? fields.memo : String(cur[7] == null ? '' : cur[7]),
+    });
     if (last >= 2) {
-      const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+      const rows = sh.getRange(2, 1, last - 1, HEADER.length).getValues();
       for (let i = 0; i < rows.length; i++) {
         if (String(rows[i][0]).toLowerCase() === email && String(rows[i][1]) === deptId && String(rows[i][2]) === slug) {
-          const rowIdx = i + 2;
-          if (rating) sh.getRange(rowIdx, 4, 1, 3).setValues([[name, rating, now]]);
-          else sh.deleteRow(rowIdx);
+          const rowIdx = i + 2, m = merge(rows[i]);
+          if (m.rating || m.met || m.memo) sh.getRange(rowIdx, 4, 1, 5).setValues([[name, m.rating, now, m.met, m.memo]]);
+          else sh.deleteRow(rowIdx); // 아무 기록도 안 남으면 행 삭제
           return;
         }
       }
     }
-    if (rating) sh.appendRow([email, deptId, slug, name, rating, now]);
+    const m = merge([]);
+    if (m.rating || m.met || m.memo) sh.appendRow([email, deptId, slug, name, m.rating, now, m.met, m.memo]);
   } finally {
     lock.releaseLock();
   }

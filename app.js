@@ -43,7 +43,7 @@ const CONFIG = {
 };
 
 /* ---------- 상태 ---------- */
-const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), session: null };
+const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), notes: new Map(), session: null };
 const $app = document.getElementById('app');
 const $status = document.getElementById('dataStatus');
 const $q = document.getElementById('q');
@@ -270,6 +270,7 @@ function route() {
 
 function render() {
   const r = route();
+  document.body.classList.toggle('is-home', r.view === 'home' && !state.query.trim()); // 첫 화면에서는 새로고침 아이콘 숨김(J 로고가 대신함)
   if (!state.rows.length && state.source !== 'error') { renderSkeleton(r); return; }
   if (r.view === 'dept') {
     const d = state.depts.find(x => x.id === r.dept);
@@ -433,9 +434,9 @@ function renderStats() {
 
 function exportCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const head = ['학과', '이름', '영문명', '직급', '연구실', '전공 키워드', '선호도', '뜻', '점수'];
+  const head = ['학과', '이름', '영문명', '직급', '연구실', '전공 키워드', '선호도', '뜻', '점수', '만남 횟수', '메모'];
   const lines = [head.map(q).join(',')];
-  state.rows.forEach(p => { const r = getRating(p); lines.push([p.dept_name, p.name, p.name_en, p.rank, p.office, p.tags.join('; '), r || '', r ? CONFIG.RATINGS.NAMES[r] || '' : '', SCORE[r] != null ? SCORE[r] : ''].map(q).join(',')); });
+  state.rows.forEach(p => { const r = getRating(p); lines.push([p.dept_name, p.name, p.name_en, p.rank, p.office, p.tags.join('; '), r || '', r ? CONFIG.RATINGS.NAMES[r] || '' : '', SCORE[r] != null ? SCORE[r] : '', getMet(p) || '', getMemo(p)].map(q).join(',')); });
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -470,7 +471,6 @@ function renderHome() {
             <div class="drow__num">${d.profs.length}<small>명</small></div>
             <div class="drow__main">
               <h2 class="drow__name">${esc(d.name)}</h2>
-              ${d.url ? `<div class="drow__en">${esc(d.url.replace(/^https?:\/\//, ''))}</div>` : ''}
               <div class="drow__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
               ${ratingSummary(d)}
             </div>
@@ -546,6 +546,7 @@ function profCard(p, d, showDept = false) {
         <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
         <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+        <div class="prof__note">${noteBadge(entryOf(rKey(p)))}</div>
         ${p.office ? `<div class="prof__office"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</div>` : ''}
       </div>
     </div>`;
@@ -553,6 +554,8 @@ function profCard(p, d, showDept = false) {
 
 /* ---------- 선호도 ---------- */
 const rKey = p => `${p.dept_id}/${p.slug}`;
+/* 카드에 붙는 작은 표시: 만남 N회 · 메모 있음 */
+const noteBadge = e => (e.met ? `<span class="nb nb--met" title="만난 횟수">만남 ${e.met}회</span>` : '') + (e.memo ? `<span class="nb nb--memo" title="${esc(e.memo)}">메모</span>` : '');
 const getRating = p => state.ratings.get(rKey(p)) || '';
 const matchRating = p => state.ratingFilter === '전체' || (state.ratingFilter === '미지정' ? !getRating(p) : getRating(p) === state.ratingFilter);
 const countRating = (d, r) => r === '전체' ? d.profs.length : d.profs.filter(p => r === '미지정' ? !getRating(p) : getRating(p) === r).length;
@@ -583,7 +586,50 @@ function bindRates(root) {
 }
 const getRatingByKey = k => state.ratings.get(k) || '';
 
+/* 만남 횟수 −/+ */
+function meetCounter(p) {
+  const n = getMet(p);
+  return `<div class="counter ${n ? '' : 'counter--zero'}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 만난 횟수">
+    <button type="button" class="counter__b" data-dec aria-label="1회 줄이기">−</button>
+    <span class="counter__n" aria-live="polite">${n}</span><span class="counter__u">회</span>
+    <button type="button" class="counter__b" data-inc aria-label="1회 늘리기">+</button>
+  </div>`;
+}
+function bindNotes(root) {
+  root.querySelectorAll('.counter').forEach(c => c.addEventListener('click', e => {
+    const b = e.target.closest('.counter__b'); if (!b) return;
+    e.stopPropagation(); e.preventDefault();
+    const key = c.dataset.key, cur = getNote(key).met || 0;
+    setMet(key, cur + (b.hasAttribute('data-inc') ? 1 : -1));
+  }));
+  root.querySelectorAll('textarea.memo').forEach(t => {
+    t.addEventListener('input', () => { scheduleMemo(t.dataset.key, t.value); const st = t.parentElement.querySelector('.memo__st'); if (st) st.textContent = '입력 중…'; });
+    t.addEventListener('blur', () => commitMemo(t.dataset.key, t.value));
+  });
+}
+
 function ratingsCacheKey() { return 'jnu-ratings:' + (state.session ? state.session.email : 'local'); }
+function notesCacheKey() { return 'jnu-notes:' + (state.session ? state.session.email : 'local'); }
+
+/* 교수별 개인 기록: 선호도(state.ratings) + 만남 횟수·메모(state.notes) */
+const getNote = key => state.notes.get(key) || { met: 0, memo: '' };
+const getMet = p => getNote(rKey(p)).met || 0;
+const getMemo = p => getNote(rKey(p)).memo || '';
+const normMet = v => Math.max(0, Math.min(999, Math.round(Number(v) || 0)));
+const normMemo = v => String(v == null ? '' : v).slice(0, 2000);
+/* 한 교수의 로컬 기록 전체 {rating, met, memo} */
+const entryOf = key => ({ rating: state.ratings.get(key) || '', ...getNote(key) });
+const entryEmpty = e => !e.rating && !e.met && !e.memo;
+const entryEq = (a, b) => a.rating === b.rating && (a.met || 0) === (b.met || 0) && (a.memo || '') === (b.memo || '');
+function applyEntry(key, e) {
+  if (e.rating !== undefined) { if (e.rating) state.ratings.set(key, e.rating); else state.ratings.delete(key); }
+  if (e.met !== undefined || e.memo !== undefined) {
+    const n = { ...getNote(key) };
+    if (e.met !== undefined) n.met = normMet(e.met);
+    if (e.memo !== undefined) n.memo = normMemo(e.memo);
+    if (!n.met && !n.memo) state.notes.delete(key); else state.notes.set(key, n);
+  }
+}
 
 function loadRatingsCache() {
   try {
@@ -600,18 +646,29 @@ function loadRatingsCache() {
       }
     }
   } catch { state.ratings = new Map(); }
+  try {
+    const m = JSON.parse(localStorage.getItem(notesCacheKey()) || '{}');
+    state.notes = new Map(Object.entries(m).map(([k, v]) => [k, { met: normMet(v && v.met), memo: normMemo(v && v.memo) }]).filter(([, v]) => v.met || v.memo));
+  } catch { state.notes = new Map(); }
 }
 function saveRatingsCache() {
   try { localStorage.setItem(ratingsCacheKey(), JSON.stringify(Object.fromEntries(state.ratings))); } catch {}
+  try { localStorage.setItem(notesCacheKey(), JSON.stringify(Object.fromEntries(state.notes))); } catch {}
 }
 
 /* ---------- 여러 기기 동기화 ----------
  * 시트(서버)가 기준입니다. 처음 들어올 때, 화면이 다시 보일 때(탭 전환·잠금 해제), 창에 포커스가 올 때,
  * 그리고 화면이 보이는 동안 SYNC_SEC 마다 시트를 다시 읽어 다른 기기에서 바꾼 값을 반영합니다.
- * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다. */
+ * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다.
+ * 저장 단위는 교수 1명의 일부 필드({rating}, {met}, {memo} 또는 그 조합)입니다. */
 const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, timer: null, last: 0, savedAt: 0 };
 const dirtyKey = () => 'jnu-ratings-dirty:' + (state.session ? state.session.email : 'local');
-function loadDirty() { try { sync.dirty = new Map(Object.entries(JSON.parse(localStorage.getItem(dirtyKey()) || '{}'))); } catch { sync.dirty = new Map(); } }
+function loadDirty() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(dirtyKey()) || '{}');
+    sync.dirty = new Map(Object.entries(raw).map(([k, v]) => [k, typeof v === 'object' && v ? v : { rating: normRating(v) }])); // 예전 형식(문자열)도 읽음
+  } catch { sync.dirty = new Map(); }
+}
 function saveDirty() { try { if (sync.dirty.size) localStorage.setItem(dirtyKey(), JSON.stringify(Object.fromEntries(sync.dirty))); else localStorage.removeItem(dirtyKey()); } catch {} }
 
 async function loadRatings() {
@@ -625,12 +682,13 @@ function startSyncLoop() {
   if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
   const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
   sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); } }, sec * 1000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); } else flushMemo(); });
   window.addEventListener('focus', () => syncRatings());
   window.addEventListener('online', () => syncRatings());
   window.addEventListener('pageshow', e => { if (e.persisted) syncRatings(); });
+  window.addEventListener('pagehide', flushMemo);
   // 같은 기기의 다른 탭에서 바꾼 값도 바로 반영
-  window.addEventListener('storage', e => { if (e.key === ratingsCacheKey()) { loadRatingsCache(); render(); } });
+  window.addEventListener('storage', e => { if (e.key === ratingsCacheKey() || e.key === notesCacheKey()) { loadRatingsCache(); render(); } });
 }
 
 async function syncRatings({ initial = false } = {}) {
@@ -640,90 +698,112 @@ async function syncRatings({ initial = false } = {}) {
   sync.running = true;
   try {
     // 1) 저장에 실패했던 항목 먼저 다시 올림
-    for (const [key, val] of [...sync.dirty]) {
-      if (await pushRating(key, val)) { sync.dirty.delete(key); saveDirty(); }
+    for (const [key, fields] of [...sync.dirty]) {
+      if (await pushEntry(key, fields)) { sync.dirty.delete(key); saveDirty(); }
     }
     updateSaveBar();
-    // 2) 시트에서 내 선호도 전체를 읽음
+    // 2) 시트에서 내 기록 전체를 읽음
     const r = await ratingsApi('list', {});
     if (!r || !Array.isArray(r.ratings)) throw new Error((r && r.error) || '응답 오류');
     const server = new Map();
-    r.ratings.forEach(x => { const v = normRating(x.rating); if (v) server.set(`${x.dept_id}/${x.slug}`, v); });
-    // 3) 이 기기에만 있는 값(시트 연동 전에 찍은 것 등)은 시트로 올림
-    const localOnly = [...state.ratings].filter(([k]) => !server.has(k) && !sync.pending.has(k) && !sync.dirty.has(k));
+    r.ratings.forEach(x => { const e = { rating: normRating(x.rating), met: normMet(x.met), memo: normMemo(x.memo) }; if (!entryEmpty(e)) server.set(`${x.dept_id}/${x.slug}`, e); });
+    const locked = k => sync.pending.has(k) || sync.dirty.has(k) || sync.queue.has(k);
+    // 3) 이 기기에만 있는 기록(시트 연동 전에 적은 것 등)은 시트로 올림
+    const keys = new Set([...state.ratings.keys(), ...state.notes.keys()]);
+    const localOnly = [...keys].filter(k => !server.has(k) && !locked(k)).map(k => [k, entryOf(k)]);
     // 4) 서버 값을 기준으로 화면 갱신 (저장 중/실패한 항목은 로컬 값 유지)
     const changed = [];
-    for (const [k, v] of server) if (!sync.pending.has(k) && !sync.dirty.has(k) && state.ratings.get(k) !== v) { state.ratings.set(k, v); changed.push([k, v]); }
-    for (const [k] of [...state.ratings]) if (!server.has(k) && !sync.pending.has(k) && !sync.dirty.has(k) && !localOnly.some(([lk]) => lk === k)) { state.ratings.delete(k); changed.push([k, '']); }
+    for (const [k, e] of server) if (!locked(k) && !entryEq(entryOf(k), e)) { applyEntry(k, e); changed.push(k); }
+    for (const k of keys) if (!server.has(k) && !locked(k) && !localOnly.some(([lk]) => lk === k)) { applyEntry(k, { rating: '', met: 0, memo: '' }); changed.push(k); }
     saveRatingsCache();
     sync.last = Date.now();
     if (initial) render();
-    else if (changed.length) { if (route().view === 'dept') changed.forEach(([k, v]) => refreshRatingUI(k, v)); else render(); flashStatus(`다른 기기의 선호도 ${changed.length}건을 반영했습니다`); }
+    else if (changed.length) { if (route().view === 'dept') changed.forEach(k => refreshRatingUI(k, state.ratings.get(k) || '')); else render(); flashStatus(`다른 기기의 기록 ${changed.length}건을 반영했습니다`); }
     let n = 0;
-    for (const [key, val] of localOnly) if (await pushRating(key, val)) n++;
-    if (n) { saveRatingsCache(); flashStatus(`이 기기의 선호도 ${n}건을 시트로 동기화했습니다`); }
+    for (const [key, e] of localOnly) if (await pushEntry(key, e)) n++;
+    if (n) { saveRatingsCache(); flashStatus(`이 기기의 기록 ${n}건을 시트로 동기화했습니다`); }
   } catch (e) {
-    console.warn('선호도 동기화 실패:', e.message);
+    console.warn('동기화 실패:', e.message);
     if (initial) flashStatus('선호도 동기화 실패 — 시트 연결을 확인하세요', true);
   } finally { sync.running = false; }
 }
 
-/* 한 건을 시트에 저장. 성공하면 true (재시도 없음 — 호출 쪽에서 처리) */
-async function pushRating(key, val) {
+/* 한 교수의 일부 필드를 시트에 저장. 성공하면 true (재시도 없음 — 호출 쪽에서 처리) */
+async function pushEntry(key, fields) {
   const [dept_id, slug] = key.split('/');
   const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
   if (!p) return true; // 목록에 없는 교수(삭제됨)면 건너뜀
-  sync.pending.set(key, val);
+  sync.pending.set(key, fields);
   try {
-    const r = await ratingsApi('set', { dept_id, slug, name: p.name, rating: val });
+    const r = await ratingsApi('set', { dept_id, slug, name: p.name, ...fields });
     if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
     sync.savedAt = Date.now();
     return true;
   } catch (e) {
-    console.warn('선호도 저장 실패:', key, e.message);
+    console.warn('저장 실패:', key, e.message);
     sync.lastError = e.message;
     return false;
-  } finally { if (sync.pending.get(key) === val) sync.pending.delete(key); }
+  } finally { if (sync.pending.get(key) === fields) sync.pending.delete(key); }
 }
 
-/* 칩을 누르면 화면은 즉시 바뀌고, 같은 순간에 시트로 저장을 보냅니다.
- * 같은 교수를 연달아 누르면 마지막 값만 순서대로 보내고(꼬임 방지), 실패하면 1초·3초·8초 뒤 다시 시도한 뒤
+/* 값을 바꾸면 화면은 즉시 바뀌고, 같은 순간에 시트로 저장을 보냅니다.
+ * 같은 교수를 연달아 바꾸면 바뀐 필드를 합쳐 순서대로 보내고(꼬임 방지), 실패하면 1초·3초·8초 뒤 다시 시도한 뒤
  * 그래도 안 되면 이 기기에 '미저장'으로 남겨 두었다가 연결·로그인이 회복되는 즉시 자동으로 올립니다. */
-async function setRating(key, val) {
-  if (val) state.ratings.set(key, val); else state.ratings.delete(key);
+async function saveEntry(key, fields) {
+  applyEntry(key, fields);
   saveRatingsCache();
-  refreshRatingUI(key, val);
+  refreshRatingUI(key, state.ratings.get(key) || '');
   if (!CONFIG.RATINGS.API_URL || !state.session) return;
-  sync.dirty.delete(key); saveDirty();
+  const d = sync.dirty.get(key);
+  if (d) { sync.dirty.delete(key); saveDirty(); fields = { ...d, ...fields }; } // 미저장분과 합쳐 보냄
   const q = sync.queue.get(key);
-  if (q) { q.next = val; return; } // 이미 보내는 중이면 끝난 뒤 마지막 값을 보냄
+  if (q) { q.next = { ...(q.next || {}), ...fields }; return; } // 이미 보내는 중이면 끝난 뒤 합쳐서 보냄
   sync.queue.set(key, { next: undefined });
   markSaving(key, 'saving'); updateSaveBar();
-  let cur = val;
+  let cur = fields;
   try {
     for (;;) {
       let ok = false;
       for (const wait of [0, 1000, 3000, 8000]) {
         if (wait) await new Promise(r => setTimeout(r, wait));
-        if (sync.queue.get(key).next !== undefined) break; // 새 값이 들어왔으면 그것부터
-        ok = await pushRating(key, cur);
+        if (sync.queue.get(key).next !== undefined) break; // 새 값이 들어왔으면 합쳐서 그것부터
+        ok = await pushEntry(key, cur);
         if (ok) break;
       }
       const nx = sync.queue.get(key).next;
-      if (nx !== undefined) { sync.queue.set(key, { next: undefined }); cur = nx; continue; }
-      if (!ok) { sync.dirty.set(key, cur); saveDirty(); markSaving(key, 'error'); flashStatus('선호도를 시트에 저장하지 못했습니다 — ' + (sync.lastError || '') + ' (연결되면 자동으로 다시 저장)', true); }
+      if (nx !== undefined) { sync.queue.set(key, { next: undefined }); cur = ok ? nx : { ...cur, ...nx }; continue; }
+      if (!ok) { sync.dirty.set(key, { ...(sync.dirty.get(key) || {}), ...cur }); saveDirty(); markSaving(key, 'error'); flashStatus('시트에 저장하지 못했습니다 — ' + (sync.lastError || '') + ' (연결되면 자동으로 다시 저장)', true); }
       else markSaving(key, 'saved');
       break;
     }
   } finally { sync.queue.delete(key); updateSaveBar(); }
 }
+const setRating = (key, val) => saveEntry(key, { rating: val });
+const setMet = (key, n) => saveEntry(key, { met: normMet(n) });
 
-/* 카드·드로어의 칩 묶음에 저장 상태 표시 (saving → saved/error) */
+/* 메모: 입력을 멈추고 0.8초 뒤 저장, 창을 닫거나 화면을 떠날 때는 즉시 저장 */
+const memoTimers = new Map();
+function scheduleMemo(key, text) {
+  clearTimeout(memoTimers.get(key));
+  memoTimers.set(key, setTimeout(() => { memoTimers.delete(key); commitMemo(key, text); }, 800));
+}
+function commitMemo(key, text) {
+  text = normMemo(text);
+  if (getNote(key).memo === text && !memoTimers.has(key)) return;
+  clearTimeout(memoTimers.get(key)); memoTimers.delete(key);
+  saveEntry(key, { memo: text });
+}
+function flushMemo() {
+  document.querySelectorAll('textarea.memo[data-key]').forEach(t => { if (memoTimers.has(t.dataset.key) || getNote(t.dataset.key).memo !== normMemo(t.value)) commitMemo(t.dataset.key, t.value); });
+}
+
+/* 카드·드로어의 칩 묶음·메모칸에 저장 상태 표시 (saving → saved/error) */
 function markSaving(key, st) {
-  document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"]`).forEach(g => {
+  document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"], .memo-box[data-key="${CSS.escape(key)}"], .counter[data-key="${CSS.escape(key)}"]`).forEach(g => {
     g.dataset.save = st;
     if (st === 'saved') setTimeout(() => { if (g.dataset.save === 'saved') delete g.dataset.save; }, 1500);
   });
+  document.querySelectorAll(`.memo-box[data-key="${CSS.escape(key)}"] .memo__st`).forEach(el => { el.textContent = st === 'saving' ? '저장 중…' : st === 'saved' ? '저장됨 ✓' : st === 'error' ? '미저장 — 연결되면 자동 저장' : ''; });
 }
 
 /* 하단 상태줄: 저장 중 / 저장됨 / 미저장 N건 */
@@ -742,7 +822,7 @@ function updateSaveBar() {
   }
   delete $saveBar.dataset.mode;
   if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = `시트에 저장 중… (${saving}건)`; $saveBar.hidden = false; }
-  else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 선호도 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
+  else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
   else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
   else $saveBar.hidden = true;
 }
@@ -757,6 +837,11 @@ async function keepTokenFresh() {
 /* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */
 function refreshRatingUI(key, val) {
   document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"] .rate__b`).forEach(b => b.setAttribute('aria-pressed', b.dataset.val === val));
+  const note = getNote(key);
+  document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"] .counter__n`).forEach(el => { el.textContent = note.met; });
+  document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"]`).forEach(el => el.classList.toggle('counter--zero', !note.met));
+  document.querySelectorAll(`textarea.memo[data-key="${CSS.escape(key)}"]`).forEach(t => { if (document.activeElement !== t && !memoTimers.has(key) && t.value !== note.memo) t.value = note.memo; });
+  document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"] .prof__note`).forEach(el => { el.innerHTML = noteBadge(entryOf(key)); });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
   const r = route();
   if (r.view === 'dept') {
@@ -804,9 +889,17 @@ function openDrawer(p, d) {
         <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}</div>
         <div>
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span>${rateChips(p, true)}</div>
+          <div class="d-meet"><span class="d-meet__lbl">만남</span>${meetCounter(p)}</div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+        </div>
+      </div>
+
+      <div class="d-section"><h3>메모</h3>
+        <div class="memo-box" data-key="${esc(rKey(p))}">
+          <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
+          <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>
 
@@ -826,6 +919,7 @@ function openDrawer(p, d) {
       ${links.length ? `<div class="d-section"><h3>바로가기</h3><div class="d-links">${links.map(l => `<a class="lnk ${l.primary ? 'primary' : ''}" href="${esc(l.href)}" ${l.href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(l.label)} ↗</a>`).join('')}</div></div>` : ''}
     </div>`;
   bindRates($panel);
+  bindNotes($panel);
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
   $panel.querySelector('[data-close]').focus();
@@ -833,6 +927,7 @@ function openDrawer(p, d) {
 
 function closeDrawer(navigate = true) {
   if ($drawer.hidden) return;
+  flushMemo(); // 쓰다 만 메모를 바로 저장
   $drawer.hidden = true;
   document.body.style.overflow = '';
   if (navigate) {
