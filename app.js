@@ -681,8 +681,9 @@ async function loadRatings() {
 function startSyncLoop() {
   if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
   const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
-  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); } }, sec * 1000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); } else flushMemo(); });
+  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); checkVersion(); } }, sec * 1000);
+  updateSaveBar(); checkVersion();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); checkVersion(); } else flushMemo(); });
   window.addEventListener('focus', () => syncRatings());
   window.addEventListener('online', () => syncRatings());
   window.addEventListener('pageshow', e => { if (e.persisted) syncRatings(); });
@@ -825,6 +826,22 @@ function updateSaveBar() {
   else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
   else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
   else $saveBar.hidden = true;
+}
+
+/* 새 버전이 배포됐는지 확인 (index.html의 로더가 붙인 ?v= 와 version.json 비교). 다르면 새로고침 안내 */
+const APP_V = (() => { try { const m = (document.currentScript && document.currentScript.src || '').match(/[?&]v=([^&]+)/); return m ? m[1] : ''; } catch { return ''; } })();
+async function checkVersion() {
+  if (!APP_V || document.visibilityState !== 'visible') return;
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.v && String(j.v) !== APP_V && $saveBar && !sync.queue.size && !sync.dirty.size) {
+      $saveBar.className = 'savebar savebar--busy'; $saveBar.dataset.mode = 'ver';
+      $saveBar.innerHTML = `새 버전이 있습니다 <button type="button" class="savebar__btn" id="reloadNew">새로고침</button>`; $saveBar.hidden = false;
+      $saveBar.querySelector('#reloadNew').addEventListener('click', () => { flushMemo(); setTimeout(() => location.reload(), 300); });
+    }
+  } catch {}
 }
 
 /* 토큰이 5분 안에 만료되면 화면이 보이는 동안 미리 조용히 갱신해 둔다 (저장 시점에 만료돼 실패하는 일 방지) */
