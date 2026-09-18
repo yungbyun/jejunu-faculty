@@ -335,6 +335,13 @@ function quizStart() {
   Object.assign(quiz, { deck: pool, i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0 });
 }
 const quizCur = () => quiz.deck[quiz.i];
+/* 다음 문제로. 답을 맞히지 않고 넘기면 그 문제는 점수 없이 지나간다 */
+function quizNext() {
+  speechStop();
+  quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask';
+  quiz.heard = ''; quiz.micErr = ''; quiz.gained = 0;
+  renderQuiz();
+}
 const quizMaxHints = p => 1 + p.name.length;              // 1: 학과, 그다음 한 글자씩
 const quizQScore = () => Math.max(QUIZ_MIN, QUIZ_BASE - quiz.hints * QUIZ_HINT - quiz.wrong * QUIZ_WRONG);
 const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
@@ -441,6 +448,36 @@ function speechStart() {
   renderQuiz();
 }
 
+/* 사진(카드)을 옆으로 미는 동작. 왼쪽으로 밀면 다음 문제, 세로로 움직이면 평소대로 화면이 스크롤된다 */
+let swipeGuard = false;
+function bindSwipe(card) {
+  if (!card) return;
+  const photo = card.querySelector('.qz-photo') || card;
+  let x0 = null, y0 = null, dir = 0;   // dir: 0 미정, 1 가로, 2 세로
+  const reset = () => { card.style.transition = 'transform .18s var(--ease)'; card.style.transform = ''; x0 = y0 = null; dir = 0; };
+  photo.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dir = 0;
+    card.style.transition = 'none';
+  }, { passive: true });
+  photo.addEventListener('touchmove', e => {
+    if (x0 === null) return;
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+    if (!dir && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) dir = Math.abs(dx) > Math.abs(dy) ? 1 : 2;
+    if (dir !== 1) return;
+    e.preventDefault();                                   // 가로로 밀 때만 스크롤을 막는다
+    card.style.transform = `translateX(${dx < 0 ? dx : dx * 0.25}px)`;
+  }, { passive: false });
+  photo.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = (e.changedTouches[0] || {}).clientX - x0;
+    const go = dir === 1 && dx < -60;
+    reset();
+    if (go) { swipeGuard = true; setTimeout(() => { swipeGuard = false; }, 500); quizNext(); }
+  });
+  photo.addEventListener('touchcancel', reset);
+}
+
 function renderQuiz() {
   if (!state.rows.length) return;
   const pool = quizPool();
@@ -517,7 +554,7 @@ function renderQuiz() {
       </div>
       <div class="qz-main">
         <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
-        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">사진이나 힌트 버튼을 누르면 학과부터 알려 줍니다</div>`}
+        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : ''}
         ${quiz.state === 'ask' ? `
           <form class="qz-form" id="qzForm" autocomplete="off">
             <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -534,6 +571,7 @@ function renderQuiz() {
           <div class="qz-acts">
             <button type="button" class="qz-btn" data-hint ${quiz.hints >= max ? 'disabled' : ''}>힌트 (${quiz.hints}/${max})</button>
             <button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>
+            <button type="button" class="qz-btn qz-btn--ghost" data-skip title="이 교수는 건너뜁니다 (사진을 왼쪽으로 밀어도 됩니다)">다음 →</button>
           </div>` : `
           <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : 'warn'}">${quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}` : '정답을 공개했습니다 · 0점'}</div>
           <div class="qz-acts">
@@ -578,7 +616,9 @@ function bindQuiz() {
   $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quiz.ex = new Set(); quizSaveDepts(); quizSaveEx(); quizStart(); renderQuiz(); });
   $app.querySelector('[data-dnone]')?.addEventListener('click', () => { quiz.depts = new Set(); quizSaveDepts(); quizStart(); renderQuiz(); });
   $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { speechStop(); quizStart(); renderQuiz(); }));
+  bindSwipe($app.querySelector('.qz-card'));
   const takeHint = () => {
+    if (swipeGuard) return;                       // 방금 민 동작이면 힌트로 치지 않는다
     const p = quizCur(); if (!p || quiz.state !== 'ask' || quiz.hints >= quizMaxHints(p)) return;
     quiz.hints++; quiz.hintTotal++;
     if (quiz.hints >= quizMaxHints(p)) { quiz.state = 'give'; quiz.gained = 0; } // 이름이 다 열리면 정답 공개
@@ -589,9 +629,8 @@ function bindQuiz() {
     if (el.tagName !== 'BUTTON') el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); takeHint(); } });
   });
   $app.querySelector('[data-give]')?.addEventListener('click', () => { speechStop(); quiz.heard = ''; quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
-  $app.querySelector('[data-next]')?.addEventListener('click', () => {
-    speechStop(); quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask'; quiz.heard = ''; quiz.micErr = ''; renderQuiz();
-  });
+  $app.querySelector('[data-next]')?.addEventListener('click', quizNext);
+  $app.querySelector('[data-skip]')?.addEventListener('click', quizNext);
   $app.querySelector('[data-mic]')?.addEventListener('click', () => { quiz.micErr = ''; quiz.listening ? speechStop() : speechStart(); });
   $app.querySelector('#qzForm')?.addEventListener('submit', e => {
     e.preventDefault();
@@ -776,8 +815,7 @@ function renderHome() {
   const total = state.rows.length;
   $app.innerHTML = `
     <div class="view home">
-      <div class="hero">
-        <h1>교수진 안내</h1>
+      <div class="hero hero--sum">
         <p>${state.depts.length}개 학과 · 전임교원 ${total}명${(() => { const na = state.rows.filter(p => getRating(p) === '비').length; return na ? ` · 비참여 ${na}명 <span class="muted">(비해당, 평가 대상 ${total - na}명)</span>` : ''; })()}</p>
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
