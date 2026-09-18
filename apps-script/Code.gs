@@ -13,6 +13,8 @@
 // app.js 의 CONFIG.AUTH.CLIENT_ID 와 같은 값
 const CLIENT_ID = '626785532501-v1u8fi2n26sgti0ir43stlm9vnnj6ru9.apps.googleusercontent.com';
 const SHEET_NAME = 'ratings';
+const SET_SHEET = 'settings';                     // 퀴즈 학과·교수 선택 등 개인 설정
+const SET_HEADER = ['email', 'key', 'value', 'updated_at'];
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
 // 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(비해당 — 연구년 등으로 평가 제외)
 const RATINGS = ['확', '중', '모', '부', '비'];
@@ -30,7 +32,12 @@ function doPost(e) {
   const email = verifyToken(body.token);
   if (!email) return out({ error: 'unauthorized' });
 
-  if (body.action === 'list') return out({ email, ratings: listRatings(email) });
+  if (body.action === 'list') return out({ email, ratings: listRatings(email), settings: listSettings(email) });
+  if (body.action === 'setting') {
+    if (!body.key) return out({ error: 'missing key' });
+    upsertSetting(email, String(body.key), String(body.value == null ? '' : body.value));
+    return out({ ok: true });
+  }
   if (body.action === 'set') {
     if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
     // 보낸 필드만 바꿉니다: rating(선호도) / met(만남 횟수) / memo(메모)
@@ -109,6 +116,42 @@ function upsert(email, deptId, slug, name, fields) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ---------- 개인 설정 (settings 탭) ---------- */
+function setSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SET_SHEET);
+  if (!sh) { sh = ss.insertSheet(SET_SHEET); sh.appendRow(SET_HEADER); sh.setFrozenRows(1); }
+  return sh;
+}
+
+function listSettings(email) {
+  const sh = setSheet(), last = sh.getLastRow();
+  const outObj = {};
+  if (last < 2) return outObj;
+  sh.getRange(2, 1, last - 1, SET_HEADER.length).getValues()
+    .filter(r => String(r[0]).toLowerCase() === email && r[1])
+    .forEach(r => { outObj[String(r[1])] = String(r[2] == null ? '' : r[2]); });
+  return outObj;
+}
+
+function upsertSetting(email, key, value) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = setSheet(), last = sh.getLastRow(), now = new Date();
+    if (last >= 2) {
+      const rows = sh.getRange(2, 1, last - 1, 2).getValues();
+      for (let i = 0; i < rows.length; i++) {
+        if (String(rows[i][0]).toLowerCase() === email && String(rows[i][1]) === key) {
+          sh.getRange(i + 2, 3, 1, 2).setValues([[value, now]]);
+          return;
+        }
+      }
+    }
+    sh.appendRow([email, key, value, now]);
+  } finally { lock.releaseLock(); }
 }
 
 /* 시트에 남아 있는 예전 값(상→확, 하→모)을 한 번에 새 값으로 바꿉니다. (편집기에서 직접 실행)

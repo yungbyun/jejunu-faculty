@@ -297,16 +297,20 @@ function render() {
  * 사진을 보고 이름을 맞힙니다. 힌트를 누를 때마다 학과 → 성 → 이름 첫 글자 → 두 번째 글자… 순으로 열립니다.
  * 점수: 정답 100점에서 힌트 1개당 25점, 오답 1회당 10점을 빼고 최소 10점. 정답을 보면 0점. */
 const QUIZ_BASE = 100, QUIZ_HINT = 25, QUIZ_WRONG = 10, QUIZ_MIN = 10;
-const QUIZ_DEPTS_KEY = 'jnu-quiz-depts', QUIZ_EX_KEY = 'jnu-quiz-ex';
+const QUIZ_DEPTS_KEY = 'jnu-quiz-depts2', QUIZ_EX_KEY = 'jnu-quiz-ex';
+const QUIZ_OFF_DEPTS = ['ce']; // 기본으로 꺼 두는 학과(본인 학과라 굳이 외울 필요 없음). 칩을 누르면 켤 수 있다
 const quiz = { depts: null, ex: null, deck: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false, pickingP: false };
 
 function quizDepts() {
   if (quiz.depts) return quiz.depts;
   try { const v = JSON.parse(localStorage.getItem(QUIZ_DEPTS_KEY) || 'null'); if (Array.isArray(v)) quiz.depts = new Set(v); } catch {}
-  if (!quiz.depts) quiz.depts = new Set(state.depts.map(d => d.id));
+  if (!quiz.depts) {
+    quiz.depts = new Set(state.depts.map(d => d.id).filter(id => !QUIZ_OFF_DEPTS.includes(id)));
+    try { localStorage.removeItem('jnu-quiz-depts'); } catch {} // 예전 키 정리
+  }
   return quiz.depts;
 }
-function quizSaveDepts() { try { localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify([...quizDepts()])); } catch {} }
+function quizSaveDepts() { try { localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify([...quizDepts()])); } catch {} saveSetting(SET_QD, settingValue(SET_QD)); }
 /* 학과 안에서 개별로 뺀 교수들 (제외 방식이라 학과를 새로 켜면 그 학과 교수는 모두 포함된 상태로 시작) */
 function quizEx() {
   if (quiz.ex) return quiz.ex;
@@ -314,7 +318,7 @@ function quizEx() {
   if (!quiz.ex) quiz.ex = new Set();
   return quiz.ex;
 }
-function quizSaveEx() { try { const e = quizEx(); e.size ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify([...e])) : localStorage.removeItem(QUIZ_EX_KEY); } catch {} }
+function quizSaveEx() { try { const e = quizEx(); e.size ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify([...e])) : localStorage.removeItem(QUIZ_EX_KEY); } catch {} saveSetting(SET_QX, settingValue(SET_QX)); }
 /* 학과가 켜져 있고 사진이 있는 교수 = 선택 후보 */
 function quizCandidates() {
   const sel = quizDepts();
@@ -863,7 +867,7 @@ function saveRatingsCache() {
  * 그리고 화면이 보이는 동안 SYNC_SEC 마다 시트를 다시 읽어 다른 기기에서 바꾼 값을 반영합니다.
  * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다.
  * 저장 단위는 교수 1명의 일부 필드({rating}, {met}, {memo} 또는 그 조합)입니다. */
-const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, timer: null, last: 0, savedAt: 0 };
+const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, timer: null, last: 0, savedAt: 0, pendS: new Map(), busyS: new Set(), dirtyS: new Map() };
 const dirtyKey = () => 'jnu-ratings-dirty:' + (state.session ? state.session.email : 'local');
 function loadDirty() {
   try {
@@ -876,6 +880,7 @@ function saveDirty() { try { if (sync.dirty.size) localStorage.setItem(dirtyKey(
 async function loadRatings() {
   loadRatingsCache();
   loadDirty();
+  loadSetDirty();
   await syncRatings({ initial: true });
   startSyncLoop();
 }
@@ -901,6 +906,7 @@ async function syncRatings({ initial = false } = {}) {
   sync.running = true;
   try {
     // 1) 저장에 실패했던 항목 먼저 다시 올림
+    for (const [k, v] of [...sync.dirtyS]) { if (await pushSetting(k, v)) { sync.dirtyS.delete(k); saveSetDirty(); } }
     for (const [key, fields] of [...sync.dirty]) {
       if (await pushEntry(key, fields)) { sync.dirty.delete(key); saveDirty(); }
     }
@@ -908,6 +914,7 @@ async function syncRatings({ initial = false } = {}) {
     // 2) 시트에서 내 기록 전체를 읽음
     const r = await ratingsApi('list', {});
     if (!r || !Array.isArray(r.ratings)) throw new Error((r && r.error) || '응답 오류');
+    applySettings(r.settings);
     const server = new Map();
     r.ratings.forEach(x => { const e = { rating: normRating(x.rating), met: normMet(x.met), memo: normMemo(x.memo) }; if (!entryEmpty(e)) server.set(`${x.dept_id}/${x.slug}`, e); });
     const locked = k => sync.pending.has(k) || sync.dirty.has(k) || sync.queue.has(k);
@@ -929,6 +936,78 @@ async function syncRatings({ initial = false } = {}) {
     console.warn('동기화 실패:', e.message);
     if (initial) flashStatus('선호도 동기화 실패 — 시트 연결을 확인하세요', true);
   } finally { sync.running = false; }
+}
+
+/* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
+ * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_KEYS = [SET_QD, SET_QX];
+const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
+function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
+function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
+
+/* 지금 이 기기의 설정 값 (정렬해 두어 비교가 안정적이도록) */
+function settingValue(key) {
+  if (key === SET_QD) return [...quizDepts()].sort();
+  if (key === SET_QX) return [...quizEx()].sort();
+  return null;
+}
+/* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
+function settingApplyLocal(key, v) {
+  try {
+    if (key === SET_QD) { quiz.depts = new Set(v); localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify(v)); }
+    if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
+  } catch {}
+}
+const setStored = key => { try { return localStorage.getItem(key === SET_QD ? QUIZ_DEPTS_KEY : QUIZ_EX_KEY) != null; } catch { return false; } };
+
+async function pushSetting(key, value) {
+  try {
+    const r = await ratingsApi('setting', { key, value: JSON.stringify(value) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
+    sync.savedAt = Date.now();
+    return true;
+  } catch (e) { console.warn('설정 저장 실패:', key, e.message); sync.lastError = e.message; return false; }
+}
+
+/* 설정 저장 — 같은 키를 연달아 바꾸면 마지막 값만 보내고, 실패하면 이 기기에 남겼다가 다음 동기화 때 다시 올림 */
+async function saveSetting(key, value) {
+  if (!CONFIG.RATINGS.API_URL || !state.session) return;
+  sync.pendS.set(key, value);
+  if (sync.busyS.has(key)) return;
+  sync.busyS.add(key); updateSaveBar();
+  try {
+    while (sync.pendS.has(key)) {
+      const v = sync.pendS.get(key);
+      let ok = false;
+      for (const wait of [0, 1000, 3000]) {
+        if (wait) await new Promise(r => setTimeout(r, wait));
+        ok = await pushSetting(key, v);
+        if (ok || sync.pendS.get(key) !== v) break;
+      }
+      if (sync.pendS.get(key) === v) sync.pendS.delete(key);
+      if (ok) { sync.dirtyS.delete(key); saveSetDirty(); }
+      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus('퀴즈 설정을 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
+    }
+  } finally { sync.busyS.delete(key); updateSaveBar(); }
+}
+
+/* 서버 설정을 화면에 반영. 서버에 아직 없고 이 기기에만 있으면 올린다 */
+function applySettings(m) {
+  let changed = false;
+  for (const key of SET_KEYS) {
+    if (sync.pendS.has(key) || sync.busyS.has(key) || sync.dirtyS.has(key)) continue;
+    const raw = m ? m[key] : '';
+    if (raw == null || raw === '') { if (setStored(key)) saveSetting(key, settingValue(key)); continue; }
+    let v; try { v = JSON.parse(raw); } catch { continue; }
+    if (!Array.isArray(v)) continue;
+    if (JSON.stringify(settingValue(key)) === JSON.stringify([...v].sort())) continue;
+    settingApplyLocal(key, v); changed = true;
+  }
+  if (changed) {
+    quizStart();
+    if (route().view === 'quiz') renderQuiz();
+    flashStatus('다른 기기의 퀴즈 설정을 반영했습니다');
+  }
 }
 
 /* 한 교수의 일부 필드를 시트에 저장. 성공하면 true (재시도 없음 — 호출 쪽에서 처리) */
@@ -1013,7 +1092,7 @@ function markSaving(key, st) {
 let $saveBar = null;
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
-  const saving = sync.queue.size, dirty = sync.dirty.size;
+  const saving = sync.queue.size + sync.busyS.size, dirty = sync.dirty.size + sync.dirtyS.size;
   if (sync.authNeeded) {
     if ($saveBar.dataset.mode !== 'auth') {
       $saveBar.className = 'savebar savebar--warn savebar--auth'; $saveBar.dataset.mode = 'auth';
