@@ -383,7 +383,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .chip{flex:none;min-height:36px}
   .filters-wrap{align-items:stretch;width:100%}
   .nav{margin-left:0}.nav a{padding:6px 9px;font-size:13px}
-  .topbar__inner{flex-wrap:wrap;height:auto;padding:8px 0;row-gap:8px;gap:8px}
+  .topbar__inner{flex-wrap:wrap;height:auto;padding:8px 18px;row-gap:8px;gap:8px} /* 좌우 여백: 로고·테마 버튼이 화면 끝에 붙지 않게 */
   .topbar__tools{display:contents}
   #refreshBtn{margin-left:auto}
   .search{order:9;flex:1 1 100%;min-width:100%}
