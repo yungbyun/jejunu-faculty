@@ -1,0 +1,117 @@
+{
+ "updated": "2026-09-18",
+ "profs": {
+  "park-eun-jin": {
+   "highlights": [],
+   "items": [],
+   "note": "제주대 소속이 확인되는 공개 자료를 찾지 못함. 동명이인(숙명여대 교수 등)이 많아 모두 제외."
+  },
+  "kim-hyun-jung": {
+   "highlights": [
+    "2016 WISET 약진 멘토상",
+    "WISET 제주지역사업단 연구지원부장"
+   ],
+   "items": [
+    {
+     "t": "제주대 김현정 교수-제주동중 김창건 교감, WISET 멘토상 수상",
+     "u": "https://www.headlinejeju.co.kr/news/articleView.html?idxno=290552",
+     "s": "헤드라인제주",
+     "d": "2016-11-04",
+     "k": "academic"
+    }
+   ],
+   "note": "동명이인이 매우 많아(제주대병원 마취통증의학과 등) 소속이 명시된 자료만 채택. 최근 10년 내 추가 자료는 확인되지 않음."
+  },
+  "chun-ji-yeon": {
+   "highlights": [
+    "2024 농림축산식품부 장관 표창",
+    "2023 과학기술 우수논문상",
+    "제주푸드테크산업발전협의회 공동위원장",
+    "2015년 부임, 건국대 농학박사"
+   ],
+   "items": [
+    {
+     "t": "제주대 식품생명공학과 천지연 교수 농림부 장관 표창",
+     "u": "https://www.seogwipo.co.kr/news/articleView.html?idxno=226379",
+     "s": "서귀포신문",
+     "d": "2024-12-04",
+     "k": "academic"
+    },
+    {
+     "t": "제주대 천지연·전유진 교수, 한국과총 제33회 과학기술 우수논문상 수상",
+     "u": "https://www.headlinejeju.co.kr/news/articleView.html?idxno=519155",
+     "s": "헤드라인제주",
+     "d": "2023-07-05",
+     "k": "academic"
+    },
+    {
+     "t": "제주대 화장품과학연구센터, 지역기업과 손잡고 혁신인재 키운다 (천지연 교수 연구실 계약Lab 참여)",
+     "u": "https://www.headlinejeju.co.kr/news/articleView.html?idxno=590101",
+     "s": "헤드라인제주",
+     "d": "2026-04-06",
+     "k": "activity"
+    }
+   ],
+   "note": "제주식품산업협회 이사, 제주푸드테크산업발전협의회 공동위원장 이력은 기사 본문에서 확인. 수상 논문은 제주산 흰점박이꽃무지 유충 분말 제조공정 최적화."
+  },
+  "lim-jongbin": {
+   "highlights": [
+    "2022 바이오식품소재실험실 개설",
+    "안전관리 우수연구실 2년 연속 인증",
+    "2025 지소화성 쿠키 산학협력",
+    "구멍갈파래 건강기능성 소재화"
+   ],
+   "items": [
+    {
+     "t": "제주대 RISE사업단 선정기업·임종빈 교수 공동연구 '지소화성 쿠키' 감귤박람회 품평회",
+     "u": "https://www.koreatimenews.com/news/article.html?no=1001900",
+     "s": "코리아타임뉴스",
+     "d": "2025-11-24",
+     "k": "activity"
+    },
+    {
+     "t": "제주대 연구실, 2년 연속 '안전관리 우수연구실' 선정",
+     "u": "https://www.jejudomin.co.kr/news/articleView.html?idxno=307411",
+     "s": "제주도민일보",
+     "d": "",
+     "k": "academic"
+    },
+    {
+     "t": "제주대 공과대학 바이오식품소재실험실 '안전관리 우수연구실 인증 현판식' 개최",
+     "u": "https://www.samdailbo.com/news/articleView.html?idxno=242245",
+     "s": "삼다일보",
+     "d": "",
+     "k": "news"
+    },
+    {
+     "t": "바다 골칫거리 '구멍갈파래'…다이어트 식품 '일석이조'",
+     "u": "https://www.jejudomin.co.kr/news/articleView.html?idxno=213726",
+     "s": "제주도민일보",
+     "d": "",
+     "k": "news"
+    }
+   ],
+   "note": "연구실은 탄수화물 제품(쿠키·빵)·장뇌축(gut-brain axis)·Food AI 3개 축으로 운영. 일부 기사는 날짜를 확정하지 못함."
+  },
+  "lee-hae-won": {
+   "highlights": [
+    "Food Biotechnology Lab 운영"
+   ],
+   "items": [
+    {
+     "t": "Food Biotechnology Laboratory (공과대학 1호관 2층)",
+     "u": "https://sites.google.com/view/food-biotechnology-laboratory",
+     "s": "연구실 홈페이지",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "동명이인이 매우 많아 대부분 폐기. 제주대 소속이 확인된 자료는 연구실 홈페이지뿐이며 학내 보직·수상·언론 보도는 확인되지 않음."
+  },
+  "park-jong-jin": {
+   "highlights": [],
+   "items": [],
+   "note": "제주대 소속이 확인되는 공개 자료를 찾지 못함. 한국식품연구원 Jong-Jin Park 프로필이 전공과 일치하나 제주대 표기가 없어 제외."
+  }
+ }
+}

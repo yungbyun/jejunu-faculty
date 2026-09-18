@@ -1,0 +1,123 @@
+{
+ "updated": "2026-09-18",
+ "profs": {
+  "kim-tae-il": {
+   "highlights": [
+    "일본 교토대 석·박사",
+    "저서 '제주 도시건축을 이야기하다'",
+    "2015 테쉬폰 보존 토론회 좌장"
+   ],
+   "items": [
+    {
+     "t": "건축 전문가가 말하는 '제주 도시건축'이 가야 할 길",
+     "u": "https://www.jejusori.net/news/articleView.html?idxno=323028",
+     "s": "제주의소리",
+     "d": "2020-11-30",
+     "k": "news"
+    },
+    {
+     "t": "\"테쉬폰, 제주 유입뒤 전국 확산...건축학적 가치 충분\" (토론회 좌장)",
+     "u": "https://www.jejusori.net/news/articleView.html?idxno=163853",
+     "s": "제주의소리",
+     "d": "2015-06-26",
+     "k": "activity"
+    },
+    {
+     "t": "김태일 저자 소개 — 저서 '제주 도시건축을 이야기하다'·'고령화사회의 주거공간학'",
+     "u": "https://agbook.co.kr/people/kim-taeil",
+     "s": "안그라픽스",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "학내 보직·수상 관련 공개 자료는 확인되지 않음."
+  },
+  "park-chul-min": {
+   "highlights": [],
+   "items": [
+    {
+     "t": "가로경관적 관점에서 이도2지구 내 건축물의 형태구성적 특성에 관한 연구",
+     "u": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART001829965",
+     "s": "KCI",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "동명이인이 매우 많아 대부분 제외. 논문 1건도 소속이 완전히 확인되지 않아 재확인 필요. 언론·보직 자료는 찾지 못함."
+  },
+  "kim-hyoung-jun": {
+   "highlights": [
+    "제주 현대건축 지역성 논문 다수"
+   ],
+   "items": [
+    {
+     "t": "제주 현대건축의 지역성 구현 방식에 관한 연구",
+     "u": "https://www.kais99.org/jkais/journal/Vol19No03/vol19no03p07.pdf",
+     "s": "한국산학기술학회",
+     "d": "2018",
+     "k": "academic"
+    },
+    {
+     "t": "제주 IT기업의 건축에 내포된 지역성에 관한 연구",
+     "u": "https://www.koreascience.kr/article/JAKO202222059434652.pdf",
+     "s": "KoreaScience",
+     "d": "2022",
+     "k": "academic"
+    }
+   ],
+   "note": "소속은 두 논문 본문에서 확인됨. 언론 인터뷰·보직·위원회 활동 자료는 없음."
+  },
+  "park-chung-keun": {
+   "highlights": [
+    "미디어제주 '저널 제주건축' 기고"
+   ],
+   "items": [
+    {
+     "t": "공항계획 개념에 대한 고찰 (저널 제주건축 기고)",
+     "u": "https://www.mediajeju.com/news/articleView.html?idxno=322416",
+     "s": "미디어제주",
+     "d": "2020-04-01",
+     "k": "news"
+    },
+    {
+     "t": "제주형 도심항공교통(J-UAM) 건축계획 수립을 위한 기초연구",
+     "u": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART003108505",
+     "s": "KCI",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "기고문 필자 소개에서 '제주대학교 건축학과 교수'로 확인됨."
+  },
+  "yi-yong-kyu": {
+   "highlights": [
+    "옛 제주대 본관 복원 논의 자문",
+    "미디어제주 '저널 제주건축' 기고"
+   ],
+   "items": [
+    {
+     "t": "한국건축계 '보존' 목소리에도…허물어진 '제주의 낭만' (옛 제주대 본관 관련 인터뷰)",
+     "u": "https://www.nocutnews.co.kr/news/5930648",
+     "s": "노컷뉴스",
+     "d": "2023-04-21",
+     "k": "news"
+    },
+    {
+     "t": "제주 '텍스폰'과 '개척농가' (저널 제주건축 기고)",
+     "u": "http://www.mediajeju.com/news/articleView.html?idxno=328806",
+     "s": "미디어제주",
+     "d": "2021-02-08",
+     "k": "news"
+    },
+    {
+     "t": "1960년대 제주대학에 남긴 김중업 건축 작품의 전형성과 지역성",
+     "u": "https://www.kci.go.kr/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART002871762",
+     "s": "KCI",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "노컷뉴스·미디어제주에서 '제주대학교 건축학부 교수'로 확인됨."
+  }
+ }
+}

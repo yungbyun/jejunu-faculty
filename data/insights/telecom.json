@@ -1,0 +1,126 @@
+{
+ "updated": "2026-09-18",
+ "profs": {
+  "doo-yeong-yang": {
+   "highlights": [],
+   "items": [
+    {
+     "t": "Yang Doh (Doo-Yeong Yang) — Professor, Dept. of Electronic Engineering, JNU",
+     "u": "https://www.researchgate.net/profile/Yang-Doh",
+     "s": "ResearchGate",
+     "d": "",
+     "k": "academic"
+    },
+    {
+     "t": "양두영 논문 저자 정보(국내 학술논문 목록)",
+     "u": "https://www.dbpia.co.kr/author/authorDetail?ancId=1268698",
+     "s": "DBpia",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "언론 보도·보직·수상 관련 공개 자료를 찾지 못함."
+  },
+  "jeong-woo-jwa": {
+   "highlights": [
+    "2017 정보통신원장·원격교육원장",
+    "2002년 부임, 한양대·KAIST",
+    "스마트관광 앱 국가 R&D 수행",
+    "K-MOOC 강좌 참여"
+   ],
+   "items": [
+    {
+     "t": "제주대, 정보통신원장에 좌정우 교수 (정보통신원장 겸 원격교육원장, 임기 2년)",
+     "u": "https://www.headlinejeju.co.kr/news/articleView.html?idxno=321313",
+     "s": "헤드라인제주",
+     "d": "2017-12-01",
+     "k": "notice"
+    },
+    {
+     "t": "[보고서] ICT 융합 기반의 스마트관광 모바일 앱과 요소 기술 개발",
+     "u": "https://scienceon.kisti.re.kr/srch/selectPORSrchReport.do?cn=TRKO202100014287&SITE=CLICK",
+     "s": "ScienceON(KISTI)",
+     "d": "",
+     "k": "academic"
+    },
+    {
+     "t": "K-MOOC '4차 산업혁명의 이해' 강좌",
+     "u": "https://www.kmooc.kr/view/course/detail/2995",
+     "s": "K-MOOC",
+     "d": "",
+     "k": "activity"
+    }
+   ],
+   "note": "보직 기사는 본문에서 제주대·2002년 임용이 확인됨. 스마트관광 R&D 보고서의 연구책임자 여부는 확인하지 못함."
+  },
+  "seung-yeup-hyun": {
+   "highlights": [
+    "2023 항공우주산업 세미나 특강"
+   ],
+   "items": [
+    {
+     "t": "제주 항공우주산업 인식확산 세미나 — '항공우주산업 통신공학 기술자의 역할' 특강",
+     "u": "https://www.headlinejeju.co.kr/news/articleView.html?idxno=518276",
+     "s": "헤드라인제주",
+     "d": "2023-06-25",
+     "k": "news"
+    },
+    {
+     "t": "불균질 지반에 매설된 비금속 배관의 지하투과레이더 응답 특성 변화",
+     "u": "https://www.jkiees.org/archive/view_article?pid=jkiees-30-5-399",
+     "s": "한국전자파학회논문지",
+     "d": "2019",
+     "k": "academic"
+    }
+   ],
+   "note": "학내 보직 관련 공개 자료는 찾지 못함."
+  },
+  "daesung-yu": {
+   "highlights": [
+    "2025.9 제주대 통신공학과 임용",
+    "전북대 학·박사, 英 서리대 박사후",
+    "화웨이-서리대 공동연구 참여"
+   ],
+   "items": [
+    {
+     "t": "전북대 졸업 유대성 박사, 제주대학교 교수 임용 (통신공학과 조교수)",
+     "u": "https://www.lecturernews.com/news/articleView.html?idxno=184469",
+     "s": "한국강사신문",
+     "d": "2025",
+     "k": "notice"
+    },
+    {
+     "t": "Learning Decentralized Power Control in Cell-Free Massive MIMO Networks (제1저자)",
+     "u": "https://arxiv.org/abs/2303.02573",
+     "s": "arXiv",
+     "d": "2023-03",
+     "k": "academic"
+    },
+    {
+     "t": "AI Communication & Signal Processing (ACSP) Lab 연구실 홈페이지",
+     "u": "https://sites.google.com/view/acsplab",
+     "s": "ACSP Lab",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "2025년 9월 부임한 신임 조교수로 제주대 관련 자료는 임용 기사 외에 거의 없음. 논문은 임용 전 성과."
+  },
+  "hyeongyong-lim": {
+   "highlights": [
+    "한양대 전자컴퓨터공학 학·박사",
+    "前 국방과학연구소 선임연구원"
+   ],
+   "items": [
+    {
+     "t": "Hyeongyong Lim 개인 연구 홈페이지 — 학력·경력·연구분야",
+     "u": "https://sites.google.com/view/hylim/home",
+     "s": "개인 홈페이지",
+     "d": "",
+     "k": "academic"
+    }
+   ],
+   "note": "개인 홈페이지가 국방과학연구소 소속으로 표기돼 있어 부임 이후 갱신되지 않은 것으로 보임. 제주대 소속이 확인되는 언론·보직 자료는 찾지 못함."
+  }
+ }
+}
