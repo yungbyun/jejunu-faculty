@@ -32,7 +32,13 @@ const CONFIG = {
   // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
   RATINGS: {
     API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
-    LABELS: ['상', '중', '하', '부'],
+    // 선호도 값과 뜻. 비(비해당)는 연구년 등으로 이번 평가에서 제외되는 경우
+    LABELS: ['확', '중', '모', '부', '비'],
+    NAMES: { '확': '확실', '중': '보통', '모': '모름', '부': '부정', '비': '비해당 (연구년 등 평가 제외)' },
+    // 예전에 저장된 값(상/하)은 자동으로 새 값으로 읽음
+    LEGACY: { '상': '확', '하': '모' },
+    // 다른 기기에서 바꾼 선호도를 다시 읽는 주기(초). 화면이 보일 때만 동작
+    SYNC_SEC: 60,
   },
 };
 
@@ -283,7 +289,8 @@ function render() {
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
-const SCORE = { '상': 3, '중': 2, '하': 1, '부': -1 };
+const SCORE = { '확': 3, '중': 2, '모': 1, '부': -1 }; // 비(비해당)는 점수 없음 → 평균·키워드 분석에서 제외
+const hasScore = p => SCORE[getRating(p)] != null;
 const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
 const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
@@ -293,7 +300,7 @@ function dist(profs) {
   return c;
 }
 function avgScore(profs) {
-  const rated = profs.filter(getRating);
+  const rated = profs.filter(hasScore);
   if (!rated.length) return null;
   return rated.reduce((a, p) => a + SCORE[getRating(p)], 0) / rated.length;
 }
@@ -312,7 +319,7 @@ function stackBar(profs, opts = {}) {
 
 function tagStats() {
   const m = new Map(); // tag -> {scores:[], n}
-  state.rows.filter(getRating).forEach(p => p.tags.forEach(t => {
+  state.rows.filter(hasScore).forEach(p => p.tags.forEach(t => {
     if (!m.has(t)) m.set(t, []);
     m.get(t).push(SCORE[getRating(p)]);
   }));
@@ -327,25 +334,26 @@ function renderStats() {
   const c = dist(all);
   const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
   const { list: tags, minN } = tagStats();
-  const singles = minN === 2 ? (() => { const seen = new Set(tags.map(t => t.tag)), out = []; state.rows.filter(getRating).forEach(p => p.tags.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ tag: t, r: getRating(p), prof: p.name }); } })); return out.sort((a, b) => SCORE[b.r] - SCORE[a.r]); })() : [];
+  const singles = minN === 2 ? (() => { const seen = new Set(tags.map(t => t.tag)), out = []; state.rows.filter(hasScore).forEach(p => p.tags.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ tag: t, r: getRating(p), prof: p.name }); } })); return out.sort((a, b) => SCORE[b.r] - SCORE[a.r]); })() : [];
   const ranks = Object.keys(RANK_ORDER).map(r => ({ r, profs: all.filter(p => p.rank === r) })).filter(x => x.profs.length);
   const legend = `<div class="legend" aria-label="범례">${RLABELS().map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(r)}</span>`).join('')}</div>`;
 
   $app.innerHTML = `
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
-      <div class="hero"><div class="eyebrow">Preference analytics</div><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}상·중·하·부 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p></div>
+      <div class="hero"><div class="eyebrow">Preference analytics</div><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}${CONFIG.RATINGS.LABELS.join('·')} 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p>
+        <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(CONFIG.RATINGS.NAMES[r])}</span>`).join('')}</div></div>
 
-      ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 상·중·하·부 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
+      ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 ${CONFIG.RATINGS.LABELS.join('·')} 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
 
       <section class="st-sec">
         <div class="st-hero">
           <div class="st-hero__num">${rated.length}<small>/ ${all.length}명 평가</small></div>
           <div class="meter" aria-label="평가 진행률 ${pct}%"><span style="width:${pct}%"></span></div>
-          <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(상 3 · 중 2 · 하 1 · 부 −1, 미지정 제외)</span></div>
+          <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(확 3 · 중 2 · 모 1 · 부 −1 · 비해당·미지정은 평균에서 제외)</span></div>
         </div>
         <div class="tiles">
-          ${RLABELS().map(r => `<div class="tile tile--${rcls(r)}"><span class="tile__lbl"><i class="sw sw--${rcls(r)}"></i>${esc(r)}${r === '부' ? '<span class="opt"> (부정)</span>' : ''}</span><span class="tile__val">${c[r]}</span><span class="tile__pct">${all.length ? Math.round(c[r] / all.length * 100) : 0}%</span></div>`).join('')}
+          ${RLABELS().map(r => `<div class="tile tile--${rcls(r)}"><span class="tile__lbl"><i class="sw sw--${rcls(r)}"></i>${esc(r)}${CONFIG.RATINGS.NAMES[r] ? `<span class="opt"> ${esc(CONFIG.RATINGS.NAMES[r].split(' ')[0])}</span>` : ''}</span><span class="tile__val">${c[r]}</span><span class="tile__pct">${all.length ? Math.round(c[r] / all.length * 100) : 0}%</span></div>`).join('')}
         </div>
       </section>
 
@@ -376,7 +384,7 @@ function renderStats() {
               <div class="dv__val">${fmt1(t.avg)}</div>
             </div>`).join('')}
         </div>
-        <p class="st-note">오른쪽(초록)은 내가 높게 본 연구 주제, 왼쪽(빨강)은 낮게 본 주제입니다. 축은 −1(부)에서 3(상)까지입니다.</p>
+        <p class="st-note">오른쪽(초록)은 내가 높게 본 연구 주제, 왼쪽(빨강)은 낮게 본 주제입니다. 축은 −1(부)에서 3(확)까지이며, 비해당·미지정 교수는 계산에 넣지 않습니다.</p>
         ${singles.length ? `<details class="st-details"><summary>교수 1명뿐인 키워드 ${singles.length}개 보기</summary><div class="kw-cloud">${singles.map(t => `<span class="kw kw--${rcls(t.r)}" title="${esc(t.prof)}"><i class="sw sw--${rcls(t.r)}"></i>${esc(t.tag)}</span>`).join('')}</div></details>` : ''}` : `<div class="empty">평가한 교수가 생기면 키워드 분석이 표시됩니다.</div>`}
       </section>
 
@@ -414,9 +422,9 @@ function renderStats() {
 
 function exportCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const head = ['학과', '이름', '영문명', '직급', '연구실', '전공 키워드', '선호도', '점수'];
+  const head = ['학과', '이름', '영문명', '직급', '연구실', '전공 키워드', '선호도', '뜻', '점수'];
   const lines = [head.map(q).join(',')];
-  state.rows.forEach(p => { const r = getRating(p); lines.push([p.dept_name, p.name, p.name_en, p.rank, p.office, p.tags.join('; '), r || '', r ? SCORE[r] : ''].map(q).join(',')); });
+  state.rows.forEach(p => { const r = getRating(p); lines.push([p.dept_name, p.name, p.name_en, p.rank, p.office, p.tags.join('; '), r || '', r ? CONFIG.RATINGS.NAMES[r] || '' : '', SCORE[r] != null ? SCORE[r] : ''].map(q).join(',')); });
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -543,12 +551,14 @@ function ratingSummary(d) {
   if (!parts.length) return '';
   return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}</div>`;
 }
-const rClass = r => ({ '상': 'high', '중': 'mid', '하': 'low', '부': 'neg' }[r] || '');
+const rClass = r => ({ '확': 'high', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
+/* 저장된 값을 현재 라벨로 정규화 (예전 값 상→확, 하→모; 모르는 값은 버림) */
+const normRating = v => { v = String(v || ''); return CONFIG.RATINGS.LEGACY[v] || (CONFIG.RATINGS.LABELS.includes(v) ? v : ''); };
 
 function rateChips(p, big = false) {
   const cur = getRating(p);
   return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
-    ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="선호도 ${esc(r)}${r === '부' ? '(부정)' : ''}">${esc(r)}</button>`).join('')}
+    ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(r)} · ${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
   </div>`;
 }
 
@@ -567,13 +577,13 @@ function ratingsCacheKey() { return 'jnu-ratings:' + (state.session ? state.sess
 function loadRatingsCache() {
   try {
     const m = JSON.parse(localStorage.getItem(ratingsCacheKey()) || '{}');
-    state.ratings = new Map(Object.entries(m));
+    state.ratings = new Map(Object.entries(m).map(([k, v]) => [k, normRating(v)]).filter(([, v]) => v));
     // 로그인 기능이 켜지기 전(계정 구분 없이) 이 기기에 저장된 선호도가 있으면 현재 계정으로 합친다
     if (state.session) {
       const legacy = JSON.parse(localStorage.getItem('jnu-ratings:local') || 'null');
       if (legacy && typeof legacy === 'object') {
         let n = 0;
-        for (const [k, v] of Object.entries(legacy)) if (!state.ratings.has(k)) { state.ratings.set(k, v); n++; }
+        for (const [k, v] of Object.entries(legacy)) { const nv = normRating(v); if (nv && !state.ratings.has(k)) { state.ratings.set(k, nv); n++; } }
         localStorage.removeItem('jnu-ratings:local');
         if (n) saveRatingsCache();
       }
@@ -584,30 +594,78 @@ function saveRatingsCache() {
   try { localStorage.setItem(ratingsCacheKey(), JSON.stringify(Object.fromEntries(state.ratings))); } catch {}
 }
 
+/* ---------- 여러 기기 동기화 ----------
+ * 시트(서버)가 기준입니다. 처음 들어올 때, 화면이 다시 보일 때(탭 전환·잠금 해제), 창에 포커스가 올 때,
+ * 그리고 화면이 보이는 동안 SYNC_SEC 마다 시트를 다시 읽어 다른 기기에서 바꾼 값을 반영합니다.
+ * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다. */
+const sync = { pending: new Map(), dirty: new Map(), running: false, timer: null, last: 0 };
+
 async function loadRatings() {
   loadRatingsCache();
+  await syncRatings({ initial: true });
+  startSyncLoop();
+}
+
+function startSyncLoop() {
+  if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
+  const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
+  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') syncRatings(); }, sec * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRatings(); });
+  window.addEventListener('focus', () => syncRatings());
+  window.addEventListener('online', () => syncRatings());
+  window.addEventListener('pageshow', e => { if (e.persisted) syncRatings(); });
+  // 같은 기기의 다른 탭에서 바꾼 값도 바로 반영
+  window.addEventListener('storage', e => { if (e.key === ratingsCacheKey()) { loadRatingsCache(); render(); } });
+}
+
+async function syncRatings({ initial = false } = {}) {
   if (!CONFIG.RATINGS.API_URL || !state.session) return;
+  if (sync.running) return;
+  if (!initial && Date.now() - sync.last < 5000) return; // 연속 호출 방지
+  sync.running = true;
   try {
-    const r = await ratingsApi('list', {});
-    if (r && Array.isArray(r.ratings)) {
-      const server = new Map(r.ratings.map(x => [`${x.dept_id}/${x.slug}`, x.rating]));
-      // 이 기기에만 저장돼 있던(시트 연동 전에 찍은) 선호도는 시트로 올려 합친다
-      const localOnly = [...state.ratings].filter(([k]) => !server.has(k));
-      state.ratings = server;
-      saveRatingsCache();
-      render();
-      if (localOnly.length) {
-        let n = 0;
-        for (const [key, val] of localOnly) {
-          const [dept_id, slug] = key.split('/');
-          const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
-          if (!p) continue;
-          try { const res = await ratingsApi('set', { dept_id, slug, name: p.name, rating: val }); if (res && res.ok) { state.ratings.set(key, val); n++; } } catch {}
-        }
-        if (n) { saveRatingsCache(); render(); flashStatus(`이 기기의 선호도 ${n}건을 시트로 동기화했습니다`); }
-      }
+    // 1) 저장에 실패했던 항목 먼저 다시 올림
+    for (const [key, val] of [...sync.dirty]) {
+      if (await pushRating(key, val)) sync.dirty.delete(key);
     }
-  } catch (e) { console.warn('선호도 불러오기 실패:', e.message); flashStatus('선호도 동기화 실패 — 시트 연결을 확인하세요', true); }
+    // 2) 시트에서 내 선호도 전체를 읽음
+    const r = await ratingsApi('list', {});
+    if (!r || !Array.isArray(r.ratings)) throw new Error((r && r.error) || '응답 오류');
+    const server = new Map();
+    r.ratings.forEach(x => { const v = normRating(x.rating); if (v) server.set(`${x.dept_id}/${x.slug}`, v); });
+    // 3) 이 기기에만 있는 값(시트 연동 전에 찍은 것 등)은 시트로 올림
+    const localOnly = [...state.ratings].filter(([k]) => !server.has(k) && !sync.pending.has(k) && !sync.dirty.has(k));
+    // 4) 서버 값을 기준으로 화면 갱신 (저장 중/실패한 항목은 로컬 값 유지)
+    const changed = [];
+    for (const [k, v] of server) if (!sync.pending.has(k) && !sync.dirty.has(k) && state.ratings.get(k) !== v) { state.ratings.set(k, v); changed.push([k, v]); }
+    for (const [k] of [...state.ratings]) if (!server.has(k) && !sync.pending.has(k) && !sync.dirty.has(k) && !localOnly.some(([lk]) => lk === k)) { state.ratings.delete(k); changed.push([k, '']); }
+    saveRatingsCache();
+    sync.last = Date.now();
+    if (initial) render();
+    else if (changed.length) { if (route().view === 'dept') changed.forEach(([k, v]) => refreshRatingUI(k, v)); else render(); flashStatus(`다른 기기의 선호도 ${changed.length}건을 반영했습니다`); }
+    let n = 0;
+    for (const [key, val] of localOnly) if (await pushRating(key, val)) n++;
+    if (n) { saveRatingsCache(); flashStatus(`이 기기의 선호도 ${n}건을 시트로 동기화했습니다`); }
+  } catch (e) {
+    console.warn('선호도 동기화 실패:', e.message);
+    if (initial) flashStatus('선호도 동기화 실패 — 시트 연결을 확인하세요', true);
+  } finally { sync.running = false; }
+}
+
+/* 한 건을 시트에 저장. 성공하면 true */
+async function pushRating(key, val) {
+  const [dept_id, slug] = key.split('/');
+  const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
+  if (!p) return true; // 목록에 없는 교수(삭제됨)면 건너뜀
+  sync.pending.set(key, val);
+  try {
+    const r = await ratingsApi('set', { dept_id, slug, name: p.name, rating: val });
+    if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
+    return true;
+  } catch (e) {
+    console.warn('선호도 저장 실패:', key, e.message);
+    return false;
+  } finally { if (sync.pending.get(key) === val) sync.pending.delete(key); }
 }
 
 async function setRating(key, val) {
@@ -615,14 +673,9 @@ async function setRating(key, val) {
   saveRatingsCache();
   refreshRatingUI(key, val);
   if (!CONFIG.RATINGS.API_URL || !state.session) return;
-  const [dept_id, slug] = key.split('/');
-  const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
-  try {
-    const r = await ratingsApi('set', { dept_id, slug, name: p ? p.name : '', rating: val });
-    if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
-  } catch (e) {
-    flashStatus('선호도를 시트에 저장하지 못했습니다 — ' + e.message, true);
-  }
+  sync.dirty.delete(key);
+  const ok = await pushRating(key, val);
+  if (!ok) { sync.dirty.set(key, val); flashStatus('선호도를 시트에 저장하지 못했습니다 — 연결되면 자동으로 다시 저장합니다', true); }
 }
 
 /* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */

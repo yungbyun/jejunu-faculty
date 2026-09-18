@@ -13,7 +13,11 @@
 const CLIENT_ID = '626785532501-v1u8fi2n26sgti0ir43stlm9vnnj6ru9.apps.googleusercontent.com';
 const SHEET_NAME = 'ratings';
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at'];
-const RATINGS = ['상', '중', '하', '부'];
+// 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(비해당 — 연구년 등으로 평가 제외)
+const RATINGS = ['확', '중', '모', '부', '비'];
+// 예전 값(상/하)이 시트에 남아 있어도 새 값으로 읽습니다
+const LEGACY = { '상': '확', '하': '모' };
+const norm = v => { v = String(v || ''); return LEGACY[v] || (RATINGS.indexOf(v) >= 0 ? v : ''); };
 
 function doGet() {
   return out({ ok: true, service: 'jejunu-faculty ratings' });
@@ -27,8 +31,9 @@ function doPost(e) {
 
   if (body.action === 'list') return out({ email, ratings: listRatings(email) });
   if (body.action === 'set') {
-    const rating = String(body.rating || '');
-    if (rating && RATINGS.indexOf(rating) < 0) return out({ error: 'bad rating' });
+    const raw = String(body.rating || '');
+    const rating = norm(raw);
+    if (raw && !rating) return out({ error: 'bad rating' });
     if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
     upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), rating);
     return out({ ok: true });
@@ -66,8 +71,8 @@ function listRatings(email) {
   if (last < 2) return [];
   const rows = sh.getRange(2, 1, last - 1, HEADER.length).getValues();
   return rows
-    .filter(r => String(r[0]).toLowerCase() === email && r[4])
-    .map(r => ({ dept_id: String(r[1]), slug: String(r[2]), name: String(r[3]), rating: String(r[4]) }));
+    .filter(r => String(r[0]).toLowerCase() === email && norm(r[4]))
+    .map(r => ({ dept_id: String(r[1]), slug: String(r[2]), name: String(r[3]), rating: norm(r[4]), updated_at: r[5] ? new Date(r[5]).toISOString() : '' }));
 }
 
 function upsert(email, deptId, slug, name, rating) {
@@ -92,6 +97,21 @@ function upsert(email, deptId, slug, name, rating) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* 시트에 남아 있는 예전 값(상→확, 하→모)을 한 번에 새 값으로 바꿉니다. (편집기에서 직접 실행)
+ * 실행: 편집기 상단 함수 선택 → migrateRatings → ▶ 실행 */
+function migrateRatings() {
+  const sh = sheet();
+  const last = sh.getLastRow();
+  if (last < 2) return 0;
+  const rng = sh.getRange(2, 5, last - 1, 1);
+  const vals = rng.getValues();
+  let n = 0;
+  const next = vals.map(([v]) => { const s = String(v || ''); if (LEGACY[s]) { n++; return [LEGACY[s]]; } return [v]; });
+  if (n) rng.setValues(next);
+  Logger.log('변환한 행: ' + n);
+  return n;
 }
 
 function out(obj) {
