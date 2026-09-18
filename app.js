@@ -309,7 +309,9 @@ const fmt1 = n => n == null ? '–' : (Math.round(n * 100) / 100).toFixed(2);
 function sureRate(profs) {
   const pool = profs.filter(p => getRating(p) !== '비');
   const sure = pool.filter(p => getRating(p) === '확').length;
-  return { pool: pool.length, sure, na: profs.length - pool.length, pct: pool.length ? Math.round(sure / pool.length * 1000) / 10 : null };
+  // 50%가 되려면 확이 몇 명 더 필요한지 (모수는 그대로 두고 확만 늘어난다고 가정). 음수면 그만큼 여유
+  const need = Math.ceil(pool.length / 2) - sure;
+  return { pool: pool.length, sure, na: profs.length - pool.length, pct: pool.length ? Math.round(sure / pool.length * 1000) / 10 : null, need, rest: pool.length - sure };
 }
 const fmtPct = v => v == null ? '–' : (Number.isInteger(v) ? v : v.toFixed(1)) + '%';
 
@@ -357,7 +359,7 @@ function renderStats() {
         <div class="st-hero">
           <div class="st-hero__num">${rated.length}<small>/ ${all.length}명 평가</small></div>
           <div class="meter" aria-label="평가 진행률 ${pct}%"><span style="width:${pct}%"></span></div>
-          ${(() => { const sr = sureRate(all); return `<div class="st-sure"><span class="st-sure__pct">${fmtPct(sr.pct)}</span><span class="st-sure__txt"><b>확(확실) 비율</b> — 확 ${sr.sure}명 / 평가 대상 ${sr.pool}명 <span class="muted">(전체 ${all.length}명에서 비해당 ${sr.na}명 제외)</span></span></div>`; })()}
+          ${(() => { const sr = sureRate(all); return `<div class="st-sure"><span class="st-sure__pct">${fmtPct(sr.pct)}</span><span class="st-sure__txt"><b>확(확실) 비율</b> — 확 ${sr.sure}명 / 평가 대상 ${sr.pool}명 <span class="muted">(전체 ${all.length}명에서 비해당 ${sr.na}명 제외)</span><br>${sr.pool ? (sr.need > 0 ? `<span class="st-sure__need">50%가 되려면 확 <b>${sr.need}명</b> 더 필요</span> <span class="muted">(${Math.ceil(sr.pool / 2)}명 이상 · 나머지 ${sr.rest}명 중에서)</span>` : `<span class="st-sure__ok">50% 달성</span> <span class="muted">(${-sr.need}명 여유)</span>`) : ''}</span></div>`; })()}
           <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(확 3 · 중 2 · 모 1 · 부 −1 · 비해당·미지정은 평균에서 제외)</span></div>
         </div>
         <div class="tiles">
@@ -370,7 +372,7 @@ function renderStats() {
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
-              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 확 ${fmtPct(sureRate(d.profs).pct)} · 평균 ${fmt1(avgScore(d.profs))}</small></div>
+              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 확 ${fmtPct(sureRate(d.profs).pct)}${(() => { const r = sureRate(d.profs); return r.pool ? (r.need > 0 ? ` (50%까지 ${r.need}명 더)` : ' (50% 달성)') : ''; })()} · 평균 ${fmt1(avgScore(d.profs))}</small></div>
               ${stackBar(d.profs, { deptId: d.id })}
             </div>`).join('')}
         </div>
@@ -404,9 +406,9 @@ function renderStats() {
         </div>
         <div>
           <div class="st-head"><h2>학과별</h2></div>
-          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>평균</th></tr></thead>
-          <tbody>${state.depts.map(d => { const dc = dist(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(sureRate(d.profs).pct)}</b></td><td>${fmt1(avgScore(d.profs))}</td></tr>`; }).join('')}</tbody></table>
-          <p class="st-note">확% = 확(확실) 인원 ÷ (인원 − 비해당). 비해당(연구년 등)은 모수에서 뺍니다.</p>
+          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>50%까지</th><th>평균</th></tr></thead>
+          <tbody>${state.depts.map(d => { const dc = dist(d.profs), r = sureRate(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(r.pct)}</b></td><td>${r.pool ? (r.need > 0 ? `+${r.need}` : '달성') : '·'}</td><td>${fmt1(avgScore(d.profs))}</td></tr>`; }).join('')}</tbody></table>
+          <p class="st-note">확% = 확(확실) 인원 ÷ (인원 − 비해당). 비해당(연구년 등)은 모수에서 뺍니다. "50%까지"는 확이 몇 명 더 있어야 절반이 되는지입니다.</p>
         </div>
       </section>
 
