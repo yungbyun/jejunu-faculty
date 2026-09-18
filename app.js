@@ -379,31 +379,66 @@ function nameHeard(said, name) {
   return lev(jamo(a), jamo(b)) <= 1;
 }
 
-let rec = null;
-function speechStop() { try { rec && rec.stop(); } catch {} rec = null; quiz.listening = false; }
+let rec = null, recGen = 0, recTimer = null;
+
+function speechStop() {
+  recGen++;                                   // 이 뒤에 도착하는 결과는 무시
+  clearTimeout(recTimer); recTimer = null;
+  const r = rec; rec = null; quiz.listening = false;
+  if (r) { r.onresult = r.onerror = r.onend = null; try { r.abort ? r.abort() : r.stop(); } catch {} }
+}
+
 function speechStart() {
   if (!SR || quiz.listening) return;
-  const p = quizCur(); if (!p || quiz.state !== 'ask') return;
+  const p = quizCur();
+  if (!p || quiz.state !== 'ask') return;
   let r;
-  try { r = new SR(); } catch { return; }
-  rec = r;
+  try { r = new SR(); } catch { quiz.micErr = '이 브라우저에서는 음성 인식을 쓸 수 없습니다'; renderQuiz(); return; }
+  const gen = ++recGen;
+  const stale = () => gen !== recGen;
+  /* 어떤 핸들러에서 예외가 나도 '듣는 중'에 갇히지 않도록 전부 감싼다 */
+  const guard = fn => (...a) => { try { fn(...a); } catch (e) { console.warn('음성 인식 처리 오류:', e); if (!stale()) { speechStop(); quiz.micErr = '음성 인식 처리 중 문제가 생겼습니다'; renderQuiz(); } } };
+
   r.lang = 'ko-KR'; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
-  quiz.listening = true; quiz.heard = ''; renderQuiz();
-  r.onresult = e => {
-    const alts = [...e.results[0]].map(x => x.transcript.trim()).filter(Boolean);
-    quiz.listening = false; rec = null;
-    const hit = alts.find(t => nameHeard(t, p.name));
-    if (hit) {
-      quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok'; quiz.heard = hit;
-    } else {
-      quiz.heard = alts[0] || '';   // 잘못 들었을 때는 오답으로 치지 않고 입력칸에 넣어 준다
+
+  r.onresult = guard(e => {
+    if (stale()) return;
+    // SpeechRecognitionResult는 이터러블이 아니라 length + 인덱스로만 읽어야 한다
+    const res = e.results && e.results[0];
+    const alts = [];
+    for (let i = 0; res && i < res.length; i++) {
+      const t = res[i] && res[i].transcript;
+      if (t && String(t).trim()) alts.push(String(t).trim());
     }
+    speechStop();
+    quiz.micErr = '';
+    const hit = alts.find(t => nameHeard(t, p.name));
+    if (hit) { quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok'; quiz.heard = hit; }
+    else { quiz.heard = alts[0] || ''; if (!quiz.heard) quiz.micErr = '알아듣지 못했습니다 — 다시 말해 보세요'; } // 잘못 들어도 오답으로 치지 않는다
     renderQuiz();
     if (quiz.state === 'ask') { const i = $app.querySelector('#qzIn'); if (i) { i.value = quiz.heard; i.focus(); } }
-  };
-  r.onerror = ev => { quiz.listening = false; rec = null; quiz.micErr = ev.error === 'not-allowed' ? '마이크 권한이 필요합니다' : ev.error === 'no-speech' ? '소리가 들리지 않았습니다' : '음성 인식에 실패했습니다'; renderQuiz(); };
-  r.onend = () => { if (quiz.listening) { quiz.listening = false; renderQuiz(); } };
-  try { r.start(); } catch { quiz.listening = false; rec = null; }
+  });
+
+  r.onerror = guard(ev => {
+    if (stale()) return;
+    const code = ev && ev.error;
+    if (code === 'aborted') { speechStop(); renderQuiz(); return; }   // 사용자가 중지한 경우
+    speechStop();
+    quiz.micErr = code === 'not-allowed' || code === 'service-not-allowed' ? '마이크 권한이 거부되었습니다 — 주소창의 자물쇠에서 허용해 주세요'
+      : code === 'no-speech' ? '소리가 들리지 않았습니다'
+      : code === 'audio-capture' ? '마이크를 찾지 못했습니다'
+      : code === 'network' ? '네트워크 문제로 음성 인식에 실패했습니다'
+      : '음성 인식에 실패했습니다';
+    renderQuiz();
+  });
+
+  r.onend = guard(() => { if (stale() || !quiz.listening) return; speechStop(); renderQuiz(); });
+
+  // 시작을 먼저 하고(사용자 제스처 안에서) 그다음 화면을 그린다
+  try { r.start(); } catch (e) { console.warn('음성 인식 시작 실패:', e); quiz.micErr = '음성 인식을 시작하지 못했습니다'; renderQuiz(); return; }
+  rec = r; quiz.listening = true; quiz.heard = ''; quiz.micErr = '';
+  recTimer = setTimeout(() => { if (!stale() && quiz.listening) { speechStop(); quiz.micErr = '시간이 지나 중지했습니다 — 다시 눌러 주세요'; renderQuiz(); } }, 12000);
+  renderQuiz();
 }
 
 function renderQuiz() {
