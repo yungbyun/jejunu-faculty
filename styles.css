@@ -275,6 +275,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-hero{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:12px}
 .st-hero__num{font-size:48px;font-weight:700;letter-spacing:-1.5px;line-height:1}
 .st-hero__num small{font-size:15px;font-weight:500;color:var(--ink-3);letter-spacing:0;margin-left:8px}
+.st-sure{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:10px 0 8px;padding:10px 14px;border-radius:var(--radius-s);background:color-mix(in srgb,#1f8a5b 8%,transparent);border:1px solid color-mix(in srgb,#1f8a5b 25%,transparent)}
+.st-sure__pct{font-size:30px;font-weight:800;letter-spacing:-.8px;color:#1f8a5b;line-height:1}
+.st-sure__txt{font-size:13px;color:var(--ink-2)}.st-sure__txt b{color:var(--ink)}
 .st-hero__sub{font-size:13.5px;color:var(--ink-2);margin-top:10px}
 .meter{height:8px;border-radius:999px;background:color-mix(in srgb,var(--brand) 16%,transparent);margin-top:14px;overflow:hidden}
 .meter span{display:block;height:100%;background:var(--brand);border-radius:999px;transition:width .4s var(--ease)}
