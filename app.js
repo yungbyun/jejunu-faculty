@@ -350,7 +350,7 @@ function renderStats() {
   $app.innerHTML = `
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
-      <div class="hero"><div class="eyebrow">Preference analytics</div><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}${CONFIG.RATINGS.LABELS.join('·')} 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p>
+      <div class="hero"><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}${CONFIG.RATINGS.LABELS.join('·')} 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p>
         <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(CONFIG.RATINGS.NAMES[r])}</span>`).join('')}</div></div>
 
       ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 ${CONFIG.RATINGS.LABELS.join('·')} 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
@@ -461,7 +461,7 @@ function renderHome() {
     <div class="view home">
       <div class="hero">
         <h1>교수진 안내</h1>
-        <p>${state.depts.length}개 학과 · 전임교원 ${total}명</p>
+        <p>${state.depts.length}개 학과 · 전임교원 ${total}명${(() => { const na = state.rows.filter(p => getRating(p) === '비').length; return na ? ` · 비참여 ${na}명 <span class="muted">(비해당, 평가 대상 ${total - na}명)</span>` : ''; })()}</p>
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
       <div class="dept-list">
@@ -470,7 +470,7 @@ function renderHome() {
             <div class="drow__num">${d.profs.length}<small>명</small></div>
             <div class="drow__main">
               <h2 class="drow__name">${esc(d.name)}</h2>
-              <div class="drow__en">${esc(d.en || '')}${d.url ? ` · ${esc(d.url.replace(/^https?:\/\//, ''))}` : ''}</div>
+              ${d.url ? `<div class="drow__en">${esc(d.url.replace(/^https?:\/\//, ''))}</div>` : ''}
               <div class="drow__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
               ${ratingSummary(d)}
             </div>

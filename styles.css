@@ -365,7 +365,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .home .hero h1{font-size:30px;letter-spacing:-.8px}
   .dept{padding:22px 20px 20px}
   /* 첫 화면 학과 행 */
-  .drow{grid-template-columns:48px 1fr;grid-template-areas:"num main" "avs avs";gap:8px 12px;padding:18px 6px;margin:0 -6px;border-radius:10px}
+  .drow{grid-template-columns:48px 1fr;grid-template-areas:"num main" ". avs";gap:8px 12px;padding:18px 6px;margin:0 -6px;border-radius:10px} /* 사진 줄은 본문과 왼쪽 정렬 */
   .drow__num{grid-area:num;font-size:26px}
   .drow__main{grid-area:main;min-width:0}
   .drow__name{font-size:18px}
