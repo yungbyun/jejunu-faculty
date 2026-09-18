@@ -433,3 +433,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @media (prefers-reduced-motion: reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ---------- 저장 상태 ---------- */
+.rate[data-save="saving"]{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent);animation:savepulse 1s ease-in-out infinite}
+.rate[data-save="saved"]{box-shadow:0 0 0 2px color-mix(in srgb,#1f8a5b 55%,transparent)}
+.rate[data-save="error"]{box-shadow:0 0 0 2px #c0392b}
+@keyframes savepulse{0%,100%{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,#2563eb 15%,transparent)}}
+.savebar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:8px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:#fff;background:#374151;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.savebar[hidden]{display:none}
+.savebar--busy{background:#2563eb}.savebar--ok{background:#1f8a5b}.savebar--warn{background:#c0392b}
+.savebar__btn{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
+.savebar__btn:hover{background:rgba(255,255,255,.3)}

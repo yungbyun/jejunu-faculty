@@ -305,6 +305,13 @@ function avgScore(profs) {
   return rated.reduce((a, p) => a + SCORE[getRating(p)], 0) / rated.length;
 }
 const fmt1 = n => n == null ? '–' : (Math.round(n * 100) / 100).toFixed(2);
+/* 확(확실) 비율: 비해당(연구년 등) 교수를 모수에서 뺀 뒤 계산 */
+function sureRate(profs) {
+  const pool = profs.filter(p => getRating(p) !== '비');
+  const sure = pool.filter(p => getRating(p) === '확').length;
+  return { pool: pool.length, sure, na: profs.length - pool.length, pct: pool.length ? Math.round(sure / pool.length * 1000) / 10 : null };
+}
+const fmtPct = v => v == null ? '–' : (Number.isInteger(v) ? v : v.toFixed(1)) + '%';
 
 function stackBar(profs, opts = {}) {
   const c = dist(profs), total = profs.length || 1;
@@ -350,6 +357,7 @@ function renderStats() {
         <div class="st-hero">
           <div class="st-hero__num">${rated.length}<small>/ ${all.length}명 평가</small></div>
           <div class="meter" aria-label="평가 진행률 ${pct}%"><span style="width:${pct}%"></span></div>
+          ${(() => { const sr = sureRate(all); return `<div class="st-sure"><span class="st-sure__pct">${fmtPct(sr.pct)}</span><span class="st-sure__txt"><b>확(확실) 비율</b> — 확 ${sr.sure}명 / 평가 대상 ${sr.pool}명 <span class="muted">(전체 ${all.length}명에서 비해당 ${sr.na}명 제외)</span></span></div>`; })()}
           <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(확 3 · 중 2 · 모 1 · 부 −1 · 비해당·미지정은 평균에서 제외)</span></div>
         </div>
         <div class="tiles">
@@ -362,7 +370,7 @@ function renderStats() {
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
-              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 평균 ${fmt1(avgScore(d.profs))}</small></div>
+              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 확 ${fmtPct(sureRate(d.profs).pct)} · 평균 ${fmt1(avgScore(d.profs))}</small></div>
               ${stackBar(d.profs, { deptId: d.id })}
             </div>`).join('')}
         </div>
@@ -391,13 +399,14 @@ function renderStats() {
       <section class="st-sec st-two">
         <div>
           <div class="st-head"><h2>직급별</h2></div>
-          <table class="st-table"><thead><tr><th>직급</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>평균</th></tr></thead>
-          <tbody>${ranks.map(x => { const dc = dist(x.profs); return `<tr><td>${esc(x.r)}</td><td>${x.profs.length}</td><td>${x.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmt1(avgScore(x.profs))}</b></td></tr>`; }).join('')}</tbody></table>
+          <table class="st-table"><thead><tr><th>직급</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>평균</th></tr></thead>
+          <tbody>${ranks.map(x => { const dc = dist(x.profs); return `<tr><td>${esc(x.r)}</td><td>${x.profs.length}</td><td>${x.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(sureRate(x.profs).pct)}</b></td><td>${fmt1(avgScore(x.profs))}</td></tr>`; }).join('')}</tbody></table>
         </div>
         <div>
           <div class="st-head"><h2>학과별</h2></div>
-          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>평균</th></tr></thead>
-          <tbody>${state.depts.map(d => { const dc = dist(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmt1(avgScore(d.profs))}</b></td></tr>`; }).join('')}</tbody></table>
+          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>평균</th></tr></thead>
+          <tbody>${state.depts.map(d => { const dc = dist(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(sureRate(d.profs).pct)}</b></td><td>${fmt1(avgScore(d.profs))}</td></tr>`; }).join('')}</tbody></table>
+          <p class="st-note">확% = 확(확실) 인원 ÷ (인원 − 비해당). 비해당(연구년 등)은 모수에서 뺍니다.</p>
         </div>
       </section>
 
@@ -598,10 +607,14 @@ function saveRatingsCache() {
  * 시트(서버)가 기준입니다. 처음 들어올 때, 화면이 다시 보일 때(탭 전환·잠금 해제), 창에 포커스가 올 때,
  * 그리고 화면이 보이는 동안 SYNC_SEC 마다 시트를 다시 읽어 다른 기기에서 바꾼 값을 반영합니다.
  * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다. */
-const sync = { pending: new Map(), dirty: new Map(), running: false, timer: null, last: 0 };
+const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, timer: null, last: 0, savedAt: 0 };
+const dirtyKey = () => 'jnu-ratings-dirty:' + (state.session ? state.session.email : 'local');
+function loadDirty() { try { sync.dirty = new Map(Object.entries(JSON.parse(localStorage.getItem(dirtyKey()) || '{}'))); } catch { sync.dirty = new Map(); } }
+function saveDirty() { try { if (sync.dirty.size) localStorage.setItem(dirtyKey(), JSON.stringify(Object.fromEntries(sync.dirty))); else localStorage.removeItem(dirtyKey()); } catch {} }
 
 async function loadRatings() {
   loadRatingsCache();
+  loadDirty();
   await syncRatings({ initial: true });
   startSyncLoop();
 }
@@ -609,7 +622,7 @@ async function loadRatings() {
 function startSyncLoop() {
   if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
   const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
-  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') syncRatings(); }, sec * 1000);
+  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); } }, sec * 1000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRatings(); });
   window.addEventListener('focus', () => syncRatings());
   window.addEventListener('online', () => syncRatings());
@@ -626,8 +639,9 @@ async function syncRatings({ initial = false } = {}) {
   try {
     // 1) 저장에 실패했던 항목 먼저 다시 올림
     for (const [key, val] of [...sync.dirty]) {
-      if (await pushRating(key, val)) sync.dirty.delete(key);
+      if (await pushRating(key, val)) { sync.dirty.delete(key); saveDirty(); }
     }
+    updateSaveBar();
     // 2) 시트에서 내 선호도 전체를 읽음
     const r = await ratingsApi('list', {});
     if (!r || !Array.isArray(r.ratings)) throw new Error((r && r.error) || '응답 오류');
@@ -652,7 +666,7 @@ async function syncRatings({ initial = false } = {}) {
   } finally { sync.running = false; }
 }
 
-/* 한 건을 시트에 저장. 성공하면 true */
+/* 한 건을 시트에 저장. 성공하면 true (재시도 없음 — 호출 쪽에서 처리) */
 async function pushRating(key, val) {
   const [dept_id, slug] = key.split('/');
   const p = state.rows.find(x => x.dept_id === dept_id && x.slug === slug);
@@ -661,21 +675,71 @@ async function pushRating(key, val) {
   try {
     const r = await ratingsApi('set', { dept_id, slug, name: p.name, rating: val });
     if (!r || !r.ok) throw new Error((r && r.error) || '저장 실패');
+    sync.savedAt = Date.now();
     return true;
   } catch (e) {
     console.warn('선호도 저장 실패:', key, e.message);
+    sync.lastError = e.message;
     return false;
   } finally { if (sync.pending.get(key) === val) sync.pending.delete(key); }
 }
 
+/* 칩을 누르면 화면은 즉시 바뀌고, 같은 순간에 시트로 저장을 보냅니다.
+ * 같은 교수를 연달아 누르면 마지막 값만 순서대로 보내고(꼬임 방지), 실패하면 1초·3초·8초 뒤 다시 시도한 뒤
+ * 그래도 안 되면 이 기기에 '미저장'으로 남겨 두었다가 연결·로그인이 회복되는 즉시 자동으로 올립니다. */
 async function setRating(key, val) {
   if (val) state.ratings.set(key, val); else state.ratings.delete(key);
   saveRatingsCache();
   refreshRatingUI(key, val);
   if (!CONFIG.RATINGS.API_URL || !state.session) return;
-  sync.dirty.delete(key);
-  const ok = await pushRating(key, val);
-  if (!ok) { sync.dirty.set(key, val); flashStatus('선호도를 시트에 저장하지 못했습니다 — 연결되면 자동으로 다시 저장합니다', true); }
+  sync.dirty.delete(key); saveDirty();
+  const q = sync.queue.get(key);
+  if (q) { q.next = val; return; } // 이미 보내는 중이면 끝난 뒤 마지막 값을 보냄
+  sync.queue.set(key, { next: undefined });
+  markSaving(key, 'saving'); updateSaveBar();
+  let cur = val;
+  try {
+    for (;;) {
+      let ok = false;
+      for (const wait of [0, 1000, 3000, 8000]) {
+        if (wait) await new Promise(r => setTimeout(r, wait));
+        if (sync.queue.get(key).next !== undefined) break; // 새 값이 들어왔으면 그것부터
+        ok = await pushRating(key, cur);
+        if (ok) break;
+      }
+      const nx = sync.queue.get(key).next;
+      if (nx !== undefined) { sync.queue.set(key, { next: undefined }); cur = nx; continue; }
+      if (!ok) { sync.dirty.set(key, cur); saveDirty(); markSaving(key, 'error'); flashStatus('선호도를 시트에 저장하지 못했습니다 — ' + (sync.lastError || '') + ' (연결되면 자동으로 다시 저장)', true); }
+      else markSaving(key, 'saved');
+      break;
+    }
+  } finally { sync.queue.delete(key); updateSaveBar(); }
+}
+
+/* 카드·드로어의 칩 묶음에 저장 상태 표시 (saving → saved/error) */
+function markSaving(key, st) {
+  document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"]`).forEach(g => {
+    g.dataset.save = st;
+    if (st === 'saved') setTimeout(() => { if (g.dataset.save === 'saved') delete g.dataset.save; }, 1500);
+  });
+}
+
+/* 하단 상태줄: 저장 중 / 저장됨 / 미저장 N건 */
+let $saveBar = null;
+function updateSaveBar() {
+  if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
+  const saving = sync.queue.size, dirty = sync.dirty.size;
+  if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = `시트에 저장 중… (${saving}건)`; $saveBar.hidden = false; }
+  else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 선호도 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
+  else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
+  else $saveBar.hidden = true;
+}
+
+/* 토큰이 5분 안에 만료되면 화면이 보이는 동안 미리 조용히 갱신해 둔다 (저장 시점에 만료돼 실패하는 일 방지) */
+async function keepTokenFresh() {
+  const s = state.session;
+  if (!s || !s.credential || s.tokExp - Date.now() > 5 * 60e3 || tokenWaiter) return;
+  try { await getFreshToken(); } catch (e) { console.warn('토큰 갱신 실패:', e.message); }
 }
 
 /* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */
@@ -695,7 +759,7 @@ function refreshRatingUI(key, val) {
 /* Apps Script 호출 — ID 토큰을 함께 보내 서버가 본인 여부를 확인 */
 async function ratingsApi(action, payload) {
   const token = await getFreshToken();
-  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify({ action, token, ...payload }), redirect: 'follow' });
+  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify({ action, token, ...payload }), redirect: 'follow', keepalive: action === 'set' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
 }
