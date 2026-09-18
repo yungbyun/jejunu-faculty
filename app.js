@@ -297,8 +297,8 @@ function render() {
  * 사진을 보고 이름을 맞힙니다. 힌트를 누를 때마다 학과 → 성 → 이름 첫 글자 → 두 번째 글자… 순으로 열립니다.
  * 점수: 정답 100점에서 힌트 1개당 25점, 오답 1회당 10점을 빼고 최소 10점. 정답을 보면 0점. */
 const QUIZ_BASE = 100, QUIZ_HINT = 25, QUIZ_WRONG = 10, QUIZ_MIN = 10;
-const QUIZ_DEPTS_KEY = 'jnu-quiz-depts';
-const quiz = { depts: null, deck: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false };
+const QUIZ_DEPTS_KEY = 'jnu-quiz-depts', QUIZ_EX_KEY = 'jnu-quiz-ex';
+const quiz = { depts: null, ex: null, deck: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false, pickingP: false };
 
 function quizDepts() {
   if (quiz.depts) return quiz.depts;
@@ -307,9 +307,22 @@ function quizDepts() {
   return quiz.depts;
 }
 function quizSaveDepts() { try { localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify([...quizDepts()])); } catch {} }
-function quizPool() {
+/* 학과 안에서 개별로 뺀 교수들 (제외 방식이라 학과를 새로 켜면 그 학과 교수는 모두 포함된 상태로 시작) */
+function quizEx() {
+  if (quiz.ex) return quiz.ex;
+  try { const v = JSON.parse(localStorage.getItem(QUIZ_EX_KEY) || 'null'); if (Array.isArray(v)) quiz.ex = new Set(v); } catch {}
+  if (!quiz.ex) quiz.ex = new Set();
+  return quiz.ex;
+}
+function quizSaveEx() { try { const e = quizEx(); e.size ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify([...e])) : localStorage.removeItem(QUIZ_EX_KEY); } catch {} }
+/* 학과가 켜져 있고 사진이 있는 교수 = 선택 후보 */
+function quizCandidates() {
   const sel = quizDepts();
   return state.rows.filter(p => p.photo && sel.has(p.dept_id));
+}
+function quizPool() {
+  const ex = quizEx();
+  return quizCandidates().filter(p => !ex.has(rKey(p)));
 }
 function quizStart() {
   const pool = quizPool().slice();
@@ -320,37 +333,58 @@ const quizCur = () => quiz.deck[quiz.i];
 const quizMaxHints = p => 1 + p.name.length;              // 1: 학과, 그다음 한 글자씩
 const quizQScore = () => Math.max(QUIZ_MIN, QUIZ_BASE - quiz.hints * QUIZ_HINT - quiz.wrong * QUIZ_WRONG);
 const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
-function quizMask(p, hints) {
-  const k = Math.max(0, Math.min(hints - 1, p.name.length));
-  return p.name.split('').map((c, i) => i < k ? c : '○').join(' ');
+/* 이름 자리 — 글자마다 가는 테두리 네모 칸. 열린 글자만 채워 보여 준다 */
+function quizMask(p, hints, reveal) {
+  const k = reveal ? p.name.length : Math.max(0, Math.min(hints - 1, p.name.length));
+  return p.name.split('').map((c, i) => `<span class="qz-ch${i < k ? ' on' : ''}">${i < k ? esc(c) : ''}</span>`).join('');
 }
 
 function renderQuiz() {
   if (!state.rows.length) return;
   const pool = quizPool();
   const sel = quizDepts();
+  const ex = quizEx();
+  const cand = quizCandidates();
+  const caret = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const byDept = state.depts.filter(d => sel.has(d.id)).map(d => [d, cand.filter(p => p.dept_id === d.id)]).filter(([, ps]) => ps.length);
   const picker = `
     <div class="qz-picker ${quiz.picking ? 'open' : ''}">
       <button type="button" class="qz-picker__t" id="qzPick" aria-expanded="${quiz.picking}">
-        학과 선택 <b>${sel.size}/${state.depts.length}</b> · 대상 ${pool.length}명
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        학과 선택 <b>${sel.size}/${state.depts.length}</b>${caret}
       </button>
       ${quiz.picking ? `<div class="qz-picker__b">
         <div class="qz-dchips">
           ${state.depts.map(d => `<button type="button" class="qz-dchip" data-d="${esc(d.id)}" aria-pressed="${sel.has(d.id)}" style="--dept-color:${esc(d.color)}">${esc(d.name)}<span class="n">${d.profs.length}</span></button>`).join('')}
         </div>
         <div class="qz-dacts"><button type="button" class="btn" data-dall>전체 선택</button><button type="button" class="btn" data-dnone>전체 해제</button></div>
-        <p class="st-note">학과를 바꾸면 게임이 새로 시작됩니다.</p>
+        <p class="st-note">학과를 바꾸면 게임이 새로 시작됩니다. 학과를 켜면 그 학과 교수는 모두 포함됩니다.</p>
       </div>` : ''}
+    </div>
+    <div class="qz-picker ${quiz.pickingP ? 'open' : ''}">
+      <button type="button" class="qz-picker__t" id="qzPickP" aria-expanded="${quiz.pickingP}">
+        출제 교수 <b>${pool.length}</b>/${cand.length}명${caret}
+      </button>
+      ${quiz.pickingP ? (byDept.length ? `<div class="qz-picker__b">
+        ${byDept.map(([d, ps]) => {
+          const on = ps.filter(p => !ex.has(rKey(p))).length;
+          return `<div class="qz-pgroup" style="--dept-color:${esc(d.color)}">
+            <div class="qz-pgroup__h"><b>${esc(d.name)}</b><span class="n">${on}/${ps.length}</span>
+              <button type="button" class="qz-mini" data-pall="${esc(d.id)}">모두</button><button type="button" class="qz-mini" data-pnone="${esc(d.id)}">해제</button></div>
+            <div class="qz-pchips">${ps.map(p => `<button type="button" class="qz-pchip" data-p="${esc(rKey(p))}" aria-pressed="${!ex.has(rKey(p))}">${esc(p.name)}</button>`).join('')}</div>
+          </div>`;
+        }).join('')}
+        <div class="qz-dacts"><button type="button" class="btn" data-pallall>전체 선택</button><button type="button" class="btn" data-pnoneall>전체 해제</button></div>
+        <p class="st-note">개별로 뺀 교수는 다음에도 기억됩니다.</p>
+      </div>` : `<div class="qz-picker__b"><p class="st-note">먼저 학과를 선택해 주세요.</p></div>`) : ''}
     </div>`;
 
   if (!pool.length) {
     $app.innerHTML = `<div class="view quiz"><div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>이름 맞히기</span></div>
       <div class="hero"><h1>이름 맞히기</h1><p>사진을 보고 교수 이름을 맞히는 게임입니다.</p></div>
-      ${picker}<div class="empty"><strong>선택한 학과에 사진이 있는 교수가 없습니다</strong>학과를 하나 이상 선택해 주세요.</div></div>`;
+      ${picker}<div class="empty"><strong>출제할 교수가 없습니다</strong>학과를 하나 이상 선택하고, 교수 선택에서 최소 한 명은 켜 주세요.</div></div>`;
     bindQuiz(); return;
   }
-  if (!quiz.deck.length || quiz.deck.some(p => !sel.has(p.dept_id))) quizStart();
+  if (!quiz.deck.length || quiz.deck.some(p => !sel.has(p.dept_id) || ex.has(rKey(p)))) quizStart();
 
   const done = quiz.i >= quiz.deck.length;
   const p = done ? null : quizCur();
@@ -380,7 +414,7 @@ function renderQuiz() {
         <img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="교수 사진" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">
       </div>
       <div class="qz-main">
-        <div class="qz-mask" aria-live="polite">${quiz.state === 'ask' ? esc(quizMask(p, quiz.hints)) : esc(p.name)}</div>
+        <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
         ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">힌트를 누르면 학과부터 알려 줍니다</div>`}
         ${quiz.state === 'ask' ? `
           <form class="qz-form" id="qzForm" autocomplete="off">
@@ -416,12 +450,24 @@ function renderQuiz() {
 
 function bindQuiz() {
   $app.querySelector('#qzPick')?.addEventListener('click', () => { quiz.picking = !quiz.picking; renderQuiz(); });
+  $app.querySelector('#qzPickP')?.addEventListener('click', () => { quiz.pickingP = !quiz.pickingP; renderQuiz(); });
+  const exApply = fn => { fn(quizEx()); quizSaveEx(); quizStart(); renderQuiz(); };
+  $app.querySelectorAll('.qz-pchip').forEach(b => b.addEventListener('click', () => {
+    exApply(e => { const k = b.dataset.p; e.has(k) ? e.delete(k) : e.add(k); });
+  }));
+  $app.querySelectorAll('[data-pall]').forEach(b => b.addEventListener('click', () =>
+    exApply(e => quizCandidates().filter(p => p.dept_id === b.dataset.pall).forEach(p => e.delete(rKey(p))))));
+  $app.querySelectorAll('[data-pnone]').forEach(b => b.addEventListener('click', () =>
+    exApply(e => quizCandidates().filter(p => p.dept_id === b.dataset.pnone).forEach(p => e.add(rKey(p))))));
+  $app.querySelector('[data-pallall]')?.addEventListener('click', () => exApply(e => quizCandidates().forEach(p => e.delete(rKey(p)))));
+  $app.querySelector('[data-pnoneall]')?.addEventListener('click', () => exApply(e => quizCandidates().forEach(p => e.add(rKey(p)))));
   $app.querySelectorAll('.qz-dchip').forEach(b => b.addEventListener('click', () => {
     const s = quizDepts(), id = b.dataset.d;
-    s.has(id) ? s.delete(id) : s.add(id);
+    if (s.has(id)) s.delete(id);
+    else { s.add(id); const e = quizEx(); state.rows.filter(p => p.dept_id === id).forEach(p => e.delete(rKey(p))); quizSaveEx(); }
     quizSaveDepts(); quizStart(); renderQuiz();
   }));
-  $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quizSaveDepts(); quizStart(); renderQuiz(); });
+  $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quiz.ex = new Set(); quizSaveDepts(); quizSaveEx(); quizStart(); renderQuiz(); });
   $app.querySelector('[data-dnone]')?.addEventListener('click', () => { quiz.depts = new Set(); quizSaveDepts(); quizStart(); renderQuiz(); });
   $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { quizStart(); renderQuiz(); }));
   $app.querySelector('[data-hint]')?.addEventListener('click', () => {
