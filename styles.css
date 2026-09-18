@@ -401,6 +401,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .prof{flex-wrap:wrap}
   .rate{position:static;order:9;flex-basis:100%;justify-content:flex-end;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--surface-2);box-shadow:none;backdrop-filter:none;padding:6px 10px;gap:8px}
   .rate::before{content:'선호도';margin-right:auto;font-size:12px;color:var(--ink-3);align-self:center}
+  .rate--big::before{content:none} /* 상세 창에서는 라벨 없이 칩만 */
   .rate__b{width:30px;height:30px;font-size:12.5px}
   /* 교수 카드: 사진 왼쪽 + 정보 오른쪽 리스트형 */
   .prof-grid{grid-template-columns:1fr;gap:10px}

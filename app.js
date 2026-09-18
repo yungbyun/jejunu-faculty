@@ -889,7 +889,7 @@ function openDrawer(p, d) {
         <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}</div>
         <div>
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span>${rateChips(p, true)}</div>
-          <div class="d-meet"><span class="d-meet__lbl">만남</span>${meetCounter(p)}</div>
+          <div class="d-meet">${meetCounter(p)}</div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
