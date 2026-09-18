@@ -901,7 +901,10 @@ function profCard(p, d, showDept = false) {
         <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${meetCounter(p)}</div>
-        ${p.office ? `<div class="prof__office"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</div>` : ''}
+        ${p.office || p.phone ? `<div class="prof__office">
+          ${p.office ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</span>` : '<span></span>'}
+          ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
+        </div>` : ''}
       </div>
     </div>`;
 }
@@ -1358,8 +1361,8 @@ function persistSession() { try { localStorage.setItem(AUTH_KEY, JSON.stringify(
 function bindCards() {
   const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
   $app.querySelectorAll('.prof').forEach(b => {
-    b.addEventListener('click', e => { if (e.target.closest('.rate, .counter')) return; open(b); });
-    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .counter')) { e.preventDefault(); open(b); } });
+    b.addEventListener('click', e => { if (e.target.closest('.rate, .counter, .po__tel')) return; open(b); });
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .counter, .po__tel')) { e.preventDefault(); open(b); } });
   });
   bindRates($app);
   bindNotes($app);
@@ -1457,15 +1460,6 @@ function openDrawer(p, d) {
           <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
           <div class="memo__st" aria-live="polite"></div>
         </div>
-      </div>
-
-      <div class="d-section"><h3>연락처</h3>
-        <dl class="d-info">
-          ${p.office ? `<dt>연구실</dt><dd>${esc(p.office)}</dd>` : ''}
-          ${p.phone ? `<dt>전화</dt><dd><a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a></dd>` : ''}
-          ${p.email ? `<dt>이메일</dt><dd><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></dd>` : ''}
-          ${p.homepage ? `<dt>홈페이지</dt><dd><a href="${esc(p.homepage)}" target="_blank" rel="noopener">${esc(p.homepage.replace(/^https?:\/\//, ''))}</a></dd>` : ''}
-        </dl>
       </div>
 
       <div class="d-section d-ins"><h3>검색 결과</h3><div class="ins" data-slug="${esc(p.slug)}">${insightsHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
