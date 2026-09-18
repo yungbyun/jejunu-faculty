@@ -329,6 +329,7 @@ function quizPool() {
   return quizCandidates().filter(p => !ex.has(rKey(p)));
 }
 function quizStart() {
+  speechStop(); quiz.heard = ''; quiz.micErr = '';
   const pool = quizPool().slice();
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   Object.assign(quiz, { deck: pool, i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0 });
@@ -341,6 +342,68 @@ const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
 function quizMask(p, hints, reveal) {
   const k = reveal ? p.name.length : Math.max(0, Math.min(hints - 1, p.name.length));
   return p.name.split('').map((c, i) => `<span class="qz-ch${i < k ? ' on' : ''}">${i < k ? esc(c) : ''}</span>`).join('');
+}
+
+/* ---------- 음성으로 이름 맞히기 ----------
+ * 브라우저 내장 음성 인식(Web Speech API)을 씁니다. 크롬·사파리에서 동작하고 파이어폭스는 지원하지 않습니다.
+ * 한국어 이름은 잘못 들리는 일이 잦아서, 후보를 여러 개 받아 자모 단위로 한 글자 차이까지 정답으로 봅니다.
+ * 잘못 들었을 때는 오답으로 치지 않고 들은 말을 입력칸에 넣어 주기만 합니다. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechOK = () => !!SR;
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ', JONG = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ';
+function jamo(str) {
+  let o = '';
+  for (const c of String(str)) {
+    const k = c.charCodeAt(0) - 0xAC00;
+    if (k >= 0 && k < 11172) { o += CHO[Math.floor(k / 588)] + JUNG[Math.floor((k % 588) / 28)] + (JONG[k % 28] || '').trim(); }
+    else o += c;
+  }
+  return o;
+}
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+/* 들은 말이 이름과 같다고 볼 수 있는가 — 글자 수가 같고 자모 차이가 1 이하 */
+function nameHeard(said, name) {
+  const a = quizNorm(said), b = quizNorm(name);
+  if (!a) return false;
+  if (a === b) return true;
+  if ([...a].length !== [...b].length) return false;
+  return lev(jamo(a), jamo(b)) <= 1;
+}
+
+let rec = null;
+function speechStop() { try { rec && rec.stop(); } catch {} rec = null; quiz.listening = false; }
+function speechStart() {
+  if (!SR || quiz.listening) return;
+  const p = quizCur(); if (!p || quiz.state !== 'ask') return;
+  let r;
+  try { r = new SR(); } catch { return; }
+  rec = r;
+  r.lang = 'ko-KR'; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
+  quiz.listening = true; quiz.heard = ''; renderQuiz();
+  r.onresult = e => {
+    const alts = [...e.results[0]].map(x => x.transcript.trim()).filter(Boolean);
+    quiz.listening = false; rec = null;
+    const hit = alts.find(t => nameHeard(t, p.name));
+    if (hit) {
+      quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok'; quiz.heard = hit;
+    } else {
+      quiz.heard = alts[0] || '';   // 잘못 들었을 때는 오답으로 치지 않고 입력칸에 넣어 준다
+    }
+    renderQuiz();
+    if (quiz.state === 'ask') { const i = $app.querySelector('#qzIn'); if (i) { i.value = quiz.heard; i.focus(); } }
+  };
+  r.onerror = ev => { quiz.listening = false; rec = null; quiz.micErr = ev.error === 'not-allowed' ? '마이크 권한이 필요합니다' : ev.error === 'no-speech' ? '소리가 들리지 않았습니다' : '음성 인식에 실패했습니다'; renderQuiz(); };
+  r.onend = () => { if (quiz.listening) { quiz.listening = false; renderQuiz(); } };
+  try { r.start(); } catch { quiz.listening = false; rec = null; }
 }
 
 function renderQuiz() {
@@ -422,15 +485,22 @@ function renderQuiz() {
         ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">힌트를 누르면 학과부터 알려 줍니다</div>`}
         ${quiz.state === 'ask' ? `
           <form class="qz-form" id="qzForm" autocomplete="off">
-            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하거나 말하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
+            ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
+              <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>` : ''}
             <button type="submit" class="qz-btn qz-btn--go">확인</button>
           </form>
-          <div class="qz-msg ${quiz.wrong ? 'warn' : ''}">${quiz.wrong ? `틀렸습니다 · ${quiz.wrong}회 · 이 문제 현재 ${quizQScore()}점` : `맞히면 ${quizQScore()}점`}</div>
+          <div class="qz-msg ${quiz.listening ? 'live' : quiz.micErr ? 'warn' : quiz.wrong ? 'warn' : ''}">${
+            quiz.listening ? '듣는 중… 이름을 말해 보세요'
+            : quiz.micErr ? esc(quiz.micErr)
+            : quiz.heard ? `들은 말: <b>${esc(quiz.heard)}</b> — 맞으면 확인을 누르세요`
+            : quiz.wrong ? `틀렸습니다 · ${quiz.wrong}회 · 이 문제 현재 ${quizQScore()}점` : `맞히면 ${quizQScore()}점`}</div>
           <div class="qz-acts">
             <button type="button" class="qz-btn" data-hint ${quiz.hints >= max ? 'disabled' : ''}>힌트 (${quiz.hints}/${max})</button>
             <button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>
           </div>` : `
-          <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : 'warn'}">${quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점` : '정답을 공개했습니다 · 0점'}</div>
+          <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : 'warn'}">${quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}` : '정답을 공개했습니다 · 0점'}</div>
           <div class="qz-acts">
             <a class="qz-btn qz-btn--ghost" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 보기</a>
             <button type="button" class="qz-btn qz-btn--go" data-next>${quiz.i + 1 >= quiz.deck.length ? '결과 보기' : '다음 문제'}</button>
@@ -473,21 +543,23 @@ function bindQuiz() {
   }));
   $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quiz.ex = new Set(); quizSaveDepts(); quizSaveEx(); quizStart(); renderQuiz(); });
   $app.querySelector('[data-dnone]')?.addEventListener('click', () => { quiz.depts = new Set(); quizSaveDepts(); quizStart(); renderQuiz(); });
-  $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { quizStart(); renderQuiz(); }));
+  $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { speechStop(); quizStart(); renderQuiz(); }));
   $app.querySelector('[data-hint]')?.addEventListener('click', () => {
     const p = quizCur(); if (!p || quiz.hints >= quizMaxHints(p)) return;
     quiz.hints++; quiz.hintTotal++;
     if (quiz.hints >= quizMaxHints(p)) { quiz.state = 'give'; quiz.gained = 0; } // 이름이 다 열리면 정답 공개
     renderQuiz();
   });
-  $app.querySelector('[data-give]')?.addEventListener('click', () => { quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
+  $app.querySelector('[data-give]')?.addEventListener('click', () => { speechStop(); quiz.heard = ''; quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
   $app.querySelector('[data-next]')?.addEventListener('click', () => {
-    quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask'; renderQuiz();
+    speechStop(); quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask'; quiz.heard = ''; quiz.micErr = ''; renderQuiz();
   });
+  $app.querySelector('[data-mic]')?.addEventListener('click', () => { quiz.micErr = ''; quiz.listening ? speechStop() : speechStart(); });
   $app.querySelector('#qzForm')?.addEventListener('submit', e => {
     e.preventDefault();
     const p = quizCur(), inp = $app.querySelector('#qzIn'), v = quizNorm(inp.value);
     if (!v) return;
+    speechStop(); quiz.micErr = ''; quiz.heard = '';
     if (v === quizNorm(p.name) || (p.name_en && v === quizNorm(p.name_en))) {
       quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok';
     } else { quiz.wrong++; inp.value = ''; }
