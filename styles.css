@@ -400,8 +400,6 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .st-table{font-size:12px}.st-table th,.st-table td{padding:6px 5px}
   .prof{flex-wrap:wrap}
   .rate{position:static;order:9;flex-basis:100%;justify-content:flex-end;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--surface-2);box-shadow:none;backdrop-filter:none;padding:6px 10px;gap:8px}
-  .rate::before{content:'선호도';margin-right:auto;font-size:12px;color:var(--ink-3);align-self:center}
-  .rate--big::before{content:none} /* 상세 창에서는 라벨 없이 칩만 */
   .rate__b{width:30px;height:30px;font-size:12.5px}
   /* 교수 카드: 사진 왼쪽 + 정보 오른쪽 리스트형 */
   .prof-grid{grid-template-columns:1fr;gap:10px}
@@ -471,9 +469,11 @@ textarea.memo::placeholder{color:var(--ink-3)}
 .counter[data-save="saving"]{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent)}
 .counter[data-save="saved"]{box-shadow:0 0 0 2px color-mix(in srgb,#1f8a5b 55%,transparent)}
 .counter[data-save="error"]{box-shadow:0 0 0 2px #c0392b}
+.prof__foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
 .prof__note{display:flex;gap:5px;flex-wrap:wrap}
 .prof__note:empty{display:none}
-.nb{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-top:8px}
+.prof__foot .counter{margin-left:auto;padding:2px}.prof__foot .counter__b{width:24px;height:24px;font-size:14px}.prof__foot .counter__n{font-size:14px;min-width:22px}.prof__foot .counter__u{font-size:11px;margin-right:2px}
+.nb{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
 .nb--met{color:#7c3aed;background:color-mix(in srgb,#7c3aed 10%,transparent)}
 .nb--memo{color:#b45309;background:color-mix(in srgb,#b45309 10%,transparent)}
 .nb--memo::before{content:"✎";font-size:10px}

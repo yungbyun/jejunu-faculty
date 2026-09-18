@@ -546,7 +546,7 @@ function profCard(p, d, showDept = false) {
         <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
         <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
-        <div class="prof__note">${noteBadge(entryOf(rKey(p)))}</div>
+        <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${meetCounter(p)}</div>
         ${p.office ? `<div class="prof__office"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</div>` : ''}
       </div>
     </div>`;
@@ -555,7 +555,7 @@ function profCard(p, d, showDept = false) {
 /* ---------- 선호도 ---------- */
 const rKey = p => `${p.dept_id}/${p.slug}`;
 /* 카드에 붙는 작은 표시: 만남 N회 · 메모 있음 */
-const noteBadge = e => (e.met ? `<span class="nb nb--met" title="만난 횟수">만남 ${e.met}회</span>` : '') + (e.memo ? `<span class="nb nb--memo" title="${esc(e.memo)}">메모</span>` : '');
+const noteBadge = e => e.memo ? `<span class="nb nb--memo" title="${esc(e.memo)}">메모</span>` : '';
 const getRating = p => state.ratings.get(rKey(p)) || '';
 const matchRating = p => state.ratingFilter === '전체' || (state.ratingFilter === '미지정' ? !getRating(p) : getRating(p) === state.ratingFilter);
 const countRating = (d, r) => r === '전체' ? d.profs.length : d.profs.filter(p => r === '미지정' ? !getRating(p) : getRating(p) === r).length;
@@ -864,10 +864,11 @@ async function ratingsApi(action, payload) {
 function bindCards() {
   const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
   $app.querySelectorAll('.prof').forEach(b => {
-    b.addEventListener('click', e => { if (e.target.closest('.rate')) return; open(b); });
-    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate')) { e.preventDefault(); open(b); } });
+    b.addEventListener('click', e => { if (e.target.closest('.rate, .counter')) return; open(b); });
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .counter')) { e.preventDefault(); open(b); } });
   });
   bindRates($app);
+  bindNotes($app);
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
 
@@ -888,8 +889,7 @@ function openDrawer(p, d) {
       <div class="d-profile">
         <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}</div>
         <div>
-          <div class="d-top"><span class="d-rank">${esc(p.rank)}</span>${rateChips(p, true)}</div>
-          <div class="d-meet">${meetCounter(p)}</div>
+          <div class="d-top"><span class="d-rank">${esc(p.rank)}</span></div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
