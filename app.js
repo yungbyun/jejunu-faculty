@@ -554,30 +554,31 @@ function renderQuiz() {
       </div>
       <div class="qz-main">
         <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
-        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : ''}
-        ${quiz.state === 'ask' ? `
-          <form class="qz-form" id="qzForm" autocomplete="off">
-            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
-            ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
-              <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </button>` : ''}
-            <button type="submit" class="qz-btn qz-btn--go">확인</button>
-          </form>
-          <div class="qz-msg ${quiz.listening ? 'live' : quiz.micErr ? 'warn' : quiz.wrong ? 'warn' : ''}">${
-            quiz.listening ? '듣는 중… 이름을 말해 보세요'
-            : quiz.micErr ? esc(quiz.micErr)
-            : quiz.heard ? `들은 말: <b>${esc(quiz.heard)}</b> — 맞으면 확인을 누르세요`
-            : quiz.wrong ? `틀렸습니다 · ${quiz.wrong}회 · 이 문제 현재 ${quizQScore()}점` : `맞히면 ${quizQScore()}점`}</div>
-          <div class="qz-acts">
-            <button type="button" class="qz-btn" data-hint ${quiz.hints >= max ? 'disabled' : ''}>힌트 (${quiz.hints}/${max})</button>
-            <button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>
-            <button type="button" class="qz-btn qz-btn--ghost" data-skip title="이 교수는 건너뜁니다 (사진을 왼쪽으로 밀어도 됩니다)">다음 →</button>
-          </div>` : `
-          <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : 'warn'}">${quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}` : '정답을 공개했습니다 · 0점'}</div>
-          <div class="qz-acts">
-            <a class="qz-btn qz-btn--ghost" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 보기</a>
-            <button type="button" class="qz-btn qz-btn--go" data-next>${quiz.i + 1 >= quiz.deck.length ? '결과 보기' : '다음 문제'}</button>
-          </div>`}
+        <div class="qz-hintline">${quiz.hints >= 1 || quiz.state !== 'ask' ? `${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}` : ''}</div>
+        <form class="qz-form" id="qzForm" autocomplete="off">
+          <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false"
+            ${quiz.state === 'ask' ? '' : `value="${esc(p.name)}" disabled`}>
+          ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic ${quiz.state === 'ask' ? '' : 'disabled'} aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
+            <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>` : ''}
+          <button type="submit" class="qz-btn qz-btn--go" ${quiz.state === 'ask' ? '' : 'disabled'}>확인</button>
+        </form>
+
+        <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : quiz.state === 'give' ? 'warn' : quiz.listening ? 'live' : quiz.micErr || quiz.wrong ? 'warn' : ''}">${
+          quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}`
+          : quiz.state === 'give' ? '정답을 공개했습니다 · 0점'
+          : quiz.listening ? '듣는 중… 이름을 말해 보세요'
+          : quiz.micErr ? esc(quiz.micErr)
+          : quiz.heard ? `들은 말: <b>${esc(quiz.heard)}</b> — 맞으면 확인을 누르세요`
+          : quiz.wrong ? `틀렸습니다 · ${quiz.wrong}회 · 이 문제 현재 ${quizQScore()}점` : `맞히면 ${quizQScore()}점`}</div>
+
+        <div class="qz-acts">
+          <button type="button" class="qz-btn" data-hint ${quiz.state !== 'ask' || quiz.hints >= max ? 'disabled' : ''}>힌트 (${quiz.hints}/${max})</button>
+          ${quiz.state === 'ask'
+            ? `<button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>`
+            : `<a class="qz-btn qz-btn--ghost" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 보기</a>`}
+          <button type="button" class="qz-btn ${quiz.state === 'ask' ? 'qz-btn--ghost' : 'qz-btn--go'}" data-skip title="${quiz.state === 'ask' ? '이 교수는 건너뜁니다 (사진을 왼쪽으로 밀어도 됩니다)' : '다음 문제'}">${quiz.state === 'ask' ? '다음 →' : quiz.i + 1 >= quiz.deck.length ? '결과 보기' : '다음 문제'}</button>
+        </div>
       </div>
     </div>`;
 
@@ -591,7 +592,7 @@ function renderQuiz() {
     </div>`;
   bindQuiz();
   const inp = $app.querySelector('#qzIn');
-  if (inp && !('ontouchstart' in window)) inp.focus();
+  if (inp && !inp.disabled && !('ontouchstart' in window)) inp.focus();
 }
 
 function bindQuiz() {
@@ -629,7 +630,6 @@ function bindQuiz() {
     if (el.tagName !== 'BUTTON') el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); takeHint(); } });
   });
   $app.querySelector('[data-give]')?.addEventListener('click', () => { speechStop(); quiz.heard = ''; quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
-  $app.querySelector('[data-next]')?.addEventListener('click', quizNext);
   $app.querySelector('[data-skip]')?.addEventListener('click', quizNext);
   $app.querySelector('[data-mic]')?.addEventListener('click', () => { quiz.micErr = ''; quiz.listening ? speechStop() : speechStart(); });
   $app.querySelector('#qzForm')?.addEventListener('submit', e => {
@@ -1417,6 +1417,17 @@ function insightsHtml(p, d, data) {
     ${insSearchRow(p)}`;
 }
 
+function aiHtml(p, d, data) {
+  if (data === undefined) return `<div class="ins__skel">불러오는 중…</div>`;
+  const e = data && data.profs && data.profs[p.slug], a = e && e.ai;
+  if (e && e.self) return `<p class="ins__empty">본인입니다.</p>`;
+  if (!a || !a.items || !a.items.length) return `<p class="ins__empty">아직 정리된 내용이 없습니다.</p>`;
+  return `
+    ${a.sum ? `<p class="aix__sum">${esc(a.sum)}</p>` : ''}
+    <ul class="aix__list">${a.items.map(x => `<li><b>${esc(x.t)}</b><span>${esc(x.d)}</span></li>`).join('')}</ul>
+    <p class="ins__foot">세부 전공·대표 논문을 바탕으로 정리한 제안입니다.</p>`;
+}
+
 /* ---------- 상세 드로어 ---------- */
 function openDrawer(p, d) {
   const links = [
@@ -1461,7 +1472,7 @@ function openDrawer(p, d) {
 
       ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary">${esc(p.summary)}</p></div>` : ''}
 
-      ${p.papers.length ? `<div class="d-section"><h3>대표 논문</h3><ul class="d-papers">${p.papers.map(x => `<li><span class="t">${esc(x.t)}</span><span class="j"><i>${esc(x.j || '')}</i>${x.y ? ` · ${esc(x.y)}` : ''}</span></li>`).join('')}</ul></div>` : ''}
+      <div class="d-section d-aix"><h3>AI 융합 방향</h3><div class="aix" data-slug="${esc(p.slug)}">${aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 
       ${links.length ? `<div class="d-section"><h3>바로가기</h3><div class="d-links">${links.map(l => `<a class="lnk ${l.primary ? 'primary' : ''}" href="${esc(l.href)}" ${l.href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(l.label)} ↗</a>`).join('')}</div></div>` : ''}
     </div>`;
@@ -1470,6 +1481,8 @@ function openDrawer(p, d) {
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
     if (box) box.innerHTML = insightsHtml(p, d, data);
+    const abox = $panel.querySelector(`.aix[data-slug="${CSS.escape(p.slug)}"]`);
+    if (abox) abox.innerHTML = aiHtml(p, d, data);
   });
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
