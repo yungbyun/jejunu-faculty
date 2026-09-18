@@ -1420,6 +1420,24 @@ function insightsHtml(p, d, data) {
     ${insSearchRow(p)}`;
 }
 
+/* 항목 하나: 결론은 늘 보이고, 용어 풀이는 접어 둔다.
+ * 예전 형식(설명이 d 한 덩어리)도 그대로 읽히도록 term/concl로 나눠 준다. */
+function aiItemHtml(x, i) {
+  let term = x.term, concl = x.concl;
+  if (concl == null) {
+    const t = String(x.d || '').trim(), k = t.lastIndexOf('따라서 ');
+    if (k >= 0) { term = t.slice(0, k).trim(); concl = t.slice(k + 4).trim(); }
+    else { term = ''; concl = t; }
+  }
+  return `<li>
+    <div class="aix__top">
+      <span class="aix__num" aria-hidden="true">${i + 1}</span>
+      <div class="aix__txt"><b>${esc(x.t)}</b><p class="aix__concl">${esc(concl)}</p></div>
+    </div>
+    ${term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${esc(term)}</div></details>` : ''}
+  </li>`;
+}
+
 function aiHtml(p, d, data) {
   if (data === undefined) return `<div class="ins__skel">불러오는 중…</div>`;
   const e = data && data.profs && data.profs[p.slug], a = e && e.ai;
@@ -1427,7 +1445,7 @@ function aiHtml(p, d, data) {
   if (!a || !a.items || !a.items.length) return `<p class="ins__empty">아직 정리된 내용이 없습니다.</p>`;
   return `
     ${a.sum ? `<p class="aix__sum">${esc(a.sum)}</p>` : ''}
-    <ul class="aix__list">${a.items.map(x => `<li><b>${esc(x.t)}</b><span>${esc(x.d)}</span></li>`).join('')}</ul>
+    <ul class="aix__list">${a.items.map(aiItemHtml).join('')}</ul>
     <p class="ins__foot">세부 전공·대표 논문을 바탕으로 정리한 제안입니다.</p>`;
 }
 
