@@ -429,7 +429,7 @@ function renderQuiz() {
     </div>
     <div class="qz-picker ${quiz.pickingP ? 'open' : ''}">
       <button type="button" class="qz-picker__t" id="qzPickP" aria-expanded="${quiz.pickingP}">
-        출제 교수 <b>${pool.length}</b>/${cand.length}명${caret}
+        교수 <b>${pool.length}</b>/${cand.length}명${caret}
       </button>
       ${quiz.pickingP ? (byDept.length ? `<div class="qz-picker__b">
         ${byDept.map(([d, ps]) => {
@@ -447,8 +447,8 @@ function renderQuiz() {
 
   if (!pool.length) {
     $app.innerHTML = `<div class="view quiz"><div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>이름 맞히기</span></div>
-      <div class="hero"><h1>이름 맞히기</h1><p>사진을 보고 교수 이름을 맞히는 게임입니다.</p></div>
-      ${picker}<div class="empty"><strong>출제할 교수가 없습니다</strong>학과를 하나 이상 선택하고, 교수 선택에서 최소 한 명은 켜 주세요.</div></div>`;
+      <div class="empty"><strong>출제할 교수가 없습니다</strong>학과를 하나 이상 선택하고, 교수 목록에서 최소 한 명은 켜 주세요.</div>
+      ${picker}</div>`;
     bindQuiz(); return;
   }
   if (!quiz.deck.length || quiz.deck.some(p => !sel.has(p.dept_id) || ex.has(rKey(p)))) quizStart();
@@ -485,7 +485,7 @@ function renderQuiz() {
         ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">힌트를 누르면 학과부터 알려 줍니다</div>`}
         ${quiz.state === 'ask' ? `
           <form class="qz-form" id="qzForm" autocomplete="off">
-            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하거나 말하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
             ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
               <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>` : ''}
@@ -511,10 +511,9 @@ function renderQuiz() {
   $app.innerHTML = `
     <div class="view quiz">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>이름 맞히기</span></div>
-      <div class="hero"><h1>이름 맞히기</h1><p>사진을 보고 교수 이름을 맞혀 보세요. 정답 ${QUIZ_BASE}점에서 힌트 1개당 ${QUIZ_HINT}점, 오답 1회당 ${QUIZ_WRONG}점을 뺍니다(최소 ${QUIZ_MIN}점).</p></div>
-      ${picker}
-      ${head}
       ${body}
+      ${head}
+      ${picker}
       <div class="qz-foot"><button type="button" class="btn" data-restart>처음부터 다시</button></div>
     </div>`;
   bindQuiz();
