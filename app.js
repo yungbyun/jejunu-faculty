@@ -998,9 +998,9 @@ async function loadRatings() {
 function startSyncLoop() {
   if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
   const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
-  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); checkVersion(); } }, sec * 1000);
-  updateSaveBar(); checkVersion();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); checkVersion(); } else flushMemo(); });
+  sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); } }, sec * 1000);
+  updateSaveBar();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); } else flushMemo(); });
   window.addEventListener('focus', () => syncRatings());
   window.addEventListener('online', () => syncRatings());
   window.addEventListener('pageshow', e => { if (e.persisted) syncRatings(); });
@@ -1222,18 +1222,39 @@ function updateSaveBar() {
 
 /* 새 버전이 배포됐는지 확인 (index.html의 로더가 붙인 ?v= 와 version.json 비교). 다르면 새로고침 안내 */
 const APP_V = (() => { try { const m = (document.currentScript && document.currentScript.src || '').match(/[?&]v=([^&]+)/); return m ? m[1] : ''; } catch { return ''; } })();
+/* 캐시를 건너뛰고 다시 불러온다. 아이폰 홈 화면 앱은 location.reload()로도 캐시가 남는 일이 있어
+ * 주소에 값을 붙여 새 주소로 이동시킨다. */
+function hardReload() {
+  try { flushMemo(); } catch {}
+  const u = location.pathname + '?r=' + Date.now() + location.hash;
+  setTimeout(() => { try { location.replace(u); } catch { location.reload(); } }, 250);
+}
+
 async function checkVersion() {
   if (!APP_V || document.visibilityState !== 'visible') return;
   try {
     const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const j = await r.json();
-    if (j && j.v && String(j.v) !== APP_V && $saveBar && !sync.queue.size && !sync.dirty.size) {
-      $saveBar.className = 'savebar savebar--busy'; $saveBar.dataset.mode = 'ver';
-      $saveBar.innerHTML = `새 버전이 있습니다 <button type="button" class="savebar__btn" id="reloadNew">새로고침</button>`; $saveBar.hidden = false;
-      $saveBar.querySelector('#reloadNew').addEventListener('click', () => { flushMemo(); setTimeout(() => location.reload(), 300); });
-    }
+    if (!j || !j.v || String(j.v) === APP_V) return;
+    if (sync.queue.size || sync.dirty.size) return;          // 저장 중이면 나중에
+    updateSaveBar();                                          // $saveBar 준비
+    if (!$saveBar) return;
+    $saveBar.className = 'savebar savebar--busy'; $saveBar.dataset.mode = 'ver';
+    $saveBar.innerHTML = `새 버전이 있습니다 <button type="button" class="savebar__btn" id="reloadNew">새로고침</button>`;
+    $saveBar.hidden = false;
+    $saveBar.querySelector('#reloadNew').addEventListener('click', hardReload);
   } catch {}
+}
+
+/* 버전 감시는 로그인·시트 연동과 무관하게 항상 돈다 */
+function startVersionWatch() {
+  checkVersion();
+  setInterval(checkVersion, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+  window.addEventListener('focus', checkVersion);
+  window.addEventListener('pageshow', e => { if (e.persisted) checkVersion(); });
+  document.getElementById('footReload')?.addEventListener('click', hardReload);
 }
 
 /* 앱 토큰 만료가 가까우면 화면이 보이는 동안 미리 갱신해 둔다 (구글 창을 띄우지 않는다) */
@@ -1585,6 +1606,7 @@ function showGate() {
 }
 
 /* ---------- 시작 ---------- */
+startVersionWatch();
 window.addEventListener('hashchange', () => { state.rankFilter = '전체'; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
 if (!authEnabled()) {
   enterApp(null);

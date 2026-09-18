@@ -218,6 +218,9 @@ main{min-height:60vh;padding:40px 20px 72px}
 .foot__status.ok::before{background:#22a06b}
 .foot__status.warn::before{background:#e0a020}
 .foot__sep{opacity:.5}
+.foot__btn{font:inherit;font-size:inherit;padding:4px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer;transition:all .14s}
+.foot__btn:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.foot__btn:active{transform:scale(.96)}
 
 /* ---------- 로그인 게이트 · 사용자 ---------- */
 .gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:grid;place-items:center;padding:24px}
