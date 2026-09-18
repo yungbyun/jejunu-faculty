@@ -209,7 +209,7 @@ function apply(rawRows, source) {
 /* 새로 고침 버튼: 캐시를 지우고 시트에서 다시 읽음 */
 const refreshBtn = document.getElementById('refreshBtn');
 async function refreshNow() {
-  refreshBtn.classList.add('busy');
+  refreshBtn?.classList.add('busy');
   setStatus('loading');
   try { localStorage.removeItem('jnu-faculty-cache'); } catch {}
   try {
@@ -222,10 +222,10 @@ async function refreshNow() {
     if (state.rows.length) { setStatus(state.source === 'sheet' ? 'sheet' : 'fallback'); flashStatus('시트를 읽지 못했습니다 — 공개 설정을 확인하세요', true); }
     else loadData();
   } finally {
-    setTimeout(() => refreshBtn.classList.remove('busy'), 400);
+    setTimeout(() => refreshBtn?.classList.remove('busy'), 400);
   }
 }
-refreshBtn.addEventListener('click', refreshNow);
+refreshBtn?.addEventListener('click', refreshNow);
 
 /* 좌상단 로고(J) 클릭: 첫 화면으로 돌아가면서 시트에서 데이터 새로 고침 */
 document.querySelector('.brand').addEventListener('click', e => {
@@ -889,6 +889,57 @@ function bindCards() {
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
 
+/* ---------- 검색 결과 (data/insights/<학과>.json) ----------
+ * GitHub Pages는 정적 호스팅이라 브라우저에서 검색 API를 부를 수 없어, 미리 모아 둔 파일을 읽어 보여줍니다.
+ * 상세 창을 열 때 해당 학과 파일만 가져오므로 첫 화면 로딩에는 영향이 없습니다. */
+const insCache = new Map(), insWait = new Map();
+function loadInsights(deptId) {
+  if (insCache.has(deptId)) return Promise.resolve(insCache.get(deptId));
+  if (insWait.has(deptId)) return insWait.get(deptId);
+  const pr = fetch(`data/insights/${encodeURIComponent(deptId)}.json?v=${encodeURIComponent(APP_V || '1')}`)
+    .then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(d => { insCache.set(deptId, d); insWait.delete(deptId); return d; });
+  insWait.set(deptId, pr);
+  return pr;
+}
+
+const K_LABEL = { news: '보도', notice: '학내', academic: '연구', activity: '대외' };
+
+/* 직접 더 찾아보기 버튼 — 이름만으로는 동명이인이 섞이므로 소속을 붙여 검색 */
+function insSearchRow(p) {
+  const q = encodeURIComponent(`"${p.name}" 제주대`);
+  const scholar = p.scholar || `https://scholar.google.com/scholar?q=${encodeURIComponent((p.name_en || p.name) + ' Jeju National University')}`;
+  return `<div class="ins__search">
+    <a class="lnk" href="https://search.naver.com/search.naver?where=news&query=${q}" target="_blank" rel="noopener">네이버뉴스 ↗</a>
+    <a class="lnk" href="https://www.google.com/search?tbm=nws&q=${q}" target="_blank" rel="noopener">구글뉴스 ↗</a>
+    <a class="lnk" href="${esc(scholar)}" target="_blank" rel="noopener">Scholar ↗</a>
+  </div>`;
+}
+
+function insItemHtml(x) {
+  return `<li class="ins__i ins__i--${esc(x.k || 'news')}">
+    <a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.t)}</a>
+    <div class="ins__meta"><span class="ins__k">${esc(K_LABEL[x.k] || '기타')}</span>${x.s ? `<span>${esc(x.s)}</span>` : ''}${x.d ? `<span>${esc(x.d)}</span>` : ''}</div>
+  </li>`;
+}
+
+function insightsHtml(p, d, data) {
+  if (data === undefined) return `<div class="ins__skel">불러오는 중…</div>`;
+  const e = data && data.profs && data.profs[p.slug];
+  if (e && e.self) return `<p class="ins__empty">본인입니다.</p>`;
+  if (!e || (!e.items?.length && !e.highlights?.length)) {
+    return `<p class="ins__empty">아직 모아 둔 자료가 없습니다. 아래에서 직접 찾아보세요.</p>${insSearchRow(p)}`;
+  }
+  const items = e.items || [], head = items.slice(0, 5), rest = items.slice(5);
+  return `
+    ${e.highlights?.length ? `<div class="ins__hl">${e.highlights.map(h => `<span class="ins__chip">${esc(h)}</span>`).join('')}</div>` : ''}
+    ${head.length ? `<ul class="ins__list">${head.map(insItemHtml).join('')}</ul>` : ''}
+    ${rest.length ? `<details class="ins__more"><summary>나머지 ${rest.length}개 보기</summary><ul class="ins__list">${rest.map(insItemHtml).join('')}</ul></details>` : ''}
+    ${e.note ? `<p class="ins__note">${esc(e.note)}</p>` : ''}
+    <p class="ins__foot">${esc(data.updated || '')} 기준 · 공개된 보도·공지·학술 자료</p>
+    ${insSearchRow(p)}`;
+}
+
 /* ---------- 상세 드로어 ---------- */
 function openDrawer(p, d) {
   const links = [
@@ -929,6 +980,8 @@ function openDrawer(p, d) {
         </dl>
       </div>
 
+      <div class="d-section d-ins"><h3>검색 결과</h3><div class="ins" data-slug="${esc(p.slug)}">${insightsHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
+
       ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary">${esc(p.summary)}</p></div>` : ''}
 
       ${p.papers.length ? `<div class="d-section"><h3>대표 논문</h3><ul class="d-papers">${p.papers.map(x => `<li><span class="t">${esc(x.t)}</span><span class="j"><i>${esc(x.j || '')}</i>${x.y ? ` · ${esc(x.y)}` : ''}</span></li>`).join('')}</ul></div>` : ''}
@@ -937,6 +990,10 @@ function openDrawer(p, d) {
     </div>`;
   bindRates($panel);
   bindNotes($panel);
+  if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
+    const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
+    if (box) box.innerHTML = insightsHtml(p, d, data);
+  });
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
   $panel.querySelector('[data-close]').focus();

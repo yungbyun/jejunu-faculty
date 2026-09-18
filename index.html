@@ -11,7 +11,7 @@
 <meta name="description" content="제주대학교 공과대학 학과별 교수진 — 연구실, 연락처, 세부 전공과 최근 논문">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231b3a5c'/><text x='32' y='42' font-size='30' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>J</text></svg>">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="styles.css?v=20260918n" id="cssMain">
+<link rel="stylesheet" href="styles.css?v=20260918p" id="cssMain">
 </head>
 <body>
 
@@ -33,9 +33,6 @@
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <input id="q" type="search" placeholder="교수명 · 전공 키워드 검색" autocomplete="off">
       </label>
-      <button id="refreshBtn" class="iconbtn" type="button" aria-label="데이터 새로 고침" title="Google 시트에서 최신 데이터 다시 불러오기">
-        <svg class="ico-refresh" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
       <div id="userBox" class="user" hidden></div>
       <button id="themeBtn" class="iconbtn" type="button" aria-label="테마 전환" title="라이트/다크 전환">
         <svg class="ico-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -75,7 +72,7 @@
 /* 버전 확인 후 app.js 로드: version.json은 매번 새로 읽으므로(캐시 없음) 배포 직후에도 옛 코드가 남지 않습니다.
    읽지 못하면(오프라인 등) 아래 기본 버전으로 로드합니다. */
 (async function () {
-  var v = '20260918n';
+  var v = '20260918p';
   try { var r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { var j = await r.json(); if (j && j.v) v = String(j.v); } } catch (e) {}
   var css = document.getElementById('cssMain');
   if (css && css.href.indexOf('v=' + v) < 0) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'styles.css?v=' + v; l.onload = function () { css.remove(); }; document.head.appendChild(l); }
