@@ -445,3 +445,4 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .savebar--busy{background:#2563eb}.savebar--ok{background:#1f8a5b}.savebar--warn{background:#c0392b}
 .savebar__btn{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
 .savebar__btn:hover{background:rgba(255,255,255,.3)}
+.savebar--auth{white-space:normal;text-align:center;flex-wrap:wrap;justify-content:center;border-radius:16px;padding:10px 14px}

@@ -27,7 +27,7 @@ const CONFIG = {
     // 허용할 도메인 — 예: ['jejunu.ac.kr'] (이 도메인 메일은 모두 통과). 둘 다 비우면 구글 로그인만 하면 통과
     ALLOWED_DOMAINS: ['jejunu.ac.kr'],
     // 로그인 유지 시간(시간)
-    SESSION_HOURS: 24 * 7,
+    SESSION_HOURS: 24 * 365, // 앱을 열 때마다 이 기간만큼 다시 연장되므로 사실상 계속 유지
   },
   // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
   RATINGS: {
@@ -625,7 +625,7 @@ function startSyncLoop() {
   if (sync.timer || !CONFIG.RATINGS.API_URL || !state.session) return;
   const sec = Math.max(15, Number(CONFIG.RATINGS.SYNC_SEC) || 60);
   sync.timer = setInterval(() => { if (document.visibilityState === 'visible') { syncRatings(); keepTokenFresh(); } }, sec * 1000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncRatings(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepTokenFresh(); syncRatings(); } });
   window.addEventListener('focus', () => syncRatings());
   window.addEventListener('online', () => syncRatings());
   window.addEventListener('pageshow', e => { if (e.persisted) syncRatings(); });
@@ -731,6 +731,16 @@ let $saveBar = null;
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
   const saving = sync.queue.size, dirty = sync.dirty.size;
+  if (sync.authNeeded) {
+    if ($saveBar.dataset.mode !== 'auth') {
+      $saveBar.className = 'savebar savebar--warn savebar--auth'; $saveBar.dataset.mode = 'auth';
+      $saveBar.innerHTML = `<span>${dirty ? `미저장 ${dirty}건 · ` : ''}저장을 계속하려면 Google 로그인을 한 번 확인해 주세요</span><span id="reloginBtn"></span>`;
+      $saveBar.hidden = false;
+      ensureGis().then(() => google.accounts.id.renderButton(document.getElementById('reloginBtn'), { theme: 'filled_blue', size: 'medium', text: 'continue_with', shape: 'pill', locale: 'ko' })).catch(() => {});
+    }
+    return;
+  }
+  delete $saveBar.dataset.mode;
   if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = `시트에 저장 중… (${saving}건)`; $saveBar.hidden = false; }
   else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 선호도 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
   else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
@@ -902,10 +912,14 @@ function onCredential(resp) {
   if (!p || p.aud !== CONFIG.AUTH.CLIENT_ID || !p.email_verified) { if (tokenWaiter) { tokenWaiter.reject(new Error('토큰 확인 실패')); tokenWaiter = null; } gateMessage('로그인 정보를 확인할 수 없습니다. 다시 시도해 주세요.', true); return; }
   if (!isAllowed(p.email)) { if (tokenWaiter) { tokenWaiter.reject(new Error('허용되지 않은 계정')); tokenWaiter = null; } gateMessage(`${p.email} 계정은 접근이 허용되지 않았습니다.`, true); return; }
   const s = saveSession(p, resp.credential);
-  if (tokenWaiter) { // 조용한 토큰 갱신 중이었음
-    const w = tokenWaiter; tokenWaiter = null;
-    if (state.session && state.session.email !== s.email) { w.reject(new Error('다른 계정으로 로그인됨')); location.reload(); return; }
-    state.session = s; w.resolve(s.credential); return;
+  if (state.session) { // 이미 앱 안에 있음: 토큰만 갈아 끼우고 밀린 저장을 바로 올림
+    if (state.session.email !== s.email) { if (tokenWaiter) { tokenWaiter.reject(new Error('다른 계정으로 로그인됨')); tokenWaiter = null; } location.reload(); return; }
+    state.session = s;
+    sync.authNeeded = false;
+    if (tokenWaiter) { const w = tokenWaiter; tokenWaiter = null; w.resolve(s.credential); }
+    else { sync.last = 0; syncRatings(); }
+    updateSaveBar();
+    return;
   }
   enterApp(s);
 }
@@ -927,14 +941,18 @@ async function getFreshToken() {
   const s = state.session;
   if (!s) throw new Error('로그인 필요');
   if (s.credential && s.tokExp - Date.now() > 60e3) return s.credential;
+  if (sync.authNeeded) throw new Error('로그인 확인 필요'); // 이미 버튼을 띄워 둔 상태면 조용한 갱신을 반복하지 않음
   await ensureGis();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { if (tokenWaiter) { tokenWaiter = null; reject(new Error('로그인 갱신 필요 — 로그아웃 후 다시 로그인해 주세요')); } }, 15000);
+    const timer = setTimeout(() => { if (tokenWaiter) { tokenWaiter = null; reject(authError()); } }, 15000);
     const done = fn => v => { clearTimeout(timer); fn(v); };
     tokenWaiter = { resolve: done(resolve), reject: done(reject) };
-    google.accounts.id.prompt(n => { if (n.isNotDisplayed && n.isNotDisplayed() || n.isSkippedMoment && n.isSkippedMoment()) { if (tokenWaiter) { tokenWaiter.reject(new Error('로그인 갱신 필요 — 로그아웃 후 다시 로그인해 주세요')); tokenWaiter = null; } } });
+    google.accounts.id.prompt(n => { if (n.isNotDisplayed && n.isNotDisplayed() || n.isSkippedMoment && n.isSkippedMoment()) { if (tokenWaiter) { tokenWaiter.reject(authError()); tokenWaiter = null; } } });
   });
 }
+
+/* 조용한 갱신이 안 될 때: 로그아웃시키지 않고 하단 막대에 Google 버튼을 띄워 한 번만 누르게 함 */
+function authError() { sync.authNeeded = true; updateSaveBar(); return new Error('로그인 확인 필요'); }
 
 function renderUser(s) {
   if (!$user) return;
@@ -954,6 +972,7 @@ function logout() {
 
 function enterApp(session) {
   state.session = session;
+  if (session) { session.exp = Date.now() + CONFIG.AUTH.SESSION_HOURS * 3600e3; try { localStorage.setItem(AUTH_KEY, JSON.stringify(session)); } catch {} } // 열 때마다 로그인 유지 기간 연장
   document.body.classList.add('authed');
   $gate.hidden = true;
   if (session) renderUser(session);
