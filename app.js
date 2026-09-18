@@ -265,6 +265,7 @@ function route() {
     return { view: 'dept', dept: decodeURIComponent(parts[1]), prof: parts[2] === 'prof' && parts[3] ? decodeURIComponent(parts[3]) : null };
   }
   if (parts[0] === 'stats') return { view: 'stats' };
+  if (parts[0] === 'quiz') return { view: 'quiz' };
   return { view: 'home' };
 }
 
@@ -281,12 +282,167 @@ function render() {
   } else if (r.view === 'stats') {
     renderStats();
     closeDrawer(false);
+  } else if (r.view === 'quiz') {
+    renderQuiz();
+    closeDrawer(false);
   } else {
     renderHome();
     closeDrawer(false);
   }
   document.querySelectorAll('[data-nav]').forEach(a => a.setAttribute('aria-current', a.dataset.nav === r.view ? 'page' : 'false'));
   window.scrollTo({ top: 0 });
+}
+
+/* ---------- 화면: 이름 맞히기 퀴즈 ----------
+ * 사진을 보고 이름을 맞힙니다. 힌트를 누를 때마다 학과 → 성 → 이름 첫 글자 → 두 번째 글자… 순으로 열립니다.
+ * 점수: 정답 100점에서 힌트 1개당 25점, 오답 1회당 10점을 빼고 최소 10점. 정답을 보면 0점. */
+const QUIZ_BASE = 100, QUIZ_HINT = 25, QUIZ_WRONG = 10, QUIZ_MIN = 10;
+const QUIZ_DEPTS_KEY = 'jnu-quiz-depts';
+const quiz = { depts: null, deck: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false };
+
+function quizDepts() {
+  if (quiz.depts) return quiz.depts;
+  try { const v = JSON.parse(localStorage.getItem(QUIZ_DEPTS_KEY) || 'null'); if (Array.isArray(v)) quiz.depts = new Set(v); } catch {}
+  if (!quiz.depts) quiz.depts = new Set(state.depts.map(d => d.id));
+  return quiz.depts;
+}
+function quizSaveDepts() { try { localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify([...quizDepts()])); } catch {} }
+function quizPool() {
+  const sel = quizDepts();
+  return state.rows.filter(p => p.photo && sel.has(p.dept_id));
+}
+function quizStart() {
+  const pool = quizPool().slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  Object.assign(quiz, { deck: pool, i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0 });
+}
+const quizCur = () => quiz.deck[quiz.i];
+const quizMaxHints = p => 1 + p.name.length;              // 1: 학과, 그다음 한 글자씩
+const quizQScore = () => Math.max(QUIZ_MIN, QUIZ_BASE - quiz.hints * QUIZ_HINT - quiz.wrong * QUIZ_WRONG);
+const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
+function quizMask(p, hints) {
+  const k = Math.max(0, Math.min(hints - 1, p.name.length));
+  return p.name.split('').map((c, i) => i < k ? c : '○').join(' ');
+}
+
+function renderQuiz() {
+  if (!state.rows.length) return;
+  const pool = quizPool();
+  const sel = quizDepts();
+  const picker = `
+    <div class="qz-picker ${quiz.picking ? 'open' : ''}">
+      <button type="button" class="qz-picker__t" id="qzPick" aria-expanded="${quiz.picking}">
+        학과 선택 <b>${sel.size}/${state.depts.length}</b> · 대상 ${pool.length}명
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      ${quiz.picking ? `<div class="qz-picker__b">
+        <div class="qz-dchips">
+          ${state.depts.map(d => `<button type="button" class="qz-dchip" data-d="${esc(d.id)}" aria-pressed="${sel.has(d.id)}" style="--dept-color:${esc(d.color)}">${esc(d.name)}<span class="n">${d.profs.length}</span></button>`).join('')}
+        </div>
+        <div class="qz-dacts"><button type="button" class="btn" data-dall>전체 선택</button><button type="button" class="btn" data-dnone>전체 해제</button></div>
+        <p class="st-note">학과를 바꾸면 게임이 새로 시작됩니다.</p>
+      </div>` : ''}
+    </div>`;
+
+  if (!pool.length) {
+    $app.innerHTML = `<div class="view quiz"><div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>이름 맞히기</span></div>
+      <div class="hero"><h1>이름 맞히기</h1><p>사진을 보고 교수 이름을 맞히는 게임입니다.</p></div>
+      ${picker}<div class="empty"><strong>선택한 학과에 사진이 있는 교수가 없습니다</strong>학과를 하나 이상 선택해 주세요.</div></div>`;
+    bindQuiz(); return;
+  }
+  if (!quiz.deck.length || quiz.deck.some(p => !sel.has(p.dept_id))) quizStart();
+
+  const done = quiz.i >= quiz.deck.length;
+  const p = done ? null : quizCur();
+  const d = p ? state.depts.find(x => x.id === p.dept_id) : null;
+  const max = p ? quizMaxHints(p) : 0;
+  const asked = quiz.i + (quiz.state === 'ask' ? 0 : 1);
+  const head = `
+    <div class="qz-score">
+      <div class="qz-score__n">${quiz.score}<small>점</small></div>
+      <div class="qz-score__m">
+        <span>맞힘 <b>${quiz.correct}</b>/${asked}</span>
+        <span>힌트 <b>${quiz.hintTotal}</b>개</span>
+        <span>진행 <b>${Math.min(quiz.i + 1, quiz.deck.length)}</b>/${quiz.deck.length}</span>
+      </div>
+      <div class="meter" aria-label="진행률"><span style="width:${Math.round(quiz.i / quiz.deck.length * 100)}%"></span></div>
+    </div>`;
+
+  const body = done ? `
+    <div class="qz-end">
+      <div class="qz-end__n">${quiz.score}<small>점</small></div>
+      <p>${quiz.deck.length}명 중 <b>${quiz.correct}명</b>을 맞혔습니다 · 힌트 ${quiz.hintTotal}개 사용 · 평균 ${Math.round(quiz.score / quiz.deck.length)}점</p>
+      <button type="button" class="qz-btn qz-btn--go" data-restart>다시 하기</button>
+    </div>` : `
+    <div class="qz-card" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+      <div class="qz-photo">
+        <div class="avatar" aria-hidden="true">?</div>
+        <img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="교수 사진" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">
+      </div>
+      <div class="qz-main">
+        <div class="qz-mask" aria-live="polite">${quiz.state === 'ask' ? esc(quizMask(p, quiz.hints)) : esc(p.name)}</div>
+        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">힌트를 누르면 학과부터 알려 줍니다</div>`}
+        ${quiz.state === 'ask' ? `
+          <form class="qz-form" id="qzForm" autocomplete="off">
+            <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button type="submit" class="qz-btn qz-btn--go">확인</button>
+          </form>
+          <div class="qz-msg ${quiz.wrong ? 'warn' : ''}">${quiz.wrong ? `틀렸습니다 · ${quiz.wrong}회 · 이 문제 현재 ${quizQScore()}점` : `맞히면 ${quizQScore()}점`}</div>
+          <div class="qz-acts">
+            <button type="button" class="qz-btn" data-hint ${quiz.hints >= max ? 'disabled' : ''}>힌트 (${quiz.hints}/${max})</button>
+            <button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>
+          </div>` : `
+          <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : 'warn'}">${quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점` : '정답을 공개했습니다 · 0점'}</div>
+          <div class="qz-acts">
+            <a class="qz-btn qz-btn--ghost" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 보기</a>
+            <button type="button" class="qz-btn qz-btn--go" data-next>${quiz.i + 1 >= quiz.deck.length ? '결과 보기' : '다음 문제'}</button>
+          </div>`}
+      </div>
+    </div>`;
+
+  $app.innerHTML = `
+    <div class="view quiz">
+      <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>이름 맞히기</span></div>
+      <div class="hero"><h1>이름 맞히기</h1><p>사진을 보고 교수 이름을 맞혀 보세요. 정답 ${QUIZ_BASE}점에서 힌트 1개당 ${QUIZ_HINT}점, 오답 1회당 ${QUIZ_WRONG}점을 뺍니다(최소 ${QUIZ_MIN}점).</p></div>
+      ${picker}
+      ${head}
+      ${body}
+      <div class="qz-foot"><button type="button" class="btn" data-restart>처음부터 다시</button></div>
+    </div>`;
+  bindQuiz();
+  const inp = $app.querySelector('#qzIn');
+  if (inp && !('ontouchstart' in window)) inp.focus();
+}
+
+function bindQuiz() {
+  $app.querySelector('#qzPick')?.addEventListener('click', () => { quiz.picking = !quiz.picking; renderQuiz(); });
+  $app.querySelectorAll('.qz-dchip').forEach(b => b.addEventListener('click', () => {
+    const s = quizDepts(), id = b.dataset.d;
+    s.has(id) ? s.delete(id) : s.add(id);
+    quizSaveDepts(); quizStart(); renderQuiz();
+  }));
+  $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quizSaveDepts(); quizStart(); renderQuiz(); });
+  $app.querySelector('[data-dnone]')?.addEventListener('click', () => { quiz.depts = new Set(); quizSaveDepts(); quizStart(); renderQuiz(); });
+  $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { quizStart(); renderQuiz(); }));
+  $app.querySelector('[data-hint]')?.addEventListener('click', () => {
+    const p = quizCur(); if (!p || quiz.hints >= quizMaxHints(p)) return;
+    quiz.hints++; quiz.hintTotal++;
+    if (quiz.hints >= quizMaxHints(p)) { quiz.state = 'give'; quiz.gained = 0; } // 이름이 다 열리면 정답 공개
+    renderQuiz();
+  });
+  $app.querySelector('[data-give]')?.addEventListener('click', () => { quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
+  $app.querySelector('[data-next]')?.addEventListener('click', () => {
+    quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask'; renderQuiz();
+  });
+  $app.querySelector('#qzForm')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const p = quizCur(), inp = $app.querySelector('#qzIn'), v = quizNorm(inp.value);
+    if (!v) return;
+    if (v === quizNorm(p.name) || (p.name_en && v === quizNorm(p.name_en))) {
+      quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok';
+    } else { quiz.wrong++; inp.value = ''; }
+    renderQuiz();
+  });
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
@@ -719,7 +875,7 @@ async function syncRatings({ initial = false } = {}) {
     saveRatingsCache();
     sync.last = Date.now();
     if (initial) render();
-    else if (changed.length) { if (route().view === 'dept') changed.forEach(k => refreshRatingUI(k, state.ratings.get(k) || '')); else render(); flashStatus(`다른 기기의 기록 ${changed.length}건을 반영했습니다`); }
+    else if (changed.length) { const v = route().view; if (v === 'dept') changed.forEach(k => refreshRatingUI(k, state.ratings.get(k) || '')); else if (v !== 'quiz') render(); flashStatus(`다른 기기의 기록 ${changed.length}건을 반영했습니다`); }
     let n = 0;
     for (const [key, e] of localOnly) if (await pushEntry(key, e)) n++;
     if (n) { saveRatingsCache(); flashStatus(`이 기기의 기록 ${n}건을 시트로 동기화했습니다`); }
