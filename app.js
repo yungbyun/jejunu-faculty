@@ -511,13 +511,13 @@ function renderQuiz() {
       <button type="button" class="qz-btn qz-btn--go" data-restart>다시 하기</button>
     </div>` : `
     <div class="qz-card" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
-      <div class="qz-photo">
+      <div class="qz-photo ${quiz.state === 'ask' && quiz.hints < max ? 'qz-photo--tap' : ''}"${quiz.state === 'ask' && quiz.hints < max ? ' data-hint role="button" tabindex="0" title="사진을 누르면 힌트가 하나 열립니다" aria-label="힌트 열기"' : ''}>
         <div class="avatar" aria-hidden="true">?</div>
         <img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="교수 사진" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">
       </div>
       <div class="qz-main">
         <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
-        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">힌트를 누르면 학과부터 알려 줍니다</div>`}
+        ${quiz.hints >= 1 || quiz.state !== 'ask' ? `<div class="qz-hintline">${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}</div>` : `<div class="qz-hintline muted">사진이나 힌트 버튼을 누르면 학과부터 알려 줍니다</div>`}
         ${quiz.state === 'ask' ? `
           <form class="qz-form" id="qzForm" autocomplete="off">
             <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -578,11 +578,15 @@ function bindQuiz() {
   $app.querySelector('[data-dall]')?.addEventListener('click', () => { quiz.depts = new Set(state.depts.map(d => d.id)); quiz.ex = new Set(); quizSaveDepts(); quizSaveEx(); quizStart(); renderQuiz(); });
   $app.querySelector('[data-dnone]')?.addEventListener('click', () => { quiz.depts = new Set(); quizSaveDepts(); quizStart(); renderQuiz(); });
   $app.querySelectorAll('[data-restart]').forEach(b => b.addEventListener('click', () => { speechStop(); quizStart(); renderQuiz(); }));
-  $app.querySelector('[data-hint]')?.addEventListener('click', () => {
-    const p = quizCur(); if (!p || quiz.hints >= quizMaxHints(p)) return;
+  const takeHint = () => {
+    const p = quizCur(); if (!p || quiz.state !== 'ask' || quiz.hints >= quizMaxHints(p)) return;
     quiz.hints++; quiz.hintTotal++;
     if (quiz.hints >= quizMaxHints(p)) { quiz.state = 'give'; quiz.gained = 0; } // 이름이 다 열리면 정답 공개
     renderQuiz();
+  };
+  $app.querySelectorAll('[data-hint]').forEach(el => {
+    el.addEventListener('click', takeHint);
+    if (el.tagName !== 'BUTTON') el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); takeHint(); } });
   });
   $app.querySelector('[data-give]')?.addEventListener('click', () => { speechStop(); quiz.heard = ''; quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
   $app.querySelector('[data-next]')?.addEventListener('click', () => {
@@ -1199,11 +1203,12 @@ let $saveBar = null;
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
   const saving = sync.queue.size + sync.busyS.size, dirty = sync.dirty.size + sync.dirtyS.size;
-  if (sync.authNeeded) {
+  if (sync.authNeeded && !sync.authHidden) {
     if ($saveBar.dataset.mode !== 'auth') {
       $saveBar.className = 'savebar savebar--warn savebar--auth'; $saveBar.dataset.mode = 'auth';
-      $saveBar.innerHTML = `<span>${dirty ? `미저장 ${dirty}건 · ` : ''}저장을 계속하려면 Google 로그인을 한 번 확인해 주세요</span><span id="reloginBtn"></span>`;
+      $saveBar.innerHTML = `<span>${dirty ? `미저장 ${dirty}건 · ` : ''}저장을 계속하려면 Google 로그인을 한 번 확인해 주세요</span><span id="reloginBtn"></span><button type="button" class="savebar__btn" id="authLater">나중에</button>`;
       $saveBar.hidden = false;
+      $saveBar.querySelector('#authLater').addEventListener('click', () => { sync.authHidden = true; delete $saveBar.dataset.mode; updateSaveBar(); });
       ensureGis().then(() => google.accounts.id.renderButton(document.getElementById('reloginBtn'), { theme: 'filled_blue', size: 'medium', text: 'continue_with', shape: 'pill', locale: 'ko' })).catch(() => {});
     }
     return;
@@ -1231,11 +1236,12 @@ async function checkVersion() {
   } catch {}
 }
 
-/* 토큰이 5분 안에 만료되면 화면이 보이는 동안 미리 조용히 갱신해 둔다 (저장 시점에 만료돼 실패하는 일 방지) */
+/* 앱 토큰 만료가 가까우면 화면이 보이는 동안 미리 갱신해 둔다 (구글 창을 띄우지 않는다) */
 async function keepTokenFresh() {
   const s = state.session;
-  if (!s || !s.credential || s.tokExp - Date.now() > 5 * 60e3 || tokenWaiter) return;
-  try { await getFreshToken(); } catch (e) { console.warn('토큰 갱신 실패:', e.message); }
+  if (!s || !CONFIG.RATINGS.API_URL || tokenWaiter) return;
+  if (s.appToken && s.appExp - Date.now() > APP_TOK_RENEW) return;
+  try { await authToken(); } catch (e) { console.warn('토큰 갱신 실패:', e.message); }
 }
 
 /* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */
@@ -1257,13 +1263,38 @@ function refreshRatingUI(key, val) {
   }
 }
 
-/* Apps Script 호출 — ID 토큰을 함께 보내 서버가 본인 여부를 확인 */
-async function ratingsApi(action, payload) {
-  const token = await getFreshToken();
-  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify({ action, token, ...payload }), redirect: 'follow', keepalive: action === 'set' });
+/* Apps Script 호출 */
+async function apiPost(payload) {
+  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify(payload), redirect: 'follow', keepalive: payload.action === 'set' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
 }
+async function ratingsApi(action, payload) {
+  const token = await authToken();
+  return apiPost({ action, token, ...payload });
+}
+
+/* 서버에 보낼 토큰.
+ * 구글 ID 토큰은 1시간이면 만료되고 브라우저가 조용한 재발급을 자주 막습니다. 그래서 로그인을 한 번 확인한 뒤에는
+ * 스크립트가 발급한 앱 토큰(기본 90일)을 받아 쓰고, 만료가 가까워지면 그 토큰만으로 조용히 갱신합니다. */
+const APP_TOK_RENEW = 7 * 86400e3;   // 만료 7일 전부터 갱신
+async function authToken() {
+  const s = state.session;
+  if (!s) throw new Error('로그인 필요');
+  if (s.appToken && s.appExp - Date.now() > APP_TOK_RENEW) return s.appToken;
+  const base = (s.appToken && s.appExp - Date.now() > 60e3) ? s.appToken : await getFreshToken();
+  try {
+    const r = await apiPost({ action: 'session', token: base });
+    if (r && r.ok && r.token) {
+      s.appToken = r.token; s.appExp = Number(r.exp) || 0;
+      persistSession();
+      sync.authNeeded = false;
+      return s.appToken;
+    }
+  } catch (e) { console.warn('앱 토큰 발급 실패:', e.message); }
+  return base;   // 스크립트가 아직 옛 버전이면 구글 토큰을 그대로 씀
+}
+function persistSession() { try { localStorage.setItem(AUTH_KEY, JSON.stringify(state.session)); } catch {} }
 
 function bindCards() {
   const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
@@ -1471,7 +1502,8 @@ function onCredential(resp) {
   if (state.session) { // 이미 앱 안에 있음: 토큰만 갈아 끼우고 밀린 저장을 바로 올림
     if (state.session.email !== s.email) { if (tokenWaiter) { tokenWaiter.reject(new Error('다른 계정으로 로그인됨')); tokenWaiter = null; } location.reload(); return; }
     state.session = s;
-    sync.authNeeded = false;
+    sync.authNeeded = false; sync.authHidden = false;
+    if (CONFIG.RATINGS.API_URL) authToken().catch(() => {});   // 새 로그인 직후 장기 토큰 확보
     if (tokenWaiter) { const w = tokenWaiter; tokenWaiter = null; w.resolve(s.credential); }
     else { sync.last = 0; syncRatings(); }
     updateSaveBar();
@@ -1508,7 +1540,7 @@ async function getFreshToken() {
 }
 
 /* 조용한 갱신이 안 될 때: 로그아웃시키지 않고 하단 막대에 Google 버튼을 띄워 한 번만 누르게 함 */
-function authError() { sync.authNeeded = true; updateSaveBar(); return new Error('로그인 확인 필요'); }
+function authError() { sync.authNeeded = true; sync.authHidden = false; updateSaveBar(); return new Error('로그인 확인 필요'); }
 
 function renderUser(s) {
   if (!$user) return;
@@ -1528,6 +1560,10 @@ function logout() {
 
 function enterApp(session) {
   state.session = session;
+  // 구글 자격이 아직 살아 있는 동안 장기 토큰을 미리 받아 둔다 (만료된 뒤에는 발급할 수 없다)
+  if (session && CONFIG.RATINGS.API_URL && !session.appToken && session.credential && session.tokExp - Date.now() > 60e3) {
+    authToken().catch(e => console.warn('앱 토큰 선발급 실패:', e.message));
+  }
   if (session) { session.exp = Date.now() + CONFIG.AUTH.SESSION_HOURS * 3600e3; try { localStorage.setItem(AUTH_KEY, JSON.stringify(session)); } catch {} } // 열 때마다 로그인 유지 기간 연장
   document.body.classList.add('authed');
   $gate.hidden = true;

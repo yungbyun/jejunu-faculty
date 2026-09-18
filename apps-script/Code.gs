@@ -22,6 +22,38 @@ const RATINGS = ['확', '중', '모', '부', '비'];
 const LEGACY = { '상': '확', '하': '모' };
 const norm = v => { v = String(v || ''); return LEGACY[v] || (RATINGS.indexOf(v) >= 0 ? v : ''); };
 
+/* ---------- 앱 세션 토큰 ----------
+ * 구글 ID 토큰은 1시간이면 만료되는데, 브라우저 추적 방지 때문에 조용한 재발급이 자주 막힙니다.
+ * 그래서 구글 로그인을 한 번 확인한 뒤에는 이 스크립트가 직접 서명한 토큰(기본 90일)을 발급해 쓰고,
+ * 만료 전에는 그 토큰만으로 갱신할 수 있게 합니다. 서명 키는 스크립트 속성에만 저장됩니다. */
+const APP_TOKEN_DAYS = 90;
+
+function appSecret() {
+  const props = PropertiesService.getScriptProperties();
+  let k = props.getProperty('APP_SECRET');
+  if (!k) { k = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('APP_SECRET', k); }
+  return k;
+}
+function appSign(email, exp) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(email + '|' + exp, appSecret()));
+}
+function makeAppToken(email) {
+  const exp = Date.now() + APP_TOKEN_DAYS * 86400000;
+  return { token: 'a1.' + Utilities.base64EncodeWebSafe(email) + '.' + exp + '.' + appSign(email, exp), exp: exp };
+}
+function verifyAppToken(t) {
+  if (!t || String(t).indexOf('a1.') !== 0) return null;
+  const parts = String(t).split('.');
+  if (parts.length !== 4) return null;
+  try {
+    const email = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
+    const exp = Number(parts[2]);
+    if (!(exp > Date.now())) return null;
+    if (appSign(email, exp) !== parts[3]) return null;
+    return email;
+  } catch (err) { return null; }
+}
+
 function doGet() {
   return out({ ok: true, service: 'jejunu-faculty ratings' });
 }
@@ -32,6 +64,7 @@ function doPost(e) {
   const email = verifyToken(body.token);
   if (!email) return out({ error: 'unauthorized' });
 
+  if (body.action === 'session') { const t = makeAppToken(email); return out({ ok: true, token: t.token, exp: t.exp, email: email }); }
   if (body.action === 'list') return out({ email, ratings: listRatings(email), settings: listSettings(email) });
   if (body.action === 'setting') {
     if (!body.key) return out({ error: 'missing key' });
@@ -51,9 +84,11 @@ function doPost(e) {
   return out({ error: 'bad action' });
 }
 
-/* Google ID 토큰 검증 → 이메일 */
+/* 토큰 → 이메일. 앱 토큰을 먼저 보고, 아니면 구글 ID 토큰으로 검증 */
 function verifyToken(token) {
   if (!token) return null;
+  const mine = verifyAppToken(token);
+  if (mine) return mine;
   try {
     const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) return null;
