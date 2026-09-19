@@ -893,21 +893,23 @@ function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
   return `
     <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" data-fav="${isFav(p) ? '1' : ''}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
-      ${rateChips(p)}
-      ${favBtn(p)}
       <div class="prof__photo">
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
         ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
       </div>
       <div class="prof__body">
-        <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
-        <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
+        <div class="prof__head">
+          <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
+          <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
+          ${favBtn(p)}
+        </div>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${meetCounter(p)}</div>
         ${p.office || p.phone ? `<div class="prof__office">
           ${p.office ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(p.office)}</span>` : '<span></span>'}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
         </div>` : ''}
+        ${rateChips(p)}
       </div>
     </div>`;
 }

@@ -157,6 +157,8 @@ main{min-height:60vh;padding:40px 20px 72px}
 .avatar{position:absolute;inset:0;display:grid;place-items:center;font-size:44px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--dept-color,var(--accent)),color-mix(in srgb,var(--dept-color,var(--accent)) 55%,#000 10%))}
 .prof__body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px}
 .prof__rank{font-size:12px;font-weight:600;color:var(--dept-color,var(--accent));letter-spacing:.3px}
+/* PC: 기존처럼 직위 위, 이름 아래 (관심 버튼은 absolute 라 이 흐름에서 빠져 있다) */
+.prof__head{display:flex;flex-direction:column;gap:8px}
 .prof__name{font-size:19px;font-weight:800;letter-spacing:-.3px;line-height:1.2;margin:0}
 .prof__name small{display:block;font-size:12.5px;font-weight:500;color:var(--ink-3);margin-top:2px;letter-spacing:.1px}
 .prof__tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
@@ -483,25 +485,26 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .st-two{grid-template-columns:1fr}
   .st-lists{grid-template-columns:1fr 1fr}
   .st-table{font-size:12px}.st-table th,.st-table td{padding:6px 5px}
-  .prof{flex-wrap:wrap}
-  .rate{position:static;order:9;flex:1 1 auto;justify-content:flex-end;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--surface-2);box-shadow:none;backdrop-filter:none;padding:6px 10px;gap:8px}
-  .rate__b{width:30px;height:30px;font-size:12.5px}
-  /* 관심 버튼: 사진 위에 얹으면 작은 얼굴을 가려서, 선호도와 같은 아래 줄로 내린다.
-     ::after 는 폭 100% 짜리 줄바꿈용 — 이게 없으면 관심 버튼이 사진 옆에 끼어든다 */
-  .prof::after{content:"";order:7;flex:0 0 100%;height:0;margin:0}
-  .fav{position:static;order:8;width:96px;height:auto;align-self:stretch;flex:none;border:0;border-top:1px solid var(--line);border-right:1px solid var(--line);border-radius:0;background:var(--surface-2);box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-  .fav svg{opacity:.45;width:17px;height:17px}
-  .fav[aria-pressed="true"]{border-top-color:var(--fav-c);border-right-color:var(--fav-c)}
+  /* 선호도·관심 버튼은 사진 위에 얹지 않는다(작은 얼굴을 가림). 본문 안으로 흘려보낸다 */
+  .rate{position:static;justify-content:flex-start;margin:4px 0 0 -4px;padding:0;gap:6px;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .rate__b{width:28px;height:28px;font-size:12px}
+  .fav{position:static;order:3;margin-left:auto;flex:none;width:30px;height:30px;background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .fav svg{opacity:.4}
+  .fav[aria-pressed="true"]{background:var(--fav-c);border-color:var(--fav-c)}
   /* 교수 카드: 사진 왼쪽 + 정보 오른쪽 리스트형 */
   .prof-grid{grid-template-columns:1fr;gap:10px}
   .prof{flex-direction:row;align-items:stretch;border-radius:14px}
   .prof:hover{transform:none}
-  .prof__photo{aspect-ratio:auto;width:96px;min-height:124px;flex:none}
+  .prof__photo{aspect-ratio:auto;width:120px;min-height:150px;flex:none}
   .prof__photo img{object-position:center 20%}
-  .avatar{font-size:30px}
+  .avatar{font-size:34px}
   .prof__body{padding:12px 14px;gap:5px;min-width:0;flex:1 1 auto;justify-content:center}
-  .prof__name{font-size:17px}
-  .prof__name small{font-size:12px}
+  /* 이름 · 직위 · 관심 버튼을 한 줄로 (직위는 이름 뒤로 보낸다) */
+  .prof__head{flex-direction:row;align-items:center;gap:7px}
+  .prof__head .prof__rank{order:2;font-size:12px}
+  .prof__name{font-size:18px;order:1}
+  .prof__name small{display:none}   /* 영문명은 폰에서 줄만 차지해 숨김 */
+  .prof__tags .tag:nth-child(n+3){display:none}  /* 태그는 2개까지 */
   .prof__tags .tag{font-size:11px;padding:2px 8px}
   .prof__office{font-size:12px}
   /* 상세 드로어: 전체 화면 시트 */
@@ -526,8 +529,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 }
 @media (max-width:480px){
   .brand__text{display:none}
-  .prof__photo{width:84px;min-height:110px}
-  .fav{width:84px}
+  .prof__photo{width:108px;min-height:140px}
 }
 @media (prefers-reduced-motion: reduce){
   *{animation:none!important;transition:none!important}
