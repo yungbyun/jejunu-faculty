@@ -1455,9 +1455,45 @@ function refreshOpenAix() {
 
 /* 원본 항목을 term / concl 두 칸으로 읽는다.
  * 예전 형식(설명이 d 한 덩어리)도 "따라서"를 기준으로 갈라 그대로 표시된다. */
-/* 모델이 **굵게** 로 보낸 강조를 살려 준다.
- * esc() 로 먼저 HTML 을 막은 뒤에 바꾸므로 태그가 주입될 여지는 없다. */
-const aiRich = s => esc(s).replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>');
+/* ---------- 강조 표시 ----------
+ * 두 가지를 굵게 만든다: 모델이 **…** 로 보낸 부분과, 학과 파일에 적어 둔 핵심 키워드.
+ * 키워드는 한 글에서 처음 나온 자리 한 번만 칠하고, 이미 강조된 자리 안에서는 다시 칠하지 않는다.
+ * 원문은 그대로 두고 화면에서만 칠하므로 구글 시트의 세부 전공도 건드리지 않는다.
+ * HTML 은 맨 마지막에 esc() 로 막으므로 태그가 주입될 여지가 없다. */
+const MK_A = '\u0001', MK_B = '\u0002';
+
+function aiRich(str, kws) {
+  const raw = String(str ?? '').replace(/[\u0001\u0002]/g, '');
+  // 1) **…** → 표시 조각으로
+  let parts = [];
+  let last = 0;
+  raw.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, (m, inner, at) => {
+    if (at > last) parts.push({ mark: false, s: raw.slice(last, at) });
+    parts.push({ mark: true, s: inner });
+    last = at + m.length;
+    return m;
+  });
+  if (last < raw.length) parts.push({ mark: false, s: raw.slice(last) });
+  if (!parts.length) parts = [{ mark: false, s: raw }];
+
+  // 2) 키워드를 아직 강조되지 않은 조각에서 처음 한 번만
+  for (const kw of (kws || [])) {
+    if (!kw || kw.length < 2) continue;
+    let done = false;
+    for (let i = 0; i < parts.length && !done; i++) {
+      if (parts[i].mark) continue;
+      const at = parts[i].s.indexOf(kw);
+      if (at < 0) continue;
+      const before = parts[i].s.slice(0, at), after = parts[i].s.slice(at + kw.length);
+      const mid = [{ mark: true, s: kw }];
+      if (before) mid.unshift({ mark: false, s: before });
+      if (after) mid.push({ mark: false, s: after });
+      parts.splice(i, 1, ...mid);
+      done = true;
+    }
+  }
+  return parts.map(p => p.mark ? `<strong>${esc(p.s)}</strong>` : esc(p.s)).join('');
+}
 
 function aiParts(x) {
   let term = x.term, concl = x.concl;
@@ -1471,7 +1507,7 @@ function aiParts(x) {
 
 const aiBusy = new Set();   // 다시 쓰는 중인 항목 키
 
-function aiItemHtml(x, i, p, d) {
+function aiItemHtml(x, i, p, d, kw) {
   const key = aiKey(d.id, p.slug, i);
   const src = aiParts(x);
   const ed = aiEditOf(d.id, p.slug, i);
@@ -1482,10 +1518,10 @@ function aiItemHtml(x, i, p, d) {
       <span class="aix__num" aria-hidden="true">${i + 1}</span>
       <div class="aix__txt">
         <b>${esc(v.title)}${ed ? `<span class="aix__badge" title="${esc(ed.hint || '')}">고쳐 씀</span>` : ''}</b>
-        <p class="aix__concl">${aiRich(v.concl)}</p>
+        <p class="aix__concl">${aiRich(v.concl, kw)}</p>
       </div>
     </div>
-    ${v.term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${aiRich(v.term)}</div></details>` : ''}
+    ${v.term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${aiRich(v.term, kw)}</div></details>` : ''}
     <div class="aix__foot">
       <button type="button" class="aix__redo" data-air-open="${esc(String(i))}" ${busy ? 'disabled' : ''}>다시 작성하기</button>
       ${ed ? `<button type="button" class="aix__undo" data-air-undo="${esc(String(i))}" ${busy ? 'disabled' : ''}>원래대로</button>` : ''}
@@ -1504,14 +1540,21 @@ function aiItemHtml(x, i, p, d) {
   </li>`;
 }
 
+/* 세부 전공: 학과 파일의 키워드가 있으면 굵게 칠해 보여 준다 (원문은 그대로) */
+function summaryHtml(p, d) {
+  const data = insCache.get(d.id);
+  const kw = (data && data.profs && data.profs[p.slug] && data.profs[p.slug].kw) || [];
+  return aiRich(p.summary, kw);
+}
+
 function aiHtml(p, d, data) {
   if (data === undefined) return `<div class="ins__skel">불러오는 중…</div>`;
   const e = data && data.profs && data.profs[p.slug], a = e && e.ai;
   if (e && e.self) return `<p class="ins__empty">본인입니다.</p>`;
   if (!a || !a.items || !a.items.length) return `<p class="ins__empty">아직 정리된 내용이 없습니다.</p>`;
   return `
-    ${a.sum ? `<p class="aix__sum">${esc(a.sum)}</p>` : ''}
-    <ul class="aix__list">${a.items.map((x, i) => aiItemHtml(x, i, p, d)).join('')}</ul>
+    ${a.sum ? `<p class="aix__sum">${aiRich(a.sum, e.kw || [])}</p>` : ''}
+    <ul class="aix__list">${a.items.map((x, i) => aiItemHtml(x, i, p, d, e.kw || [])).join('')}</ul>
     <p class="ins__foot">세부 전공·대표 논문을 바탕으로 정리한 제안입니다.</p>`;
 }
 
@@ -1635,7 +1678,7 @@ function openDrawer(p, d) {
 
       <div class="d-section d-ins"><h3>검색 결과</h3><div class="ins" data-slug="${esc(p.slug)}">${insightsHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 
-      ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary">${esc(p.summary)}</p></div>` : ''}
+      ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary" data-slug="${esc(p.slug)}">${summaryHtml(p, d)}</p></div>` : ''}
 
       <div class="d-section d-aix"><h3>AI 융합 방향</h3><div class="aix" data-slug="${esc(p.slug)}" data-dept="${esc(d.id)}">${aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 
@@ -1649,6 +1692,8 @@ function openDrawer(p, d) {
     if (box) box.innerHTML = insightsHtml(p, d, data);
     const abox = $panel.querySelector(`.aix[data-slug="${CSS.escape(p.slug)}"]`);
     if (abox) abox.innerHTML = aiHtml(p, d, data);
+    const sbox = $panel.querySelector(`.d-summary[data-slug="${CSS.escape(p.slug)}"]`);
+    if (sbox) sbox.innerHTML = summaryHtml(p, d);
   });
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
