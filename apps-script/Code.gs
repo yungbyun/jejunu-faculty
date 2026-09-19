@@ -22,6 +22,15 @@ const RATINGS = ['확', '중', '모', '부', '비'];
 const LEGACY = { '상': '확', '하': '모' };
 const norm = v => { v = String(v || ''); return LEGACY[v] || (RATINGS.indexOf(v) >= 0 ? v : ''); };
 
+/* ---------- AI 융합 방향 다시 쓰기 (airewrites 탭) ----------
+ * 항목 하나를 사용자의 추가 지시에 따라 다시 쓴 결과를 계정별로 보관합니다.
+ * 원본 data/insights/*.json 은 건드리지 않고, 화면에서 이 값이 있으면 덮어 그립니다. */
+const AIR_SHEET = 'airewrites';
+const AIR_HEADER = ['email', 'dept_id', 'slug', 'idx', 'title', 'term', 'concl', 'hint', 'updated_at'];
+const AIR_MODEL = 'claude-sonnet-4-5';
+const AIR_MAX_ITEMS = 12;          // 교수 한 명당 항목 수 상한 (idx 범위 검사용)
+const AIR_MIN_GAP_MS = 3000;       // 같은 사람이 연달아 부르는 것을 막는 최소 간격
+
 /* ---------- 앱 세션 토큰 ----------
  * 구글 ID 토큰은 1시간이면 만료되는데, 브라우저 추적 방지 때문에 조용한 재발급이 자주 막힙니다.
  * 그래서 구글 로그인을 한 번 확인한 뒤에는 이 스크립트가 직접 서명한 토큰(기본 90일)을 발급해 쓰고,
@@ -65,7 +74,7 @@ function doPost(e) {
   if (!email) return out({ error: 'unauthorized' });
 
   if (body.action === 'session') { const t = makeAppToken(email); return out({ ok: true, token: t.token, exp: t.exp, email: email }); }
-  if (body.action === 'list') return out({ email, ratings: listRatings(email), settings: listSettings(email) });
+  if (body.action === 'list') return out({ email, ratings: listRatings(email), settings: listSettings(email), airewrites: airList(email) });
   if (body.action === 'setting') {
     if (!body.key) return out({ error: 'missing key' });
     upsertSetting(email, String(body.key), String(body.value == null ? '' : body.value));
@@ -79,6 +88,12 @@ function doPost(e) {
     if (body.met !== undefined) fields.met = Math.max(0, Math.min(999, Math.round(Number(body.met) || 0)));
     if (body.memo !== undefined) fields.memo = String(body.memo == null ? '' : body.memo).slice(0, 2000);
     upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), fields);
+    return out({ ok: true });
+  }
+  if (body.action === 'airewrite') return airewrite(email, body);
+  if (body.action === 'airewrite_reset') {
+    if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
+    airDelete(email, String(body.dept_id), String(body.slug), Number(body.idx));
     return out({ ok: true });
   }
   return out({ error: 'bad action' });
@@ -187,6 +202,198 @@ function upsertSetting(email, key, value) {
     }
     sh.appendRow([email, key, value, now]);
   } finally { lock.releaseLock(); }
+}
+
+/* ==========================================================
+ * AI 융합 방향 — 항목 하나 다시 쓰기
+ * ========================================================== */
+
+function airSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(AIR_SHEET);
+  if (!sh) { sh = ss.insertSheet(AIR_SHEET); sh.appendRow(AIR_HEADER); sh.setFrozenRows(1); }
+  return sh;
+}
+
+/* 내 계정이 다시 쓴 항목 전부. 키는 "dept_id/slug/idx" */
+function airList(email) {
+  const sh = airSheet(), last = sh.getLastRow();
+  const o = {};
+  if (last < 2) return o;
+  sh.getRange(2, 1, last - 1, AIR_HEADER.length).getValues()
+    .filter(r => String(r[0]).toLowerCase() === email && r[1] && r[2])
+    .forEach(r => {
+      o[String(r[1]) + '/' + String(r[2]) + '/' + (Number(r[3]) || 0)] = {
+        title: String(r[4] == null ? '' : r[4]),
+        term: String(r[5] == null ? '' : r[5]),
+        concl: String(r[6] == null ? '' : r[6]),
+        hint: String(r[7] == null ? '' : r[7]),
+        updated_at: r[8] ? new Date(r[8]).toISOString() : '',
+      };
+    });
+  return o;
+}
+
+function airFindRow(sh, email, deptId, slug, idx) {
+  const last = sh.getLastRow();
+  if (last < 2) return 0;
+  const rows = sh.getRange(2, 1, last - 1, 4).getValues();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).toLowerCase() === email && String(rows[i][1]) === deptId
+      && String(rows[i][2]) === slug && (Number(rows[i][3]) || 0) === idx) return i + 2;
+  }
+  return 0;
+}
+
+function airSave(email, deptId, slug, idx, v) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = airSheet(), now = new Date();
+    const row = [email, deptId, slug, idx, v.title, v.term, v.concl, v.hint, now];
+    const at = airFindRow(sh, email, deptId, slug, idx);
+    if (at) sh.getRange(at, 1, 1, AIR_HEADER.length).setValues([row]);
+    else sh.appendRow(row);
+  } finally { lock.releaseLock(); }
+}
+
+/* 되돌리기: 그 줄을 지우면 화면은 원본 JSON 으로 돌아갑니다 */
+function airDelete(email, deptId, slug, idx) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = airSheet();
+    const at = airFindRow(sh, email, deptId, slug, Number(idx) || 0);
+    if (at) sh.deleteRow(at);
+  } finally { lock.releaseLock(); }
+}
+
+/* 사람마다 최소 간격을 두어, 실수로 연타했을 때 호출이 겹치지 않게 합니다 */
+function airThrottle(email) {
+  const cache = CacheService.getScriptCache();
+  const k = 'air:' + email;
+  const prev = Number(cache.get(k) || 0);
+  const now = Date.now();
+  if (prev && now - prev < AIR_MIN_GAP_MS) return false;
+  cache.put(k, String(now), 60);
+  return true;
+}
+
+/* 글의 결을 유지하기 위한 작성 규칙. data/insights 를 만들 때 쓴 것과 같은 기준입니다. */
+function airRules() {
+  return [
+    '당신은 제주대 공과대학 교수진 안내 앱의 "AI 융합 방향" 문안을 다듬는 편집자입니다.',
+    '',
+    '읽는 사람은 변영철 교수(컴퓨터공학·인공지능 전공)입니다. 다른 학과 교수를 만나 대화할 때 쓸 실마리로 읽습니다.',
+    'AI 쪽은 전문가이므로 AI 용어는 설명할 필요가 없고, 상대 교수 전공의 용어를 푸는 데 지면을 씁니다.',
+    '',
+    '항목은 세 칸으로 되어 있습니다.',
+    '- title: 짧은 제목 (14자 이내)',
+    '- term: 용어 풀이. 낯선 말이 무엇을 가리키는지 풀고, 그래서 지금은 무엇을 사람 손으로 하고 있으며 왜 그럴 수밖에 없는지까지 씁니다. 160~280자.',
+    '- concl: 결론. "~하는 대신, ~해 줍니다" 꼴의 한두 문장. 40~120자. 문장을 "따라서"로 시작하지 않습니다.',
+    '',
+    '지켜야 할 것:',
+    '- 아이디어를 새로 만들지 말고, 원문이 말하는 그 아이디어를 더 알기 쉽게 다듬기만 합니다.',
+    '- 상대 전공의 용어는 피하지 말고 한 번 언급한 뒤 곧바로 풉니다. 용어를 통째로 빼면 면담에서 그 단어를 쓸 수 없습니다.',
+    '- AI 기법 이름(PINN, GNN, 확산모델, 베이즈 최적화, RAG, 트랜스포머 등)은 쓰지 말고 하는 일로 풀어 씁니다.',
+    '- 금지 표현: 혁신적, 획기적, 패러다임, 극대화, 인사이트, 솔루션.',
+    '- 단정("~한다")보다 여지를 두는 말투("~해 볼 수 있습니다", "~하는 쪽입니다")를 씁니다.',
+    '- 확실하지 않은 수치나 사실을 지어내지 않습니다. 모르는 대목은 두루뭉술하게 둡니다.',
+    '',
+    '출력은 JSON 객체 하나뿐입니다. 설명 문장, 코드펜스, 그 밖의 어떤 글도 덧붙이지 마세요.',
+    '{"title":"...","term":"...","concl":"..."}'
+  ].join('\n');
+}
+
+function airPrompt(b) {
+  return [
+    '## 지금 들어 있는 항목',
+    '제목: ' + b.title,
+    '용어 풀이: ' + b.term,
+    '결론: ' + b.concl,
+    '',
+    '## 교수님이 요청한 수정 방향',
+    b.hint,
+    '',
+    '위 요청을 반영해 이 항목을 다시 써 주세요. JSON 객체만 출력합니다.'
+  ].join('\n');
+}
+
+/* Claude API 호출. 키는 스크립트 속성 ANTHROPIC_KEY 에 둡니다. */
+function airCallClaude(sys, user) {
+  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
+  if (!key) return { error: 'API 키가 설정되지 않았습니다 (스크립트 속성 ANTHROPIC_KEY)' };
+  let res;
+  try {
+    res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      payload: JSON.stringify({
+        model: AIR_MODEL,
+        max_tokens: 1200,
+        system: sys,
+        messages: [{ role: 'user', content: user }],
+      }),
+      muteHttpExceptions: true,
+    });
+  } catch (err) {
+    return { error: '모델을 부르지 못했습니다: ' + err.message };
+  }
+  const code = res.getResponseCode();
+  const text = res.getContentText();
+  if (code === 401 || code === 403) return { error: 'API 키가 거부되었습니다 (' + code + ')' };
+  if (code === 429) return { error: '요청이 몰렸습니다. 잠시 뒤 다시 눌러 주세요' };
+  if (code !== 200) return { error: '모델 응답 오류 (' + code + ')' };
+  let body;
+  try { body = JSON.parse(text); } catch (err) { return { error: '모델 응답을 읽지 못했습니다' }; }
+  const parts = body && body.content;
+  let outText = '';
+  if (parts && parts.length) {
+    for (let i = 0; i < parts.length; i++) if (parts[i] && parts[i].type === 'text') outText += parts[i].text;
+  }
+  if (!outText) return { error: '모델이 빈 응답을 보냈습니다' };
+  return { text: outText };
+}
+
+/* 모델이 코드펜스를 붙이거나 앞뒤로 말을 덧붙여도 JSON 만 건져 냅니다 */
+function airParse(t) {
+  let s = String(t || '').trim();
+  s = s.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  let o;
+  try { o = JSON.parse(s.slice(a, b + 1)); } catch (err) { return null; }
+  const title = String(o.title == null ? '' : o.title).trim();
+  const term = String(o.term == null ? '' : o.term).trim();
+  const concl = String(o.concl == null ? '' : o.concl).trim();
+  if (!title || !concl) return null;
+  return { title: title.slice(0, 40), term: term.slice(0, 1200), concl: concl.slice(0, 400) };
+}
+
+function airewrite(email, body) {
+  const deptId = String(body.dept_id || ''), slug = String(body.slug || '');
+  const idx = Math.round(Number(body.idx) || 0);
+  const hint = String(body.hint == null ? '' : body.hint).trim().slice(0, 1000);
+  if (!deptId || !slug) return out({ error: 'missing key' });
+  if (!(idx >= 0 && idx < AIR_MAX_ITEMS)) return out({ error: 'bad idx' });
+  if (!hint) return out({ error: '어떻게 고칠지 적어 주세요' });
+  if (!airThrottle(email)) return out({ error: '조금 전에 보낸 요청을 처리하는 중입니다. 잠시 뒤 다시 눌러 주세요' });
+
+  const src = {
+    title: String(body.title || '').slice(0, 200),
+    term: String(body.term || '').slice(0, 2000),
+    concl: String(body.concl || '').slice(0, 800),
+    hint: hint,
+  };
+  const r = airCallClaude(airRules(), airPrompt(src));
+  if (r.error) return out({ error: r.error });
+  const v = airParse(r.text);
+  if (!v) return out({ error: '모델이 형식에 맞지 않는 답을 보냈습니다. 다시 눌러 주세요' });
+
+  v.hint = hint;
+  airSave(email, deptId, slug, idx, v);
+  return out({ ok: true, item: { title: v.title, term: v.term, concl: v.concl, hint: hint, updated_at: new Date().toISOString() } });
 }
 
 /* 시트에 남아 있는 예전 값(상→확, 하→모)을 한 번에 새 값으로 바꿉니다. (편집기에서 직접 실행)

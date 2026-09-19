@@ -43,7 +43,7 @@ const CONFIG = {
 };
 
 /* ---------- 상태 ---------- */
-const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), notes: new Map(), session: null };
+const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), notes: new Map(), aiEdits: new Map(), session: null };
 const $app = document.getElementById('app');
 const $status = document.getElementById('dataStatus');
 const $q = document.getElementById('q');
@@ -1066,6 +1066,7 @@ async function syncRatings({ initial = false } = {}) {
     const r = await ratingsApi('list', {});
     if (!r || !Array.isArray(r.ratings)) throw new Error((r && r.error) || '응답 오류');
     applySettings(r.settings);
+    applyAiEdits(r.airewrites);
     const server = new Map();
     r.ratings.forEach(x => { const e = { rating: normRating(x.rating), met: normMet(x.met), memo: normMemo(x.memo) }; if (!entryEmpty(e)) server.set(`${x.dept_id}/${x.slug}`, e); });
     const locked = k => sync.pending.has(k) || sync.dirty.has(k) || sync.queue.has(k);
@@ -1420,21 +1421,82 @@ function insightsHtml(p, d, data) {
     ${insSearchRow(p)}`;
 }
 
-/* 항목 하나: 결론은 늘 보이고, 용어 풀이는 접어 둔다.
- * 예전 형식(설명이 d 한 덩어리)도 그대로 읽히도록 term/concl로 나눠 준다. */
-function aiItemHtml(x, i) {
+/* ---------- 다시 쓴 항목 (airewrites 시트) ----------
+ * 원본 data/insights/*.json 은 그대로 두고, 내 계정이 다시 쓴 항목만 그 위에 덮어 그린다. */
+const aiKey = (deptId, slug, i) => `${deptId}/${slug}/${i}`;
+const aiEditOf = (deptId, slug, i) => state.aiEdits.get(aiKey(deptId, slug, i)) || null;
+
+function applyAiEdits(m) {
+  if (!m || typeof m !== 'object') return;
+  const next = new Map();
+  for (const k of Object.keys(m)) {
+    const v = m[k];
+    if (v && (v.title || v.concl)) next.set(k, { title: String(v.title || ''), term: String(v.term || ''), concl: String(v.concl || ''), hint: String(v.hint || ''), updated_at: String(v.updated_at || '') });
+  }
+  // 다시 쓰는 중인 항목은 건드리지 않는다
+  for (const [k, v] of state.aiEdits) if (aiBusy.has(k)) next.set(k, v);
+  let changed = next.size !== state.aiEdits.size;
+  if (!changed) for (const [k, v] of next) { const o = state.aiEdits.get(k); if (!o || o.title !== v.title || o.term !== v.term || o.concl !== v.concl) { changed = true; break; } }
+  state.aiEdits = next;
+  if (changed) refreshOpenAix();
+}
+
+/* 상세 창이 열려 있으면 AI 융합 방향만 다시 그린다 (다른 부분은 건드리지 않음) */
+function refreshOpenAix() {
+  if ($drawer.hidden) return;
+  const box = $panel.querySelector('.aix[data-slug]');
+  if (!box) return;
+  const slug = box.dataset.slug, deptId = box.dataset.dept;
+  const p = state.rows.find(x => x.slug === slug && x.dept_id === deptId);
+  const d = state.depts.find(x => x.id === deptId);
+  if (!p || !d) return;
+  redrawAix(box, p, d);
+}
+
+/* 원본 항목을 term / concl 두 칸으로 읽는다.
+ * 예전 형식(설명이 d 한 덩어리)도 "따라서"를 기준으로 갈라 그대로 표시된다. */
+function aiParts(x) {
   let term = x.term, concl = x.concl;
   if (concl == null) {
     const t = String(x.d || '').trim(), k = t.lastIndexOf('따라서 ');
     if (k >= 0) { term = t.slice(0, k).trim(); concl = t.slice(k + 4).trim(); }
     else { term = ''; concl = t; }
   }
-  return `<li>
+  return { title: String(x.t || ''), term: String(term || ''), concl: String(concl || '') };
+}
+
+const aiBusy = new Set();   // 다시 쓰는 중인 항목 키
+
+function aiItemHtml(x, i, p, d) {
+  const key = aiKey(d.id, p.slug, i);
+  const src = aiParts(x);
+  const ed = aiEditOf(d.id, p.slug, i);
+  const v = ed ? { title: ed.title || src.title, term: ed.term, concl: ed.concl } : src;
+  const busy = aiBusy.has(key);
+  return `<li data-air="${esc(String(i))}" class="${busy ? 'is-busy' : ''}">
     <div class="aix__top">
       <span class="aix__num" aria-hidden="true">${i + 1}</span>
-      <div class="aix__txt"><b>${esc(x.t)}</b><p class="aix__concl">${esc(concl)}</p></div>
+      <div class="aix__txt">
+        <b>${esc(v.title)}${ed ? `<span class="aix__badge" title="${esc(ed.hint || '')}">고쳐 씀</span>` : ''}</b>
+        <p class="aix__concl">${esc(v.concl)}</p>
+      </div>
     </div>
-    ${term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${esc(term)}</div></details>` : ''}
+    ${v.term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${esc(v.term)}</div></details>` : ''}
+    <div class="aix__foot">
+      <button type="button" class="aix__redo" data-air-open="${esc(String(i))}" ${busy ? 'disabled' : ''}>다시 작성하기</button>
+      ${ed ? `<button type="button" class="aix__undo" data-air-undo="${esc(String(i))}" ${busy ? 'disabled' : ''}>원래대로</button>` : ''}
+      <span class="aix__wait" aria-live="polite">${busy ? '다시 쓰는 중… 10초쯤 걸립니다' : ''}</span>
+    </div>
+    <div class="aix__form" data-air-form="${esc(String(i))}" hidden>
+      <label class="aix__lbl" for="airH${esc(String(i))}">어떻게 고칠까요?</label>
+      <textarea id="airH${esc(String(i))}" class="aix__ta" rows="3" maxlength="1000"
+        placeholder="예: 과전압이 뭔지 더 풀어 주세요 / 제주 상황을 예로 들어 주세요 / 두 문장으로 줄여 주세요"></textarea>
+      <div class="aix__btns">
+        <button type="button" class="aix__go" data-air-go="${esc(String(i))}">다시 쓰기</button>
+        <button type="button" class="aix__cancel" data-air-cancel="${esc(String(i))}">취소</button>
+      </div>
+      <p class="aix__err" role="alert" hidden></p>
+    </div>
   </li>`;
 }
 
@@ -1445,8 +1507,95 @@ function aiHtml(p, d, data) {
   if (!a || !a.items || !a.items.length) return `<p class="ins__empty">아직 정리된 내용이 없습니다.</p>`;
   return `
     ${a.sum ? `<p class="aix__sum">${esc(a.sum)}</p>` : ''}
-    <ul class="aix__list">${a.items.map(aiItemHtml).join('')}</ul>
+    <ul class="aix__list">${a.items.map((x, i) => aiItemHtml(x, i, p, d)).join('')}</ul>
     <p class="ins__foot">세부 전공·대표 논문을 바탕으로 정리한 제안입니다.</p>`;
+}
+
+/* 다시 작성하기 버튼·입력칸 동작. 상세 창을 그릴 때마다 다시 매단다. */
+function bindAix(root, p, d) {
+  const box = root.querySelector('.aix[data-slug]');
+  if (!box || box.dataset.airBound === '1') return;
+  box.dataset.airBound = '1';
+
+  const li = i => box.querySelector(`li[data-air="${CSS.escape(String(i))}"]`);
+  const form = i => box.querySelector(`[data-air-form="${CSS.escape(String(i))}"]`);
+  const showErr = (i, msg) => {
+    const el = form(i)?.querySelector('.aix__err');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.hidden = !msg;
+  };
+
+  box.addEventListener('click', async e => {
+    const open = e.target.closest('[data-air-open]');
+    if (open) {
+      const i = open.dataset.airOpen, f = form(i);
+      if (!f) return;
+      f.hidden = false;
+      showErr(i, '');
+      f.querySelector('.aix__ta')?.focus();
+      return;
+    }
+    const cancel = e.target.closest('[data-air-cancel]');
+    if (cancel) { const f = form(cancel.dataset.airCancel); if (f) { f.hidden = true; showErr(cancel.dataset.airCancel, ''); } return; }
+
+    const undo = e.target.closest('[data-air-undo]');
+    if (undo) {
+      const i = Number(undo.dataset.airUndo);
+      if (!confirm('이 항목을 원래 내용으로 되돌릴까요? 고쳐 쓴 내용은 지워집니다.')) return;
+      undo.disabled = true;
+      try {
+        await ratingsApi('airewrite_reset', { dept_id: d.id, slug: p.slug, idx: i });
+        state.aiEdits.delete(aiKey(d.id, p.slug, i));
+        redrawAix(box, p, d);
+      } catch (err) {
+        undo.disabled = false;
+        flashStatus('되돌리지 못했습니다 — ' + err.message, true);
+      }
+      return;
+    }
+
+    const go = e.target.closest('[data-air-go]');
+    if (!go) return;
+    const i = Number(go.dataset.airGo), key = aiKey(d.id, p.slug, i);
+    const f = form(i), ta = f?.querySelector('.aix__ta');
+    const hint = String(ta?.value || '').trim();
+    if (!hint) { showErr(i, '어떻게 고칠지 한 줄이라도 적어 주세요.'); ta?.focus(); return; }
+    if (!state.session) { showErr(i, '로그인이 필요합니다.'); return; }
+    if (aiBusy.has(key)) return;
+
+    // 원문(또는 지금 보이는 내용)을 모델에 그대로 넘긴다
+    const data = insCache.get(d.id);
+    const item = data?.profs?.[p.slug]?.ai?.items?.[i];
+    if (!item) { showErr(i, '원본 내용을 찾지 못했습니다.'); return; }
+    const ed = aiEditOf(d.id, p.slug, i), src = aiParts(item);
+    const cur = ed ? { title: ed.title || src.title, term: ed.term, concl: ed.concl } : src;
+
+    aiBusy.add(key);
+    if (f) f.hidden = true;
+    redrawAix(box, p, d);
+    try {
+      const r = await ratingsApi('airewrite', { dept_id: d.id, slug: p.slug, idx: i, hint, title: cur.title, term: cur.term, concl: cur.concl });
+      if (!r || !r.ok || !r.item) throw new Error((r && r.error) || '응답 오류');
+      state.aiEdits.set(key, { title: String(r.item.title || ''), term: String(r.item.term || ''), concl: String(r.item.concl || ''), hint: String(r.item.hint || hint), updated_at: String(r.item.updated_at || '') });
+      aiBusy.delete(key);
+      redrawAix(box, p, d);
+      li(i)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (err) {
+      // 실패해도 원래 내용은 그대로 두고, 적어 둔 지시문도 남겨 둔다
+      aiBusy.delete(key);
+      redrawAix(box, p, d);
+      const f2 = form(i);
+      if (f2) { f2.hidden = false; const t2 = f2.querySelector('.aix__ta'); if (t2) t2.value = hint; }
+      showErr(i, '다시 쓰지 못했습니다 — ' + err.message);
+    }
+  });
+}
+
+/* AI 융합 방향 칸만 다시 그리고 이벤트를 다시 맨다 */
+function redrawAix(box, p, d) {
+  // box 자체는 그대로 두고 안쪽만 갈아 끼운다 — 위임해 둔 클릭 리스너가 계속 살아 있다
+  box.innerHTML = aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined);
 }
 
 /* ---------- 상세 드로어 ---------- */
@@ -1484,12 +1633,13 @@ function openDrawer(p, d) {
 
       ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary">${esc(p.summary)}</p></div>` : ''}
 
-      <div class="d-section d-aix"><h3>AI 융합 방향</h3><div class="aix" data-slug="${esc(p.slug)}">${aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
+      <div class="d-section d-aix"><h3>AI 융합 방향</h3><div class="aix" data-slug="${esc(p.slug)}" data-dept="${esc(d.id)}">${aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 
       ${links.length ? `<div class="d-section"><h3>바로가기</h3><div class="d-links">${links.map(l => `<a class="lnk ${l.primary ? 'primary' : ''}" href="${esc(l.href)}" ${l.href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(l.label)} ↗</a>`).join('')}</div></div>` : ''}
     </div>`;
   bindRates($panel);
   bindNotes($panel);
+  bindAix($panel, p, d);
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
     if (box) box.innerHTML = insightsHtml(p, d, data);
