@@ -284,7 +284,13 @@
     "산란파",
     "비파괴",
     "역산"
-   ]
+   ],
+   "joined": {
+    "year": 2023,
+    "text": "2023년 3월 임용",
+    "src": "https://civil.jejunu.ac.kr/civil/index/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "park-jeongha": {
    "highlights": [
@@ -345,7 +351,13 @@
     "적설심",
     "한라산",
     "관측소"
-   ]
+   ],
+   "joined": {
+    "year": 2026,
+    "text": "2026년 9월 임용",
+    "src": "https://civil.jejunu.ac.kr/civil/index/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   }
  }
 }

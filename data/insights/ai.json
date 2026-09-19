@@ -73,7 +73,13 @@
     "충전소 추천",
     "주민 수용성",
     "수요예측"
-   ]
+   ],
+   "joined": {
+    "year": 2022,
+    "text": "2022년 임용",
+    "src": "https://ai.jejunu.ac.kr/artificial/index/info/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "jisoo-kim": {
    "highlights": [
@@ -124,7 +130,13 @@
     "이상음",
     "양자화",
     "증류"
-   ]
+   ],
+   "joined": {
+    "year": 2023,
+    "text": "2023년 3월 임용",
+    "src": "https://ai.jejunu.ac.kr/artificial/index/info/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "kyuchang-chang": {
    "highlights": [
@@ -175,7 +187,13 @@
     "강화학습",
     "수요반응",
     "용존산소"
-   ]
+   ],
+   "joined": {
+    "year": 2023,
+    "text": "2023년 9월 임용",
+    "src": "https://ai.jejunu.ac.kr/artificial/index/info/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "gyeongmin-kim": {
    "highlights": [
@@ -233,7 +251,13 @@
     "프롬프트 학습",
     "LLM 라쇼날",
     "이상치"
-   ]
+   ],
+   "joined": {
+    "year": 2024,
+    "text": "2024년 9월 임용",
+    "src": "https://ai.jejunu.ac.kr/artificial/index/info/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "hyojung-ahn": {
    "highlights": [
@@ -297,7 +321,13 @@
     "이상탐지",
     "위험평가",
     "송전탑"
-   ]
+   ],
+   "joined": {
+    "year": 2025,
+    "text": "2025년 9월 임용",
+    "src": "https://ai.jejunu.ac.kr/artificial/index/info/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   }
  }
 }

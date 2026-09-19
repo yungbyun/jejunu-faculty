@@ -70,7 +70,14 @@
     "회전수",
     "연료량",
     "게인"
-   ]
+   ],
+   "joined": {
+    "year": 1986,
+    "text": "1986년부터 제주대 재직",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력",
+    "memo": "조교 시작"
+   }
   },
   "dong-won-jung": {
    "highlights": [
@@ -215,7 +222,13 @@
     "녹색합성",
     "플라크",
     "니오븀"
-   ]
+   ],
+   "joined": {
+    "year": 2001,
+    "text": "2001년 3월 임용",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "sang-jae-kim": {
    "highlights": [
@@ -296,7 +309,13 @@
     "전기촉매",
     "그린수소",
     "과전압"
-   ]
+   ],
+   "joined": {
+    "year": 2002,
+    "text": "2002년 10월 임용",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "youn-cheol-park": {
    "highlights": [
@@ -551,7 +570,13 @@
     "와류구조",
     "시변",
     "격자"
-   ]
+   ],
+   "joined": {
+    "year": 2023,
+    "text": "2023년 3월 임용",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "jongmin-choi": {
    "highlights": [
@@ -600,7 +625,13 @@
     "냉방부하",
     "흡착제",
     "폐열"
-   ]
+   ],
+   "joined": {
+    "year": 2025,
+    "text": "2025년 3월 임용",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "min-cheol-kim": {
    "highlights": [
@@ -649,7 +680,13 @@
     "바늘삽입",
     "도르래",
     "장력"
-   ]
+   ],
+   "joined": {
+    "year": 2026,
+    "text": "2026년 3월 임용",
+    "src": "https://mse.jejunu.ac.kr/mechsys/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   }
  }
 }

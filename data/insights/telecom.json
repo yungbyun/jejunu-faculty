@@ -53,7 +53,13 @@
     "초고주파",
     "위상오차",
     "편파기"
-   ]
+   ],
+   "joined": {
+    "year": 1992,
+    "text": "1992년 3월 임용",
+    "src": "https://telecom.jejunu.ac.kr/telecom/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "jeong-woo-jwa": {
    "highlights": [
@@ -118,7 +124,13 @@
     "DST",
     "시계열",
     "기지국"
-   ]
+   ],
+   "joined": {
+    "year": 2002,
+    "text": "2002년 10월 임용",
+    "src": "https://telecom.jejunu.ac.kr/telecom/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "seung-yeup-hyun": {
    "highlights": [
@@ -173,7 +185,13 @@
     "FDTD",
     "GPR",
     "세선"
-   ]
+   ],
+   "joined": {
+    "year": 2012,
+    "text": "2012년 3월 임용",
+    "src": "https://telecom.jejunu.ac.kr/telecom/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "daesung-yu": {
    "highlights": [
@@ -287,7 +305,13 @@
     "경로손실",
     "저궤도",
     "회절"
-   ]
+   ],
+   "joined": {
+    "year": 2026,
+    "text": "2026년 임용",
+    "src": "https://telecom.jejunu.ac.kr/telecom/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   }
  }
 }

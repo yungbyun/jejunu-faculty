@@ -199,7 +199,14 @@
     "복잡지형",
     "풍력터빈",
     "LCOE"
-   ]
+   ],
+   "joined": {
+    "year": 2012,
+    "text": "2012년 3월 임용",
+    "src": "https://chemeng.jejunu.ac.kr/chemeng/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력",
+    "memo": "2004~2007년 초빙교수 이력 별도"
+   }
   },
   "bum-suk-kim": {
    "highlights": [

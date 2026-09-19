@@ -39,7 +39,13 @@
     "주석",
     "상추",
     "진균"
-   ]
+   ],
+   "joined": {
+    "year": 2010,
+    "text": "2010년 9월 임용",
+    "src": "https://foodse.jejunu.ac.kr/foodse/professer/professerinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "kim-hyun-jung": {
    "highlights": [
@@ -89,7 +95,13 @@
     "압출면",
     "유화제",
     "감귤"
-   ]
+   ],
+   "joined": {
+    "year": 2012,
+    "text": "2012년 9월 임용",
+    "src": "https://foodse.jejunu.ac.kr/foodse/professer/professerinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "chun-ji-yeon": {
    "highlights": [
@@ -155,7 +167,13 @@
     "균질화",
     "액적",
     "수율"
-   ]
+   ],
+   "joined": {
+    "year": 2015,
+    "text": "2015년 9월 임용",
+    "src": "https://foodse.jejunu.ac.kr/foodse/professer/professerinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "lim-jongbin": {
    "highlights": [
@@ -228,7 +246,13 @@
     "송악꿀",
     "글루텐",
     "초분광"
-   ]
+   ],
+   "joined": {
+    "year": 2022,
+    "text": "2022년 3월 임용",
+    "src": "https://foodse.jejunu.ac.kr/foodse/professer/professerinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "lee-hae-won": {
    "highlights": [
@@ -316,7 +340,13 @@
     "레오로지",
     "갈변",
     "라벨"
-   ]
+   ],
+   "joined": {
+    "year": 2026,
+    "text": "2026년 9월 임용",
+    "src": "https://foodse.jejunu.ac.kr/foodse/professer/professerinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   }
  }
 }

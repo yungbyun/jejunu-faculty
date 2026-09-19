@@ -1404,15 +1404,26 @@ function insItemHtml(x) {
   </li>`;
 }
 
+/* 제주대 임용 시기. 학과 홈페이지 약력에 적힌 것만 넣었고, 확인 못 한 교수는 줄 자체를 띄우지 않는다. */
+function joinedHtml(e) {
+  const j = e && e.joined;
+  if (!j || !j.text) return '';
+  const body = `<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>${esc(j.text)}${j.memo ? `<i class="ins__memo">${esc(j.memo)}</i>` : ''}</span>`;
+  return j.src
+    ? `<a class="ins__joined" href="${esc(j.src)}" target="_blank" rel="noopener" title="${esc(j.src_name || '출처')}">${body}</a>`
+    : `<div class="ins__joined">${body}</div>`;
+}
+
 function insightsHtml(p, d, data) {
   if (data === undefined) return `<div class="ins__skel">불러오는 중…</div>`;
   const e = data && data.profs && data.profs[p.slug];
   if (e && e.self) return `<p class="ins__empty">본인입니다.</p>`;
   if (!e || (!e.items?.length && !e.highlights?.length)) {
-    return `<p class="ins__empty">아직 모아 둔 자료가 없습니다. 아래에서 직접 찾아보세요.</p>${insSearchRow(p)}`;
+    return `${joinedHtml(e)}<p class="ins__empty">아직 모아 둔 자료가 없습니다. 아래에서 직접 찾아보세요.</p>${insSearchRow(p)}`;
   }
   const items = e.items || [], head = items.slice(0, 5), rest = items.slice(5);
   return `
+    ${joinedHtml(e)}
     ${e.highlights?.length ? `<div class="ins__hl">${e.highlights.map(h => `<span class="ins__chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${head.length ? `<ul class="ins__list">${head.map(insItemHtml).join('')}</ul>` : ''}
     ${rest.length ? `<details class="ins__more"><summary>나머지 ${rest.length}개 보기</summary><ul class="ins__list">${rest.map(insItemHtml).join('')}</ul></details>` : ''}

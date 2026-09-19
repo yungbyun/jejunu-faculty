@@ -184,7 +184,13 @@
     "재구성",
     "개폐기",
     "위상"
-   ]
+   ],
+   "joined": {
+    "year": 2016,
+    "text": "2016년 9월 임용",
+    "src": "https://elec.jejunu.ac.kr/elec/index/pofessorinfo/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "yeong-jun-choi": {
    "highlights": [],

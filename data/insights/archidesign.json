@@ -224,7 +224,14 @@
     "이착륙장",
     "AHP",
     "가중치"
-   ]
+   ],
+   "joined": {
+    "year": 2005,
+    "text": "2005년부터 제주대 재직",
+    "src": "https://archidesign.jejunu.ac.kr/archidesign/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력",
+    "memo": "약력에 '교수'로만 표기"
+   }
   },
   "yi-yong-kyu": {
    "highlights": [

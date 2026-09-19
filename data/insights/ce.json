@@ -86,7 +86,13 @@
     "위상 표현",
     "GNN",
     "V2X"
-   ]
+   ],
+   "joined": {
+    "year": 1996,
+    "text": "1996년 임용",
+    "src": "https://ce.jejunu.ac.kr/ce/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "do-hyeun-kim": {
    "highlights": [
@@ -174,7 +180,13 @@
     "강화학습",
     "앙상블",
     "보간"
-   ]
+   ],
+   "joined": {
+    "year": 2004,
+    "text": "2004년 9월 임용",
+    "src": "https://ce.jejunu.ac.kr/ce/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "soo-kyun-kim": {
    "highlights": [
@@ -255,7 +267,13 @@
     "메타러닝",
     "위성영상",
     "설명 맵"
-   ]
+   ],
+   "joined": {
+    "year": 2020,
+    "text": "2020년 임용",
+    "src": "https://ce.jejunu.ac.kr/ce/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "joon-min-gil": {
    "highlights": [
@@ -335,7 +353,13 @@
     "엣지 추론",
     "수급 매칭",
     "컨테이너"
-   ]
+   ],
+   "joined": {
+    "year": 2023,
+    "text": "2023년 임용",
+    "src": "https://ce.jejunu.ac.kr/ce/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "seungmin-park": {
    "highlights": [
@@ -417,7 +441,13 @@
     "SSVEP",
     "뇌연결성",
     "진화연산"
-   ]
+   ],
+   "joined": {
+    "year": 2026,
+    "text": "2026년 임용",
+    "src": "https://ce.jejunu.ac.kr/ce/professor/professorinfo.htm",
+    "src_name": "학과 홈페이지 교수 약력"
+   }
   },
   "yung-cheol-byun": {
    "self": true,

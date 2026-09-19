@@ -222,6 +222,16 @@ main{min-height:60vh;padding:40px 20px 72px}
 .aix__term{padding:0 14px 13px 47px;color:var(--ink-2);font-size:13px;line-height:1.8;word-break:keep-all}
 .aix__concl strong,.aix__term strong,.aix__sum strong,.d-summary strong{font-weight:700;color:var(--ink)}
 
+/* 제주대 임용 시기 (검색 결과 맨 위) */
+.ins__joined{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:5px 11px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);font-size:12.5px;font-weight:600;
+  text-decoration:none;transition:border-color .15s var(--ease),color .15s var(--ease)}
+a.ins__joined:hover{border-color:var(--dept-color,var(--accent));color:var(--dept-color,var(--accent))}
+.ins__joined svg{flex:none;opacity:.75}
+.ins__memo{font-style:normal;font-weight:500;color:var(--ink-3);margin-left:5px}
+.ins__memo:before{content:"("}
+.ins__memo:after{content:")"}
+
 /* 다시 작성하기 */
 .aix__badge{margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--dept-color,var(--accent));color:#fff;
   font-size:10.5px;font-weight:700;vertical-align:1px;letter-spacing:0}
