@@ -75,6 +75,11 @@ a.bat                   git add -A / commit / push 한 번에
 `CONFIG.RATINGS.API_URL` 에 있습니다. 액션: `session`, `list`, `setting`, `set`,
 `airewrite`, `airewrite_reset`.
 
+개인 설정은 `settings` 탭에 `email / key / value`로 저장되고, `setting` 액션은 **키 이름을 가리지 않습니다.**
+그래서 새로운 개인 설정을 추가할 때 서버를 고칠 필요가 없습니다. 현재 쓰는 키는 `quiz-depts`, `quiz-ex`,
+그리고 관심 교수 목록 `fav`(값은 `["<dept_id>/<slug>", ...]`)입니다. app.js 쪽은 `SET_KEYS`와
+`settingValue` / `settingApplyLocal` / `SET_LOCAL_KEY` 네 군데에 분기를 넣으면 됩니다.
+
 **고쳤을 때 배포 방법 (사용자가 직접 해야 함):** Apps Script 편집기에 붙여넣고 저장만 하면 아무 일도
 일어나지 않습니다. 반드시 **배포 → 배포 관리 → 새 버전**으로 다시 배포해야 반영됩니다.
 반영이 안 되면 앱에서 `bad action` 오류가 납니다.

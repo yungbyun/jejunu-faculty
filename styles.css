@@ -311,6 +311,27 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .rate__b[aria-pressed="true"]{background:var(--rc);color:#fff;border-color:var(--rc);box-shadow:0 0 0 2px color-mix(in srgb,var(--rc) 25%,transparent)}
 .prof[data-rating="확"]{border-color:#1f8a5b}.prof[data-rating="중"]{border-color:#2563eb}.prof[data-rating="모"]{border-color:#9ca3af}.prof[data-rating="부"]{border-color:#c0392b;opacity:.72}
 .prof[data-rating="비"]{border-color:#7c5cbf;border-style:dashed;opacity:.6}
+
+/* ---------- 관심 교수 ----------
+   선호도 칩이 카드 오른쪽 위를 쓰므로 관심 버튼은 왼쪽 위에 둔다.
+   선호도는 테두리 색으로 표현되고 있어, 관심은 배경 틴트로만 구분한다(서로 싸우지 않게). */
+.fav{position:absolute;top:10px;left:10px;z-index:3;width:28px;height:28px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--ink-3);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.08);transition:all .15s}
+.fav svg{opacity:0;transition:opacity .15s}
+.fav:hover{color:var(--ink);border-color:var(--line-2)}
+.fav:hover svg{opacity:.4}
+.fav:focus-visible{outline:3px solid color-mix(in srgb,var(--fav-c) 40%,transparent);outline-offset:2px}
+.fav[aria-pressed="true"]{--fav-c:#e0a10c;background:var(--fav-c);border-color:var(--fav-c);color:#fff;box-shadow:0 0 0 2px color-mix(in srgb,var(--fav-c) 28%,transparent)}
+.fav[aria-pressed="true"] svg{opacity:1}
+.fav{--fav-c:#e0a10c}
+.prof[data-fav="1"]{background:color-mix(in srgb,#e0a10c 8%,var(--surface))}
+.prof[data-fav="1"][data-rating="부"],.prof[data-fav="1"][data-rating="비"]{opacity:.85}
+.rs--fav{display:inline-flex;align-items:center;gap:3px;color:#a1740a;background:color-mix(in srgb,#e0a10c 16%,transparent)}
+.rs--fav svg{width:11px;height:11px}
+.chip--fav{display:inline-flex;align-items:center;gap:4px}
+.chip--fav svg{width:12px;height:12px}
+.chip--fav[aria-pressed="true"]{background:#e0a10c;border-color:#e0a10c;color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rs--fav{color:#f0c14b}}
+:root[data-theme="dark"] .rs--fav{color:#f0c14b}
 .prof[data-rating="부"]:hover,.prof[data-rating="비"]:hover{opacity:1}
 .rate--big{position:static;display:inline-flex;box-shadow:none;background:var(--surface-2)}
 .d-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}

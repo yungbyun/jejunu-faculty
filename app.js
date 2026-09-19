@@ -43,7 +43,7 @@ const CONFIG = {
 };
 
 /* ---------- 상태 ---------- */
-const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', localPhotos: new Set(), ratings: new Map(), notes: new Map(), aiEdits: new Map(), session: null };
+const state = { rows: [], depts: [], source: '', query: '', rankFilter: '전체', ratingFilter: '전체', favOnly: false, localPhotos: new Set(), ratings: new Map(), notes: new Map(), aiEdits: new Map(), session: null };
 const $app = document.getElementById('app');
 const $status = document.getElementById('dataStatus');
 const $q = document.getElementById('q');
@@ -860,7 +860,7 @@ function renderSearch(q) {
 /* ---------- 화면: 학과 교수 목록 ---------- */
 function renderDept(d) {
   const ranks = ['전체', ...Object.keys(RANK_ORDER).filter(r => d.profs.some(p => p.rank === r))];
-  const list = d.profs.filter(p => (state.rankFilter === '전체' || p.rank === state.rankFilter) && matchRating(p));
+  const list = d.profs.filter(p => (state.rankFilter === '전체' || p.rank === state.rankFilter) && matchRating(p) && (!state.favOnly || isFav(p)));
   const rf = ['전체', ...CONFIG.RATINGS.LABELS, '미지정'];
   $app.innerHTML = `
     <div class="view" style="--dept-color:${esc(d.color)}">
@@ -877,6 +877,7 @@ function renderDept(d) {
           </div>
           <div class="filters filters--rate" role="group" aria-label="선호도 필터">
             ${rf.map(r => `<button class="chip chip--rate" type="button" data-rating="${esc(r)}" data-val="${esc(r)}" aria-pressed="${state.ratingFilter === r}">${esc(r)}<span class="n">${countRating(d, r)}</span></button>`).join('')}
+            <button class="chip chip--fav" type="button" data-favfilter aria-pressed="${state.favOnly}" title="관심 교수만 보기">${FAV_SVG}관심<span class="n">${favCount(d)}</span></button>
           </div>
         </div>
       </div>
@@ -884,14 +885,16 @@ function renderDept(d) {
     </div>`;
   $app.querySelectorAll('.chip[data-rank]').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
   $app.querySelectorAll('.chip[data-rating]').forEach(b => b.addEventListener('click', () => { state.ratingFilter = b.dataset.rating; renderDept(d); }));
+  $app.querySelector('.chip[data-favfilter]')?.addEventListener('click', () => { state.favOnly = !state.favOnly; renderDept(d); });
   bindCards();
 }
 
 function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
   return `
-    <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
+    <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" data-fav="${isFav(p) ? '1' : ''}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
       ${rateChips(p)}
+      ${favBtn(p)}
       <div class="prof__photo">
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
         ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
@@ -919,12 +922,49 @@ const countRating = (d, r) => r === '전체' ? d.profs.length : d.profs.filter(p
 
 function ratingSummary(d) {
   const parts = CONFIG.RATINGS.LABELS.map(r => [r, countRating(d, r)]).filter(([, n]) => n);
-  if (!parts.length) return '';
-  return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}</div>`;
+  const nf = favCount(d);
+  const fav = nf ? `<span class="rs rs--fav" title="관심 교수 ${nf}명">${FAV_SVG}${nf}</span>` : '';
+  if (!parts.length && !fav) return '';
+  return `<div class="drow__rates">${fav}${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}</div>`;
 }
 const rClass = r => ({ '확': 'high', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
 /* 저장된 값을 현재 라벨로 정규화 (예전 값 상→확, 하→모; 모르는 값은 버림) */
 const normRating = v => { v = String(v || ''); return CONFIG.RATINGS.LEGACY[v] || (CONFIG.RATINGS.LABELS.includes(v) ? v : ''); };
+
+/* ---------- 관심 교수 ----------
+ * 카드 왼쪽 위의 동그란 버튼으로 켜고 끕니다. 퀴즈 설정과 같은 길(settings 탭)로 저장되므로
+ * 서버(Code.gs)는 고칠 것이 없고, 다른 기기에서도 그대로 따라옵니다. */
+const FAV_KEY = 'jnu-fav';
+let favSet = null;
+function favs() {
+  if (favSet) return favSet;
+  try { const v = JSON.parse(localStorage.getItem(FAV_KEY) || 'null'); if (Array.isArray(v)) favSet = new Set(v); } catch {}
+  if (!favSet) favSet = new Set();
+  return favSet;
+}
+const isFav = p => favs().has(rKey(p));
+const favCount = d => d.profs.filter(isFav).length;
+function favSave() {
+  try { const f = favs(); f.size ? localStorage.setItem(FAV_KEY, JSON.stringify([...f])) : localStorage.removeItem(FAV_KEY); } catch {}
+  saveSetting(SET_FAV, settingValue(SET_FAV));
+}
+function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : f.add(k); favSave(); return f.has(k); }
+
+const FAV_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const favBtn = p => `<button type="button" class="fav" data-key="${esc(rKey(p))}" aria-pressed="${isFav(p)}" title="관심 교수" aria-label="${esc(p.name)} 관심 교수 ${isFav(p) ? '해제' : '표시'}">${FAV_SVG}</button>`;
+
+function bindFavs(root) {
+  root.querySelectorAll('.fav').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); e.preventDefault();
+    const p = state.rows.find(x => rKey(x) === b.dataset.key); if (!p) return;
+    const on = toggleFav(p);
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', `${p.name} 관심 교수 ${on ? '해제' : '표시'}`);
+    const card = b.closest('.prof'); if (card) card.dataset.fav = on ? '1' : '';
+    const chip = $app.querySelector('.chip--fav .n');
+    if (chip) { const d = state.depts.find(x => x.id === p.dept_id); if (d) chip.textContent = favCount(d); }
+  }));
+}
 
 function rateChips(p, big = false) {
   const cur = getRating(p);
@@ -1092,7 +1132,7 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_KEYS = [SET_QD, SET_QX];
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_KEYS = [SET_QD, SET_QX, SET_FAV];
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1101,6 +1141,7 @@ function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirty
 function settingValue(key) {
   if (key === SET_QD) return [...quizDepts()].sort();
   if (key === SET_QX) return [...quizEx()].sort();
+  if (key === SET_FAV) return [...favs()].sort();
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1108,9 +1149,11 @@ function settingApplyLocal(key, v) {
   try {
     if (key === SET_QD) { quiz.depts = new Set(v); localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify(v)); }
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
+    if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
   } catch {}
 }
-const setStored = key => { try { return localStorage.getItem(key === SET_QD ? QUIZ_DEPTS_KEY : QUIZ_EX_KEY) != null; } catch { return false; } };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY };
+const setStored = key => { try { return localStorage.getItem(SET_LOCAL_KEY[key]) != null; } catch { return false; } };
 
 async function pushSetting(key, value) {
   try {
@@ -1138,7 +1181,7 @@ async function saveSetting(key, value) {
       }
       if (sync.pendS.get(key) === v) sync.pendS.delete(key);
       if (ok) { sync.dirtyS.delete(key); saveSetDirty(); }
-      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus('퀴즈 설정을 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
+      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus((key === SET_FAV ? '관심 교수' : '퀴즈 설정') + '을(를) 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
     }
   } finally { sync.busyS.delete(key); updateSaveBar(); }
 }
@@ -1157,8 +1200,8 @@ function applySettings(m) {
   }
   if (changed) {
     quizStart();
-    if (route().view === 'quiz') renderQuiz();
-    flashStatus('다른 기기의 퀴즈 설정을 반영했습니다');
+    route().view === 'quiz' ? renderQuiz() : render();
+    flashStatus('다른 기기에서 바꾼 설정을 반영했습니다');
   }
 }
 
@@ -1362,10 +1405,11 @@ function persistSession() { try { localStorage.setItem(AUTH_KEY, JSON.stringify(
 function bindCards() {
   const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
   $app.querySelectorAll('.prof').forEach(b => {
-    b.addEventListener('click', e => { if (e.target.closest('.rate, .counter, .po__tel')) return; open(b); });
-    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .counter, .po__tel')) { e.preventDefault(); open(b); } });
+    b.addEventListener('click', e => { if (e.target.closest('.rate, .fav, .counter, .po__tel')) return; open(b); });
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .fav, .counter, .po__tel')) { e.preventDefault(); open(b); } });
   });
   bindRates($app);
+  bindFavs($app);
   bindNotes($app);
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
@@ -1880,7 +1924,7 @@ function showGate() {
 
 /* ---------- 시작 ---------- */
 startVersionWatch();
-window.addEventListener('hashchange', () => { state.rankFilter = '전체'; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
+window.addEventListener('hashchange', () => { state.rankFilter = '전체'; state.favOnly = false; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
 if (!authEnabled()) {
   enterApp(null);
 } else {
