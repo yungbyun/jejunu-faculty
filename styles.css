@@ -220,6 +220,7 @@ main{min-height:60vh;padding:40px 20px 72px}
 .aix__lo{display:none}
 .aix__more[open] .aix__lo{display:inline}
 .aix__term{padding:0 14px 13px 47px;color:var(--ink-2);font-size:13px;line-height:1.8;word-break:keep-all}
+.aix__concl strong,.aix__term strong{font-weight:700;color:var(--ink)}
 
 /* 다시 작성하기 */
 .aix__badge{margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--dept-color,var(--accent));color:#fff;

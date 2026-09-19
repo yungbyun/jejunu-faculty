@@ -1455,6 +1455,10 @@ function refreshOpenAix() {
 
 /* 원본 항목을 term / concl 두 칸으로 읽는다.
  * 예전 형식(설명이 d 한 덩어리)도 "따라서"를 기준으로 갈라 그대로 표시된다. */
+/* 모델이 **굵게** 로 보낸 강조를 살려 준다.
+ * esc() 로 먼저 HTML 을 막은 뒤에 바꾸므로 태그가 주입될 여지는 없다. */
+const aiRich = s => esc(s).replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>');
+
 function aiParts(x) {
   let term = x.term, concl = x.concl;
   if (concl == null) {
@@ -1478,10 +1482,10 @@ function aiItemHtml(x, i, p, d) {
       <span class="aix__num" aria-hidden="true">${i + 1}</span>
       <div class="aix__txt">
         <b>${esc(v.title)}${ed ? `<span class="aix__badge" title="${esc(ed.hint || '')}">고쳐 씀</span>` : ''}</b>
-        <p class="aix__concl">${esc(v.concl)}</p>
+        <p class="aix__concl">${aiRich(v.concl)}</p>
       </div>
     </div>
-    ${v.term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${esc(v.term)}</div></details>` : ''}
+    ${v.term ? `<details class="aix__more"><summary><svg class="aix__chev" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="aix__lc">여기 나오는 말 풀이</span><span class="aix__lo">접기</span></summary><div class="aix__term">${aiRich(v.term)}</div></details>` : ''}
     <div class="aix__foot">
       <button type="button" class="aix__redo" data-air-open="${esc(String(i))}" ${busy ? 'disabled' : ''}>다시 작성하기</button>
       ${ed ? `<button type="button" class="aix__undo" data-air-undo="${esc(String(i))}" ${busy ? 'disabled' : ''}>원래대로</button>` : ''}
