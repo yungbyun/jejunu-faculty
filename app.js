@@ -792,7 +792,7 @@ function renderStats() {
         <div class="st-lists">
           ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
             <div class="st-list"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
-              ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">${esc(p.name)}<small>${esc(p.dept_name)} · ${esc(p.rank)}</small></a></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+              ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}</a></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
             </div>`; }).join('')}
         </div>
       </section>
