@@ -826,13 +826,19 @@ function favSection() {
         ${list.map(p => {
           const d = state.depts.find(x => x.id === p.dept_id);
           const r = getRating(p);
-          return `<a class="favc" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+          const { loc } = officeParts(p.office);
+          return `<div class="favw" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+            <a class="favc" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">
             <span class="favc__ph">${p.photo
               ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')">`
               : esc(initial(p.name))}</span>
-            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
+            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(loc)}</small>` : ''}</span>
             ${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}
-          </a>`;
+            </a>
+            <button type="button" class="favx" data-key="${esc(rKey(p))}" title="관심 해제" aria-label="${esc(p.name)} 관심 교수 해제">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>`;
         }).join('')}
       </div>
     </section>`;
@@ -868,6 +874,15 @@ function renderHome() {
           </a>`).join('')}
       </div>
     </div>`;
+
+  $app.querySelectorAll('.favx').forEach(b => b.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    const p = state.rows.find(x => rKey(x) === b.dataset.key);
+    if (!p) return;
+    toggleFav(p);
+    renderHome();           // 명단·학과별 표시를 한 번에 다시 그린다
+    flashStatus(`${p.name} 교수를 관심에서 해제했습니다`);
+  }));
 }
 
 function matches(p, q) {

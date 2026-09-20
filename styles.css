@@ -399,13 +399,20 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favsec__head h2 svg{color:#e0a10c}
 .favsec__head h2 b{font-size:17px;color:#a1740a}
 .favsec__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
-.favc{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
-.favc:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
-.favc__ph{width:38px;height:38px;flex:none;border-radius:50%;overflow:hidden;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--dept-color),color-mix(in srgb,var(--dept-color) 60%,#000))}
+.favw{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
+.favw:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
+.favc{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;padding:7px 10px}
+/* 관심 해제 버튼 — 카드 링크의 형제로 둔다(a 안에 button 을 넣으면 안 되므로) */
+.favx{flex:none;width:34px;padding:0;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink-3);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+.favx:hover{background:color-mix(in srgb,#c0392b 10%,transparent);color:#c0392b}
+.favx:focus-visible{outline:3px solid color-mix(in srgb,#c0392b 40%,transparent);outline-offset:-3px}
+.favc__ph{width:40px;height:40px;flex:none;border-radius:50%;overflow:hidden;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--dept-color),color-mix(in srgb,var(--dept-color) 60%,#000))}
 .favc__ph img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
 .favc__t{min-width:0;display:flex;flex-direction:column;line-height:1.3}
 .favc__t b{font-size:14.5px;font-weight:700}
 .favc__t small{font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.favc__loc{display:flex;align-items:center;gap:3px;margin-top:1px}
+.favc__loc svg{flex:none}
 .favc .rs{margin-left:auto;flex:none}
 @media (max-width:720px){
   .favsec{padding:14px;margin:4px 0 18px}
