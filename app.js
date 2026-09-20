@@ -926,7 +926,7 @@ function ratingSummary(d) {
   const nf = favCount(d);
   const fav = nf ? `<span class="rs rs--fav" title="관심 교수 ${nf}명">${FAV_SVG}${nf}</span>` : '';
   if (!parts.length && !fav) return '';
-  return `<div class="drow__rates">${fav}${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}</div>`;
+  return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}${fav}</div>`;
 }
 const rClass = r => ({ '확': 'high', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
 /* 저장된 값을 현재 라벨로 정규화 (예전 값 상→확, 하→모; 모르는 값은 버림) */

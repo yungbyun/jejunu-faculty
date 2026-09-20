@@ -334,6 +334,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .fav{--fav-c:#e0a10c}
 .prof[data-fav="1"]{background:color-mix(in srgb,#e0a10c 8%,var(--surface))}
 .prof[data-fav="1"][data-rating="부"],.prof[data-fav="1"][data-rating="비"]{opacity:.85}
+/* 관심 칩은 선호도 칩 바로 뒤에 이어 붙인다 */
 .rs--fav{display:inline-flex;align-items:center;gap:3px;color:#a1740a;background:color-mix(in srgb,#e0a10c 16%,transparent)}
 .rs--fav svg{width:11px;height:11px}
 .chip--fav{display:inline-flex;align-items:center;gap:4px}
@@ -347,9 +348,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .d-top .d-rank{margin-bottom:0}
 .rate--big .rate__b{width:30px;height:30px;font-size:12.5px}
 .filters-wrap{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
-.filters--rate{justify-content:flex-end}
+.filters--rate{width:100%}
 .filters--rate .chip{padding:5px 11px;font-size:12.5px}
-.chip--fav{margin-left:12px}
+.chip--fav{margin-left:auto}
 .filters--rate .chip[data-val="확"][aria-pressed="true"]{background:#1f8a5b;border-color:#1f8a5b}
 .filters--rate .chip[data-val="중"][aria-pressed="true"]{background:#2563eb;border-color:#2563eb}
 .filters--rate .chip[data-val="모"][aria-pressed="true"]{background:#6b7280;border-color:#6b7280}
@@ -480,6 +481,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .filters::-webkit-scrollbar{display:none}
   .chip{flex:none;min-height:36px}
   .filters-wrap{align-items:stretch;width:100%}
+  .chip--fav{margin-left:8px}
   .nav{margin-left:0}.nav a{padding:6px 9px;font-size:13px}
   .topbar__inner{flex-wrap:wrap;height:auto;padding:8px 18px;row-gap:8px;gap:8px} /* 좌우 여백: 로고·테마 버튼이 화면 끝에 붙지 않게 */
   .topbar__tools{display:contents}
