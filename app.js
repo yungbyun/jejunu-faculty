@@ -758,7 +758,7 @@ function renderStats() {
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
-              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a></div>
+              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>(${d.profs.length}명)</small></div>
               ${stackBar(d.profs, { deptId: d.id })}
             </div>`).join('')}
         </div>
