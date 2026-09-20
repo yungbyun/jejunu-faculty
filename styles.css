@@ -737,6 +737,10 @@ textarea.memo::placeholder{color:var(--ink-3)}
 .oc__ob--q{color:var(--rs-mid);background:color-mix(in srgb,#0a7ab0 14%,transparent)}
 .oc__ob--s{color:var(--rs-high);background:color-mix(in srgb,#38831c 14%,transparent)}
 .oc__ob--e{color:var(--rs-neg);background:color-mix(in srgb,#c0392b 12%,transparent)}
+.oc__mc{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;color:var(--ink-2);background:var(--surface-2)}
+.oc__cnt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.oc__cnt .st-note{margin:0}
+.counter.mailc .counter__n{color:var(--brand)}
 .oc__sch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .oc__sch .st-note{margin:0}
 .oc__schw{font-size:13px;font-weight:700}

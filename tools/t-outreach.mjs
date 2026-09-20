@@ -78,6 +78,28 @@ const noMail = await page.evaluate(() => ({
 }));
 check('메일 없는 교수 표시가 데이터와 일치', noMail.data === noMail.shown, `${noMail.shown}명 표시`);
 
+// 7) 접촉 상태에 '면담'은 없다
+check('상태에 면담 없음', await page.evaluate(() =>
+  !document.querySelector('[data-of="st"][data-v="면담"]') && !CT_STATES.includes('면담')));
+
+// 8) 메일 보낸 횟수 카운터
+await page.click(`[data-open="${k2}"]`);
+await page.waitForSelector('.oc__ta', { timeout: 10000 });
+await page.click('.oc__d [data-ch="메일"]');
+await page.waitForSelector('.mailc', { timeout: 10000 });
+check('카운터가 0에서 시작', await page.evaluate(() => document.querySelector('.mailc .counter__n').textContent === '0'));
+await page.click('.mailc [data-inc]');
+await page.waitForTimeout(500);
+check('+ 누르면 1', await page.evaluate(k => mails()[k] === 1, k2));
+check('행에 메일 횟수 배지', await page.evaluate(() => /메일 1회/.test(document.querySelector('.oc__mc')?.textContent || '')));
+check('localStorage 저장', await page.evaluate(k => {
+  try { return (JSON.parse(localStorage.getItem('jnu-mailcnt') || '{}'))[k] === 1; } catch { return false; }
+}, k2));
+await page.click('.mailc [data-dec]');
+await page.waitForTimeout(500);
+check('− 누르면 0으로 되돌아감', await page.evaluate(k => !mails()[k], k2));
+check('0이면 배지 사라짐', await page.evaluate(() => !document.querySelector('.oc__mc')));
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);

@@ -842,6 +842,7 @@ function renderOutreach() {
         <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
         <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
         ${r ? `<span class="rs rs--${rcls(r)}">${esc(r)}</span>` : ''}
+        ${mailOf(p) ? `<span class="oc__mc">메일 ${mailOf(p)}회</span>` : ''}
         ${obTag}
         <span class="oc__st oc__st--${st === '미접촉' ? 'none' : 'on'}">${esc(st)}</span>
         ${p.email ? '' : '<span class="oc__no">메일 없음</span>'}
@@ -890,6 +891,15 @@ function fillDraft(k) {
         <button type="button" class="btn" data-copy>복사</button>
         ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
       </div>
+      <div class="oc__cnt">
+        <span class="ot-f__l">보낸 횟수</span>
+        <div class="counter mailc ${mailOf(p) ? '' : 'counter--zero'}" data-mk="${esc(k)}" role="group" aria-label="${esc(p.name)} 메일 보낸 횟수">
+          <button type="button" class="counter__b" data-dec aria-label="1회 줄이기">−</button>
+          <span class="counter__n" aria-live="polite">${mailOf(p)}</span>
+          <button type="button" class="counter__b" data-inc aria-label="1회 늘리기">+</button>
+        </div>
+        <span class="st-note">'메일 앱에서 열기'를 누르면 저절로 1 늘어납니다.</span>
+      </div>
       ${schedRow(p, k)}
       <div class="oc__stset"><span class="ot-f__l">상태</span><div class="filters">${
         CT_STATES.map(v => `<button type="button" class="chip" data-st="${esc(k)}" data-v="${esc(v)}" aria-pressed="${ctState(p) === v}">${esc(v)}</button>`).join('')}</div></div>`;
@@ -898,6 +908,16 @@ function fillDraft(k) {
       try { await navigator.clipboard.writeText(ta.value); }
       catch { ta.select(); try { document.execCommand('copy'); } catch {} }
       e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
+    });
+    box.querySelector('.mailc')?.addEventListener('click', e => {
+      const btn = e.target.closest('.counter__b'); if (!btn) return;
+      setMail(p, mailOf(p) + (btn.hasAttribute('data-inc') ? 1 : -1));
+      renderOutreach();
+    });
+    // 메일 앱을 여는 것은 보내러 간다는 뜻이므로 한 번 센다. 잘못 세면 − 로 줄이면 된다.
+    box.querySelector('.oc__acts a.btn')?.addEventListener('click', () => {
+      setMail(p, mailOf(p) + 1);
+      setTimeout(() => { if (OUT.open === k) renderOutreach(); }, 400);
     });
     box.querySelector('[data-queue]')?.addEventListener('click', () => {
       const when = box.querySelector('.oc__at')?.value;
@@ -1318,12 +1338,12 @@ function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : 
  * 서버(Code.gs)는 키 이름을 가리지 않으므로 고칠 것이 없다.
  *   trait   {"<dept>/<slug>": "연"}
  *   contact {"<dept>/<slug>": {"st":"보냄","at":"2026-09-20"}} */
-const TRAIT_KEY = 'jnu-trait', CONTACT_KEY = 'jnu-contact';
+const TRAIT_KEY = 'jnu-trait', CONTACT_KEY = 'jnu-contact', MAIL_KEY = 'jnu-mailcnt';
 const TRAITS = ['연', '강', '둘'];
 const TRAIT_NAMES = { '연': '연구 중심', '강': '강의 활용', '둘': '둘 다' };
-const CT_STATES = ['미접촉', '초안', '보냄', '답장', '면담'];
+const CT_STATES = ['미접촉', '초안', '보냄', '답장'];
 
-let traitMap = null, contactMap = null;
+let traitMap = null, contactMap = null, mailMap = null;
 function loadObj(k) {
   try { const v = JSON.parse(localStorage.getItem(k) || 'null'); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
   return {};
@@ -1333,9 +1353,19 @@ function saveObj(k, m, setKey) {
   saveSetting(setKey, m);
 }
 function traits() { if (!traitMap) traitMap = loadObj(TRAIT_KEY); return traitMap; }
+function mails() { if (!mailMap) mailMap = loadObj(MAIL_KEY); return mailMap; }
 function contacts() { if (!contactMap) contactMap = loadObj(CONTACT_KEY); return contactMap; }
 
 const traitOf = p => traits()[rKey(p)] || '';
+/* 메일을 몇 번 보냈는지. 학과 화면의 방문 카운터와 같은 모양이지만 저장 자리는 다르다
+ * (방문은 ratings 탭의 met 열, 이쪽은 settings 탭의 mailcnt 키 — 서버를 고치지 않으려고). */
+const mailOf = p => mails()[rKey(p)] || 0;
+function setMail(p, n) {
+  const m = mails(), k = rKey(p);
+  n = Math.max(0, Math.min(99, Math.round(n) || 0));
+  if (n) m[k] = n; else delete m[k];
+  saveObj(MAIL_KEY, m, SET_MC);
+}
 const ctOf = p => contacts()[rKey(p)] || null;
 const ctState = p => (ctOf(p) || {}).st || '미접촉';
 
@@ -1540,10 +1570,10 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_CT = 'contact';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_CT];
-const SET_OBJ = [SET_TR, SET_CT];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_CT]: '접촉 상태' };
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_CT = 'contact', SET_MC = 'mailcnt';
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_CT, SET_MC];
+const SET_OBJ = [SET_TR, SET_CT, SET_MC];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_CT]: '접촉 상태', [SET_MC]: '메일 보낸 횟수' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1555,6 +1585,7 @@ function settingValue(key) {
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
   if (key === SET_TR) return traits();
   if (key === SET_CT) return contacts();
+  if (key === SET_MC) return mails();
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1565,9 +1596,10 @@ function settingApplyLocal(key, v) {
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
     if (key === SET_TR) { traitMap = v; Object.keys(v).length ? localStorage.setItem(TRAIT_KEY, JSON.stringify(v)) : localStorage.removeItem(TRAIT_KEY); }
     if (key === SET_CT) { contactMap = v; Object.keys(v).length ? localStorage.setItem(CONTACT_KEY, JSON.stringify(v)) : localStorage.removeItem(CONTACT_KEY); }
+    if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_CT]: CONTACT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_CT]: CONTACT_KEY, [SET_MC]: MAIL_KEY };
 const setStored = key => { try { return localStorage.getItem(SET_LOCAL_KEY[key]) != null; } catch { return false; } };
 
 async function pushSetting(key, value) {
