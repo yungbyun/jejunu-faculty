@@ -155,7 +155,7 @@ main{min-height:60vh;padding:40px 20px 72px}
 .prof__photo img.loaded{opacity:1;transition:opacity .3s,transform .4s var(--ease)}
 .prof:hover .prof__photo img{transform:scale(1.03)}
 .avatar{position:absolute;inset:0;display:grid;place-items:center;font-size:44px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--dept-color,var(--accent)),color-mix(in srgb,var(--dept-color,var(--accent)) 55%,#000 10%))}
-.prof__body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px}
+.prof__body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
 .prof__rank{font-size:12px;font-weight:600;color:var(--dept-color,var(--accent));letter-spacing:.3px}
 /* PC: 기존처럼 직위 위, 이름 아래 (관심 버튼은 absolute 라 이 흐름에서 빠져 있다) */
 .prof__head{display:flex;flex-direction:column;gap:8px}
@@ -517,9 +517,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .po__tel{margin-left:0;flex:none}
   /* 선호도 칩과 카운터는 한 줄에 다 들어가지 않으므로 줄을 나눈다.
      선호도가 한 줄을 차지하고, 카운터는 그 아래 오른쪽 끝(카드 우하단)에 놓인다 */
-  .prof__foot{gap:4px;flex-wrap:wrap}
-  .prof__foot .rate{flex:1 0 100%;margin:0 0 0 -4px}
-  .prof__foot .counter{margin-left:auto}
+  .prof__foot{gap:4px;flex-wrap:wrap;margin-top:4px}
+  .prof__foot .counter{order:1;margin-left:auto}
+  .prof__foot .rate{order:2;flex:1 0 100%;margin:0 0 0 -4px}
   /* 상세 드로어: 전체 화면 시트 */
   .drawer__panel{width:100%;border-left:0;box-shadow:none;padding-bottom:env(safe-area-inset-bottom)}
   .d-head{padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
@@ -580,7 +580,8 @@ textarea.memo::placeholder{color:var(--ink-3)}
 .counter[data-save="saving"]{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent)}
 .counter[data-save="saved"]{box-shadow:0 0 0 2px color-mix(in srgb,#1f8a5b 55%,transparent)}
 .counter[data-save="error"]{box-shadow:0 0 0 2px #c0392b}
-.prof__foot{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-top:4px}
+/* 카운터 줄은 카드 바닥에 붙인다(내용 길이가 달라도 모든 카드에서 같은 자리) */
+.prof__foot{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-top:auto;padding-top:4px}
 .prof__note{display:flex;gap:5px;flex-wrap:wrap}
 .prof__note:empty{display:none}
 .prof__foot .counter{margin-left:auto;padding:2px}.prof__foot .counter__b{width:24px;height:24px;font-size:14px}.prof__foot .counter__n{font-size:14px;min-width:22px}.prof__foot .counter__u{font-size:11px;margin-right:2px}
