@@ -71,11 +71,12 @@ await page.click('[data-of="st"][data-v="전체"]');
 await page.waitForTimeout(400);
 check('필터 해제', await page.evaluate(() => document.querySelectorAll('.oc').length === 70));
 
-// 6) 이메일 없는 교수 표시
-check('메일 없는 교수 표시', await page.evaluate(() => {
-  const n = state.rows.filter(p => !p.email).length;
-  return document.querySelectorAll('.oc__no').length === n && n > 0;
-}), );
+// 6) 이메일 없는 교수 표시 — 지금은 70명 모두 이메일이 있어 0명이 정상이다
+const noMail = await page.evaluate(() => ({
+  data: state.rows.filter(p => !p.email).length,
+  shown: document.querySelectorAll('.oc__no').length,
+}));
+check('메일 없는 교수 표시가 데이터와 일치', noMail.data === noMail.shown, `${noMail.shown}명 표시`);
 
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
