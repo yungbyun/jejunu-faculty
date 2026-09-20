@@ -93,6 +93,23 @@ check('저장 뒤 조립', await page.evaluate(() => {
 }));
 check('1회차 발송 기록은 2회차에 안 보임', await page.evaluate(() => !document.querySelector('.oc__ep')));
 
+// 8) 채널마다 본문이 다르다 — 문자는 짧게, 카톡은 메일에 가깝게
+const ch = await page.evaluate(() => {
+  const p = state.rows.find(x => segOf(x) === 'B');
+  const e = epOf(1);
+  return { mail: epBody(e, p, '메일', ''), sms: epBody(e, p, '문자', ''), kakao: epBody(e, p, '카톡', '') };
+});
+check('세 채널 본문이 모두 다름', new Set([ch.mail, ch.sms, ch.kakao]).size === 3);
+check('문자 < 카톡 < 메일 순으로 짧음', ch.sms.length < ch.kakao.length && ch.kakao.length < ch.mail.length,
+  `문자 ${ch.sms.length} / 카톡 ${ch.kakao.length} / 메일 ${ch.mail.length}`);
+check('문자에는 사업단 소개 없음', !/AI융합원/.test(ch.sms));
+check('카톡에는 사업단 소개 있음', /AI융합원/.test(ch.kakao));
+check('세 채널 모두 30개 기업 언급', [ch.mail, ch.sms, ch.kakao].every(t => /30개가 넘는/.test(t)));
+check('카톡 본문이 비면 문자로 대신', await page.evaluate(() => {
+  const p = state.rows.find(x => segOf(x) === 'B');
+  return epBody({ body: 'M', sms: 'S', seg: {} }, p, '카톡', '') === 'S';
+}));
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);
