@@ -165,7 +165,9 @@ main{min-height:60vh;padding:40px 20px 72px}
 .prof__tags .tag{font-size:11.5px;padding:2px 9px}
 .prof__office{font-size:var(--fs-xs);color:var(--ink-3);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
 .po__room,.po__tel{display:inline-flex;align-items:center;gap:5px;min-width:0}
-.po__room{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.po__room svg{flex:none}
+/* 말줄임은 글자를 담은 요소에 걸어야 한다. flex 컨테이너에 걸면 먹지 않고 옆 칸(전화번호)을 덮어쓴다 */
+.po__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .po__tel{color:var(--ink-3);text-decoration:none;white-space:nowrap;flex:none}
 .po__tel:hover,.po__tel:focus-visible{color:var(--dept-color,var(--accent));text-decoration:underline}
 
@@ -506,7 +508,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .prof__name small{display:none}   /* 영문명은 폰에서 줄만 차지해 숨김 */
   .prof__tags .tag:nth-child(n+3){display:none}  /* 태그는 2개까지 */
   .prof__tags .tag{font-size:11px;padding:2px 8px}
-  .prof__office{font-size:12px}
+  /* 폰: 호실 이름이 길면 잘라내지 말고 줄을 바꾼다 (방 번호가 문자열 끝에 있어 잘리면 안 됨) */
+  .prof__office{font-size:12px;flex-wrap:wrap;align-items:flex-start;gap:2px 8px}
+  .po__room{align-items:flex-start;flex:1 1 auto}
+  .po__room svg{margin-top:3px}
+  .po__t{white-space:normal;overflow:visible;line-height:1.45}
+  .po__tel{margin-left:auto}
   /* 상세 드로어: 전체 화면 시트 */
   .drawer__panel{width:100%;border-left:0;box-shadow:none;padding-bottom:env(safe-area-inset-bottom)}
   .d-head{padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
