@@ -734,9 +734,6 @@ function renderStats() {
   const all = state.rows, rated = all.filter(getRating);
   const c = dist(all);
   const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
-  const { list: tags, minN } = tagStats();
-  const singles = minN === 2 ? (() => { const seen = new Set(tags.map(t => t.tag)), out = []; state.rows.filter(hasScore).forEach(p => p.tags.forEach(t => { if (!seen.has(t)) { seen.add(t); out.push({ tag: t, r: getRating(p), prof: p.name }); } })); return out.sort((a, b) => SCORE[b.r] - SCORE[a.r]); })() : [];
-  const ranks = Object.keys(RANK_ORDER).map(r => ({ r, profs: all.filter(p => p.rank === r) })).filter(x => x.profs.length);
   const legend = `<div class="legend" aria-label="범례">${RLABELS().map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(r)}</span>`).join('')}</div>`;
 
   $app.innerHTML = `
@@ -770,39 +767,6 @@ function renderStats() {
             </div>`).join('')}
         </div>
         <p class="st-note">막대의 구간을 누르면 해당 학과가 그 선호도 필터로 열립니다.</p>
-      </section>
-
-      <section class="st-sec">
-        <div class="st-head"><h2>전공 키워드 × 선호도</h2><span class="muted st-small">키워드별 평균 점수 · 교수 ${minN}명 이상인 키워드</span></div>
-        ${tags.length ? `
-        <div class="dv">
-          <div class="dv__axis"><span></span><div class="dv__axisin"><span>−1 부정</span><span>0</span><span>3 긍정</span></div><span></span></div>
-          ${tags.map(t => `
-            <div class="dv__row" title="${esc(t.tag)} · 평균 ${fmt1(t.avg)} · 교수 ${t.n}명">
-              <div class="dv__lbl">${esc(t.tag)}<small>${t.n}</small></div>
-              <div class="dv__track">
-                <span class="dv__neg" style="width:${t.avg < 0 ? Math.min(100, -t.avg / 1 * 100) : 0}%"></span>
-                <span class="dv__pos" style="width:${t.avg > 0 ? Math.min(100, t.avg / 3 * 100) : 0}%"></span>
-              </div>
-              <div class="dv__val">${fmt1(t.avg)}</div>
-            </div>`).join('')}
-        </div>
-        <p class="st-note">오른쪽(초록)은 내가 높게 본 연구 주제, 왼쪽(빨강)은 낮게 본 주제입니다. 축은 −1(부)에서 3(확)까지이며, 비해당·미지정 교수는 계산에 넣지 않습니다.</p>
-        ${singles.length ? `<details class="st-details"><summary>교수 1명뿐인 키워드 ${singles.length}개 보기</summary><div class="kw-cloud">${singles.map(t => `<span class="kw kw--${rcls(t.r)}" title="${esc(t.prof)}"><i class="sw sw--${rcls(t.r)}"></i>${esc(t.tag)}</span>`).join('')}</div></details>` : ''}` : `<div class="empty">평가한 교수가 생기면 키워드 분석이 표시됩니다.</div>`}
-      </section>
-
-      <section class="st-sec st-two">
-        <div>
-          <div class="st-head"><h2>직급별</h2></div>
-          <table class="st-table"><thead><tr><th>직급</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>평균</th></tr></thead>
-          <tbody>${ranks.map(x => { const dc = dist(x.profs); return `<tr><td>${esc(x.r)}</td><td>${x.profs.length}</td><td>${x.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(sureRate(x.profs).pct)}</b></td><td>${fmt1(avgScore(x.profs))}</td></tr>`; }).join('')}</tbody></table>
-        </div>
-        <div>
-          <div class="st-head"><h2>학과별</h2></div>
-          <table class="st-table"><thead><tr><th>학과</th><th>인원</th><th>평가</th>${CONFIG.RATINGS.LABELS.map(r => `<th>${esc(r)}</th>`).join('')}<th>확%</th><th>50%까지</th><th>평균</th></tr></thead>
-          <tbody>${state.depts.map(d => { const dc = dist(d.profs), r = sureRate(d.profs); return `<tr><td>${esc(d.name)}</td><td>${d.profs.length}</td><td>${d.profs.filter(getRating).length}</td>${CONFIG.RATINGS.LABELS.map(r => `<td>${dc[r] || '·'}</td>`).join('')}<td><b>${fmtPct(r.pct)}</b></td><td>${r.pool ? (r.need > 0 ? `+${r.need}` : '달성') : '·'}</td><td>${fmt1(avgScore(d.profs))}</td></tr>`; }).join('')}</tbody></table>
-          <p class="st-note">확% = 확(확실) 인원 ÷ (인원 − 비해당). 비해당(연구년 등)은 모수에서 뺍니다. "50%까지"는 확이 몇 명 더 있어야 절반이 되는지입니다.</p>
-        </div>
       </section>
 
       <section class="st-sec">
