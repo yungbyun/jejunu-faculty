@@ -102,6 +102,7 @@ function doPost(e) {
     if (!body.id) return out({ error: 'missing id' });
     return out({ ok: outCancel(email, String(body.id)) });
   }
+  if (body.action === 'rewrite') return mailRewrite(email, body);
   if (body.action === 'airewrite') return airewrite(email, body);
   if (body.action === 'airewrite_reset') {
     if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
@@ -562,6 +563,58 @@ function outboxStatus() {
   Logger.log('보내기: ' + (outboxOn_() ? (outDry_() ? '연습 모드' : '켜짐') : '꺼짐')
     + ' / 대기 ' + c.queued + ' · 보냄 ' + c.sent + ' · 실패 ' + c.error + ' · 취소 ' + c.canceled
     + ' / 남은 하루 할당량 ' + MailApp.getRemainingDailyQuota() + '통');
+}
+
+
+/* ==========================================================
+ * 메일 원고 다시 쓰기
+ *
+ * 접촉 화면에서 전체 원고를 받아 그 학과나 그 교수에 맞게 고쳐 줍니다.
+ * 사실과 숫자는 건드리지 않고, {이름} 같은 자리표시자도 그대로 둡니다.
+ * ========================================================== */
+
+function mailRewrite(email, b) {
+  if (!airThrottle(email)) return out({ error: '조금 전에 부르셨습니다. 몇 초 뒤에 다시 눌러 주세요' });
+
+  const src = String(b.text || '').trim().slice(0, 8000);
+  if (!src) return out({ error: '고칠 글이 비어 있습니다' });
+  const who = String(b.who || '').trim().slice(0, 400);   // 누구에게 가는 글인지
+  const how = String(b.how || '').trim().slice(0, 600);   // 사용자가 따로 적은 주문
+
+  const sys = [
+    '당신은 한국의 대학 교수가 동료 교수들에게 보내는 메일을 다듬는 편집자입니다.',
+    '보내는 사람은 제주대학교 공과대학 학장 선거에 나선 컴퓨터공학과 변영철 교수입니다.',
+    '',
+    '반드시 지킬 것:',
+    '1. 사실과 숫자를 절대 바꾸지 마십시오. 인원, 비율, 기업 수, 학과 이름, 기관 이름을 새로 만들지 마십시오.',
+    '2. 원문에 없는 약속이나 공약을 추가하지 마십시오.',
+    '3. 중괄호 자리표시자({이름}, {학과}, {개인화}, {연구} 등)는 글자 그대로 남겨 두십시오. 옮기거나 지우지 마십시오.',
+    '4. 문단 수와 전체 길이를 원문과 비슷하게 유지하십시오. 늘리지 마십시오.',
+    '5. 과장하거나 치켜세우지 마십시오. 읽는 사람에게 부담을 주는 부탁조로 쓰지 마십시오.',
+    '6. 담백한 한국어 평서문으로 쓰십시오. 느낌표와 이모지는 쓰지 마십시오.',
+    '',
+    '고친 본문만 출력하십시오. 설명이나 머리말, 코드펜스를 붙이지 마십시오.',
+  ].join('\n');
+
+  const user = [
+    who ? '이 글을 받는 사람: ' + who : '',
+    how ? '고칠 방향: ' + how : '고칠 방향: 받는 사람에게 더 자연스럽게 읽히도록 다듬어 주십시오.',
+    '',
+    '--- 원문 ---',
+    src,
+  ].filter(function (x) { return x !== ''; }).join('\n');
+
+  const r = airCallClaude(sys, user);
+  if (r.error) return out({ error: r.error });
+  let t = String(r.text || '').trim();
+  t = t.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();   // 혹시 코드펜스를 붙였으면 벗긴다
+
+  /* 자리표시자를 잃어버렸으면 되돌려 보내지 않는다 — 조립이 깨진다 */
+  const holes = (src.match(/\{[가-힣]+\}/g) || []);
+  for (let i = 0; i < holes.length; i++) {
+    if (t.indexOf(holes[i]) < 0) return out({ error: '모델이 ' + holes[i] + ' 자리표시자를 빠뜨렸습니다. 다시 눌러 주세요' });
+  }
+  return out({ ok: true, text: t });
 }
 
 function migrateRatings() {

@@ -754,6 +754,63 @@ const epNos = () => Object.keys(eps()).map(Number).sort((a, b) => a - b);
 const epOf = n => eps()[String(n)] || null;
 
 function epSave() { saveObj(EPS_KEY, eps(), SET_EP); }
+
+/* ---------- 전체 → 학과 → 교수 3단 원고 ----------
+ * 회차 본문이 바탕이고, 학과나 교수 단계에 글이 있으면 그것이 이깁니다.
+ * 비워 두면 위 단계를 그대로 씁니다. 그래서 필요한 곳만 채우면 됩니다.
+ * 회차마다 키를 따로 쓰는 이유: 시트 칸 하나가 5만 자라 한 키에 다 넣으면 넘칩니다. */
+const EPOV_PRE = 'epov';
+const epovLKey = n => 'jnu-epov' + n;
+let epovMap = {};
+function epov(n) { n = String(n); if (!epovMap[n]) epovMap[n] = loadObj(epovLKey(n)); return epovMap[n]; }
+function epovSave(n) { saveObj(epovLKey(n), epov(n), EPOV_PRE + n); }
+const CH_FIELD = { '메일': 'body', '문자': 'sms', '카톡': 'kakao' };
+
+/* 그 사람에게 실제로 쓰일 원고(자리표시자는 아직 그대로) */
+function epRaw(n, p, ch) {
+  const ep = epOf(n); if (!ep) return '';
+  const f = CH_FIELD[ch] || 'body', ov = epov(n);
+  const pr = (ov.prof || {})[rKey(p)] || {};
+  const dp = (ov.dept || {})[p.dept_id] || {};
+  if (pr[f]) return pr[f];
+  if (dp[f]) return dp[f];
+  return f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
+}
+/* 어느 단계 글이 쓰이고 있는지 */
+function epLevel(n, p, ch) {
+  const f = CH_FIELD[ch] || 'body', ov = epov(n);
+  if (((ov.prof || {})[rKey(p)] || {})[f]) return '교수';
+  if (((ov.dept || {})[p.dept_id] || {})[f]) return '학과';
+  return '전체';
+}
+function epSetOv(n, kind, id, ch, text) {
+  const ov = epov(n), f = CH_FIELD[ch] || 'body';
+  ov[kind] = ov[kind] || {};
+  const box = ov[kind][id] = ov[kind][id] || {};
+  if (text && text.trim()) box[f] = text; else delete box[f];
+  if (!Object.keys(box).length) delete ov[kind][id];
+  if (!Object.keys(ov[kind]).length) delete ov[kind];
+  epovSave(n);
+}
+/* 자리표시자까지 채운 최종 글 */
+const epFinal = (n, p, ch, one) => {
+  const ep = epOf(n); if (!ep) return '';
+  const line = (ep.dept || {})[p.dept_id] || (ep.seg || {})[segOf(p)] || '';
+  return epFill(epRaw(n, p, ch), p, epFill(line, p, '', one), one).replace(/\n{3,}/g, '\n\n').trim();
+};
+
+/* AI 로 다시 쓰기 — 서버(Apps Script)가 Claude 를 부른다 */
+async function aiRewrite(text, who, how) {
+  const r = await ratingsApi('rewrite', { text, who, how });
+  if (r && r.error === 'bad action') throw new Error('Apps Script 를 다시 배포해야 합니다');
+  if (!r || !r.ok) throw new Error((r && r.error) || '다시 쓰지 못했습니다');
+  return r.text;
+}
+const whoDept = id => {
+  const d = state.depts.find(x => x.id === id);
+  return d ? `제주대학교 공과대학 ${d.name} 교수님들` : '';
+};
+const whoProf = p => `제주대학교 공과대학 ${p.dept_name} ${p.name} ${p.rank}. 전공 키워드: ${(p.tags || []).join(', ')}`;
 function epAdd() {
   const n = String((epNos().pop() || 0) + 1);
   eps()[n] = { subject: `${n}회차 — 컴퓨터공학과 변영철`, body: '', sms: '', seg: {}, dept: {} };
@@ -908,6 +965,7 @@ function epBar() {
       ${ep ? `<span class="st-note">이 회차 발송 <b>${doneN}</b>/${state.rows.length}</span>` : ''}
     </div></div>`;
   if (!ep || !OUT.edit) return `<div class="ot-f ot-ep">${head}</div>`;
+  if (OUT.dept !== '전체') return `<div class="ot-f ot-ep">${head}${epDeptEdit(ep)}</div>`;
   const segRows = SEG_KEYS.map(k => {
     const n = state.rows.filter(p => segOf(p) === k).length;
     return `<label class="ep-seg"><span>${esc(SEG[k].name)} <i>${n}명</i></span>
@@ -926,6 +984,36 @@ function epBar() {
         ${epNos().length > 1 ? `<button type="button" class="btn" data-epdel>이 회차 지우기</button>` : ''}
       </div>
     </div></div>`;
+}
+
+/* 학과 하나를 골랐을 때의 원고 편집 — 비워 두면 전체 원고를 그대로 쓴다 */
+function epDeptEdit(ep) {
+  const id = OUT.dept, d = state.depts.find(x => x.id === id);
+  if (!d) return '';
+  const ov = ((epov(OUT.ep).dept || {})[id]) || {};
+  const sample = d.profs[0];
+  const rows = CHANNELS.map(ch => {
+    const f = CH_FIELD[ch];
+    const base = ch === '카톡' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
+    return `<label class="ep-f"><span>${esc(ch)} 원고 ${ov[f] ? '<i>이 학과 전용</i>' : '<i>비어 있음 — 전체 원고를 씁니다</i>'}</span>
+      <textarea rows="${ch === '메일' ? 12 : 7}" data-dov="${esc(f)}" placeholder="${esc(base.slice(0, 400))}">${esc(ov[f] || '')}</textarea></label>`;
+  }).join('');
+  return `<div class="ep-edit">
+    <p class="ep-who"><b>${esc(d.name)}</b> 교수 ${d.profs.length}명에게 나갈 원고입니다. 비워 두면 전체 원고가 그대로 나갑니다.</p>
+    <label class="ep-f"><span>개인화 한 줄 <i>{개인화} 자리에 들어갑니다. 비우면 갈래 문장(${esc(SEG[segOf(sample)].name)})을 씁니다</i></span>
+      <input type="text" data-dline value="${esc((ep.dept || {})[id] || '')}"></label>
+    ${rows}
+    <div class="ep-ai">
+      <input type="text" class="ep-how" data-how placeholder="AI에게 줄 주문 (비우면 '이 학과에 맞게 자연스럽게')">
+      <button type="button" class="btn" data-aidept>AI로 이 학과에 맞게 다시 쓰기</button>
+      <span class="st-note" data-aimsg></span>
+    </div>
+    <div class="ep-acts">
+      <button type="button" class="btn" data-dsave>저장</button>
+      <button type="button" class="btn" data-dcopy>전체 원고 가져오기</button>
+      <button type="button" class="btn" data-dclear>이 학과 원고 비우기</button>
+    </div>
+  </div>`;
 }
 
 /* 예약 발송이 지금 어떤 상태인지 한 줄로 알려 준다 */
@@ -1017,7 +1105,7 @@ function fillDraft(k) {
     const one = insLine(p, data);
     const memo = (getNote(k) || {}).memo || '';
     const ep = epOf(OUT.ep);
-    const body = ep ? epBody(ep, p, OUT.ch, one) : draftBody(p, OUT.ch, one);
+    const body = ep ? epFinal(OUT.ep, p, OUT.ch, one) : draftBody(p, OUT.ch, one);
     const subject = ep ? epFill(ep.subject || '', p, '') : `학장 선거 인사드립니다 — ${ME.dept} ${ME.name}`;
     const mailto = p.email
       ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
@@ -1030,6 +1118,14 @@ function fillDraft(k) {
       ${OUT.ch === '메일' ? `<input type="text" class="oc__sub" value="${esc(subject)}" aria-label="제목">` : ''}
       <textarea class="oc__ta" rows="${OUT.ch === '메일' ? 16 : 7}" aria-label="초안">${esc(body)}</textarea>
       <div class="oc__len">${body.length}자${OUT.ch === '문자' && body.length > 45 ? ' — 45자를 넘으므로 장문(LMS)으로 나갑니다' : ''}</div>
+      <div class="oc__ai">
+        <span class="oc__lv">지금 쓰는 원고: <b>${esc(epLevel(OUT.ep, p, OUT.ch))}</b> 단계</span>
+        <input type="text" class="ep-how" data-how placeholder="AI에게 줄 주문 (비우면 '이 교수님께 맞게')">
+        <button type="button" class="btn" data-aiprof>AI로 다시 쓰기</button>
+        <button type="button" class="btn" data-psave>이 교수님 원고로 저장</button>
+        ${epLevel(OUT.ep, p, OUT.ch) === '교수' ? `<button type="button" class="btn" data-pclear>되돌리기</button>` : ''}
+        <span class="st-note" data-aimsg></span>
+      </div>
       <div class="oc__acts">
         <button type="button" class="btn" data-copy>복사</button>
         ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
@@ -1055,6 +1151,27 @@ function fillDraft(k) {
       try { await navigator.clipboard.writeText(ta.value); }
       catch { ta.select(); try { document.execCommand('copy'); } catch {} }
       e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
+    });
+    const ta = () => box.querySelector('.oc__ta');
+    const msg = (t, bad) => { const el = box.querySelector('[data-aimsg]'); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } };
+    box.querySelector('[data-psave]')?.addEventListener('click', () => {
+      epSetOv(OUT.ep, 'prof', k, OUT.ch, ta().value);
+      flashStatus(`${p.name} 교수님 ${OUT.ch} 원고를 따로 저장했습니다`);
+      renderOutreach();
+    });
+    box.querySelector('[data-pclear]')?.addEventListener('click', () => {
+      epSetOv(OUT.ep, 'prof', k, OUT.ch, '');
+      flashStatus('위 단계 원고로 되돌렸습니다');
+      renderOutreach();
+    });
+    box.querySelector('[data-aiprof]')?.addEventListener('click', async e => {
+      const btn = e.target; btn.disabled = true; msg('다시 쓰는 중…');
+      try {
+        const how = box.querySelector('[data-how]').value.trim() || '이 교수님께 맞게 자연스럽게 다듬어 주십시오.';
+        const t = await aiRewrite(epRaw(OUT.ep, p, OUT.ch), whoProf(p), how);
+        ta().value = t; msg('다 됐습니다. 확인하시고 저장하세요.');
+      } catch (err) { msg(err.message, true); }
+      btn.disabled = false;
     });
     box.querySelector('[data-epmark]')?.addEventListener('click', () => { epMark(p, OUT.ep, !epDone(p, OUT.ep)); renderOutreach(); });
     box.querySelector('.mailc')?.addEventListener('click', e => {
@@ -1106,6 +1223,41 @@ function bindOutreach() {
   $app.querySelector('[data-epedit]')?.addEventListener('click', () => { OUT.edit = !OUT.edit; renderOutreach(); });
   $app.querySelector('[data-epdel]')?.addEventListener('click', () => {
     if (confirm(`${OUT.ep}회차 원고를 지울까요? 발송 기록은 남습니다.`)) epDel(OUT.ep);
+  });
+  const dmsg = (t, bad) => { const el = $app.querySelector('[data-aimsg]'); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } };
+  $app.querySelector('[data-dsave]')?.addEventListener('click', () => {
+    const ep = epOf(OUT.ep);
+    $app.querySelectorAll('[data-dov]').forEach(el => epSetOv(OUT.ep, 'dept', OUT.dept,
+      Object.keys(CH_FIELD).find(c => CH_FIELD[c] === el.dataset.dov), el.value));
+    const line = $app.querySelector('[data-dline]');
+    if (line) { ep.dept = ep.dept || {}; line.value.trim() ? ep.dept[OUT.dept] = line.value.trim() : delete ep.dept[OUT.dept]; epSave(); }
+    flashStatus('학과 원고를 저장했습니다'); renderOutreach();
+  });
+  $app.querySelector('[data-dcopy]')?.addEventListener('click', () => {
+    const ep = epOf(OUT.ep);
+    $app.querySelectorAll('[data-dov]').forEach(el => {
+      const f = el.dataset.dov;
+      el.value = f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
+    });
+    dmsg('전체 원고를 가져왔습니다. 고치신 뒤 저장하세요.');
+  });
+  $app.querySelector('[data-dclear]')?.addEventListener('click', () => {
+    CHANNELS.forEach(ch => epSetOv(OUT.ep, 'dept', OUT.dept, ch, ''));
+    flashStatus('이 학과 원고를 비웠습니다 — 전체 원고를 씁니다'); renderOutreach();
+  });
+  $app.querySelector('[data-aidept]')?.addEventListener('click', async e => {
+    const btn = e.target; btn.disabled = true; dmsg('다시 쓰는 중…');
+    try {
+      const ep = epOf(OUT.ep);
+      const how = $app.querySelector('[data-how]').value.trim() || '이 학과 교수님들께 맞게 자연스럽게 다듬어 주십시오.';
+      for (const el of $app.querySelectorAll('[data-dov]')) {
+        const f = el.dataset.dov;
+        const src = el.value.trim() || (f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body));
+        el.value = await aiRewrite(src, whoDept(OUT.dept), how);
+      }
+      dmsg('다 됐습니다. 확인하시고 저장하세요.');
+    } catch (err) { dmsg(err.message, true); }
+    btn.disabled = false;
   });
   $app.querySelector('[data-epsave]')?.addEventListener('click', () => {
     const ep = epOf(OUT.ep); if (!ep) return;
@@ -1724,6 +1876,9 @@ async function syncRatings({ initial = false } = {}) {
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_MC = 'mailcnt';
 const SET_EP = 'eps', SET_EPS = 'epsent';
 const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_MC, SET_EP, SET_EPS];
+/* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
+const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
+const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_TR, SET_MC, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
 const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_MC]: '메일 보낸 횟수', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
@@ -1739,6 +1894,7 @@ function settingValue(key) {
   if (key === SET_MC) return mails();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
+  if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1751,10 +1907,12 @@ function settingApplyLocal(key, v) {
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
+    if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
 const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_MC]: MAIL_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
-const setStored = key => { try { return localStorage.getItem(SET_LOCAL_KEY[key]) != null; } catch { return false; } };
+const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
+const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
 async function pushSetting(key, value) {
   try {
@@ -1782,7 +1940,7 @@ async function saveSetting(key, value) {
       }
       if (sync.pendS.get(key) === v) sync.pendS.delete(key);
       if (ok) { sync.dirtyS.delete(key); saveSetDirty(); }
-      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus(SET_LABEL[key] + '을(를) 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
+      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus((SET_LABEL[key] || '회차 원고') + '을(를) 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
     }
   } finally { sync.busyS.delete(key); updateSaveBar(); }
 }
@@ -1790,12 +1948,12 @@ async function saveSetting(key, value) {
 /* 서버 설정을 화면에 반영. 서버에 아직 없고 이 기기에만 있으면 올린다 */
 function applySettings(m) {
   const changed = [];
-  for (const key of SET_KEYS) {
+  for (const key of setKeys()) {
     if (sync.pendS.has(key) || sync.busyS.has(key) || sync.dirtyS.has(key)) continue;
     const raw = m ? m[key] : '';
     if (raw == null || raw === '') { if (setStored(key)) saveSetting(key, settingValue(key)); continue; }
     let v; try { v = JSON.parse(raw); } catch { continue; }
-    const isObj = SET_OBJ.includes(key);
+    const isObj = SET_OBJ.includes(key) || isEpov(key);
     if (isObj ? (!v || typeof v !== 'object' || Array.isArray(v)) : !Array.isArray(v)) continue;
     const cur = settingValue(key) || (isObj ? {} : []);
     const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
