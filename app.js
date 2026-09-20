@@ -671,7 +671,7 @@ function bindQuiz() {
  * 교수마다 성향(연·강·둘)을 달아 두고, 그 성향과 data/insights 의 "AI 융합 방향"을 끼워
  * 메일·문자·카톡 초안을 그 자리에서 조립한다. 초안은 만들고 복사할 뿐, 이 앱이 보내지는 않는다. */
 const CHANNELS = ['메일', '문자', '카톡'];
-const OUT = { dept: '전체', trait: '전체', open: '', ch: '메일', ep: 1, edit: false };
+const OUT = { dept: '전체', open: '', ch: '메일', ep: 1, edit: false };
 const ME = { name: '변영철', dept: '컴퓨터공학과', room: '공과대학 4호관 D407', email: 'ycb@jejunu.ac.kr' };
 
 /* 그 교수 연구에 AI 가 어떻게 붙는지 한 줄. insights 의 결론 문장을 그대로 쓴다. */
@@ -681,53 +681,8 @@ function insLine(p, data) {
   const it = ((v.ai || {}).items || [])[0];
   return (it && it.concl) || (v.ai || {}).sum || '';
 }
-const outFilter = p =>
-  (OUT.dept === '전체' || p.dept_id === OUT.dept) &&
-  (OUT.trait === '전체' || traitOf(p) === (OUT.trait === '미지정' ? '' : OUT.trait));
+const outFilter = p => OUT.dept === '전체' || p.dept_id === OUT.dept;
 
-/* 초안 조립. one = 그 교수 연구 한 줄(없으면 부트캠프 이야기로 대체한다) */
-function draftBody(p, ch, one) {
-  const t = traitOf(p) || '연';
-  const sign = ME.name + ' 드림\n' + ME.dept + ' · ' + ME.room + ' · ' + ME.email;
-  const camp = '지난 여름 부트캠프에 재학생 102명이 왔는데 그중 70%가 비전공 학생이었습니다. 코딩을 해 본 적 없는 학생들이 자기 전공 문제를 스스로 풀어냈습니다.';
-  const axis = t === '강'
-    ? 'AI 가 중심이 되는 것이 아니라 각 학과의 수업이 중심이고, AI 는 거기에 붙어서 돕는 구조를 만드는 것입니다. 교수님이 따로 공부하실 일이 아니라, 교수님 교과목에 AI 쪽 사람이 들어가 그 과목의 문제를 함께 푸는 방식입니다.'
-    : 'AI 가 중심이 되는 것이 아니라 각 학과의 연구가 중심이고, AI 는 거기에 붙어서 돕는 구조를 공과대학 안에 만드는 것입니다.';
-  const bullets = t === '강'
-    ? ['· 교과목에 바로 붙는 AI 활용 지원', '· 부트캠프 학점을 교양으로 열어 학과 전공 시수를 잡아먹지 않도록']
-    : t === '둘'
-      ? ['· 연구실로 찾아가는 AI 활용 지원 — 학생들이 이미 들고 있는 문제부터', '· 교과목에 바로 붙는 지원과, 부트캠프 학점을 교양으로']
-      : ['· 연구실로 찾아가는 AI 활용 지원 — 대학원생과 4학년이 이미 들고 있는 문제부터', '· 과제 실적 정리 같은 반복 행정 덜어 내기'];
-
-  if (ch === '메일') {
-    const mid = t === '강' ? [camp]
-      : one ? [one, '이런 일이 지금은 실제로 됩니다. 다만 교수님들이 각자 찾아 헤매실 일은 아니라고 생각합니다.']
-            : [camp];
-    return [
-      p.name + ' 교수님께', '',
-      ME.dept + ' ' + ME.name + '입니다. 이번 공과대학 학장 선거에 나서게 되어 짧게 인사드립니다.', '',
-      ...mid, '',
-      '제가 하려는 것은 하나입니다. ' + axis, '',
-      ...bullets, '',
-      (t === '강' ? '길게 쓰지 않겠습니다.' : '연구하시기도 바쁘실 텐데 길게 쓰지 않겠습니다.') + ' 투표하실 때 한 번 생각해 주시면 감사하겠습니다.', '',
-      sign,
-    ].join('\n');
-  }
-  const core = t === '강'
-    ? '지난 여름 부트캠프에 온 재학생 102명 중 70%가 비전공이었는데, 코딩을 모르던 학생들이 자기 전공 문제를 스스로 풀어냈습니다.'
-    : (one || camp);
-  const axisShort = t === '강'
-    ? 'AI 가 중심이 아니라 각 학과 수업이 중심이고 AI 가 거기 붙어서 돕는 구조를 공대에 만들려 합니다.'
-    : 'AI 가 중심이 아니라 각 학과 연구가 중심이고 AI 가 거기 붙어서 돕는 구조를 공대에 만들려 합니다.';
-  if (ch === '문자') {
-    return p.name + ' 교수님, ' + ME.dept + ' ' + ME.name + '입니다. 이번 공과대학 학장 선거에 나섰습니다. '
-      + core + ' ' + axisShort + ' 바쁘실 텐데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다. — ' + ME.name;
-  }
-  return [p.name + ' 교수님, ' + ME.dept + ' ' + ME.name + '입니다.', '',
-          '이번 공과대학 학장 선거에 나섰습니다.', '',
-          core, '', axisShort, '',
-          '바쁘신데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다.'].join('\n');
-}
 
 
 /* ---------- 회차 (지지 요청 메일을 여러 번 나눠 보내기) ----------
@@ -1029,7 +984,6 @@ function renderOutreach() {
   obLoad();
   const all = state.rows;
   const rows = all.filter(outFilter);
-  const untag = all.filter(p => !traitOf(p)).length;
   const done = epOf(OUT.ep) ? all.filter(p => epDone(p, OUT.ep)).length : 0;
   const mailed = all.filter(p => mailOf(p)).length;
 
@@ -1051,17 +1005,13 @@ function renderOutreach() {
       <div class="ot-f__r"><span class="ot-f__l">학과</span><div class="filters">${
         ['전체', ...state.depts.map(d => d.id)].map(id =>
           `<button type="button" class="chip" data-of="dept" data-v="${esc(id)}" aria-pressed="${OUT.dept === id}">${esc(deptName(id))}</button>`).join('')}</div></div>
-      <div class="ot-f__r"><span class="ot-f__l">성향</span><div class="filters">${ochips('trait', ['전체', ...TRAITS, '미지정'], OUT.trait)}</div></div>
     </div>
     ${epBar()}
     ${obNotice()}
-    <div class="ot-bulk">
-      <span class="st-note">성향 미지정 <b>${untag}</b>명${untag ? ' — 대부분 연구 쪽이면 한 번에 채우고 예외만 바꾸세요' : ''}</span>
-      ${untag ? `<button type="button" class="btn" data-fill="연">미지정을 모두 연으로</button>` : ''}
-    </div>`;
+`;
 
   const list = rows.length ? rows.map(p => {
-    const k = rKey(p), t = traitOf(p), open = OUT.open === k;
+    const k = rKey(p), open = OUT.open === k;
     const ob = obOf(p);
     const obTag = !ob ? ''
       : ob.status === 'queued' ? `<span class="oc__ob oc__ob--q">예약 ${esc(fmtWhen(new Date(ob.sendAt)))}</span>`
@@ -1078,8 +1028,6 @@ function renderOutreach() {
         ${p.email ? '' : '<span class="oc__no">메일 없음</span>'}
         <button type="button" class="btn oc__go" data-open="${esc(k)}" aria-expanded="${open}">${open ? '접기' : '초안'}</button>
       </div>
-      <div class="oc__tr"><span class="ot-f__l">성향</span><div class="filters filters--tr">${
-        TRAITS.map(v => `<button type="button" class="chip" data-tr="${esc(k)}" data-v="${esc(v)}" aria-pressed="${t === v}" title="${esc(TRAIT_NAMES[v])}">${esc(v)}</button>`).join('')}</div></div>
       ${open ? `<div class="oc__d" data-draft="${esc(k)}"><p class="st-note">초안을 만드는 중…</p></div>` : ''}
     </div>`;
   }).join('') : `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong>필터를 바꿔 보세요.</div>`;
@@ -1105,8 +1053,8 @@ function fillDraft(k) {
     const one = insLine(p, data);
     const memo = (getNote(k) || {}).memo || '';
     const ep = epOf(OUT.ep);
-    const body = ep ? epFinal(OUT.ep, p, OUT.ch, one) : draftBody(p, OUT.ch, one);
-    const subject = ep ? epFill(ep.subject || '', p, '') : `학장 선거 인사드립니다 — ${ME.dept} ${ME.name}`;
+    const body = epFinal(OUT.ep, p, OUT.ch, one);
+    const subject = epFill((ep || {}).subject || '', p, '');
     const mailto = p.email
       ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       : '';
@@ -1270,11 +1218,6 @@ function bindOutreach() {
   $app.querySelectorAll('[data-of]').forEach(b => b.addEventListener('click', () => {
     OUT[b.dataset.of] = b.dataset.v; OUT.open = ''; renderOutreach();
   }));
-  $app.querySelectorAll('[data-tr]').forEach(b => b.addEventListener('click', () => {
-    const p = state.rows.find(x => rKey(x) === b.dataset.tr);
-    if (p) { setTrait(p, b.dataset.v); renderOutreach(); }
-  }));
-  $app.querySelector('[data-fill]')?.addEventListener('click', e => { traitFillRest(e.target.dataset.fill); renderOutreach(); });
   $app.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
     OUT.open = OUT.open === b.dataset.open ? '' : b.dataset.open; renderOutreach();
   }));
@@ -1646,16 +1589,14 @@ function favSave() {
 }
 function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : f.add(k); favSave(); return f.has(k); }
 
-/* ---------- 성향(연·강·둘)과 접촉 상태 ----------
- * 관심 교수와 같은 길(settings 탭)로 저장한다. 다른 점은 값이 배열이 아니라 객체라는 것뿐이고,
+/* ---------- 메일 보낸 횟수 ----------
+ * 관심 교수와 같은 길(settings 탭)로 저장한다. 값이 배열이 아니라 객체라는 점만 다르고,
  * 서버(Code.gs)는 키 이름을 가리지 않으므로 고칠 것이 없다.
- *   trait   {"<dept>/<slug>": "연"}
- *   contact {"<dept>/<slug>": {"st":"보냄","at":"2026-09-20"}} */
-const TRAIT_KEY = 'jnu-trait', MAIL_KEY = 'jnu-mailcnt';
-const TRAITS = ['연', '강', '둘'];
-const TRAIT_NAMES = { '연': '연구 중심', '강': '강의 활용', '둘': '둘 다' };
+ *   mailcnt {"<dept>/<slug>": 2}
+ * (성향 태그와 접촉 상태는 2026-09-21 에 뺐다 — 회차 갈래가 그 일을 맡는다) */
+const MAIL_KEY = 'jnu-mailcnt';
 
-let traitMap = null, mailMap = null;
+let mailMap = null;
 function loadObj(k) {
   try { const v = JSON.parse(localStorage.getItem(k) || 'null'); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
   return {};
@@ -1664,10 +1605,8 @@ function saveObj(k, m, setKey) {
   try { Object.keys(m).length ? localStorage.setItem(k, JSON.stringify(m)) : localStorage.removeItem(k); } catch {}
   saveSetting(setKey, m);
 }
-function traits() { if (!traitMap) traitMap = loadObj(TRAIT_KEY); return traitMap; }
 function mails() { if (!mailMap) mailMap = loadObj(MAIL_KEY); return mailMap; }
 
-const traitOf = p => traits()[rKey(p)] || '';
 /* 메일을 몇 번 보냈는지. 학과 화면의 방문 카운터와 같은 모양이지만 저장 자리는 다르다
  * (방문은 ratings 탭의 met 열, 이쪽은 settings 탭의 mailcnt 키 — 서버를 고치지 않으려고). */
 const mailOf = p => mails()[rKey(p)] || 0;
@@ -1678,18 +1617,6 @@ function setMail(p, n) {
   saveObj(MAIL_KEY, m, SET_MC);
 }
 
-/* 같은 값을 다시 누르면 해제 (선호도 칩과 같은 규칙) */
-function setTrait(p, v) {
-  const m = traits(), k = rKey(p);
-  if (m[k] === v) delete m[k]; else m[k] = v;
-  saveObj(TRAIT_KEY, m, SET_TR);
-}
-/* 아직 성향을 안 정한 사람을 한 번에 채운다 — 대부분이 연구 쪽이라 예외만 손으로 바꾸면 된다 */
-function traitFillRest(v) {
-  const m = traits();
-  state.rows.forEach(p => { const k = rKey(p); if (!m[k]) m[k] = v; });
-  saveObj(TRAIT_KEY, m, SET_TR);
-}
 
 const FAV_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const favBtn = p => `<button type="button" class="fav" data-key="${esc(rKey(p))}" aria-pressed="${isFav(p)}" title="관심 교수" aria-label="${esc(p.name)} 관심 교수 ${isFav(p) ? '해제' : '표시'}">${FAV_SVG}</button>`;
@@ -1873,14 +1800,14 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_MC = 'mailcnt';
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_MC, SET_EP, SET_EPS];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_EP, SET_EPS];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
-const SET_OBJ = [SET_TR, SET_MC, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_MC]: '메일 보낸 횟수', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_OBJ = [SET_MC, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1890,7 +1817,6 @@ function settingValue(key) {
   if (key === SET_QD) return [...quizDepts()].sort();
   if (key === SET_QX) return [...quizEx()].sort();
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
-  if (key === SET_TR) return traits();
   if (key === SET_MC) return mails();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
@@ -1903,14 +1829,13 @@ function settingApplyLocal(key, v) {
     if (key === SET_QD) { quiz.depts = new Set(v); localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify(v)); }
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
-    if (key === SET_TR) { traitMap = v; Object.keys(v).length ? localStorage.setItem(TRAIT_KEY, JSON.stringify(v)) : localStorage.removeItem(TRAIT_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_MC]: MAIL_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 

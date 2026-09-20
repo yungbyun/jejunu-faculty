@@ -14,20 +14,10 @@ await page.waitForTimeout(600);
 const checks = [];
 const check = (t, v, extra = '') => { checks.push([t, v, extra]); };
 
-// 1) 성향 칩 — 켜고 끄기
-const firstKey = await page.evaluate(() => rKey(state.rows[0]));
-await page.click(`[data-tr="${firstKey}"][data-v="연"]`);
-check('성향 칩으로 연 지정', await page.evaluate(k => traits()[k] === '연', firstKey));
-check('localStorage 저장', await page.evaluate(k => {
-  try { return (JSON.parse(localStorage.getItem('jnu-trait') || '{}'))[k] === '연'; } catch { return false; }
-}, firstKey));
-await page.click(`[data-tr="${firstKey}"][data-v="연"]`);
-check('같은 값 다시 누르면 해제', await page.evaluate(k => !traits()[k], firstKey));
-
-// 2) 일괄 지정
-await page.click('[data-fill="연"]');
-check('미지정을 모두 연으로', await page.evaluate(() => state.rows.every(p => traitOf(p))));
-check('일괄 후 버튼 사라짐', await page.evaluate(() => !document.querySelector('[data-fill]')));
+// 1) 성향 태그는 뺐다 (2026-09-21) — 회차 갈래가 개인화를 맡는다
+check('성향 칩 없음', await page.evaluate(() =>
+  !document.querySelector('[data-tr]') && !document.querySelector('[data-of="trait"]') && !document.querySelector('[data-fill]')));
+check('성향 데이터 계층도 없음', await page.evaluate(() => typeof traitOf === 'undefined'));
 
 // 3) 초안 펼치기 + 채널 전환
 const k2 = await page.evaluate(() => rKey(state.rows[2]));
@@ -63,12 +53,12 @@ check('상태 칩·배지 없음', await page.evaluate(() =>
   !document.querySelector('[data-of="st"]') && !document.querySelector('.oc__st') && !document.querySelector('[data-st]')));
 check('머리말은 회차 기준', await page.evaluate(() => /회차 보냄/.test(document.querySelector('.ot-head__m').textContent)));
 
-// 5) 성향 필터
-const nYeon = await page.evaluate(() => state.rows.filter(p => traitOf(p) === '연').length);
-await page.click('[data-of="trait"][data-v="연"]');
+// 5) 남은 거르개는 학과 하나
+const nComdol = await page.evaluate(() => state.rows.filter(p => p.dept_id === 'comdol').length);
+await page.click('[data-of="dept"][data-v="comdol"]');
 await page.waitForTimeout(400);
-check('성향 필터', await page.evaluate(n => document.querySelectorAll('.oc').length === n, nYeon), `연 ${nYeon}명`);
-await page.click('[data-of="trait"][data-v="전체"]');
+check('학과 필터', await page.evaluate(n => document.querySelectorAll('.oc').length === n, nComdol), `전자공학과 ${nComdol}명`);
+await page.click('[data-of="dept"][data-v="전체"]');
 await page.waitForTimeout(400);
 check('필터 해제', await page.evaluate(() => document.querySelectorAll('.oc').length === 70));
 
