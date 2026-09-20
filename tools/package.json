@@ -1,0 +1,10 @@
+{
+  "name": "jejunu-faculty-tools",
+  "private": true,
+  "description": "화면 확인용 스크린샷 도구. node_modules 는 .gitignore 로 빠진다.",
+  "scripts": {
+    "shots": "node shots.mjs",
+    "local": "node shots.mjs http://localhost:8080/ shots local"
+  },
+  "dependencies": { "playwright": "^1.63.0" }
+}

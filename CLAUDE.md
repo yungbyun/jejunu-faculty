@@ -96,10 +96,11 @@ a.bat                   git add -A / commit / push 한 번에
 ## 5. 배포 절차
 
 1. 파일을 수정한다.
-2. **`version.json` 의 값을 반드시 올린다** (`20260919t` → `20260919u` 식). 안 올리면 사용자
+2. **화면을 고쳤으면 `tools/shots.mjs` 로 먼저 눈으로 확인한다** (§8 참고). 확인 전에는 푸시하지 않는다.
+3. **`version.json` 의 값을 반드시 올린다** (`20260919t` → `20260919u` 식). 안 올리면 사용자
    브라우저가 옛 `app.js`/`styles.css`를 계속 씁니다.
-3. `a.bat` 실행 또는 `git add -A && git commit -m "..." && git push`.
-4. 확인은 캐시를 우회해서: `https://yungbyun.github.io/jejunu-faculty/version.json?cb=<아무값>`
+4. `a.bat` 실행 또는 `git add -A && git commit -m "..." && git push`.
+5. 확인은 캐시를 우회해서: `https://yungbyun.github.io/jejunu-faculty/version.json?cb=<아무값>`
    GitHub Pages 반영에는 보통 1~2분 걸립니다. 브라우저에서는 `?r=1` 을 붙이거나 `Ctrl+Shift+R`.
 
 ## 6. 글쓰기 규칙 (사용자가 직접 정한 것 — 반드시 지킬 것)
@@ -158,6 +159,11 @@ a.bat                   git add -A / commit / push 한 번에
 안 읽혀 두 번 되돌린 적이 있습니다. 바꿔야 할 곳은 `app.js` 의 `RCOLOR` 와 `styles.css` 의
 `.rate__b--*` `.prof[data-rating]` `.filters--rate .chip[data-val]` `.rs--*` `.sw--*` `.sbar__seg--*`
 여섯 군데이며, 저장 상태 표시·안내 박스·`--accent` 같은 다른 색은 선호도와 무관하니 건드리지 마십시오.
+**예외 한 곳:** `.prof[data-rating="모"]` 의 테두리는 일부러 한 단계 연한 `#9ca3af` 입니다.
+카드 테두리를 흐리게 두려던 것이므로 `#6b7280` 으로 맞추지 마십시오.
+흰 글자가 올라가는 곳(막대 숫자·선택된 칩)은 2026-09-20 기준 대비 4.74~5.44 로 모두 4.5를 넘습니다.
+반면 학과 행의 작은 칩 `.rs--*` 은 색 글자를 같은 색 연한 배경에 올리는 구조라 3.2~4.0 이고
+다크 전용 오버라이드가 없습니다. 아직 손대지 않기로 한 상태입니다.
 
 **아이콘.** 좌상단·로그인 화면 마크는 "사람 + 체크 배지" SVG 이고, 탭 아이콘과
 `apple-touch-icon.png`(180×180)도 같은 모양입니다. iOS 는 SVG favicon 을 홈 화면에 쓰지 않으므로
@@ -182,9 +188,20 @@ PNG 가 반드시 필요합니다.
   첫 `>` 를 태그 끝으로 착각하면 찌꺼기가 화면에 글자로 나옵니다.
 - **폰의 필터 줄은 가로 스크롤 영역입니다.** `.filters` 에 `justify-content:flex-end` 를 주면
   앞쪽 칩이 스크롤로 닿을 수 없는 왼쪽 바깥으로 밀려납니다.
-- **화면을 고치면 반드시 렌더링해서 눈으로 확인하십시오.** Playwright 로 라이트·다크,
-  390px·PC 폭을 찍어 보는 것이 이 저장소의 기본 검증 방법입니다. 테스트 페이지는
-  `body class="authed"` 가 있어야 합니다(로그인 전에는 `main` 이 `visibility:hidden`).
+- **화면을 고치면 배포 전에 반드시 렌더링해서 눈으로 확인하십시오.** 이 저장소의 기본 검증
+  방법이며, 도구는 `tools/shots.mjs` 입니다.
+
+  ```
+  cd tools && npm i && npx playwright install chromium   # 처음 한 번만
+  node shots.mjs                                          # 배포본
+  node shots.mjs http://localhost:8080/ shots local       # 로컬
+  ```
+
+  첫 화면 / 학과(교수 카드) / 분석 × 390px·PC × 라이트·다크 12장을 `tools/shots/` 에 남깁니다.
+  이 폴더와 `tools/node_modules` 는 `.gitignore` 로 빠져 있습니다.
+  테스트 페이지는 `body class="authed"` 가 있어야 하므로(로그인 전에는 `main` 이
+  `visibility:hidden`) 스크립트가 `enterApp(null)` 로 게이트를 건너뜁니다. 선호도·관심 교수는
+  브라우저 메모리에만 채우며 `favSave()` 를 부르지 않으므로 **시트로 나가는 요청이 없습니다.**
 
 - 시트 401 폴백 메시지는 정상입니다.
 - `WebFetch` 는 URL별로 15분간 응답을 캐시합니다. 배포 확인은 반드시 쿼리스트링을 바꿔서 하십시오.
