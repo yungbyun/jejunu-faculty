@@ -29,7 +29,7 @@ apps-script/Code.gs     Google Apps Script 웹 앱 소스 (저장소에는 사�
 a.bat                   git add -A / commit / push 한 번에
 ```
 
-라우팅은 해시 기반입니다: `#/`, `#/dept/<id>`, `#/dept/<id>/prof/<slug>`, `#/stats`, `#/quiz`.
+라우팅은 해시 기반입니다: `#/`, `#/dept/<id>`, `#/dept/<id>/prof/<slug>`, `#/stats`, `#/outreach`, `#/quiz`.
 
 학과 id: `foodse, chemeng, archieng, elec, telecom, comdol, ai, ce, mse, nuclear, archidesign, civil`
 
@@ -167,6 +167,50 @@ a.bat                   git add -A / commit / push 한 번에
 길어졌기 때문이며, PC 기준 페이지 높이가 2311px → 1527px → 1343px 로 줄었습니다.
 학과·직위는 `title` 속성으로만 남아 마우스를 올리면 보입니다. 칩 전체가 상세 페이지 링크입니다.
 폰에서는 `.st-list` 가 한 열이 되어 선호도 이름이 줄 위로 올라갑니다.
+
+**접촉 화면 (2026-09-20).** 상단 탭에 `접촉`(`#/outreach`)을 더했습니다. 학장 선거 지지 요청
+메시지를 만들고, 누구에게 어디까지 갔는지 관리하는 화면입니다.
+
+저장은 `settings` 탭의 새 키 두 개입니다. **서버(Code.gs)는 고치지 않았습니다** — `setting` 액션이
+키 이름을 가리지 않기 때문입니다.
+
+```jsonc
+trait    {"<dept_id>/<slug>": "연"}                              // 연(연구 중심)·강(강의 활용)·둘
+contact  {"<dept_id>/<slug>": {"st":"보냄","at":"2026-09-20"}}   // 미접촉·초안·보냄·답장·면담
+```
+
+**이 두 키는 값이 배열이 아니라 객체입니다.** `applySettings` 가 `Array.isArray` 만 보고 거르던 것을
+`SET_OBJ` 목록으로 갈라 객체도 받도록 고쳤습니다. 앞으로 배열이 아닌 설정 키를 더할 때는 반드시
+`SET_OBJ` 에 넣으십시오. 넣지 않으면 다른 기기에서 바꾼 값이 조용히 무시됩니다.
+같은 이유로 `applySettings` 의 `changed` 는 불리언이 아니라 바뀐 키 목록이며, 퀴즈 키가 바뀐 때만
+`quizStart()` 를 부릅니다(예전에는 관계없는 설정이 바뀌어도 퀴즈가 새로 시작됐습니다).
+
+초안은 `draftBody(p, 채널, one)` 이 조립합니다. `one` 은 그 교수 `data/insights` 의
+`ai.items[0].concl` 한 줄이고, 없으면 부트캠프 이야기로 대체합니다. 채널은 메일·문자·카톡이며
+insights 는 행을 펼칠 때 그 학과 것만 읽어 옵니다(`loadInsights`). 보내는 사람 정보는 `ME` 상수입니다.
+
+메시지 내용의 축은 면담에서 확인된 것입니다 — **"AI 가 중심이 아니라 각 학과가 중심이고 AI 는 거기
+붙어서 돕는다"**. 최희복 교수가 강하게 동의한 지점이라 도메인 학과 교수들에게 공통으로 씁니다.
+성향이 `강` 이면 이 문장이 수업 쪽으로 바뀌고, 부트캠프 학점을 교양으로 열겠다는 항목이 붙습니다
+(전공으로 넣으면 학과 전공 과목이 하나 날아간다는 지적을 반영).
+
+**이 앱은 메시지를 보내지 않습니다.** 복사와 `mailto:` 까지만 합니다. 예약 발송은 Apps Script 에
+`outbox` 탭과 시간 트리거를 붙여야 하고, 그때는 서버를 고쳐 **직접 재배포**해야 합니다(아직 안 했음).
+카카오톡은 개인 계정 자동 발송 API 가 없어 복사해서 직접 보내는 수밖에 없습니다.
+
+최희복 교수는 `professors.json` 에 이메일이 비어 있어 목록에 "메일 없음"으로 표시되고
+`mailto:` 버튼 대신 안내가 나옵니다. 70명 중 이 한 명뿐입니다.
+
+확인 스크립트(로컬 서버가 떠 있어야 합니다 — `python -m http.server 8080 --bind 127.0.0.1`):
+
+```
+cd tools
+node t-outreach.mjs     접촉 화면 동작 17가지
+node t-console.mjs      모든 화면을 돌며 콘솔 오류 확인
+```
+
+`t-console.mjs` 가 남기는 `GSI_LOGGER ... origin is not allowed` 와 `Provider's accounts list is
+empty` 는 localhost 가 구글 OAuth 승인 출처가 아니라서 나는 것으로, 정상입니다.
 
 **표기.** `비` 의 뜻은 `연구년 등으로 제외` 이고, 분석 페이지 범례에서만 인원을 붙여
 `연구년 등으로 N명 제외` 로 보여 줍니다.

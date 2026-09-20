@@ -265,6 +265,7 @@ function route() {
     return { view: 'dept', dept: decodeURIComponent(parts[1]), prof: parts[2] === 'prof' && parts[3] ? decodeURIComponent(parts[3]) : null };
   }
   if (parts[0] === 'stats') return { view: 'stats' };
+  if (parts[0] === 'outreach') return { view: 'outreach' };
   if (parts[0] === 'quiz') return { view: 'quiz' };
   return { view: 'home' };
 }
@@ -281,6 +282,9 @@ function render() {
     p ? openDrawer(p, d) : closeDrawer(false);
   } else if (r.view === 'stats') {
     renderStats();
+    closeDrawer(false);
+  } else if (r.view === 'outreach') {
+    renderOutreach();
     closeDrawer(false);
   } else if (r.view === 'quiz') {
     renderQuiz();
@@ -662,6 +666,188 @@ function bindQuiz() {
   });
 }
 
+
+/* ---------- 화면: 접촉 (지지 요청 메시지 만들고 관리하기) ----------
+ * 교수마다 성향(연·강·둘)을 달아 두고, 그 성향과 data/insights 의 "AI 융합 방향"을 끼워
+ * 메일·문자·카톡 초안을 그 자리에서 조립한다. 초안은 만들고 복사할 뿐, 이 앱이 보내지는 않는다. */
+const CHANNELS = ['메일', '문자', '카톡'];
+const OUT = { dept: '전체', rate: '전체', trait: '전체', st: '전체', open: '', ch: '메일' };
+const ME = { name: '변영철', dept: '컴퓨터공학과', room: '공과대학 4호관 D407', email: 'ycb@jejunu.ac.kr' };
+
+/* 그 교수 연구에 AI 가 어떻게 붙는지 한 줄. insights 의 결론 문장을 그대로 쓴다. */
+function insLine(p, data) {
+  const v = data && data.profs && data.profs[p.slug];
+  if (!v) return '';
+  const it = ((v.ai || {}).items || [])[0];
+  return (it && it.concl) || (v.ai || {}).sum || '';
+}
+const outFilter = p =>
+  (OUT.dept === '전체' || p.dept_id === OUT.dept) &&
+  (OUT.rate === '전체' || getRating(p) === (OUT.rate === '미지정' ? '' : OUT.rate)) &&
+  (OUT.trait === '전체' || traitOf(p) === (OUT.trait === '미지정' ? '' : OUT.trait)) &&
+  (OUT.st === '전체' || ctState(p) === OUT.st);
+
+/* 초안 조립. one = 그 교수 연구 한 줄(없으면 부트캠프 이야기로 대체한다) */
+function draftBody(p, ch, one) {
+  const t = traitOf(p) || '연';
+  const sign = ME.name + ' 드림\n' + ME.dept + ' · ' + ME.room + ' · ' + ME.email;
+  const camp = '지난 여름 부트캠프에 재학생 102명이 왔는데 그중 70%가 비전공 학생이었습니다. 코딩을 해 본 적 없는 학생들이 자기 전공 문제를 스스로 풀어냈습니다.';
+  const axis = t === '강'
+    ? 'AI 가 중심이 되는 것이 아니라 각 학과의 수업이 중심이고, AI 는 거기에 붙어서 돕는 구조를 만드는 것입니다. 교수님이 따로 공부하실 일이 아니라, 교수님 교과목에 AI 쪽 사람이 들어가 그 과목의 문제를 함께 푸는 방식입니다.'
+    : 'AI 가 중심이 되는 것이 아니라 각 학과의 연구가 중심이고, AI 는 거기에 붙어서 돕는 구조를 공과대학 안에 만드는 것입니다.';
+  const bullets = t === '강'
+    ? ['· 교과목에 바로 붙는 AI 활용 지원', '· 부트캠프 학점을 교양으로 열어 학과 전공 시수를 잡아먹지 않도록']
+    : t === '둘'
+      ? ['· 연구실로 찾아가는 AI 활용 지원 — 학생들이 이미 들고 있는 문제부터', '· 교과목에 바로 붙는 지원과, 부트캠프 학점을 교양으로']
+      : ['· 연구실로 찾아가는 AI 활용 지원 — 대학원생과 4학년이 이미 들고 있는 문제부터', '· 과제 실적 정리 같은 반복 행정 덜어 내기'];
+
+  if (ch === '메일') {
+    const mid = t === '강' ? [camp]
+      : one ? [one, '이런 일이 지금은 실제로 됩니다. 다만 교수님들이 각자 찾아 헤매실 일은 아니라고 생각합니다.']
+            : [camp];
+    return [
+      p.name + ' 교수님께', '',
+      ME.dept + ' ' + ME.name + '입니다. 이번 공과대학 학장 선거에 나서게 되어 짧게 인사드립니다.', '',
+      ...mid, '',
+      '제가 하려는 것은 하나입니다. ' + axis, '',
+      ...bullets, '',
+      (t === '강' ? '길게 쓰지 않겠습니다.' : '연구하시기도 바쁘실 텐데 길게 쓰지 않겠습니다.') + ' 투표하실 때 한 번 생각해 주시면 감사하겠습니다.', '',
+      sign,
+    ].join('\n');
+  }
+  const core = t === '강'
+    ? '지난 여름 부트캠프에 온 재학생 102명 중 70%가 비전공이었는데, 코딩을 모르던 학생들이 자기 전공 문제를 스스로 풀어냈습니다.'
+    : (one || camp);
+  const axisShort = t === '강'
+    ? 'AI 가 중심이 아니라 각 학과 수업이 중심이고 AI 가 거기 붙어서 돕는 구조를 공대에 만들려 합니다.'
+    : 'AI 가 중심이 아니라 각 학과 연구가 중심이고 AI 가 거기 붙어서 돕는 구조를 공대에 만들려 합니다.';
+  if (ch === '문자') {
+    return p.name + ' 교수님, ' + ME.dept + ' ' + ME.name + '입니다. 이번 공과대학 학장 선거에 나섰습니다. '
+      + core + ' ' + axisShort + ' 바쁘실 텐데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다. — ' + ME.name;
+  }
+  return [p.name + ' 교수님, ' + ME.dept + ' ' + ME.name + '입니다.', '',
+          '이번 공과대학 학장 선거에 나섰습니다.', '',
+          core, '', axisShort, '',
+          '바쁘신데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다.'].join('\n');
+}
+
+const ochips = (name, vals, cur) => vals.map(v =>
+  `<button type="button" class="chip" data-of="${esc(name)}" data-v="${esc(v)}" aria-pressed="${cur === v}">${esc(v)}</button>`).join('');
+
+function renderOutreach() {
+  const all = state.rows;
+  const n = st => all.filter(p => ctState(p) === st).length;
+  const rows = all.filter(outFilter);
+  const untag = all.filter(p => !traitOf(p)).length;
+  const done = all.length - n('미접촉');
+
+  const head = `
+    <div class="ot-head">
+      <div class="ot-head__n">${done}<small>/${all.length}명</small></div>
+      <div class="ot-head__m">
+        ${CT_STATES.filter(s => s !== '미접촉').map(s => `<span>${esc(s)} <b>${n(s)}</b></span>`).join('')}
+        <span>미접촉 <b>${n('미접촉')}</b></span>
+      </div>
+      <div class="meter" aria-label="접촉 진행률"><span style="width:${Math.round(done / all.length * 100)}%"></span></div>
+    </div>`;
+
+  const deptName = id => id === '전체' ? '전체' : (state.depts.find(d => d.id === id) || {}).name || id;
+  const filters = `
+    <div class="ot-f">
+      <div class="ot-f__r"><span class="ot-f__l">학과</span><div class="filters">${
+        ['전체', ...state.depts.map(d => d.id)].map(id =>
+          `<button type="button" class="chip" data-of="dept" data-v="${esc(id)}" aria-pressed="${OUT.dept === id}">${esc(deptName(id))}</button>`).join('')}</div></div>
+      <div class="ot-f__r"><span class="ot-f__l">선호도</span><div class="filters filters--rate">${ochips('rate', ['전체', ...CONFIG.RATINGS.LABELS, '미지정'], OUT.rate)}</div></div>
+      <div class="ot-f__r"><span class="ot-f__l">성향</span><div class="filters">${ochips('trait', ['전체', ...TRAITS, '미지정'], OUT.trait)}</div></div>
+      <div class="ot-f__r"><span class="ot-f__l">상태</span><div class="filters">${ochips('st', ['전체', ...CT_STATES], OUT.st)}</div></div>
+    </div>
+    <div class="ot-bulk">
+      <span class="st-note">성향 미지정 <b>${untag}</b>명${untag ? ' — 대부분 연구 쪽이면 한 번에 채우고 예외만 바꾸세요' : ''}</span>
+      ${untag ? `<button type="button" class="btn" data-fill="연">미지정을 모두 연으로</button>` : ''}
+    </div>`;
+
+  const list = rows.length ? rows.map(p => {
+    const k = rKey(p), r = getRating(p), t = traitOf(p), st = ctState(p), open = OUT.open === k;
+    return `
+    <div class="oc ${open ? 'oc--open' : ''}" data-k="${esc(k)}">
+      <div class="oc__h">
+        <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
+        <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
+        ${r ? `<span class="rs rs--${rcls(r)}">${esc(r)}</span>` : ''}
+        <span class="oc__st oc__st--${st === '미접촉' ? 'none' : 'on'}">${esc(st)}</span>
+        ${p.email ? '' : '<span class="oc__no">메일 없음</span>'}
+        <button type="button" class="btn oc__go" data-open="${esc(k)}" aria-expanded="${open}">${open ? '접기' : '초안'}</button>
+      </div>
+      <div class="oc__tr"><span class="ot-f__l">성향</span><div class="filters filters--tr">${
+        TRAITS.map(v => `<button type="button" class="chip" data-tr="${esc(k)}" data-v="${esc(v)}" aria-pressed="${t === v}" title="${esc(TRAIT_NAMES[v])}">${esc(v)}</button>`).join('')}</div></div>
+      ${open ? `<div class="oc__d" data-draft="${esc(k)}"><p class="st-note">초안을 만드는 중…</p></div>` : ''}
+    </div>`;
+  }).join('') : `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong>필터를 바꿔 보세요.</div>`;
+
+  $app.innerHTML = `
+    <div class="view outreach">
+      <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>접촉</span></div>
+      ${head}${filters}
+      <div class="ot-list">${list}</div>
+      <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
+    </div>`;
+  bindOutreach();
+  if (OUT.open) fillDraft(OUT.open);
+}
+
+/* 펼친 행의 초안 채우기. 그 학과 insights 를 그때 한 번만 읽어 온다. */
+function fillDraft(k) {
+  const box = $app.querySelector(`[data-draft="${CSS.escape(k)}"]`);
+  const p = state.rows.find(x => rKey(x) === k);
+  if (!box || !p) return;
+  loadInsights(p.dept_id).then(data => {
+    if (OUT.open !== k) return;
+    const one = insLine(p, data);
+    const memo = (getNote(k) || {}).memo || '';
+    const body = draftBody(p, OUT.ch, one);
+    const subject = `학장 선거 인사드립니다 — ${ME.dept} ${ME.name}`;
+    const mailto = p.email
+      ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      : '';
+    box.innerHTML = `
+      ${memo ? `<div class="oc__memo"><b>면담 메모</b> ${esc(memo)}</div>` : ''}
+      <div class="oc__one${one ? '' : ' oc__one--no'}"><b>연구 한 줄</b> ${one ? esc(one) : '정리된 항목이 없어 부트캠프 이야기로 대신했습니다'}</div>
+      <div class="filters filters--ch">${CHANNELS.map(c =>
+        `<button type="button" class="chip" data-ch="${esc(c)}" aria-pressed="${OUT.ch === c}">${esc(c)}</button>`).join('')}</div>
+      ${OUT.ch === '메일' ? `<input type="text" class="oc__sub" value="${esc(subject)}" aria-label="제목" readonly>` : ''}
+      <textarea class="oc__ta" rows="${OUT.ch === '메일' ? 16 : 7}" aria-label="초안">${esc(body)}</textarea>
+      <div class="oc__len">${body.length}자${OUT.ch === '문자' && body.length > 45 ? ' — 45자를 넘으므로 장문(LMS)으로 나갑니다' : ''}</div>
+      <div class="oc__acts">
+        <button type="button" class="btn" data-copy>복사</button>
+        ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
+      </div>
+      <div class="oc__stset"><span class="ot-f__l">상태</span><div class="filters">${
+        CT_STATES.map(v => `<button type="button" class="chip" data-st="${esc(k)}" data-v="${esc(v)}" aria-pressed="${ctState(p) === v}">${esc(v)}</button>`).join('')}</div></div>`;
+    box.querySelector('[data-copy]')?.addEventListener('click', async e => {
+      const ta = box.querySelector('.oc__ta');
+      try { await navigator.clipboard.writeText(ta.value); }
+      catch { ta.select(); try { document.execCommand('copy'); } catch {} }
+      e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
+    });
+    box.querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => { OUT.ch = b.dataset.ch; fillDraft(k); }));
+    box.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => { setCt(p, b.dataset.v); renderOutreach(); }));
+  });
+}
+
+function bindOutreach() {
+  $app.querySelectorAll('[data-of]').forEach(b => b.addEventListener('click', () => {
+    OUT[b.dataset.of] = b.dataset.v; OUT.open = ''; renderOutreach();
+  }));
+  $app.querySelectorAll('[data-tr]').forEach(b => b.addEventListener('click', () => {
+    const p = state.rows.find(x => rKey(x) === b.dataset.tr);
+    if (p) { setTrait(p, b.dataset.v); renderOutreach(); }
+  }));
+  $app.querySelector('[data-fill]')?.addEventListener('click', e => { traitFillRest(e.target.dataset.fill); renderOutreach(); });
+  $app.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+    OUT.open = OUT.open === b.dataset.open ? '' : b.dataset.open; renderOutreach();
+  }));
+}
+
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
 const SCORE = { '확': 3, '중': 2, '모': 1, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
 const hasScore = p => SCORE[getRating(p)] != null;
@@ -1028,6 +1214,51 @@ function favSave() {
 }
 function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : f.add(k); favSave(); return f.has(k); }
 
+/* ---------- 성향(연·강·둘)과 접촉 상태 ----------
+ * 관심 교수와 같은 길(settings 탭)로 저장한다. 다른 점은 값이 배열이 아니라 객체라는 것뿐이고,
+ * 서버(Code.gs)는 키 이름을 가리지 않으므로 고칠 것이 없다.
+ *   trait   {"<dept>/<slug>": "연"}
+ *   contact {"<dept>/<slug>": {"st":"보냄","at":"2026-09-20"}} */
+const TRAIT_KEY = 'jnu-trait', CONTACT_KEY = 'jnu-contact';
+const TRAITS = ['연', '강', '둘'];
+const TRAIT_NAMES = { '연': '연구 중심', '강': '강의 활용', '둘': '둘 다' };
+const CT_STATES = ['미접촉', '초안', '보냄', '답장', '면담'];
+
+let traitMap = null, contactMap = null;
+function loadObj(k) {
+  try { const v = JSON.parse(localStorage.getItem(k) || 'null'); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
+  return {};
+}
+function saveObj(k, m, setKey) {
+  try { Object.keys(m).length ? localStorage.setItem(k, JSON.stringify(m)) : localStorage.removeItem(k); } catch {}
+  saveSetting(setKey, m);
+}
+function traits() { if (!traitMap) traitMap = loadObj(TRAIT_KEY); return traitMap; }
+function contacts() { if (!contactMap) contactMap = loadObj(CONTACT_KEY); return contactMap; }
+
+const traitOf = p => traits()[rKey(p)] || '';
+const ctOf = p => contacts()[rKey(p)] || null;
+const ctState = p => (ctOf(p) || {}).st || '미접촉';
+
+/* 같은 값을 다시 누르면 해제 (선호도 칩과 같은 규칙) */
+function setTrait(p, v) {
+  const m = traits(), k = rKey(p);
+  if (m[k] === v) delete m[k]; else m[k] = v;
+  saveObj(TRAIT_KEY, m, SET_TR);
+}
+function setCt(p, st) {
+  const m = contacts(), k = rKey(p);
+  if (!st || st === '미접촉' || (m[k] || {}).st === st) delete m[k];
+  else m[k] = { st, at: new Date().toISOString().slice(0, 10) };
+  saveObj(CONTACT_KEY, m, SET_CT);
+}
+/* 아직 성향을 안 정한 사람을 한 번에 채운다 — 대부분이 연구 쪽이라 예외만 손으로 바꾸면 된다 */
+function traitFillRest(v) {
+  const m = traits();
+  state.rows.forEach(p => { const k = rKey(p); if (!m[k]) m[k] = v; });
+  saveObj(TRAIT_KEY, m, SET_TR);
+}
+
 const FAV_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const favBtn = p => `<button type="button" class="fav" data-key="${esc(rKey(p))}" aria-pressed="${isFav(p)}" title="관심 교수" aria-label="${esc(p.name)} 관심 교수 ${isFav(p) ? '해제' : '표시'}">${FAV_SVG}</button>`;
 
@@ -1210,7 +1441,10 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_KEYS = [SET_QD, SET_QX, SET_FAV];
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_CT = 'contact';
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_CT];
+const SET_OBJ = [SET_TR, SET_CT];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_CT]: '접촉 상태' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1220,6 +1454,8 @@ function settingValue(key) {
   if (key === SET_QD) return [...quizDepts()].sort();
   if (key === SET_QX) return [...quizEx()].sort();
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
+  if (key === SET_TR) return traits();
+  if (key === SET_CT) return contacts();
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1228,9 +1464,11 @@ function settingApplyLocal(key, v) {
     if (key === SET_QD) { quiz.depts = new Set(v); localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify(v)); }
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
+    if (key === SET_TR) { traitMap = v; Object.keys(v).length ? localStorage.setItem(TRAIT_KEY, JSON.stringify(v)) : localStorage.removeItem(TRAIT_KEY); }
+    if (key === SET_CT) { contactMap = v; Object.keys(v).length ? localStorage.setItem(CONTACT_KEY, JSON.stringify(v)) : localStorage.removeItem(CONTACT_KEY); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_CT]: CONTACT_KEY };
 const setStored = key => { try { return localStorage.getItem(SET_LOCAL_KEY[key]) != null; } catch { return false; } };
 
 async function pushSetting(key, value) {
@@ -1259,28 +1497,31 @@ async function saveSetting(key, value) {
       }
       if (sync.pendS.get(key) === v) sync.pendS.delete(key);
       if (ok) { sync.dirtyS.delete(key); saveSetDirty(); }
-      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus((key === SET_FAV ? '관심 교수' : '퀴즈 설정') + '을(를) 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
+      else { sync.dirtyS.set(key, v); saveSetDirty(); flashStatus(SET_LABEL[key] + '을(를) 시트에 저장하지 못했습니다 — 연결되면 다시 시도합니다', true); break; }
     }
   } finally { sync.busyS.delete(key); updateSaveBar(); }
 }
 
 /* 서버 설정을 화면에 반영. 서버에 아직 없고 이 기기에만 있으면 올린다 */
 function applySettings(m) {
-  let changed = false;
+  const changed = [];
   for (const key of SET_KEYS) {
     if (sync.pendS.has(key) || sync.busyS.has(key) || sync.dirtyS.has(key)) continue;
     const raw = m ? m[key] : '';
     if (raw == null || raw === '') { if (setStored(key)) saveSetting(key, settingValue(key)); continue; }
     let v; try { v = JSON.parse(raw); } catch { continue; }
-    if (!Array.isArray(v)) continue;
-    const cur = settingValue(key) || [];
-    const same = key === SET_FAV ? JSON.stringify(cur) === JSON.stringify(v)
+    const isObj = SET_OBJ.includes(key);
+    if (isObj ? (!v || typeof v !== 'object' || Array.isArray(v)) : !Array.isArray(v)) continue;
+    const cur = settingValue(key) || (isObj ? {} : []);
+    const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
+    const same = isObj ? canon(cur) === canon(v)
+               : key === SET_FAV ? JSON.stringify(cur) === JSON.stringify(v)
                                  : JSON.stringify(cur) === JSON.stringify([...v].sort());
     if (same) continue;
-    settingApplyLocal(key, v); changed = true;
+    settingApplyLocal(key, v); changed.push(key);
   }
-  if (changed) {
-    quizStart();
+  if (changed.length) {
+    if (changed.includes(SET_QD) || changed.includes(SET_QX)) quizStart();   // 퀴즈 설정이 바뀐 때만 새로 시작
     route().view === 'quiz' ? renderQuiz() : render();
     flashStatus('다른 기기에서 바꾼 설정을 반영했습니다');
   }

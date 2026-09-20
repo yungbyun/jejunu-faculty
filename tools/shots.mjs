@@ -24,6 +24,13 @@ const ROUTES = [
   { name: 'stats', hash: '#/stats' },
   // 퀴즈는 한 문제 넘기고 힌트를 두 개 연 상태로 찍는다
   // ('이전' 버튼이 살아 있는 모습과 힌트로 열린 글자를 함께 봐야 한다)
+  // 접촉 화면은 성향을 조금 달고 한 줄을 펼친 상태로 찍는다
+  { name: 'out',   hash: '#/outreach', after: () => {
+      state.rows.forEach((p, i) => { if (i % 3) traits()[rKey(p)] = i % 7 === 2 ? '강' : i % 5 === 1 ? '둘' : '연'; });
+      contacts()[rKey(state.rows[0])] = { st: '보냄', at: '2026-09-20' };
+      contacts()[rKey(state.rows[3])] = { st: '답장', at: '2026-09-20' };
+      OUT.open = rKey(state.rows[1]); renderOutreach();
+    } },
   { name: 'quiz',  hash: '#/quiz', after: () => { quizNext(); quiz.hints = 2; renderQuiz(); } },
 ];
 const VIEWPORTS = [{ name: 'mobile', width: 390, height: 844 }, { name: 'pc', width: 1440, height: 900 }];
