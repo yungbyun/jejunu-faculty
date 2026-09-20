@@ -391,7 +391,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .tile__val{font-size:26px;font-weight:700;letter-spacing:-.5px;line-height:1.1}
 .tile__pct{font-size:12px;color:var(--ink-3)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--ink-3);flex:none}
-.sw--high{background:#1f8a5b}.sw--mid{background:#2563eb}.sw--low{background:#6b7280}.sw--neg{background:#c0392b}.sw--na{background:#7c5cbf}.sw--none{background:transparent;border:1.5px dashed var(--ink-3)}
+.sw--high{background:#22a06b}.sw--mid{background:#2563eb}.sw--low{background:#6b7280}.sw--neg{background:#c0392b}.sw--na{background:#7c5cbf}.sw--none{background:transparent;border:1.5px dashed var(--ink-3)}
 
 /* ---------- 첫 화면: 관심 교수 명단 ---------- */
 .favsec{margin:6px 0 22px;padding:16px 18px;border:1px solid color-mix(in srgb,#e0a10c 35%,var(--line));border-radius:var(--radius);background:color-mix(in srgb,#e0a10c 5%,var(--surface))}
@@ -437,11 +437,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .pie__svg{width:250px;height:173px}
   .pie__legend{gap:12px}
 }
-  .pie__legend{flex-basis:100%}
-}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.legend{display:flex;gap:10px 18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
 .legend__i{display:inline-flex;align-items:center;gap:6px}
-.legend--names{margin-top:10px;gap:10px 16px}.legend--names b{color:var(--ink)}
+.legend--names{margin-top:10px;gap:10px 22px}.legend--names b{color:var(--ink)}
 .st-rows{display:flex;flex-direction:column;gap:12px}
 .st-row{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:center}
 .st-row__lbl{font-size:14px;font-weight:600;line-height:1.3}
@@ -450,7 +448,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .sbar{display:flex;gap:2px;height:22px;width:100%}
 .sbar__seg{display:grid;place-items:center;color:#fff;font-size:11.5px;font-weight:600;min-width:0;transition:filter .15s}
 .sbar__seg:first-child{border-radius:4px 0 0 4px}.sbar__seg:last-child{border-radius:0 4px 4px 0}
-.sbar__seg--high{background:#1f8a5b}.sbar__seg--mid{background:#2563eb}.sbar__seg--low{background:#6b7280}.sbar__seg--neg{background:#c0392b}.sbar__seg--na{background:#7c5cbf}
+.sbar__seg--high{background:#22a06b}.sbar__seg--mid{background:#2563eb}.sbar__seg--low{background:#6b7280}.sbar__seg--neg{background:#c0392b}.sbar__seg--na{background:#7c5cbf}
 .sbar__seg--none{background:transparent;border:1.5px dashed var(--line-2);color:var(--ink-3)}
 .sbar__seg[data-go]{cursor:pointer}.sbar__seg[data-go]:hover{filter:brightness(1.12)}
 .dv{display:flex;flex-direction:column;gap:6px}

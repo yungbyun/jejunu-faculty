@@ -32,9 +32,9 @@ const CONFIG = {
   // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
   RATINGS: {
     API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
-    // 선호도 값과 뜻. 비(비해당)는 연구년 등으로 이번 평가에서 제외되는 경우
+    // 선호도 값과 뜻. 비(평가제외)는 연구년 등으로 이번 평가에서 빠지는 경우
     LABELS: ['확', '중', '모', '부', '비'],
-    NAMES: { '확': '확실', '중': '보통', '모': '모름', '부': '부정', '비': '비해당 (연구년 등 평가 제외)' },
+    NAMES: { '확': '확실', '중': '보통', '모': '모름', '부': '부정', '비': '연구년 등으로 제외' },
     // 예전에 저장된 값(상/하)은 자동으로 새 값으로 읽음
     LEGACY: { '상': '확', '하': '모' },
     // 다른 기기에서 바꾼 선호도를 다시 읽는 주기(초). 화면이 보일 때만 동작
@@ -645,14 +645,14 @@ function bindQuiz() {
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
-const SCORE = { '확': 3, '중': 2, '모': 1, '부': -1 }; // 비(비해당)는 점수 없음 → 평균·키워드 분석에서 제외
+const SCORE = { '확': 3, '중': 2, '모': 1, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
 const hasScore = p => SCORE[getRating(p)] != null;
 const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
 const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
 /* ---------- 선호도 원그래프 ----------
- * '비'(비해당)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
-const RCOLOR = { '확': '#1f8a5b', '중': '#2563eb', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
+ * '비'(평가제외)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
+const RCOLOR = { '확': '#22a06b', '중': '#2563eb', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 
 function donut(profs) {
@@ -675,7 +675,7 @@ function donut(profs) {
   return `
     <div class="pie">
       <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (비해당 제외, 합계 ${total}명)">
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
@@ -699,7 +699,7 @@ function avgScore(profs) {
   return rated.reduce((a, p) => a + SCORE[getRating(p)], 0) / rated.length;
 }
 const fmt1 = n => n == null ? '–' : (Math.round(n * 100) / 100).toFixed(2);
-/* 확(확실) 비율: 비해당(연구년 등) 교수를 모수에서 뺀 뒤 계산 */
+/* 확(확실) 비율: 평가제외(연구년 등) 교수를 모수에서 뺀 뒤 계산 */
 function sureRate(profs) {
   const pool = profs.filter(p => getRating(p) !== '비');
   const sure = pool.filter(p => getRating(p) === '확').length;

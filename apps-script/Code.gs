@@ -16,7 +16,7 @@ const SHEET_NAME = 'ratings';
 const SET_SHEET = 'settings';                     // 퀴즈 학과·교수 선택 등 개인 설정
 const SET_HEADER = ['email', 'key', 'value', 'updated_at'];
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
-// 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(비해당 — 연구년 등으로 평가 제외)
+// 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(평가제외 — 연구년 등)
 const RATINGS = ['확', '중', '모', '부', '비'];
 // 예전 값(상/하)이 시트에 남아 있어도 새 값으로 읽습니다
 const LEGACY = { '상': '확', '하': '모' };
