@@ -265,6 +265,7 @@ function route() {
     return { view: 'dept', dept: decodeURIComponent(parts[1]), prof: parts[2] === 'prof' && parts[3] ? decodeURIComponent(parts[3]) : null };
   }
   if (parts[0] === 'stats') return { view: 'stats' };
+  if (parts[0] === 'letters') return { view: 'letters' };
   if (parts[0] === 'outreach') return { view: 'outreach' };
   if (parts[0] === 'quiz') return { view: 'quiz' };
   return { view: 'home' };
@@ -282,6 +283,9 @@ function render() {
     p ? openDrawer(p, d) : closeDrawer(false);
   } else if (r.view === 'stats') {
     renderStats();
+    closeDrawer(false);
+  } else if (r.view === 'letters') {
+    renderLetters();
     closeDrawer(false);
   } else if (r.view === 'outreach') {
     renderOutreach();
@@ -667,6 +671,193 @@ function bindQuiz() {
 }
 
 
+
+/* ---------- 화면: 원고 (회차를 눈으로 보며 고친다) ----------
+ * 왼쪽에서 고치면 오른쪽 미리보기가 바로 바뀝니다. 입력 중에는 화면을 다시 그리지 않습니다
+ * (다시 그리면 커서가 날아갑니다). 저장은 입력이 멎으면 알아서 합니다. */
+const LET = { ep: 1, dept: '전체', ch: '메일', seg: 'B', prof: '' };
+let letTimer = null, letDirty = false;
+
+/* 미리보기에 쓸 교수 한 명 */
+function letProf() {
+  if (LET.prof) { const p = state.rows.find(x => rKey(x) === LET.prof); if (p) return p; }
+  if (LET.dept !== '전체') return (state.depts.find(d => d.id === LET.dept) || { profs: [] }).profs[0];
+  return state.rows.find(p => segOf(p) === LET.seg) || state.rows[0];
+}
+/* 지금 고치고 있는 원고 (대상이 학과면 그 학과 것) */
+function letSrc() {
+  const ep = epOf(LET.ep); if (!ep) return '';
+  const f = CH_FIELD[LET.ch];
+  if (LET.dept !== '전체') return (((epov(LET.ep).dept || {})[LET.dept]) || {})[f] || '';
+  return f === 'kakao' ? (ep.kakao || '') : (ep[f] || '');
+}
+function letSave(text) {
+  const ep = epOf(LET.ep); if (!ep) return;
+  if (LET.dept !== '전체') epSetOv(LET.ep, 'dept', LET.dept, LET.ch, text);
+  else { ep[CH_FIELD[LET.ch]] = text; epSave(); }
+}
+/* 입력이 멎으면 저장. 화면은 다시 그리지 않는다 */
+function letTouch(fn) {
+  letDirty = true; letMark('저장 중…');
+  clearTimeout(letTimer);
+  letTimer = setTimeout(() => { fn(); letDirty = false; letMark('저장됨 ✓'); }, 700);
+}
+function letMark(t) { const el = $app.querySelector('[data-letsave]'); if (el) el.textContent = t; }
+
+function letPreview() {
+  const p = letProf(); if (!p) return '';
+  const ep = epOf(LET.ep); if (!ep) return '';
+  const f = CH_FIELD[LET.ch];
+  const src = $app.querySelector('.let-src');
+  const raw = src ? src.value : letSrc();
+  const line = (ep.dept || {})[p.dept_id] || (ep.seg || {})[segOf(p)] || '';
+  const ins = insCache.get(p.dept_id);
+  const one = ins ? insLine(p, ins) : '';
+  const base = raw || (f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body));
+  return epFill(base, p, epFill(line, p, '', one), one).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function renderLetters() {
+  if (!state.rows.length) return;
+  const nos = epNos();
+  if (!nos.includes(LET.ep)) LET.ep = nos[0] || 0;
+  const ep = epOf(LET.ep);
+
+  const list = nos.map(n => {
+    const e = epOf(n), sent = state.rows.filter(p => epDone(p, n)).length;
+    const st = epStatus(n);
+    return `<button type="button" class="let-row ${LET.ep === n ? 'on' : ''}" data-letep="${n}">
+      <span class="let-row__n">${n}</span>
+      <span class="let-row__t">${esc(e.name || '(이름 없음)')}</span>
+      <span class="let-row__s let-row__s--${st === '비어 있음' ? 'empty' : st === '작성 중' ? 'draft' : 'sent'}">${esc(st)}</span>
+      <span class="let-row__d">${esc(e.planAt || '날짜 미정')}</span>
+      <span class="let-row__p">${sent}/${state.rows.length}</span>
+    </button>`;
+  }).join('');
+
+  if (!ep) {
+    $app.innerHTML = `<div class="view letters"><div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>원고</span></div>
+      <div class="empty"><strong>회차가 없습니다</strong></div></div>`;
+    return;
+  }
+
+  const p = letProf();
+  const targets = LET.dept === '전체'
+    ? SEG_KEYS.map(k => `<button type="button" class="chip" data-letseg="${k}" aria-pressed="${LET.seg === k && !LET.prof}">${esc(SEG[k].name)}</button>`).join('')
+    : (state.depts.find(d => d.id === LET.dept) || { profs: [] }).profs.map(x =>
+        `<button type="button" class="chip" data-letprof="${esc(rKey(x))}" aria-pressed="${p && rKey(p) === rKey(x)}">${esc(x.name)}</button>`).join('');
+
+  const segs = LET.dept === '전체' ? `<div class="let-segs">${SEG_KEYS.map(k =>
+    `<label class="ep-seg"><span>${esc(SEG[k].name)} <i>${state.rows.filter(x => segOf(x) === k).length}명</i></span>
+      <textarea rows="2" data-letseg-t="${k}">${esc((ep.seg || {})[k] || '')}</textarea></label>`).join('')}</div>` : '';
+
+  const deptLine = LET.dept !== '전체'
+    ? `<label class="ep-f"><span>이 학과 개인화 한 줄 <i>비우면 갈래 문장을 씁니다</i></span>
+        <input type="text" data-letdline value="${esc((ep.dept || {})[LET.dept] || '')}"></label>` : '';
+
+  $app.innerHTML = `
+    <div class="view letters">
+      <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>원고</span></div>
+
+      <div class="let-list">${list}
+        <button type="button" class="let-row let-row--add" data-letadd>+ 회차 추가</button>
+      </div>
+
+      <div class="let-edit">
+        <div class="let-meta">
+          <label><span>이름</span><input type="text" data-letf="name" value="${esc(ep.name || '')}" placeholder="예: 연락처만 주십시오"></label>
+          <label><span>보낼 때</span><input type="date" data-letf="planAt" value="${esc(ep.planAt || '')}"></label>
+          <span class="let-save" data-letsave>저장됨 ✓</span>
+        </div>
+        <label class="ep-f"><span>제목</span><input type="text" data-letf="subject" value="${esc(ep.subject || '')}"></label>
+
+        <div class="let-bar">
+          <span class="ot-f__l">대상</span>
+          <select data-letdept>
+            <option value="전체"${LET.dept === '전체' ? ' selected' : ''}>전체 (${state.rows.length}명)</option>
+            ${state.depts.map(d => `<option value="${esc(d.id)}"${LET.dept === d.id ? ' selected' : ''}>${esc(d.name)} (${d.profs.length}명)</option>`).join('')}
+          </select>
+          <span class="ot-f__l">채널</span>
+          <div class="filters filters--ch">${CHANNELS.map(c =>
+            `<button type="button" class="chip" data-letch="${esc(c)}" aria-pressed="${LET.ch === c}">${esc(c)}</button>`).join('')}</div>
+        </div>
+
+        ${deptLine}
+
+        <div class="let-2col">
+          <div class="let-pane">
+            <div class="let-pane__h">원고 ${LET.dept === '전체' ? '<i>전체</i>' : `<i>${esc((state.depts.find(d => d.id === LET.dept) || {}).name || '')} 전용</i>`}</div>
+            <textarea class="let-src" rows="20" placeholder="${LET.dept === '전체' ? '여기에 쓰십시오. {이름} {학과} {개인화} {연구} 를 쓰면 사람마다 바뀝니다.' : '비워 두면 전체 원고가 그대로 나갑니다.'}">${esc(letSrc())}</textarea>
+          </div>
+          <div class="let-pane">
+            <div class="let-pane__h">미리보기 <i>${p ? esc(p.name + ' ' + p.rank) : ''}</i></div>
+            <div class="filters let-targets">${targets}</div>
+            <div class="let-prev" data-letprev></div>
+          </div>
+        </div>
+
+        ${segs}
+
+        <div class="ep-ai">
+          <input type="text" class="ep-how" data-how placeholder="AI에게 줄 주문 (비우면 자연스럽게 다듬기)">
+          <button type="button" class="btn" data-letai>AI로 다시 쓰기</button>
+          ${LET.dept !== '전체' ? `<button type="button" class="btn" data-letcopy>전체 원고 가져오기</button>` : ''}
+          <span class="st-note" data-aimsg></span>
+        </div>
+      </div>
+    </div>`;
+
+  const prev = $app.querySelector('[data-letprev]');
+  if (prev) prev.textContent = letPreview();
+  if (p) loadInsights(p.dept_id).then(() => { const el = $app.querySelector('[data-letprev]'); if (el) el.textContent = letPreview(); });
+  bindLetters();
+}
+
+function bindLetters() {
+  const prev = () => { const el = $app.querySelector('[data-letprev]'); if (el) el.textContent = letPreview(); };
+  $app.querySelectorAll('[data-letep]').forEach(b => b.addEventListener('click', () => { LET.ep = Number(b.dataset.letep); LET.prof = ''; renderLetters(); }));
+  $app.querySelector('[data-letadd]')?.addEventListener('click', () => { epAdd(true); renderLetters(); });
+  $app.querySelectorAll('[data-letch]').forEach(b => b.addEventListener('click', () => { LET.ch = b.dataset.letch; renderLetters(); }));
+  $app.querySelectorAll('[data-letseg]').forEach(b => b.addEventListener('click', () => { LET.seg = b.dataset.letseg; LET.prof = ''; renderLetters(); }));
+  $app.querySelectorAll('[data-letprof]').forEach(b => b.addEventListener('click', () => { LET.prof = b.dataset.letprof; renderLetters(); }));
+  $app.querySelector('[data-letdept]')?.addEventListener('change', e => { LET.dept = e.target.value; LET.prof = ''; renderLetters(); });
+
+  const src = $app.querySelector('.let-src');
+  src?.addEventListener('input', () => { prev(); letTouch(() => letSave(src.value)); });
+
+  $app.querySelectorAll('[data-letf]').forEach(el => el.addEventListener('input', () => {
+    letTouch(() => { const ep = epOf(LET.ep); if (ep) { ep[el.dataset.letf] = el.value; epSave(); } });
+  }));
+  $app.querySelectorAll('[data-letseg-t]').forEach(el => el.addEventListener('input', () => {
+    prev();
+    letTouch(() => { const ep = epOf(LET.ep); if (ep) { ep.seg = ep.seg || {}; ep.seg[el.dataset.letsegT] = el.value; epSave(); } });
+  }));
+  $app.querySelector('[data-letdline]')?.addEventListener('input', e => {
+    prev();
+    letTouch(() => { const ep = epOf(LET.ep); if (!ep) return; ep.dept = ep.dept || {};
+      e.target.value.trim() ? ep.dept[LET.dept] = e.target.value.trim() : delete ep.dept[LET.dept]; epSave(); });
+  });
+  $app.querySelector('[data-letcopy]')?.addEventListener('click', () => {
+    const ep = epOf(LET.ep), f = CH_FIELD[LET.ch];
+    const t = f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
+    $app.querySelector('.let-src').value = t; prev(); letTouch(() => letSave(t));
+  });
+  $app.querySelector('[data-letai]')?.addEventListener('click', async e => {
+    const btn = e.target, msg = t => { const el = $app.querySelector('[data-aimsg]'); if (el) el.textContent = t; };
+    btn.disabled = true; msg('다시 쓰는 중…');
+    try {
+      const ep = epOf(LET.ep), f = CH_FIELD[LET.ch];
+      const cur = $app.querySelector('.let-src').value.trim() || (f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body));
+      const how = $app.querySelector('[data-how]').value.trim() || '자연스럽게 다듬어 주십시오.';
+      const who = LET.dept === '전체' ? '제주대학교 공과대학 교수님들 전체' : whoDept(LET.dept);
+      const t = await aiRewrite(cur, who, how);
+      $app.querySelector('.let-src').value = t; prev(); letTouch(() => letSave(t));
+      msg('다 됐습니다. 확인하십시오 — 저장은 알아서 됩니다.');
+    } catch (err) { msg(err.message); }
+    btn.disabled = false;
+  });
+}
+
 /* ---------- 화면: 접촉 (지지 요청 메시지 만들고 관리하기) ----------
  * 교수마다 성향(연·강·둘)을 달아 두고, 그 성향과 data/insights 의 "AI 융합 방향"을 끼워
  * 메일·문자·카톡 초안을 그 자리에서 조립한다. 초안은 만들고 복사할 뿐, 이 앱이 보내지는 않는다. */
@@ -703,7 +894,7 @@ const SEG_KEYS = Object.keys(SEG);
 const segOf = p => SEG_KEYS.find(k => SEG[k].depts.includes(p.dept_id)) || 'B';
 
 let epsMap = null, epsentMap = null;
-function eps() { if (!epsMap) { epsMap = loadObj(EPS_KEY); if (!Object.keys(epsMap).length) { epsMap = { '1': EP1 }; } } return epsMap; }
+function eps() { if (!epsMap) { epsMap = loadObj(EPS_KEY); if (!Object.keys(epsMap).length) { epsMap = epSeed(); } } return epsMap; }
 function epsent() { if (!epsentMap) epsentMap = loadObj(EPSENT_KEY); return epsentMap; }
 const epNos = () => Object.keys(eps()).map(Number).sort((a, b) => a - b);
 const epOf = n => eps()[String(n)] || null;
@@ -766,10 +957,20 @@ const whoDept = id => {
   return d ? `제주대학교 공과대학 ${d.name} 교수님들` : '';
 };
 const whoProf = p => `제주대학교 공과대학 ${p.dept_name} ${p.name} ${p.rank}. 전공 키워드: ${(p.tags || []).join(', ')}`;
-function epAdd() {
+function epAdd(silent) {
   const n = String((epNos().pop() || 0) + 1);
-  eps()[n] = { subject: `${n}회차 — 컴퓨터공학과 변영철`, body: '', sms: '', seg: {}, dept: {} };
-  epSave(); OUT.ep = Number(n); renderOutreach();
+  eps()[n] = { name: '', planAt: '', subject: `${n}회차 — 컴퓨터공학과 변영철`, body: '', sms: '', kakao: '', seg: {}, dept: {} };
+  epSave(); OUT.ep = Number(n); LET.ep = Number(n);
+  if (!silent) renderOutreach();
+  return Number(n);
+}
+/* 회차가 지금 어느 단계인지 — 따로 저장하지 않고 내용과 발송 기록으로 판단한다 */
+function epStatus(n) {
+  const ep = epOf(n); if (!ep) return '없음';
+  const sent = state.rows.filter(p => epDone(p, n)).length;
+  if (sent >= state.rows.length && state.rows.length) return '발송 완료';
+  if (sent) return '발송 중';
+  return (ep.body || '').trim() ? '작성 중' : '비어 있음';
 }
 function epDel(n) {
   delete eps()[String(n)]; epSave();
@@ -804,6 +1005,57 @@ function epBody(ep, p, ch, one) {
     : (ep.sms || ep.body);                       // 문자는 길면 안 읽히므로 따로 둔다
   return epFill(base, p, epFill(line, p, '', one), one).replace(/\n{3,}/g, '\n\n').trim();
 }
+
+
+/* 회차 열 개를 이름만 채워 둔다. 내용은 앱에서 직접 쓰신다.
+ * 앱에서 고치면 settings 에 저장되어 그쪽이 이긴다 — 여기 값은 처음 한 번의 기본값일 뿐이다. */
+const EP_NAMES = ['출마의 변', '연락처만 주십시오', 'AI 구독료 지원', '내 수업에 특강',
+  '논문 쓰는 일 자체를', '나를 아는 에이전트', 'AI 툴박스', '인턴십',
+  '국책과제와 데이터 센터', '계승·위원회·공간'];
+function epSeed() {
+  const m = { '1': Object.assign({ name: EP_NAMES[0], planAt: '' }, EP1), '2': EP2 };
+  for (let i = 3; i <= 10; i++) {
+    m[String(i)] = { name: EP_NAMES[i - 1], planAt: '', subject: '', body: '', sms: '', kakao: '', seg: {}, dept: {} };
+  }
+  return m;
+}
+
+/* 2회차 — 찾아가는 연구실 AX 지원 */
+const EP2 = {
+  name: EP_NAMES[1],
+  planAt: '',
+  subject: '교수님은 연락처만 주시면 됩니다 — 컴퓨터공학과 변영철',
+  body: [
+    '{이름} 교수님께', '',
+    '지난번에 여름 부트캠프 이야기를 드렸습니다. 오늘은 겨울에 할 일을 말씀드리려 합니다.', '',
+    '여름에 해 보고 알게 된 것이 하나 있습니다. 학생이 이미 문제를 알고 있을 때 가장 빨랐습니다. 기업에서 받아 온 문제를 처음 보는 학생보다, 자기 연구실에서 몇 달째 붙들고 있던 학생이 훨씬 멀리 갔습니다.', '',
+    '그래서 겨울방학에는 연구실로 찾아가려 합니다.', '',
+    '교수님이 하실 일은 하나입니다. 연구실 학생 연락처만 알려 주십시오. 학생에게 연구 미션을 주시는 데까지가 교수님 몫이고, 나머지는 저희가 합니다.', '',
+    '· 연구에 AI를 어떻게 붙일지 (원하실 때만)',
+    '· 연구를 돌려 볼 시뮬레이터, 결과를 보는 대시보드',
+    '· AI로 LaTeX 논문 쓰는 법',
+    '· 논문에 들어갈 그림과 다이어그램을 빠르게 그리는 법', '',
+    '{개인화}', '',
+    '긴 답장은 필요 없습니다. 학생 이름과 연락처 한 줄이면 됩니다.', '',
+    '변영철 드림', '컴퓨터공학과 · 공과대학 4호관 D407 · ycb@jejunu.ac.kr',
+  ].join('\n'),
+  sms: [
+    '{이름} 교수님, 컴퓨터공학과 변영철입니다.', '',
+    '여름 부트캠프에서 알게 된 것이 있습니다. 학생이 이미 문제를 알고 있을 때 가장 빨랐습니다. 그래서 겨울방학에는 연구실로 찾아가려 합니다.',
+    '교수님은 연구 미션만 주시고, 학생 연락처만 알려 주십시오. AI 활용법부터 시뮬레이터·대시보드, 논문 그림까지 저희가 붙어서 돕겠습니다.', '',
+    '{개인화}', '',
+    '긴 답장은 필요 없습니다. 학생 이름과 연락처 한 줄이면 됩니다. — 변영철',
+  ].join('\n'),
+  kakao: '',
+  seg: {
+    A: '교수님 학과는 캡스톤 과목으로 이미 함께하고 있습니다. 연구실 단위로도 이어 가면 좋겠습니다.',
+    B: '여름에 {학과} 학생이 왔습니다. 겨울에는 교수님 연구실 학생이면 좋겠습니다.',
+    C: '{학과}는 이번 여름에 참여가 없었습니다. 겨울에 첫 연구실이 되어 주시면 좋겠습니다.',
+    D: '저희 학과야 말할 것도 없습니다만, 연구실 단위로는 아직 해 본 적이 없습니다. 같이 해 보시지요.',
+    E: '이 일은 인공지능학과 교수님들 없이는 못 합니다. 받는 쪽으로도, 지원하는 쪽으로도 함께해 주시면 좋겠습니다.',
+  },
+  dept: {},
+};
 
 /* 1회차 기본값 — 대화로 합의한 내용을 넣어 둔다. 앱에서 그대로 고칠 수 있다. */
 const EP1 = {
@@ -1038,6 +1290,10 @@ function renderOutreach() {
       ${head}${filters}
       <div class="ot-list">${list}</div>
       <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
+      <div class="ot-imp">
+        <button type="button" class="btn" data-impopen>핸드폰 번호 한 번에 가져오기</button>
+        <span class="st-note">지금 <b>${Object.keys(mobiles()).length}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다</span>
+      </div>
     </div>`;
   bindOutreach();
   if (OUT.open) fillDraft(OUT.open);
@@ -1166,6 +1422,24 @@ function schedRow(p, k) {
 }
 
 function bindOutreach() {
+  $app.querySelector('[data-impopen]')?.addEventListener('click', e => {
+    const box = document.createElement('div');
+    box.className = 'ot-impbox';
+    box.innerHTML = `<p class="st-note">{"학과/slug": "010-0000-0000"} 꼴의 JSON 을 붙여넣으십시오.
+      <b>공개 저장소에는 저장되지 않습니다</b> — 비공개 시트로만 갑니다.</p>
+      <textarea rows="6" data-imptext placeholder='{"comdol/ko-seok-jun": "010-0000-0000"}'></textarea>
+      <div class="ep-acts"><button type="button" class="btn" data-imprun>가져오기</button>
+      <span class="st-note" data-impmsg></span></div>`;
+    e.target.replaceWith(box);
+    box.querySelector('[data-imprun]').addEventListener('click', () => {
+      const r = mobileImport(box.querySelector('[data-imptext]').value);
+      const msg = box.querySelector('[data-impmsg]');
+      if (r.err) { msg.textContent = r.err; return; }
+      box.querySelector('[data-imptext]').value = '';
+      flashStatus(`핸드폰 ${r.n}명 가져왔습니다${r.skip ? ` (건너뜀 ${r.skip})` : ''}`);
+      renderOutreach();
+    });
+  });
   $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
   $app.querySelector('[data-epadd]')?.addEventListener('click', () => { OUT.edit = true; epAdd(); });
   $app.querySelector('[data-epedit]')?.addEventListener('click', () => { OUT.edit = !OUT.edit; renderOutreach(); });
@@ -1541,9 +1815,10 @@ function profCard(p, d, showDept = false) {
         </div>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         <div class="prof__bottom">
-        ${loc || p.phone ? `<div class="prof__office">
+        ${loc || p.phone || mobileOf(p) ? `<div class="prof__office">
           ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
+          ${mobileOf(p) ? `<a class="po__tel po__mob" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.6h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(mobileOf(p))}</a>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
         </div>
@@ -1594,9 +1869,9 @@ function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : 
  * 서버(Code.gs)는 키 이름을 가리지 않으므로 고칠 것이 없다.
  *   mailcnt {"<dept>/<slug>": 2}
  * (성향 태그와 접촉 상태는 2026-09-21 에 뺐다 — 회차 갈래가 그 일을 맡는다) */
-const MAIL_KEY = 'jnu-mailcnt';
+const MAIL_KEY = 'jnu-mailcnt', MOBILE_KEY = 'jnu-mobile';
 
-let mailMap = null;
+let mailMap = null, mobileMap = null;
 function loadObj(k) {
   try { const v = JSON.parse(localStorage.getItem(k) || 'null'); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
   return {};
@@ -1606,6 +1881,38 @@ function saveObj(k, m, setKey) {
   saveSetting(setKey, m);
 }
 function mails() { if (!mailMap) mailMap = loadObj(MAIL_KEY); return mailMap; }
+
+/* ---------- 핸드폰 번호 ----------
+ * 저장소는 공개이고 data/professors.json 은 누구나 내려받을 수 있다. 그래서 개인 휴대폰 번호는
+ * 그쪽에 절대 넣지 않고, 선호도·메모와 같은 길로 비공개 시트(settings 탭)에만 둔다.
+ * 로그인한 본인에게만 보인다. */
+function mobiles() { if (!mobileMap) mobileMap = loadObj(MOBILE_KEY); return mobileMap; }
+const mobileOf = p => mobiles()[rKey(p)] || '';
+function setMobile(p, v) {
+  const m = mobiles(), k = rKey(p);
+  v = String(v || '').replace(/[^\d]/g, '');
+  if (v.length === 11) v = v.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  else if (v.length === 10) v = v.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  else v = '';
+  v ? m[k] = v : delete m[k];
+  saveObj(MOBILE_KEY, m, SET_MB);
+}
+/* 한 번에 가져오기 — {"<학과>/<slug>": "010-…"} 를 붙여넣는다 */
+function mobileImport(text) {
+  let v; try { v = JSON.parse(text); } catch { return { err: 'JSON 형식이 아닙니다' }; }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { err: '객체가 아닙니다' };
+  const m = mobiles();
+  let n = 0, skip = 0;
+  for (const [k, raw] of Object.entries(v)) {
+    if (!state.rows.some(p => rKey(p) === k)) { skip++; continue; }
+    const d = String(raw || '').replace(/[^\d]/g, '');
+    if (d.length !== 11 && d.length !== 10) { skip++; continue; }
+    m[k] = d.length === 11 ? d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+    n++;
+  }
+  saveObj(MOBILE_KEY, m, SET_MB);
+  return { n, skip };
+}
 
 /* 메일을 몇 번 보냈는지. 학과 화면의 방문 카운터와 같은 모양이지만 저장 자리는 다르다
  * (방문은 ratings 탭의 met 열, 이쪽은 settings 탭의 mailcnt 키 — 서버를 고치지 않으려고). */
@@ -1800,14 +2107,14 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt';
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_EP, SET_EPS];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_EP, SET_EPS];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
-const SET_OBJ = [SET_MC, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_OBJ = [SET_MC, SET_MB, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1818,6 +2125,7 @@ function settingValue(key) {
   if (key === SET_QX) return [...quizEx()].sort();
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
   if (key === SET_MC) return mails();
+  if (key === SET_MB) return mobiles();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
@@ -1830,12 +2138,13 @@ function settingApplyLocal(key, v) {
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
+    if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -2414,6 +2723,11 @@ function openDrawer(p, d) {
         </div>
       </div>
 
+      <div class="d-section"><h3>핸드폰</h3>
+        <input type="tel" class="d-mob" data-key="${esc(rKey(p))}" value="${esc(mobileOf(p))}" placeholder="010-0000-0000" aria-label="${esc(p.name)} 핸드폰 번호" autocomplete="off">
+        <p class="st-note">비공개 시트에만 저장됩니다. 공개되는 파일에는 들어가지 않습니다.</p>
+      </div>
+
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
@@ -2431,6 +2745,13 @@ function openDrawer(p, d) {
     </div>`;
   bindRates($panel);
   bindNotes($panel);
+  const mob = $panel.querySelector('.d-mob');
+  mob?.addEventListener('change', () => {
+    setMobile(p, mob.value);
+    mob.value = mobileOf(p);
+    flashStatus(mobileOf(p) ? `${p.name} 교수님 핸드폰을 저장했습니다` : '핸드폰 번호를 지웠습니다');
+    render();
+  });
   bindAix($panel, p, d);
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);

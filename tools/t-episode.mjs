@@ -76,22 +76,24 @@ check('localStorage 저장', await page.evaluate(k2 => {
   try { return (JSON.parse(localStorage.getItem('jnu-epsent') || '{}'))[k2].includes(1); } catch { return false; }
 }, k));
 
-// 7) 회차 추가 / 원고 편집
+// 7) 회차 추가 / 원고 편집 — 기본으로 10회차까지 있으므로 새 회차는 그다음 번호다
+const before = await page.evaluate(() => epNos().slice(-1)[0]);
 await page.click('[data-epadd]');
 await page.waitForTimeout(600);
-check('2회차 추가', await page.evaluate(() => epNos().includes(2) && OUT.ep === 2));
+const added = await page.evaluate(() => OUT.ep);
+check('회차 추가', added === before + 1 && await page.evaluate(n => epNos().includes(n), added), `${before}회차 다음 → ${added}회차`);
 check('원고 편집 패널 열림', await page.evaluate(() => !!document.querySelector('.ep-edit')));
-await page.fill('[data-epf="subject"]', '2회차 제목');
-await page.fill('[data-epf="body"]', '{이름} 교수님, 두 번째입니다. {개인화}');
-await page.fill('[data-seg="B"]', '두 번째 갈래 문장');
+await page.fill('[data-epf="subject"]', '새 회차 제목');
+await page.fill('[data-epf="body"]', '{이름} 교수님, 새 회차입니다. {개인화}');
+await page.fill('[data-seg="B"]', '새 갈래 문장');
 await page.click('[data-epsave]');
 await page.waitForTimeout(600);
-check('원고 저장됨', await page.evaluate(() => epOf(2).subject === '2회차 제목'));
-check('저장 뒤 조립', await page.evaluate(() => {
+check('원고 저장됨', await page.evaluate(n => epOf(n).subject === '새 회차 제목', added));
+check('저장 뒤 조립', await page.evaluate(n => {
   const p = state.rows.find(x => segOf(x) === 'B');
-  return epBody(epOf(2), p, '메일', '') === `${p.name} 교수님, 두 번째입니다. 두 번째 갈래 문장`;
-}));
-check('1회차 발송 기록은 2회차에 안 보임', await page.evaluate(() => !document.querySelector('.oc__ep')));
+  return epBody(epOf(n), p, '메일', '') === `${p.name} 교수님, 새 회차입니다. 새 갈래 문장`;
+}, added));
+check('1회차 발송 기록은 새 회차에 안 보임', await page.evaluate(() => !document.querySelector('.oc__ep')));
 
 // 8) 채널마다 본문이 다르다 — 문자는 짧게, 카톡은 메일에 가깝게
 const ch = await page.evaluate(() => {
