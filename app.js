@@ -889,8 +889,21 @@ function renderDept(d) {
   bindCards();
 }
 
+/* 연구실 칸은 "연구실 이름 (건물 호실)" 형태가 섞여 있다.
+ * 이름은 영문명 옆에, 위치만 호실 줄에 넣으려고 둘을 갈라 둔다. */
+const OFFICE_RE = /^\s*(.+?)\s*[（(]\s*(.+?)\s*[）)]\s*$/;
+function officeParts(o) {
+  const t = String(o || '').trim();
+  if (!t) return { lab: '', loc: '' };
+  const m = OFFICE_RE.exec(t);
+  if (m) return { lab: m[1], loc: m[2] };
+  if (/(연구실|실험실|랩)$/.test(t) && !/\d/.test(t)) return { lab: t, loc: '' };  // 호실 없이 연구실 이름만 적힌 경우
+  return { lab: '', loc: t };
+}
+
 function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
+  const { lab, loc } = officeParts(p.office);
   return `
     <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" data-fav="${isFav(p) ? '1' : ''}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
       <div class="prof__photo">
@@ -900,15 +913,17 @@ function profCard(p, d, showDept = false) {
       <div class="prof__body">
         <div class="prof__head">
           <div class="prof__rank">${esc(p.rank)}${showDept ? ` · ${esc(p.dept_name)}` : ''}</div>
-          <h3 class="prof__name">${esc(p.name)}<small>${esc(p.name_en || '')}</small></h3>
+          <h3 class="prof__name">${esc(p.name)}<span class="prof__sub"><small>${esc(p.name_en || '')}</small>${lab ? `<i class="prof__lab">${esc(lab)}</i>` : ''}</span></h3>
           ${favBtn(p)}
         </div>
         <div class="prof__tags">${p.tags.slice(0, 3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
-        ${p.office || p.phone ? `<div class="prof__office">
-          ${p.office ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(p.office)}</span></span>` : '<span></span>'}
+        <div class="prof__bottom">
+        ${loc || p.phone ? `<div class="prof__office">
+          ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
+        </div>
       </div>
     </div>`;
 }
