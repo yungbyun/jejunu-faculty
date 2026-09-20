@@ -509,11 +509,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .prof__tags .tag:nth-child(n+3){display:none}  /* 태그는 2개까지 */
   .prof__tags .tag{font-size:11px;padding:2px 8px}
   /* 폰: 호실 이름이 길면 잘라내지 말고 줄을 바꾼다 (방 번호가 문자열 끝에 있어 잘리면 안 됨) */
-  .prof__office{font-size:12px;flex-wrap:wrap;align-items:flex-start;gap:2px 8px}
-  .po__room{align-items:flex-start;flex:1 1 auto}
+  /* 방 번호와 전화번호는 각각 한 줄씩, 왼쪽 정렬 */
+  .prof__office{font-size:12px;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px}
+  .po__room{align-items:flex-start;flex:0 1 auto;max-width:100%}
   .po__room svg{margin-top:3px}
   .po__t{white-space:normal;overflow:visible;line-height:1.45}
-  .po__tel{margin-left:auto}
+  .po__tel{margin-left:0;flex:none}
+  /* 선호도 칩과 카운터는 한 줄에 다 들어가지 않으므로 줄을 나눈다.
+     선호도가 한 줄을 차지하고, 카운터는 그 아래 오른쪽 끝(카드 우하단)에 놓인다 */
+  .prof__foot{gap:4px;flex-wrap:wrap}
+  .prof__foot .rate{flex:1 0 100%;margin:0 0 0 -4px}
+  .prof__foot .counter{margin-left:auto}
   /* 상세 드로어: 전체 화면 시트 */
   .drawer__panel{width:100%;border-left:0;box-shadow:none;padding-bottom:env(safe-area-inset-bottom)}
   .d-head{padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
@@ -574,7 +580,7 @@ textarea.memo::placeholder{color:var(--ink-3)}
 .counter[data-save="saving"]{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent)}
 .counter[data-save="saved"]{box-shadow:0 0 0 2px color-mix(in srgb,#1f8a5b 55%,transparent)}
 .counter[data-save="error"]{box-shadow:0 0 0 2px #c0392b}
-.prof__foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.prof__foot{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-top:4px}
 .prof__note{display:flex;gap:5px;flex-wrap:wrap}
 .prof__note:empty{display:none}
 .prof__foot .counter{margin-left:auto;padding:2px}.prof__foot .counter__b{width:24px;height:24px;font-size:14px}.prof__foot .counter__n{font-size:14px;min-width:22px}.prof__foot .counter__u{font-size:11px;margin-right:2px}
