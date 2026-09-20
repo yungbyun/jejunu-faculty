@@ -660,30 +660,33 @@ function donut(profs) {
   const items = PIE_LABELS().map(r => ({ r, n: c[r] })).filter(x => x.n > 0);
   const total = items.reduce((a, b) => a + b.n, 0);
   if (!total) return '';
-  const R = 68, W = 26, C = 2 * Math.PI * R;
+  const sure = c['확'] || 0, pct = Math.round(sure / total * 100);
+  const R = 72, W = 24, CX = 100, CY = 112;
+  const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
   const arcs = items.map(({ r, n }) => {
-    const len = n / total * C, seg = Math.max(0, len - (items.length > 1 ? 1.5 : 0));  // 조각 사이 얇은 틈
-    const a = `<circle class="pie__seg" r="${R}" cx="100" cy="100" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
-      stroke-dasharray="${seg.toFixed(2)} ${(C - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
-      data-rating="${esc(r)}"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%)</title></circle>`;
+    const len = n / total * HALF, seg = Math.max(0, len - (items.length > 1 ? 1.5 : 0));
+    const a = `<circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
+      stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
+      transform="rotate(180 ${CX} ${CY})"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%)</title></circle>`;
     off += len;
     return a;
   }).join('');
-  const top = items.slice().sort((a, b) => b.n - a.n)[0];
   return `
     <div class="pie">
-      <svg class="pie__svg" viewBox="0 0 200 200" role="img" aria-label="선호도 분포: ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (비해당 제외, 합계 ${total}명)">
-        <circle r="${R}" cx="100" cy="100" fill="none" stroke="var(--surface-2)" stroke-width="${W}"></circle>
-        <g transform="rotate(-90 100 100)">${arcs}</g>
-        <text class="pie__n" x="100" y="96">${total}</text>
-        <text class="pie__u" x="100" y="118">명</text>
+      <svg class="pie__svg" viewBox="0 0 200 138" role="img"
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (비해당 제외, 합계 ${total}명)">
+        <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
+          stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
+        ${arcs}
+        <text class="pie__n" x="100" y="100">${pct}%</text>
+        <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
-      <ul class="pie__legend">
-        ${items.map(({ r, n }) => `<li class="pie__li"><i class="sw sw--${rcls(r)}"></i><span class="pie__r">${esc(r)}${CONFIG.RATINGS.NAMES[r] ? ` <small>${esc(CONFIG.RATINGS.NAMES[r].split(' ')[0])}</small>` : ''}</span><b class="pie__v">${n}</b><span class="pie__p">${Math.round(n / total * 100)}%</span></li>`).join('')}
-      </ul>
+      <div class="pie__legend">
+        ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
+      </div>
     </div>
-    <p class="st-note">비해당(비)은 평가 대상이 아니라 그래프에서 제외했습니다. 가장 많은 쪽은 <b>${esc(top.r)}</b> ${top.n}명입니다.</p>`;
+    <p class="st-note">비해당(비)은 평가 대상이 아니라 그래프에서 제외했습니다. 가운데 숫자는 평가 대상 ${total}명 중 확(확실)의 비율입니다.</p>`;
 }
 
 function dist(profs) {
