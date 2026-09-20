@@ -742,7 +742,10 @@ function renderStats() {
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
       <div class="hero">
-        <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(CONFIG.RATINGS.NAMES[r])}</span>`).join('')}</div></div>
+        <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => {
+          const txt = r === '비' ? `연구년 등으로 ${c[r]}명 제외` : CONFIG.RATINGS.NAMES[r];   // '비'만 실제 인원을 함께
+          return `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(txt)}</span>`;
+        }).join('')}</div></div>
 
       ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 ${CONFIG.RATINGS.LABELS.join('·')} 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
 
