@@ -731,10 +731,71 @@ function draftBody(p, ch, one) {
           '바쁘신데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다.'].join('\n');
 }
 
+/* ---------- 예약 발송 ----------
+ * 이 앱은 예약만 쌓는다. 실제 발송은 Apps Script 의 시간 트리거(sendDue)가 하고,
+ * 서버에서 outboxStart() 를 실행하기 전에는 한 통도 나가지 않는다. */
+const OB = { rows: new Map(), on: false, dry: false, quota: null, loaded: false, needDeploy: false };
+const obOf = p => OB.rows.get(rKey(p)) || null;
+const obCount = () => [...OB.rows.values()].filter(x => x.status === 'queued').length;
+
+async function obLoad(force) {
+  if (!CONFIG.RATINGS.API_URL || !state.session) return;
+  if (OB.loaded && !force) return;
+  try {
+    const r = await ratingsApi('outbox');
+    if (r && r.error === 'bad action') { OB.needDeploy = true; OB.loaded = true; if (route().view === 'outreach') renderOutreach(); return; }
+    if (!r || !r.ok) return;
+    const m = new Map();
+    (r.rows || []).forEach(x => {
+      if (x.status === 'canceled' || !x.key) return;
+      const prev = m.get(x.key);
+      if (!prev || new Date(x.sendAt) > new Date(prev.sendAt)) m.set(x.key, x);
+    });
+    Object.assign(OB, { rows: m, on: !!r.on, quota: r.quota, loaded: true, needDeploy: false });
+    if (route().view === 'outreach') renderOutreach();
+  } catch (e) { console.warn('예약 목록을 읽지 못했습니다:', e.message); }
+}
+
+async function obQueue(p, subject, body, whenLocal) {
+  const at = new Date(whenLocal);
+  if (isNaN(at.getTime())) { flashStatus('보낼 시각을 확인해 주세요', true); return; }
+  try {
+    const r = await ratingsApi('queue', { to: p.email, key: rKey(p), subject, body, sendAt: at.toISOString() });
+    if (!r || !r.ok) throw new Error((r && r.error) || '예약 실패');
+    await obLoad(true);
+    flashStatus(`${p.name} 교수님 메일을 ${fmtWhen(at)}에 보내도록 예약했습니다`);
+  } catch (e) { flashStatus('예약하지 못했습니다 — ' + e.message, true); }
+}
+
+async function obCancel(p, id) {
+  try {
+    const r = await ratingsApi('unqueue', { id });
+    if (!r || !r.ok) throw new Error((r && r.error) || '취소 실패');
+    await obLoad(true);
+    flashStatus('예약을 취소했습니다');
+  } catch (e) { flashStatus('취소하지 못했습니다 — ' + e.message, true); }
+}
+
+const pad2 = n => String(n).padStart(2, '0');
+const fmtWhen = d => `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const dtLocal = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+/* 기본값은 내일 오전 9시 — 평일 아침이 가장 열어 볼 만한 시간이다 */
+function nextMorning() { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }
+
 const ochips = (name, vals, cur) => vals.map(v =>
   `<button type="button" class="chip" data-of="${esc(name)}" data-v="${esc(v)}" aria-pressed="${cur === v}">${esc(v)}</button>`).join('');
 
+/* 예약 발송이 지금 어떤 상태인지 한 줄로 알려 준다 */
+function obNotice() {
+  if (!CONFIG.RATINGS.API_URL || !state.session) return '';
+  if (OB.needDeploy) return `<p class="ot-warn">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다 — 편집기에서 <b>배포 → 배포 관리 → 새 버전</b>.</p>`;
+  if (!OB.loaded) return '';
+  if (!OB.on) return `<p class="ot-warn">서버에서 보내기가 <b>꺼져 있습니다</b>. 예약은 쌓이지만 나가지 않습니다 — Apps Script 편집기에서 <b>outboxStart()</b> 를 실행하십시오.</p>`;
+  return `<p class="ot-ok">예약 발송 <b>켜짐</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
+}
+
 function renderOutreach() {
+  obLoad();
   const all = state.rows;
   const n = st => all.filter(p => ctState(p) === st).length;
   const rows = all.filter(outFilter);
@@ -747,6 +808,7 @@ function renderOutreach() {
       <div class="ot-head__m">
         ${CT_STATES.filter(s => s !== '미접촉').map(s => `<span>${esc(s)} <b>${n(s)}</b></span>`).join('')}
         <span>미접촉 <b>${n('미접촉')}</b></span>
+        ${OB.loaded && !OB.needDeploy ? `<span>예약 <b>${obCount()}</b></span>` : ''}
       </div>
       <div class="meter" aria-label="접촉 진행률"><span style="width:${Math.round(done / all.length * 100)}%"></span></div>
     </div>`;
@@ -761,6 +823,7 @@ function renderOutreach() {
       <div class="ot-f__r"><span class="ot-f__l">성향</span><div class="filters">${ochips('trait', ['전체', ...TRAITS, '미지정'], OUT.trait)}</div></div>
       <div class="ot-f__r"><span class="ot-f__l">상태</span><div class="filters">${ochips('st', ['전체', ...CT_STATES], OUT.st)}</div></div>
     </div>
+    ${obNotice()}
     <div class="ot-bulk">
       <span class="st-note">성향 미지정 <b>${untag}</b>명${untag ? ' — 대부분 연구 쪽이면 한 번에 채우고 예외만 바꾸세요' : ''}</span>
       ${untag ? `<button type="button" class="btn" data-fill="연">미지정을 모두 연으로</button>` : ''}
@@ -768,12 +831,18 @@ function renderOutreach() {
 
   const list = rows.length ? rows.map(p => {
     const k = rKey(p), r = getRating(p), t = traitOf(p), st = ctState(p), open = OUT.open === k;
+    const ob = obOf(p);
+    const obTag = !ob ? ''
+      : ob.status === 'queued' ? `<span class="oc__ob oc__ob--q">예약 ${esc(fmtWhen(new Date(ob.sendAt)))}</span>`
+      : ob.status === 'sent' ? `<span class="oc__ob oc__ob--s">발송됨</span>`
+      : `<span class="oc__ob oc__ob--e" title="${esc(ob.error || '')}">발송 실패</span>`;
     return `
     <div class="oc ${open ? 'oc--open' : ''}" data-k="${esc(k)}">
       <div class="oc__h">
         <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
         <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
         ${r ? `<span class="rs rs--${rcls(r)}">${esc(r)}</span>` : ''}
+        ${obTag}
         <span class="oc__st oc__st--${st === '미접촉' ? 'none' : 'on'}">${esc(st)}</span>
         ${p.email ? '' : '<span class="oc__no">메일 없음</span>'}
         <button type="button" class="btn oc__go" data-open="${esc(k)}" aria-expanded="${open}">${open ? '접기' : '초안'}</button>
@@ -821,6 +890,7 @@ function fillDraft(k) {
         <button type="button" class="btn" data-copy>복사</button>
         ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
       </div>
+      ${schedRow(p, k)}
       <div class="oc__stset"><span class="ot-f__l">상태</span><div class="filters">${
         CT_STATES.map(v => `<button type="button" class="chip" data-st="${esc(k)}" data-v="${esc(v)}" aria-pressed="${ctState(p) === v}">${esc(v)}</button>`).join('')}</div></div>`;
     box.querySelector('[data-copy]')?.addEventListener('click', async e => {
@@ -829,9 +899,38 @@ function fillDraft(k) {
       catch { ta.select(); try { document.execCommand('copy'); } catch {} }
       e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
     });
+    box.querySelector('[data-queue]')?.addEventListener('click', () => {
+      const when = box.querySelector('.oc__at')?.value;
+      obQueue(p, box.querySelector('.oc__sub').value, box.querySelector('.oc__ta').value, when);
+    });
+    box.querySelector('[data-unq]')?.addEventListener('click', e => obCancel(p, e.target.dataset.unq));
     box.querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => { OUT.ch = b.dataset.ch; fillDraft(k); }));
     box.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => { setCt(p, b.dataset.v); renderOutreach(); }));
   });
+}
+
+/* 초안 패널의 예약 줄. 메일 채널이고 주소가 있을 때만 나온다. */
+function schedRow(p, k) {
+  if (OUT.ch !== '메일' || !p.email) return '';
+  if (!CONFIG.RATINGS.API_URL || !state.session) return `<p class="st-note oc__sch">로그인하면 이 자리에서 예약 발송을 걸 수 있습니다.</p>`;
+  if (OB.needDeploy) return `<p class="st-note oc__sch">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다.</p>`;
+  const ob = obOf(p);
+  if (ob && ob.status === 'queued') {
+    return `<div class="oc__sch"><span class="ot-f__l">예약</span>
+      <span class="oc__schw">${esc(fmtWhen(new Date(ob.sendAt)))}에 보냄</span>
+      <button type="button" class="btn" data-unq="${esc(ob.id)}">예약 취소</button>
+      <span class="st-note">취소는 아직 안 나간 것만 됩니다.</span></div>`;
+  }
+  if (ob && ob.status === 'sent') {
+    return `<div class="oc__sch"><span class="ot-f__l">예약</span>
+      <span class="oc__schw">${esc(fmtWhen(new Date(ob.sentAt || ob.sendAt)))}에 보냈습니다</span>
+      <input type="datetime-local" class="oc__at" value="${esc(dtLocal(nextMorning()))}" aria-label="다시 보낼 시각">
+      <button type="button" class="btn" data-queue>다시 예약</button></div>`;
+  }
+  return `<div class="oc__sch"><span class="ot-f__l">예약</span>
+    <input type="datetime-local" class="oc__at" value="${esc(dtLocal(nextMorning()))}" aria-label="보낼 시각">
+    <button type="button" class="btn" data-queue>이 시각에 보내기</button>
+    <span class="st-note">위 제목과 본문 그대로 예약됩니다.</span></div>`;
 }
 
 function bindOutreach() {

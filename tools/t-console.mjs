@@ -14,7 +14,8 @@ for (const h of ['#/','#/dept/comdol','#/dept/comdol/prof/'+await page.evaluate(
   await page.waitForTimeout(900);
   console.log('  ' + h.padEnd(40) + ' 렌더 OK');
 }
-const real = errs.filter(e => !/401|Failed to load resource|gviz|accounts\.google|photo/i.test(e));
+// localhost 는 구글 OAuth 승인 출처가 아니라 GSI 오류가 늘 난다. 시트 401·사진 404 도 정상.
+const real = errs.filter(e => !/401|Failed to load resource|gviz|accounts\.google|photo|GSI_LOGGER|FedCM|Provider's accounts/i.test(e));
 console.log(real.length ? '\n콘솔 오류:\n' + real.join('\n') : '\n콘솔 오류 없음 (시트 401·사진 404 같은 정상 항목은 제외)');
 await b.close();
 process.exit(real.length ? 1 : 0);

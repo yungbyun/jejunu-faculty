@@ -15,6 +15,12 @@ const CLIENT_ID = '626785532501-v1u8fi2n26sgti0ir43stlm9vnnj6ru9.apps.googleuser
 const SHEET_NAME = 'ratings';
 const SET_SHEET = 'settings';                     // 퀴즈 학과·교수 선택 등 개인 설정
 const SET_HEADER = ['email', 'key', 'value', 'updated_at'];
+const OUT_SHEET = 'outbox';                        // 예약 발송 대기열
+const OUT_HEADER = ['id', 'email', 'to', 'key', 'subject', 'body', 'send_at', 'status', 'sent_at', 'error'];
+// status: queued(대기) / sent(보냄) / error(실패) / canceled(취소)
+const OUT_MAX_PER_RUN = 8;      // 트리거가 한 번 돌 때 보내는 최대 통수 — 한꺼번에 우르르 나가지 않게
+const OUT_MIN_QUOTA = 10;       // 남은 하루 발송 할당량이 이보다 적으면 그날은 멈춘다
+const OUT_MAX_AHEAD = 60;       // 예약은 최대 며칠 뒤까지
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
 // 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(평가제외 — 연구년 등)
 const RATINGS = ['확', '중', '모', '부', '비'];
@@ -89,6 +95,12 @@ function doPost(e) {
     if (body.memo !== undefined) fields.memo = String(body.memo == null ? '' : body.memo).slice(0, 2000);
     upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), fields);
     return out({ ok: true });
+  }
+  if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), quota: MailApp.getRemainingDailyQuota() });
+  if (body.action === 'queue') return outQueue(email, body);
+  if (body.action === 'unqueue') {
+    if (!body.id) return out({ error: 'missing id' });
+    return out({ ok: outCancel(email, String(body.id)) });
   }
   if (body.action === 'airewrite') return airewrite(email, body);
   if (body.action === 'airewrite_reset') {
@@ -400,6 +412,158 @@ function airewrite(email, body) {
 
 /* 시트에 남아 있는 예전 값(상→확, 하→모)을 한 번에 새 값으로 바꿉니다. (편집기에서 직접 실행)
  * 실행: 편집기 상단 함수 선택 → migrateRatings → ▶ 실행 */
+
+/* ==========================================================
+ * 예약 발송 (outbox)
+ *
+ * 브라우저는 예약만 쌓고, 실제 발송은 이 스크립트의 시간 트리거가 합니다.
+ * 메일은 이 스크립트를 승인한 계정(=본인) 이름으로 나갑니다.
+ *
+ * 처음 한 번만 — Apps Script 편집기에서 함수를 골라 실행:
+ *   1) installOutbox()   5분마다 도는 트리거를 만든다 (이 단계에서는 아직 안 보냄)
+ *   2) outboxDryRun()    연습 모드로 켠다 — 보내지 않고 보낸 척만 한다. 먼저 이걸로 확인하십시오.
+ *   3) outboxStart()     진짜로 보내기 시작
+ *   언제든 outboxStop() 으로 멈춥니다. 멈추면 대기열은 그대로 남습니다.
+ *
+ * OUTBOX 스크립트 속성이 'on' 이 아니면 sendDue() 는 아무것도 하지 않습니다.
+ * 즉 트리거만 만들어 두어도 메일은 한 통도 나가지 않습니다.
+ * ========================================================== */
+
+function outProps_() { return PropertiesService.getScriptProperties(); }
+function outboxOn_() { return outProps_().getProperty('OUTBOX') === 'on'; }
+function outDry_() { return outProps_().getProperty('OUTBOX_DRYRUN') === 'yes'; }
+
+function outSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(OUT_SHEET);
+  if (!sh) { sh = ss.insertSheet(OUT_SHEET); sh.appendRow(OUT_HEADER); sh.setFrozenRows(1); }
+  return sh;
+}
+
+function outList(email) {
+  const sh = outSheet(), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues()
+    .filter(r => String(r[1]).toLowerCase() === email)
+    .map(r => ({
+      id: String(r[0]), to: String(r[2]), key: String(r[3]), subject: String(r[4]),
+      sendAt: r[6] instanceof Date ? r[6].toISOString() : String(r[6]),
+      status: String(r[7]),
+      sentAt: r[8] instanceof Date ? r[8].toISOString() : String(r[8] || ''),
+      error: String(r[9] || ''),
+    }));
+}
+
+/* 예약 넣기. 같은 사람에게 대기 중인 예약이 이미 있으면 그 줄을 갈아 끼운다(중복 발송 방지). */
+function outQueue(email, b) {
+  const to = String(b.to || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return out({ error: 'bad to' });
+  const subject = String(b.subject || '').slice(0, 300);
+  const text = String(b.body || '').slice(0, 20000);
+  if (!subject || !text) return out({ error: 'empty mail' });
+  const at = new Date(String(b.sendAt || ''));
+  if (isNaN(at.getTime())) return out({ error: 'bad sendAt' });
+  if (at.getTime() > Date.now() + OUT_MAX_AHEAD * 86400000) return out({ error: 'too far ahead' });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = outSheet(), last = sh.getLastRow();
+    const id = Utilities.getUuid().slice(0, 8);
+    const row = [id, email, to, String(b.key || ''), subject, text, at, 'queued', '', ''];
+    if (last >= 2) {
+      const vals = sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues();
+      for (let i = 0; i < vals.length; i++) {
+        if (String(vals[i][1]).toLowerCase() === email && String(vals[i][2]) === to && String(vals[i][7]) === 'queued') {
+          sh.getRange(i + 2, 1, 1, OUT_HEADER.length).setValues([row]);
+          return out({ ok: true, id: id, replaced: true });
+        }
+      }
+    }
+    sh.appendRow(row);
+    return out({ ok: true, id: id });
+  } finally { lock.releaseLock(); }
+}
+
+/* 취소는 아직 안 보낸 것만 된다. 이미 나간 메일은 되돌릴 수 없다. */
+function outCancel(email, id) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = outSheet(), last = sh.getLastRow();
+    if (last < 2) return false;
+    const vals = sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      if (String(vals[i][0]) === id && String(vals[i][1]).toLowerCase() === email && String(vals[i][7]) === 'queued') {
+        sh.getRange(i + 2, 8).setValue('canceled');
+        return true;
+      }
+    }
+    return false;
+  } finally { lock.releaseLock(); }
+}
+
+/* 5분마다 도는 트리거가 부르는 함수. 때가 된 것만, 한 번에 조금씩 보낸다. */
+function sendDue() {
+  if (!outboxOn_()) return;                       // 켜기 전에는 한 통도 보내지 않는다
+  const dry = outDry_();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;                // 이전 실행이 아직 돌고 있으면 건너뛴다
+  try {
+    const sh = outSheet(), last = sh.getLastRow();
+    if (last < 2) return;
+    const vals = sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues();
+    const now = Date.now();
+    let sent = 0;
+    for (let i = 0; i < vals.length && sent < OUT_MAX_PER_RUN; i++) {
+      const r = vals[i];
+      if (String(r[7]) !== 'queued') continue;
+      const at = new Date(r[6]).getTime();
+      if (isNaN(at) || at > now) continue;
+      if (MailApp.getRemainingDailyQuota() < OUT_MIN_QUOTA) break;   // 할당량이 바닥나기 전에 멈춘다
+      const row = i + 2;
+      try {
+        if (!dry) GmailApp.sendEmail(String(r[2]), String(r[4]), String(r[5]));
+        sh.getRange(row, 8, 1, 3).setValues([['sent', new Date(), dry ? '연습 모드 — 실제로 보내지 않았습니다' : '']]);
+        sent++;
+      } catch (err) {
+        sh.getRange(row, 8, 1, 3).setValues([['error', new Date(), String(err).slice(0, 300)]]);
+      }
+    }
+  } finally { lock.releaseLock(); }
+}
+
+/* ---- 편집기에서 손으로 한 번씩 실행하는 스위치들 ---- */
+function installOutbox() {
+  removeOutbox();
+  ScriptApp.newTrigger('sendDue').timeBased().everyMinutes(5).create();
+  Logger.log('트리거를 만들었습니다. 아직 보내지는 않습니다 — outboxDryRun() 으로 연습해 본 뒤 outboxStart() 를 실행하십시오.');
+}
+function removeOutbox() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'sendDue').forEach(t => ScriptApp.deleteTrigger(t));
+  Logger.log('sendDue 트리거를 모두 지웠습니다.');
+}
+function outboxDryRun() {
+  outProps_().setProperties({ OUTBOX: 'on', OUTBOX_DRYRUN: 'yes' });
+  Logger.log('연습 모드입니다. 때가 된 예약을 보낸 것으로 표시만 하고 실제로는 보내지 않습니다.');
+}
+function outboxStart() {
+  outProps_().setProperties({ OUTBOX: 'on', OUTBOX_DRYRUN: 'no' });
+  Logger.log('진짜로 보냅니다. 남은 하루 할당량: ' + MailApp.getRemainingDailyQuota() + '통');
+}
+function outboxStop() {
+  outProps_().setProperty('OUTBOX', 'off');
+  Logger.log('발송을 멈췄습니다. 대기열은 그대로 남아 있습니다.');
+}
+function outboxStatus() {
+  const sh = outSheet(), last = sh.getLastRow();
+  const c = { queued: 0, sent: 0, error: 0, canceled: 0 };
+  if (last >= 2) sh.getRange(2, 8, last - 1, 1).getValues().forEach(r => { if (c[r[0]] !== undefined) c[r[0]]++; });
+  Logger.log('보내기: ' + (outboxOn_() ? (outDry_() ? '연습 모드' : '켜짐') : '꺼짐')
+    + ' / 대기 ' + c.queued + ' · 보냄 ' + c.sent + ' · 실패 ' + c.error + ' · 취소 ' + c.canceled
+    + ' / 남은 하루 할당량 ' + MailApp.getRemainingDailyQuota() + '통');
+}
+
 function migrateRatings() {
   const sh = sheet();
   const last = sh.getLastRow();

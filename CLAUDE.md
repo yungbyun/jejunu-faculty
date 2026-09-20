@@ -26,6 +26,7 @@ data/professors.json    교수 기본 데이터(시트 폴백)
 data/insights/<dept>.json   학과별 상세 데이터 12개
 data/photos/            사진 + manifest.json
 apps-script/Code.gs     Google Apps Script 웹 앱 소스 (저장소에는 사본만, 실제 배포는 수동)
+                        시트 탭: ratings / settings / airewrites / outbox(예약 발송)
 a.bat                   git add -A / commit / push 한 번에
 ```
 
@@ -73,7 +74,7 @@ a.bat                   git add -A / commit / push 한 번에
 
 `apps-script/Code.gs` 는 사본입니다. 실제 서버는 Apps Script 웹 앱이며 URL은 `app.js` 의
 `CONFIG.RATINGS.API_URL` 에 있습니다. 액션: `session`, `list`, `setting`, `set`,
-`airewrite`, `airewrite_reset`.
+`airewrite`, `airewrite_reset`, 그리고 예약 발송용 `outbox` · `queue` · `unqueue`.
 
 개인 설정은 `settings` 탭에 `email / key / value`로 저장되고, `setting` 액션은 **키 이름을 가리지 않습니다.**
 그래서 새로운 개인 설정을 추가할 때 서버를 고칠 필요가 없습니다. 현재 쓰는 키는 `quiz-depts`, `quiz-ex`,
@@ -211,6 +212,50 @@ node t-console.mjs      모든 화면을 돌며 콘솔 오류 확인
 
 `t-console.mjs` 가 남기는 `GSI_LOGGER ... origin is not allowed` 와 `Provider's accounts list is
 empty` 는 localhost 가 구글 OAuth 승인 출처가 아니라서 나는 것으로, 정상입니다.
+
+**예약 발송 (2026-09-20).** 접촉 화면에서 메일을 예약해 두면 Apps Script 의 시간 트리거가 보냅니다.
+메일은 스크립트를 승인한 계정(= 본인 Gmail)에서 나갑니다. **앱은 예약만 쌓고 보내지 않습니다.**
+
+시트에 `outbox` 탭이 생깁니다 — `id, email, to, key, subject, body, send_at, status, sent_at, error`.
+`status` 는 `queued / sent / error / canceled` 이고, 같은 사람에게 대기 중인 예약이 이미 있으면
+그 줄을 갈아 끼웁니다(중복 발송 방지). 취소는 아직 안 나간 것만 됩니다.
+
+서버 액션 세 개가 늘었습니다: `outbox`(목록·상태·남은 할당량), `queue`(예약), `unqueue`(취소).
+
+### 안전장치 — 이 순서를 지키십시오
+
+`sendDue()` 는 스크립트 속성 `OUTBOX` 가 `'on'` 일 때만 움직입니다. **트리거만 만들어 두어도 메일은
+한 통도 나가지 않습니다.** Apps Script 편집기에서 함수를 골라 직접 실행합니다.
+
+```
+1) installOutbox()    5분마다 도는 트리거를 만든다 (아직 안 보냄)
+2) outboxDryRun()     연습 모드 — 보낸 것으로 표시만 하고 실제로는 안 보낸다. 먼저 이걸로 확인할 것
+3) outboxStart()      진짜로 보내기 시작
+   outboxStop()       언제든 멈춤. 대기열은 그대로 남는다
+   outboxStatus()     지금 상태와 남은 하루 할당량을 로그로 본다
+```
+
+한 번 돌 때 최대 `OUT_MAX_PER_RUN`(8)통만 보내고, 남은 하루 할당량이 `OUT_MIN_QUOTA`(10)보다
+적으면 그날은 멈춥니다. 일반 Gmail 계정은 하루 100통이라 70명은 한 번에 됩니다만, 한꺼번에 나가면
+단체메일로 보이므로 시각을 나눠 거는 편이 낫습니다.
+
+**이 기능을 쓰려면 Apps Script 를 반드시 다시 배포해야 합니다**(배포 → 배포 관리 → 새 버전).
+재배포 전에는 앱이 `bad action` 을 받고 접촉 화면에 재배포 안내가 뜹니다.
+
+### 시각 처리
+
+브라우저는 `datetime-local` 로 받은 지역 시각을 **UTC ISO 문자열**로 바꿔 보내고(`sendAt`),
+서버는 `new Date(sendAt).getTime() <= now` 로만 비교합니다. Apps Script 프로젝트 표준시와
+무관하게 맞습니다. 기본값은 내일 오전 9시입니다.
+
+### 안 되는 것
+
+카카오톡은 개인 계정 자동 발송 API 가 없습니다(알림톡은 사업자 등록·템플릿 심사가 필요하고 선거
+홍보는 심사에서 막힐 가능성이 큽니다). 문자도 자동 발송하려면 유료 문자 API 계약이 필요합니다.
+둘 다 복사해서 직접 보내는 방식으로 남겨 두었습니다.
+
+확인 스크립트: `tools/t-sched.mjs` — `ratingsApi` 를 가짜로 바꿔 끼워 서버를 부르지 않고
+재배포 안내·꺼짐 경고·예약·취소·채널별 노출을 확인합니다(16가지).
 
 **표기.** `비` 의 뜻은 `연구년 등으로 제외` 이고, 분석 페이지 범례에서만 인원을 붙여
 `연구년 등으로 N명 제외` 로 보여 줍니다.
