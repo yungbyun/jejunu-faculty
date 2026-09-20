@@ -817,14 +817,10 @@ function favSection() {
   const order = new Map(state.depts.map((d, i) => [d.id, i]));
   list.sort((a, b) => (order.has(a.dept_id) ? order.get(a.dept_id) : 99) - (order.has(b.dept_id) ? order.get(b.dept_id) : 99)
                    || a.name.localeCompare(b.name, 'ko'));
-  const c = dist(list);
-  const sum = CONFIG.RATINGS.LABELS.map(r => [r, c[r]]).filter(([, n]) => n)
-    .map(([r, n]) => `<span class="rs rs--${rcls(r)}">${esc(r)} ${n}</span>`).join('');
   return `
     <section class="favsec">
       <div class="favsec__head">
         <h2><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>관심 교수 <b>${list.length}</b>명</span></h2>
-        ${sum ? `<div class="favsec__sum">${sum}${c['미지정'] ? `<span class="rs rs--none">미지정 ${c['미지정']}</span>` : ''}</div>` : ''}
       </div>
       <div class="favsec__list">
         ${list.map(p => {

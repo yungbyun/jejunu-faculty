@@ -398,7 +398,6 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favsec__head h2{display:flex;align-items:center;gap:6px;margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px}
 .favsec__head h2 svg{color:#e0a10c}
 .favsec__head h2 b{font-size:17px;color:#a1740a}
-.favsec__sum{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
 .favsec__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
 .favc{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
 .favc:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
@@ -411,7 +410,6 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @media (max-width:720px){
   .favsec{padding:14px;margin:4px 0 18px}
   .favsec__list{grid-template-columns:1fr;gap:6px}
-  .favsec__sum{margin-left:0;width:100%}
 }
 
 /* ---------- 선호도 원그래프 ---------- */
