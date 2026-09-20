@@ -370,7 +370,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .nav a:hover{background:var(--surface-2);color:var(--ink)}
 .nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
 .st-sec{margin-top:34px}
-.st-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.st-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.st-head .legend{margin-left:auto}   /* 범례는 오른쪽 끝, 안내 문구는 제목 옆 */
 .st-head h2{font-size:17px;font-weight:700;margin:0;letter-spacing:-.2px}
 .st-note{margin:10px 0 0;font-size:12.5px;color:var(--ink-3)}
 .st-small{font-size:12.5px}

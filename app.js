@@ -754,7 +754,7 @@ function renderStats() {
       </section>
 
       <section class="st-sec">
-        <div class="st-head"><h2>학과별 분포</h2>${legend}</div>
+        <div class="st-head"><h2>학과별 분포</h2><span class="muted st-small">막대의 구간을 누르면 해당 학과가 그 선호도 필터로 열립니다</span>${legend}</div>
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
@@ -762,7 +762,6 @@ function renderStats() {
               ${stackBar(d.profs, { deptId: d.id })}
             </div>`).join('')}
         </div>
-        <p class="st-note">막대의 구간을 누르면 해당 학과가 그 선호도 필터로 열립니다.</p>
       </section>
 
       <section class="st-sec">
