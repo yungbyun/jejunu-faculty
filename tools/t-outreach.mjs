@@ -56,17 +56,19 @@ await page.waitForTimeout(400);
 const kakao = await page.evaluate(() => document.querySelector('.oc__ta').value);
 check('카톡은 줄바꿈 있음', kakao.includes('\n\n'));
 
-// 4) 접촉 상태
-await page.click(`.oc__d [data-st="${k2}"][data-v="보냄"]`);
-await page.waitForTimeout(400);
-check('상태 보냄 저장', await page.evaluate(k => (contacts()[k] || {}).st === '보냄', k2));
-check('머리말 집계 반영', await page.evaluate(() => /보냄 1/.test(document.querySelector('.ot-head__m').textContent)));
+// 4) 선호도·접촉 상태는 이 화면에서 뺐다 (2026-09-20)
+check('선호도 칩 없음', await page.evaluate(() =>
+  !document.querySelector('[data-of="rate"]') && !document.querySelector('.oc .rs')));
+check('상태 칩·배지 없음', await page.evaluate(() =>
+  !document.querySelector('[data-of="st"]') && !document.querySelector('.oc__st') && !document.querySelector('[data-st]')));
+check('머리말은 회차 기준', await page.evaluate(() => /회차 보냄/.test(document.querySelector('.ot-head__m').textContent)));
 
-// 5) 필터
-await page.click('[data-of="st"][data-v="보냄"]');
+// 5) 성향 필터
+const nYeon = await page.evaluate(() => state.rows.filter(p => traitOf(p) === '연').length);
+await page.click('[data-of="trait"][data-v="연"]');
 await page.waitForTimeout(400);
-check('상태 필터', await page.evaluate(() => document.querySelectorAll('.oc').length === 1));
-await page.click('[data-of="st"][data-v="전체"]');
+check('성향 필터', await page.evaluate(n => document.querySelectorAll('.oc').length === n, nYeon), `연 ${nYeon}명`);
+await page.click('[data-of="trait"][data-v="전체"]');
 await page.waitForTimeout(400);
 check('필터 해제', await page.evaluate(() => document.querySelectorAll('.oc').length === 70));
 
@@ -76,10 +78,6 @@ const noMail = await page.evaluate(() => ({
   shown: document.querySelectorAll('.oc__no').length,
 }));
 check('메일 없는 교수 표시가 데이터와 일치', noMail.data === noMail.shown, `${noMail.shown}명 표시`);
-
-// 7) 접촉 상태에 '면담'은 없다
-check('상태에 면담 없음', await page.evaluate(() =>
-  !document.querySelector('[data-of="st"][data-v="면담"]') && !CT_STATES.includes('면담')));
 
 // 8) 메일 보낸 횟수 카운터
 await page.click(`[data-open="${k2}"]`);
