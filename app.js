@@ -814,9 +814,8 @@ function renderSkeleton(r) {
 function favSection() {
   const list = state.rows.filter(isFav);
   if (!list.length) return '';
-  const order = new Map(state.depts.map((d, i) => [d.id, i]));
-  list.sort((a, b) => (order.has(a.dept_id) ? order.get(a.dept_id) : 99) - (order.has(b.dept_id) ? order.get(b.dept_id) : 99)
-                   || a.name.localeCompare(b.name, 'ko'));
+  const order = new Map([...favs()].map((k, i) => [k, i]));   // 관심으로 고른 순서
+  list.sort((a, b) => order.get(rKey(a)) - order.get(rKey(b)));
   return `
     <section class="favsec">
       <div class="favsec__head">
@@ -1202,7 +1201,7 @@ function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirty
 function settingValue(key) {
   if (key === SET_QD) return [...quizDepts()].sort();
   if (key === SET_QX) return [...quizEx()].sort();
-  if (key === SET_FAV) return [...favs()].sort();
+  if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1256,7 +1255,10 @@ function applySettings(m) {
     if (raw == null || raw === '') { if (setStored(key)) saveSetting(key, settingValue(key)); continue; }
     let v; try { v = JSON.parse(raw); } catch { continue; }
     if (!Array.isArray(v)) continue;
-    if (JSON.stringify(settingValue(key)) === JSON.stringify([...v].sort())) continue;
+    const cur = settingValue(key) || [];
+    const same = key === SET_FAV ? JSON.stringify(cur) === JSON.stringify(v)
+                                 : JSON.stringify(cur) === JSON.stringify([...v].sort());
+    if (same) continue;
     settingApplyLocal(key, v); changed = true;
   }
   if (changed) {
