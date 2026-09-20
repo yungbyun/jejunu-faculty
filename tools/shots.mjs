@@ -22,8 +22,9 @@ const ROUTES = [
   { name: 'home',  hash: '#/' },
   { name: 'dept',  hash: '#/dept/comdol' },
   { name: 'stats', hash: '#/stats' },
-  // 퀴즈는 한 문제 넘겨서 찍는다 — '이전' 버튼이 살아 있는 상태를 봐야 한다
-  { name: 'quiz',  hash: '#/quiz', after: () => quizNext() },
+  // 퀴즈는 한 문제 넘기고 힌트를 두 개 연 상태로 찍는다
+  // ('이전' 버튼이 살아 있는 모습과 힌트로 열린 글자를 함께 봐야 한다)
+  { name: 'quiz',  hash: '#/quiz', after: () => { quizNext(); quiz.hints = 2; renderQuiz(); } },
 ];
 const VIEWPORTS = [{ name: 'mobile', width: 390, height: 844 }, { name: 'pc', width: 1440, height: 900 }];
 const THEMES = ['light', 'dark'];

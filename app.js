@@ -357,10 +357,11 @@ const quizStateAt = i => (i === quiz.i ? quiz.state : (quiz.res[i] || {}).state 
 const quizMaxHints = p => 1 + p.name.length;              // 1: 학과, 그다음 한 글자씩
 const quizQScore = () => Math.max(QUIZ_MIN, QUIZ_BASE - quiz.hints * QUIZ_HINT - quiz.wrong * QUIZ_WRONG);
 const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
-/* 이름 자리 — 글자마다 가는 테두리 네모 칸. 열린 글자만 채워 보여 준다 */
-function quizMask(p, hints, reveal) {
-  const k = reveal ? p.name.length : Math.max(0, Math.min(hints - 1, p.name.length));
-  return p.name.split('').map((c, i) => `<span class="qz-ch${i < k ? ' on' : ''}">${i < k ? esc(c) : ''}</span>`).join('');
+/* 힌트로 열린 글자. 사진 밑 네모 칸은 없앴고(2026-09-20) 힌트 줄에 글로 보여 준다.
+ * 힌트 1은 학과, 그다음부터 한 글자씩 열린다. 아직 안 열린 자리는 ○. */
+function quizLetters(p, hints) {
+  const k = Math.max(0, Math.min(hints - 1, p.name.length));
+  return k ? p.name.split('').map((c, i) => i < k ? esc(c) : '○').join('') : '';
 }
 
 /* ---------- 음성으로 이름 맞히기 ----------
@@ -434,6 +435,7 @@ function speechStart() {
     const hit = alts.find(t => nameHeard(t, p.name));
     if (hit) { quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok'; quiz.heard = hit; }
     else { quiz.heard = alts[0] || ''; if (!quiz.heard) quiz.micErr = '알아듣지 못했습니다 — 다시 말해 보세요'; } // 잘못 들어도 오답으로 치지 않는다
+    if (quiz.state === 'ask') { const i = $app.querySelector('#qzIn'); if (i) { i.value = quiz.heard; i.focus(); } }
     renderQuiz();
   });
 
@@ -565,14 +567,18 @@ function renderQuiz() {
         <img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="교수 사진" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">
       </div>
       <div class="qz-main">
-        <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
-        <div class="qz-hintline">${quiz.hints >= 1 || quiz.state !== 'ask' ? `${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}` : ''}</div>
-        ${speechOK() ? `<form class="qz-form" id="qzForm" autocomplete="off">
-          <button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic ${quiz.state === 'ask' ? '' : 'disabled'} aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
+        <div class="qz-hintline" aria-live="polite">${
+          quiz.state !== 'ask' ? `${esc(p.dept_name)} · ${esc(p.rank)}`
+          : quiz.hints >= 1 ? [esc(p.dept_name), quizLetters(p, quiz.hints)].filter(Boolean).join(' · ')
+          : ''}</div>
+        <form class="qz-form" id="qzForm" autocomplete="off">
+          <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false"
+            ${quiz.state === 'ask' ? '' : `value="${esc(p.name)}" disabled`}>
+          ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic ${quiz.state === 'ask' ? '' : 'disabled'} aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
             <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-          <button type="submit" class="qz-btn qz-btn--go" ${quiz.state === 'ask' && quiz.heard ? '' : 'disabled'}>확인</button>
-        </form>` : `<p class="st-note">이 브라우저에서는 음성 인식을 쓸 수 없습니다 — 힌트나 정답 보기로 진행하세요.</p>`}
+          </button>` : ''}
+          <button type="submit" class="qz-btn qz-btn--go" ${quiz.state === 'ask' ? '' : 'disabled'}>확인</button>
+        </form>
 
         <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : quiz.state === 'give' ? 'warn' : quiz.listening ? 'live' : quiz.micErr || quiz.wrong ? 'warn' : ''}">${
           quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}`
@@ -602,6 +608,8 @@ function renderQuiz() {
       <div class="qz-foot"><button type="button" class="btn" data-restart>처음부터 다시</button></div>
     </div>`;
   bindQuiz();
+  const inp = $app.querySelector('#qzIn');
+  if (inp && !inp.disabled && !('ontouchstart' in window)) inp.focus();
 }
 
 function bindQuiz() {
@@ -644,12 +652,12 @@ function bindQuiz() {
   $app.querySelector('[data-mic]')?.addEventListener('click', () => { quiz.micErr = ''; quiz.listening ? speechStop() : speechStart(); });
   $app.querySelector('#qzForm')?.addEventListener('submit', e => {
     e.preventDefault();
-    const p = quizCur(), v = quizNorm(quiz.heard);
-    if (!v || quiz.state !== 'ask') return;
-    speechStop(); quiz.micErr = '';
+    const p = quizCur(), inp = $app.querySelector('#qzIn'), v = quizNorm(inp.value);
+    if (!v) return;
+    speechStop(); quiz.micErr = ''; quiz.heard = '';
     if (v === quizNorm(p.name) || (p.name_en && v === quizNorm(p.name_en))) {
       quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok';
-    } else { quiz.wrong++; quiz.heard = ''; }
+    } else { quiz.wrong++; inp.value = ''; }
     renderQuiz();
   });
 }
