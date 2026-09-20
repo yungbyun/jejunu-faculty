@@ -39,11 +39,10 @@ check('메일 초안에 이름이 들어감', await page.evaluate(k => {
   return document.querySelector('.oc__ta').value.startsWith(p.name + ' 교수님께');
 }, k2));
 check('메일 초안에 서명', mail.includes('ycb@jejunu.ac.kr'));
-check('연구 한 줄이 본문에 반영', await page.evaluate(() => {
-  const one = document.querySelector('.oc__one')?.textContent.replace('연구 한 줄', '').trim();
-  const ta = document.querySelector('.oc__ta').value;
-  return !one || one.includes('대신했습니다') || ta.includes(one);
-}));
+// 회차 본문은 갈래 문장으로 개인화한다. 연구 한 줄은 참고용으로 위에 보여 주고,
+// 본문에 넣고 싶으면 원고에 {연구} 를 쓴다(회차 테스트에서 확인).
+check('연구 한 줄이 참고로 보임', await page.evaluate(() =>
+  !!document.querySelector('.oc__one')?.textContent.trim()));
 const href = await page.getAttribute('.oc__acts a.btn', 'href');
 check('mailto 링크 생성', !!href && href.startsWith('mailto:') && href.includes('subject='), href ? href.slice(0, 60) + '…' : '없음');
 

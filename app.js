@@ -671,7 +671,7 @@ function bindQuiz() {
  * 교수마다 성향(연·강·둘)을 달아 두고, 그 성향과 data/insights 의 "AI 융합 방향"을 끼워
  * 메일·문자·카톡 초안을 그 자리에서 조립한다. 초안은 만들고 복사할 뿐, 이 앱이 보내지는 않는다. */
 const CHANNELS = ['메일', '문자', '카톡'];
-const OUT = { dept: '전체', rate: '전체', trait: '전체', st: '전체', open: '', ch: '메일' };
+const OUT = { dept: '전체', rate: '전체', trait: '전체', st: '전체', open: '', ch: '메일', ep: 1, edit: false };
 const ME = { name: '변영철', dept: '컴퓨터공학과', room: '공과대학 4호관 D407', email: 'ycb@jejunu.ac.kr' };
 
 /* 그 교수 연구에 AI 가 어떻게 붙는지 한 줄. insights 의 결론 문장을 그대로 쓴다. */
@@ -731,6 +731,103 @@ function draftBody(p, ch, one) {
           '바쁘신데 길게 쓰지 않겠습니다. 한 번 생각해 주시면 감사하겠습니다.'].join('\n');
 }
 
+
+/* ---------- 회차 (지지 요청 메일을 여러 번 나눠 보내기) ----------
+ * 12월 투표일까지 열 번 넘게 보내므로, 한 통에 다 담지 않고 회차마다 이야기 하나씩 전한다.
+ * 회차 = 공통 본문 + 갈래별 한 줄. 갈래는 학과로 자동으로 갈린다(손으로 태깅하지 않는다).
+ * 저장은 settings 탭의 eps / epsent 키이므로 서버는 고치지 않는다. */
+const EPS_KEY = 'jnu-eps', EPSENT_KEY = 'jnu-epsent';
+
+/* 부트캠프 참여 정도에 따라 학과를 다섯 갈래로 나눈다 (2026-09 명단 기준) */
+const SEG = {
+  A: { name: '전자·통신', depts: ['comdol', 'telecom'] },
+  B: { name: '참여 학과', depts: ['mse', 'nuclear', 'foodse', 'civil', 'elec'] },
+  C: { name: '미참여 학과', depts: ['chemeng', 'archidesign', 'archieng'] },
+  D: { name: '컴퓨터공학과', depts: ['ce'] },
+  E: { name: '인공지능학과', depts: ['ai'] },
+};
+const SEG_KEYS = Object.keys(SEG);
+const segOf = p => SEG_KEYS.find(k => SEG[k].depts.includes(p.dept_id)) || 'B';
+
+let epsMap = null, epsentMap = null;
+function eps() { if (!epsMap) { epsMap = loadObj(EPS_KEY); if (!Object.keys(epsMap).length) { epsMap = { '1': EP1 }; } } return epsMap; }
+function epsent() { if (!epsentMap) epsentMap = loadObj(EPSENT_KEY); return epsentMap; }
+const epNos = () => Object.keys(eps()).map(Number).sort((a, b) => a - b);
+const epOf = n => eps()[String(n)] || null;
+
+function epSave() { saveObj(EPS_KEY, eps(), SET_EP); }
+function epAdd() {
+  const n = String((epNos().pop() || 0) + 1);
+  eps()[n] = { subject: `${n}회차 — 컴퓨터공학과 변영철`, body: '', sms: '', seg: {}, dept: {} };
+  epSave(); OUT.ep = Number(n); renderOutreach();
+}
+function epDel(n) {
+  delete eps()[String(n)]; epSave();
+  OUT.ep = epNos()[0] || 0; renderOutreach();
+}
+/* 이 사람에게 이 회차가 나갔는지 */
+const epDone = (p, n) => (epsent()[rKey(p)] || []).includes(Number(n));
+function epMark(p, n, on) {
+  const m = epsent(), k = rKey(p);
+  const arr = new Set(m[k] || []);
+  on ? arr.add(Number(n)) : arr.delete(Number(n));
+  arr.size ? m[k] = [...arr].sort((a, b) => a - b) : delete m[k];
+  saveObj(EPSENT_KEY, m, SET_EPS);
+}
+
+/* 공통 본문 + 그 사람 갈래 문장을 합쳐 실제로 보낼 글을 만든다.
+ * {이름} {학과} 는 어디서나 치환되고, {개인화} 자리에 갈래 문장이 들어간다.
+ * 학과별 문장(dept)이 있으면 갈래 문장보다 먼저 쓴다. */
+function epFill(txt, p, line, one) {
+  return String(txt || '')
+    .replace(/\{개인화\}/g, line || '')
+    .replace(/\{연구\}/g, one || '')
+    .replace(/\{이름\}/g, p.name)
+    .replace(/\{학과\}/g, p.dept_name);
+}
+/* one = 그 교수 insights 의 "AI 융합 방향" 한 줄. 본문이나 갈래 문장에서 {연구} 로 쓴다. */
+function epBody(ep, p, ch, one) {
+  if (!ep) return '';
+  const line = (ep.dept || {})[p.dept_id] || (ep.seg || {})[segOf(p)] || '';
+  const base = ch === '메일' ? ep.body : (ep.sms || ep.body);
+  return epFill(base, p, epFill(line, p, '', one), one).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/* 1회차 기본값 — 대화로 합의한 내용을 넣어 둔다. 앱에서 그대로 고칠 수 있다. */
+const EP1 = {
+  subject: '요즘 학생들이 "컴송합니다"라고 합니다 — 컴퓨터공학과 변영철',
+  body: [
+    '{이름} 교수님께', '',
+    '컴퓨터공학과 변영철입니다. 이번 공과대학 학장 선거에 나서게 되어 인사드립니다.', '',
+    '예전에는 학생들이 "문송합니다"라고 했습니다. 요즘은 "컴송합니다"라고 합니다. 컴퓨터공학과라서 죄송하다는 뜻입니다. SW 개발이 저희 학과의 핵심인데 이제 AI가 훨씬 잘하니, 굳이 컴퓨터공학과 학생을 뽑을 이유가 줄었습니다. 제 전공이 가장 먼저 흔들리고 있습니다.', '',
+    '더 걱정스러운 것은 따로 있었습니다. 요즘 학생 과제를 받아 보시면 아실 겁니다. 문제를 내주면 학생이 그대로 AI에 넣고, 나온 것을 이해하지도 않은 채 문서로 만들어 제출합니다. 학생이 배달부가 되어 버렸고, 그 사이에 배웠어야 할 것이 통째로 날아갑니다.', '',
+    '지난 여름 부트캠프에서는 순서를 바꿔 봤습니다. 제주 기업에서 실제 문제를 받아 오고, 학생이 자기 전공에 맞는 문제를 직접 골랐습니다. 구글과 업스테이지 전문가가 AI 쓰는 법을 도왔고, 나온 답은 학생이 직접 분석하고 이해해서 마지막 판단까지 했습니다. 참여 학생의 70%가 컴퓨터·AI 전공이 아니었습니다.', '',
+    '보고 나서 생각이 정리됐습니다. 학생이 손으로 하던 일은 AI가 하고, 교수가 하던 일—문제를 정의하고 판단하는 일—을 학생이 하게 됩니다. 공대가 지금 붙들어야 할 담론이 여기 있다고 봤고, 그래서 나섰습니다.', '',
+    '{개인화}', '',
+    '앞으로 투표일까지 이런 이야기를 가끔 전해 드리겠습니다. 답장은 안 하셔도 됩니다.', '',
+    '변영철 드림', '컴퓨터공학과 · 공과대학 4호관 D407 · ycb@jejunu.ac.kr',
+  ].join('\n'),
+  sms: [
+    '{이름} 교수님, 컴퓨터공학과 변영철입니다. 이번 공과대학 학장 선거에 나섰습니다.', '',
+    '요즘 학생들은 "문송합니다" 대신 "컴송합니다"라고 합니다. SW 개발은 이제 AI가 훨씬 잘하니까요. 제 전공이 먼저 흔들리고 있습니다.',
+    '더 걱정스러운 건 학생이 과제를 이해도 못 한 채 AI에 돌려 내는 일입니다. 학생이 배달부가 되어 버렸습니다.', '',
+    '지난 여름 부트캠프에서는 순서를 바꿔, 학생이 문제를 고르고 AI가 낸 답을 직접 분석해 마지막 판단까지 하게 했습니다. 공대가 붙들어야 할 담론이 여기 있다고 보고 나섰습니다.', '',
+    '{개인화}', '',
+    '답장은 안 하셔도 됩니다. — 변영철',
+  ].join('\n'),
+  seg: {
+    A: '교수님 학과는 이미 깊이 들어와 있습니다. 여름 부트캠프뿐 아니라 캡스톤디자인 과목으로도 함께했습니다.',
+    B: '이번 여름에 {학과} 학생도 왔습니다.',
+    C: '이번에는 {학과} 학생이 없었습니다. 겨울에는 꼭 왔으면 합니다.',
+    D: '교수님께는 굳이 설명드릴 필요가 없는 이야기일 겁니다. 저희 학과가 제일 먼저 겪고 있으니까요. 그래서 밖에다 이 이야기를 꺼내는 일은 저희가 해야 한다고 생각했습니다.',
+    E: '오해하실까 봐 한 줄 덧붙입니다. 각 학과가 중심이고 AI가 거기 붙어 돕는 구조로 가자는 말은, 인공지능학과의 몫이 줄어든다는 뜻이 아닙니다. 붙어 줄 사람이 필요해지는 곳이 학과 하나에서 공대 열두 개로 늘어난다는 뜻입니다. 공대의 AX는 인공지능학과 교수님들 없이는 시작도 못 합니다.',
+  },
+  dept: {
+    comdol: '교수님 학과는 이미 깊이 들어와 있습니다. 여름 부트캠프뿐 아니라 캡스톤디자인 과목으로 30명이 함께했습니다.',
+    telecom: '교수님 학과는 이미 깊이 들어와 있습니다. 여름 부트캠프뿐 아니라 캡스톤디자인 과목으로 10명이 함께했습니다.',
+  },
+};
+
 /* ---------- 예약 발송 ----------
  * 이 앱은 예약만 쌓는다. 실제 발송은 Apps Script 의 시간 트리거(sendDue)가 하고,
  * 서버에서 outboxStart() 를 실행하기 전에는 한 통도 나가지 않는다. */
@@ -785,6 +882,39 @@ function nextMorning() { const d = new Date(); d.setDate(d.getDate() + 1); d.set
 const ochips = (name, vals, cur) => vals.map(v =>
   `<button type="button" class="chip" data-of="${esc(name)}" data-v="${esc(v)}" aria-pressed="${cur === v}">${esc(v)}</button>`).join('');
 
+/* 회차 고르기 줄과 원고 편집 패널 */
+function epBar() {
+  const nos = epNos();
+  if (!nos.includes(OUT.ep)) OUT.ep = nos[0] || 0;
+  const ep = epOf(OUT.ep);
+  const doneN = state.rows.filter(p => epDone(p, OUT.ep)).length;
+  const tabs = nos.map(n => `<button type="button" class="chip" data-ep="${n}" aria-pressed="${OUT.ep === n}">${n}회차</button>`).join('');
+  const head = `<div class="ot-f__r"><span class="ot-f__l">회차</span><div class="filters">
+      ${tabs}
+      <button type="button" class="chip ep-add" data-epadd title="회차 추가">+</button>
+      ${ep ? `<button type="button" class="btn" data-epedit>${OUT.edit ? '원고 닫기' : '원고 고치기'}</button>` : ''}
+      ${ep ? `<span class="st-note">이 회차 발송 <b>${doneN}</b>/${state.rows.length}</span>` : ''}
+    </div></div>`;
+  if (!ep || !OUT.edit) return `<div class="ot-f ot-ep">${head}</div>`;
+  const segRows = SEG_KEYS.map(k => {
+    const n = state.rows.filter(p => segOf(p) === k).length;
+    return `<label class="ep-seg"><span>${esc(SEG[k].name)} <i>${n}명</i></span>
+      <textarea rows="2" data-seg="${k}">${esc((ep.seg || {})[k] || '')}</textarea></label>`;
+  }).join('');
+  return `<div class="ot-f ot-ep">${head}
+    <div class="ep-edit">
+      <label class="ep-f"><span>제목</span><input type="text" data-epf="subject" value="${esc(ep.subject || '')}"></label>
+      <label class="ep-f"><span>메일 본문</span><textarea rows="14" data-epf="body">${esc(ep.body || '')}</textarea></label>
+      <label class="ep-f"><span>문자·카톡 본문</span><textarea rows="7" data-epf="sms">${esc(ep.sms || '')}</textarea></label>
+      <p class="st-note">본문 안에 <b>{이름}</b> <b>{학과}</b> <b>{개인화}</b> <b>{연구}</b> 를 쓰면 사람마다 바뀝니다. {개인화} 자리에 아래 갈래 문장이, {연구} 자리에 그 교수님 "AI 융합 방향" 한 줄이 들어갑니다.</p>
+      <div class="ep-segs">${segRows}</div>
+      <div class="ep-acts">
+        <button type="button" class="btn" data-epsave>저장</button>
+        ${epNos().length > 1 ? `<button type="button" class="btn" data-epdel>이 회차 지우기</button>` : ''}
+      </div>
+    </div></div>`;
+}
+
 /* 예약 발송이 지금 어떤 상태인지 한 줄로 알려 준다 */
 function obNotice() {
   if (!CONFIG.RATINGS.API_URL || !state.session) return '';
@@ -823,6 +953,7 @@ function renderOutreach() {
       <div class="ot-f__r"><span class="ot-f__l">성향</span><div class="filters">${ochips('trait', ['전체', ...TRAITS, '미지정'], OUT.trait)}</div></div>
       <div class="ot-f__r"><span class="ot-f__l">상태</span><div class="filters">${ochips('st', ['전체', ...CT_STATES], OUT.st)}</div></div>
     </div>
+    ${epBar()}
     ${obNotice()}
     <div class="ot-bulk">
       <span class="st-note">성향 미지정 <b>${untag}</b>명${untag ? ' — 대부분 연구 쪽이면 한 번에 채우고 예외만 바꾸세요' : ''}</span>
@@ -842,6 +973,7 @@ function renderOutreach() {
         <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
         <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
         ${r ? `<span class="rs rs--${rcls(r)}">${esc(r)}</span>` : ''}
+        ${epOf(OUT.ep) && epDone(p, OUT.ep) ? `<span class="oc__ep">${OUT.ep}회차 보냄</span>` : ''}
         ${mailOf(p) ? `<span class="oc__mc">메일 ${mailOf(p)}회</span>` : ''}
         ${obTag}
         <span class="oc__st oc__st--${st === '미접촉' ? 'none' : 'on'}">${esc(st)}</span>
@@ -874,8 +1006,9 @@ function fillDraft(k) {
     if (OUT.open !== k) return;
     const one = insLine(p, data);
     const memo = (getNote(k) || {}).memo || '';
-    const body = draftBody(p, OUT.ch, one);
-    const subject = `학장 선거 인사드립니다 — ${ME.dept} ${ME.name}`;
+    const ep = epOf(OUT.ep);
+    const body = ep ? epBody(ep, p, OUT.ch, one) : draftBody(p, OUT.ch, one);
+    const subject = ep ? epFill(ep.subject || '', p, '') : `학장 선거 인사드립니다 — ${ME.dept} ${ME.name}`;
     const mailto = p.email
       ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       : '';
@@ -884,13 +1017,18 @@ function fillDraft(k) {
       <div class="oc__one${one ? '' : ' oc__one--no'}"><b>연구 한 줄</b> ${one ? esc(one) : '정리된 항목이 없어 부트캠프 이야기로 대신했습니다'}</div>
       <div class="filters filters--ch">${CHANNELS.map(c =>
         `<button type="button" class="chip" data-ch="${esc(c)}" aria-pressed="${OUT.ch === c}">${esc(c)}</button>`).join('')}</div>
-      ${OUT.ch === '메일' ? `<input type="text" class="oc__sub" value="${esc(subject)}" aria-label="제목" readonly>` : ''}
+      ${OUT.ch === '메일' ? `<input type="text" class="oc__sub" value="${esc(subject)}" aria-label="제목">` : ''}
       <textarea class="oc__ta" rows="${OUT.ch === '메일' ? 16 : 7}" aria-label="초안">${esc(body)}</textarea>
       <div class="oc__len">${body.length}자${OUT.ch === '문자' && body.length > 45 ? ' — 45자를 넘으므로 장문(LMS)으로 나갑니다' : ''}</div>
       <div class="oc__acts">
         <button type="button" class="btn" data-copy>복사</button>
         ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
       </div>
+      ${epOf(OUT.ep) ? `<div class="oc__cnt">
+        <span class="ot-f__l">${OUT.ep}회차</span>
+        <button type="button" class="chip" data-epmark aria-pressed="${epDone(p, OUT.ep)}">${epDone(p, OUT.ep) ? '보냄 ✓' : '보냄으로 표시'}</button>
+        <span class="st-note">갈래: ${esc(SEG[segOf(p)].name)}</span>
+      </div>` : ''}
       <div class="oc__cnt">
         <span class="ot-f__l">보낸 횟수</span>
         <div class="counter mailc ${mailOf(p) ? '' : 'counter--zero'}" data-mk="${esc(k)}" role="group" aria-label="${esc(p.name)} 메일 보낸 횟수">
@@ -909,6 +1047,7 @@ function fillDraft(k) {
       catch { ta.select(); try { document.execCommand('copy'); } catch {} }
       e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
     });
+    box.querySelector('[data-epmark]')?.addEventListener('click', () => { epMark(p, OUT.ep, !epDone(p, OUT.ep)); renderOutreach(); });
     box.querySelector('.mailc')?.addEventListener('click', e => {
       const btn = e.target.closest('.counter__b'); if (!btn) return;
       setMail(p, mailOf(p) + (btn.hasAttribute('data-inc') ? 1 : -1));
@@ -954,6 +1093,20 @@ function schedRow(p, k) {
 }
 
 function bindOutreach() {
+  $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
+  $app.querySelector('[data-epadd]')?.addEventListener('click', () => { OUT.edit = true; epAdd(); });
+  $app.querySelector('[data-epedit]')?.addEventListener('click', () => { OUT.edit = !OUT.edit; renderOutreach(); });
+  $app.querySelector('[data-epdel]')?.addEventListener('click', () => {
+    if (confirm(`${OUT.ep}회차 원고를 지울까요? 발송 기록은 남습니다.`)) epDel(OUT.ep);
+  });
+  $app.querySelector('[data-epsave]')?.addEventListener('click', () => {
+    const ep = epOf(OUT.ep); if (!ep) return;
+    $app.querySelectorAll('[data-epf]').forEach(el => { ep[el.dataset.epf] = el.value; });
+    ep.seg = ep.seg || {};
+    $app.querySelectorAll('[data-seg]').forEach(el => { ep.seg[el.dataset.seg] = el.value; });
+    epSave(); OUT.edit = false; renderOutreach();
+    flashStatus(`${OUT.ep}회차 원고를 저장했습니다`);
+  });
   $app.querySelectorAll('[data-of]').forEach(b => b.addEventListener('click', () => {
     OUT[b.dataset.of] = b.dataset.v; OUT.open = ''; renderOutreach();
   }));
@@ -1571,9 +1724,10 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_TR = 'trait', SET_CT = 'contact', SET_MC = 'mailcnt';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_CT, SET_MC];
-const SET_OBJ = [SET_TR, SET_CT, SET_MC];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_CT]: '접촉 상태', [SET_MC]: '메일 보낸 횟수' };
+const SET_EP = 'eps', SET_EPS = 'epsent';
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_TR, SET_CT, SET_MC, SET_EP, SET_EPS];
+const SET_OBJ = [SET_TR, SET_CT, SET_MC, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_TR]: '성향', [SET_CT]: '접촉 상태', [SET_MC]: '메일 보낸 횟수', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -1586,6 +1740,8 @@ function settingValue(key) {
   if (key === SET_TR) return traits();
   if (key === SET_CT) return contacts();
   if (key === SET_MC) return mails();
+  if (key === SET_EP) return eps();
+  if (key === SET_EPS) return epsent();
   return null;
 }
 /* 서버에서 받은 값을 이 기기에 적용 (되돌려 올리지 않도록 localStorage에 직접 씀) */
@@ -1597,9 +1753,11 @@ function settingApplyLocal(key, v) {
     if (key === SET_TR) { traitMap = v; Object.keys(v).length ? localStorage.setItem(TRAIT_KEY, JSON.stringify(v)) : localStorage.removeItem(TRAIT_KEY); }
     if (key === SET_CT) { contactMap = v; Object.keys(v).length ? localStorage.setItem(CONTACT_KEY, JSON.stringify(v)) : localStorage.removeItem(CONTACT_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
+    if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
+    if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_CT]: CONTACT_KEY, [SET_MC]: MAIL_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_TR]: TRAIT_KEY, [SET_CT]: CONTACT_KEY, [SET_MC]: MAIL_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
 const setStored = key => { try { return localStorage.getItem(SET_LOCAL_KEY[key]) != null; } catch { return false; } };
 
 async function pushSetting(key, value) {
