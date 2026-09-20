@@ -846,6 +846,38 @@ function renderSkeleton(r) {
 }
 
 /* ---------- 화면: 홈(학과 목록 / 검색 결과) ---------- */
+/* 첫 화면의 관심 교수 명단 — 사진·이름·학과·선호도를 한 줄 카드로. 누르면 상세로 간다. */
+function favSection() {
+  const list = state.rows.filter(isFav);
+  if (!list.length) return '';
+  const order = new Map(state.depts.map((d, i) => [d.id, i]));
+  list.sort((a, b) => (order.has(a.dept_id) ? order.get(a.dept_id) : 99) - (order.has(b.dept_id) ? order.get(b.dept_id) : 99)
+                   || a.name.localeCompare(b.name, 'ko'));
+  const c = dist(list);
+  const sum = CONFIG.RATINGS.LABELS.map(r => [r, c[r]]).filter(([, n]) => n)
+    .map(([r, n]) => `<span class="rs rs--${rcls(r)}">${esc(r)} ${n}</span>`).join('');
+  return `
+    <section class="favsec">
+      <div class="favsec__head">
+        <h2><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>관심 교수 <b>${list.length}</b>명</span></h2>
+        ${sum ? `<div class="favsec__sum">${sum}${c['미지정'] ? `<span class="rs rs--none">미지정 ${c['미지정']}</span>` : ''}</div>` : ''}
+      </div>
+      <div class="favsec__list">
+        ${list.map(p => {
+          const d = state.depts.find(x => x.id === p.dept_id);
+          const r = getRating(p);
+          return `<a class="favc" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+            <span class="favc__ph">${p.photo
+              ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')">`
+              : esc(initial(p.name))}</span>
+            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
+            ${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}
+          </a>`;
+        }).join('')}
+      </div>
+    </section>`;
+}
+
 function renderHome() {
   const q = state.query.trim().toLowerCase();
   if (q) return renderSearch(q);
@@ -853,9 +885,10 @@ function renderHome() {
   $app.innerHTML = `
     <div class="view home">
       <div class="hero hero--sum">
-        <p>${state.depts.length}개 학과 · 전임교원 ${total}명${(() => { const na = state.rows.filter(p => getRating(p) === '비').length; return na ? ` · 비참여 ${na}명 <span class="muted">(비해당, 평가 대상 ${total - na}명)</span>` : ''; })()}</p>
+        <p>${state.depts.length}개 학과 · 전임교원 ${total}명${(() => { const na = state.rows.filter(p => getRating(p) === '비').length; return na ? ` · 비참여 ${na}명` : ''; })()}</p>
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
+      ${favSection()}
       <div class="dept-list">
         ${state.depts.map(d => `
           <a class="drow" href="#/dept/${encodeURIComponent(d.id)}" style="--dept-color:${esc(d.color)}">
