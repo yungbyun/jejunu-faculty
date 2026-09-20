@@ -709,13 +709,17 @@ function sureRate(profs) {
 }
 const fmtPct = v => v == null ? '–' : (Number.isInteger(v) ? v : v.toFixed(1)) + '%';
 
+/* opts.max 를 주면 막대 전체 길이를 '가장 큰 학과 = 100%' 기준으로 줄인다.
+ * 그래야 학과별 규모 차이가 길이로 드러난다(예전에는 모두 100%를 채워 규모가 안 보였다). */
 function stackBar(profs, opts = {}) {
   const c = dist(profs), total = profs.length || 1;
-  return `<div class="sbar" role="img" aria-label="${esc(RLABELS().map(r => `${r} ${c[r]}`).join(', '))}">
+  const width = opts.max ? total / opts.max * 100 : 100;
+  return `<div class="sbar" role="img" style="width:${width.toFixed(2)}%" aria-label="${esc(profs.length)}명 — ${esc(RLABELS().filter(r => c[r]).map(r => `${r} ${c[r]}`).join(', '))}">
     ${RLABELS().filter(r => c[r]).map(r => {
-      const pct = c[r] / total * 100;
+      const pct = c[r] / total * 100;          // 막대 안에서의 비율
+      const abs = c[r] / (opts.max || total) * 100;   // 화면 전체 폭에서 차지하는 비율
       const link = opts.deptId ? ` data-go="${esc(opts.deptId)}" data-rating="${esc(r)}" tabindex="0" role="link"` : '';
-      return `<span class="sbar__seg sbar__seg--${rcls(r)}" style="flex:${c[r]} 0 0"${link} title="${esc(r)} ${c[r]}명 (${Math.round(pct)}%)">${pct >= 11 ? c[r] : ''}</span>`;
+      return `<span class="sbar__seg sbar__seg--${rcls(r)}" style="flex:${c[r]} 0 0"${link} title="${esc(r)} ${c[r]}명 (${Math.round(pct)}%)">${abs >= 4 ? c[r] : ''}</span>`;
     }).join('')}
   </div>`;
 }
@@ -736,6 +740,7 @@ function renderStats() {
   const all = state.rows, rated = all.filter(getRating);
   const c = dist(all);
   const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
+  const maxProfs = Math.max(1, ...state.depts.map(d => d.profs.length));   // 가장 큰 학과를 100% 로
   const legend = `<div class="legend" aria-label="범례">${RLABELS().map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(r)}</span>`).join('')}</div>`;
 
   $app.innerHTML = `
@@ -759,7 +764,7 @@ function renderStats() {
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
               <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>(${d.profs.length}명)</small></div>
-              ${stackBar(d.profs, { deptId: d.id })}
+              ${stackBar(d.profs, { deptId: d.id, max: maxProfs })}
             </div>`).join('')}
         </div>
       </section>
