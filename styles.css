@@ -470,13 +470,16 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-table th,.st-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right}
 .st-table th:first-child,.st-table td:first-child{text-align:left}
 .st-table th{font-size:11.5px;color:var(--ink-3);font-weight:600;letter-spacing:.3px}
-.st-lists{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.st-list{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:12px 14px}
-.st-list h3{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:6px}
+/* 선호도별 목록은 한 선호도당 한 줄로 가로로 흘린다(2026-09-20).
+   세로로 쌓으면 선호도마다 사람 수만큼 길어져 화면이 너무 길었다. */
+.st-lists{display:flex;flex-direction:column;gap:10px}
+.st-list{display:grid;grid-template-columns:92px 1fr;align-items:start;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
+.st-list h3{margin:0;padding-top:4px;font-size:13.5px;display:flex;align-items:center;gap:6px}
 .st-list h3 .n{color:var(--ink-3);font-weight:500}
-.st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.st-list li a{font-weight:600;font-size:13.5px}
-.st-list li small{display:block;color:var(--ink-3);font-size:11.5px}
+.st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.st-list li a{display:inline-flex;align-items:baseline;gap:5px;padding:4px 9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-weight:600;font-size:13px;white-space:nowrap}
+.st-list li a:hover{border-color:var(--brand)}
+.st-list li small{color:var(--ink-3);font-size:11px;font-weight:500}
 .btn{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
 .btn:hover{background:var(--surface-2)}
 .muted{color:var(--ink-3)}
@@ -544,7 +547,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .st-row{grid-template-columns:1fr;gap:6px}
   .dv__axis,.dv__row{grid-template-columns:96px 1fr 40px}
   .st-two{grid-template-columns:1fr}
-  .st-lists{grid-template-columns:1fr 1fr}
+  .st-list{grid-template-columns:1fr;gap:6px}   /* 폰에서는 선호도 이름을 줄 위로 올린다 */
   .st-table{font-size:12px}.st-table th,.st-table td{padding:6px 5px}
   /* 선호도·관심 버튼은 사진 위에 얹지 않는다(작은 얼굴을 가림). 본문 안으로 흘려보낸다 */
   .rate{position:static;justify-content:flex-start;margin:4px 0 0 -4px;padding:0;gap:6px;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -719,10 +722,9 @@ textarea.memo::placeholder{color:var(--ink-3)}
 .qz-ch.on{border-color:var(--dept-color,var(--brand))}
 .qz-hintline{font-size:13.5px;font-weight:600;color:var(--dept-color,var(--brand));min-height:20px}
 .qz-hintline.muted{color:var(--ink-3);font-weight:400}
-.qz-form{display:flex;gap:8px}
-.qz-in{flex:1;min-width:0;padding:11px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
-.qz-in:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
-.qz-in:disabled{background:var(--surface-2);color:var(--ink);font-weight:700;-webkit-text-fill-color:var(--ink);opacity:1}
+/* 이름 입력칸은 없앴다(2026-09-20). 남은 것은 마이크와 확인뿐이라 가운데로 모은다 */
+.qz-form{display:flex;gap:8px;justify-content:flex-start}
+.qz-form .qz-btn--go{min-width:128px}
 .qz-mic:disabled{opacity:.35;cursor:default}
 .qz-mic:disabled:hover{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}
 .qz-msg{min-height:19px}
@@ -751,11 +753,12 @@ textarea.memo::placeholder{color:var(--ink-3)}
   .qz-card{grid-template-columns:1fr;gap:16px;padding:16px}
   .qz-photo{max-width:230px;margin:0 auto}
   .qz-mask{justify-content:center;gap:8px}
+  .qz-form{justify-content:center}   /* 폰에서는 이름 칸처럼 가운데로 (PC 는 왼쪽 정렬) */
   .qz-ch{width:48px;height:56px;font-size:26px;border-radius:8px}
   .qz-hintline{text-align:center}
   .qz-score{gap:10px;padding:12px 14px}
   .qz-score__n{font-size:26px}
   .qz-score .meter{flex-basis:100%}
-  .qz-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
+  .qz-acts{display:grid;grid-template-columns:repeat(2,1fr)}   /* 힌트·정답보기·이전·다음 네 개를 2x2 로 (auto-fit 은 3+1 로 갈라졌다) */
   .qz-end__n{font-size:44px}
 }

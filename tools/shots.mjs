@@ -22,6 +22,8 @@ const ROUTES = [
   { name: 'home',  hash: '#/' },
   { name: 'dept',  hash: '#/dept/comdol' },
   { name: 'stats', hash: '#/stats' },
+  // 퀴즈는 한 문제 넘겨서 찍는다 — '이전' 버튼이 살아 있는 상태를 봐야 한다
+  { name: 'quiz',  hash: '#/quiz', after: () => quizNext() },
 ];
 const VIEWPORTS = [{ name: 'mobile', width: 390, height: 844 }, { name: 'pc', width: 1440, height: 900 }];
 const THEMES = ['light', 'dark'];
@@ -52,7 +54,9 @@ for (const vp of VIEWPORTS) {
 
     for (const r of ROUTES) {
       await page.evaluate(h => { location.hash = h; render(); }, r.hash);
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(800);
+      if (r.after) { await page.evaluate(`(${r.after.toString()})()`); await page.waitForTimeout(400); }
+      await page.waitForTimeout(600);
       const f = `${outDir}/${tag ? tag + '-' : ''}${r.name}-${vp.name}-${theme}.png`;
       await page.screenshot({ path: f, fullPage: true });
       console.log('저장:', f);

@@ -299,7 +299,7 @@ function render() {
 const QUIZ_BASE = 100, QUIZ_HINT = 25, QUIZ_WRONG = 10, QUIZ_MIN = 10;
 const QUIZ_DEPTS_KEY = 'jnu-quiz-depts2', QUIZ_EX_KEY = 'jnu-quiz-ex';
 const QUIZ_OFF_DEPTS = ['ce']; // 기본으로 꺼 두는 학과(본인 학과라 굳이 외울 필요 없음). 칩을 누르면 켤 수 있다
-const quiz = { depts: null, ex: null, deck: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false, pickingP: false };
+const quiz = { depts: null, ex: null, deck: [], res: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0, picking: false, pickingP: false };
 
 function quizDepts() {
   if (quiz.depts) return quiz.depts;
@@ -332,16 +332,28 @@ function quizStart() {
   speechStop(); quiz.heard = ''; quiz.micErr = '';
   const pool = quizPool().slice();
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  Object.assign(quiz, { deck: pool, i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0 });
+  Object.assign(quiz, { deck: pool, res: [], i: 0, hints: 0, wrong: 0, state: 'ask', score: 0, correct: 0, hintTotal: 0 });
 }
 const quizCur = () => quiz.deck[quiz.i];
-/* 다음 문제로. 답을 맞히지 않고 넘기면 그 문제는 점수 없이 지나간다 */
-function quizNext() {
-  speechStop();
-  quiz.i++; quiz.hints = 0; quiz.wrong = 0; quiz.state = 'ask';
-  quiz.heard = ''; quiz.micErr = ''; quiz.gained = 0;
+/* 앞뒤로 이동. 지금 문제의 상태를 quiz.res 에 넣어 두고 가려는 문제의 상태를 꺼내 온다.
+ * 이미 맞힌 문제로 되돌아가도 폼이 잠겨 있어 점수가 두 번 오르지 않고,
+ * 건너뛴 문제로 돌아가면 다시 풀 수 있다. */
+function quizSnap() {
+  if (quiz.i < quiz.deck.length)
+    quiz.res[quiz.i] = { hints: quiz.hints, wrong: quiz.wrong, state: quiz.state, gained: quiz.gained, heard: quiz.heard };
+}
+function quizGo(step) {
+  speechStop(); quizSnap();
+  quiz.i = Math.max(0, Math.min(quiz.deck.length, quiz.i + step));
+  const r = quiz.res[quiz.i];
+  Object.assign(quiz, r ? { ...r } : { hints: 0, wrong: 0, state: 'ask', gained: 0, heard: '' });
+  quiz.micErr = '';
   renderQuiz();
 }
+/* 답을 맞히지 않고 넘기면 그 문제는 점수 없이 지나간다 */
+const quizNext = () => quizGo(1);
+const quizPrev = () => quizGo(-1);
+const quizStateAt = i => (i === quiz.i ? quiz.state : (quiz.res[i] || {}).state || 'ask');
 const quizMaxHints = p => 1 + p.name.length;              // 1: 학과, 그다음 한 글자씩
 const quizQScore = () => Math.max(QUIZ_MIN, QUIZ_BASE - quiz.hints * QUIZ_HINT - quiz.wrong * QUIZ_WRONG);
 const quizNorm = v => String(v || '').replace(/[\s,·.]/g, '').toLowerCase();
@@ -423,7 +435,6 @@ function speechStart() {
     if (hit) { quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok'; quiz.heard = hit; }
     else { quiz.heard = alts[0] || ''; if (!quiz.heard) quiz.micErr = '알아듣지 못했습니다 — 다시 말해 보세요'; } // 잘못 들어도 오답으로 치지 않는다
     renderQuiz();
-    if (quiz.state === 'ask') { const i = $app.querySelector('#qzIn'); if (i) { i.value = quiz.heard; i.focus(); } }
   });
 
   r.onerror = guard(ev => {
@@ -448,7 +459,8 @@ function speechStart() {
   renderQuiz();
 }
 
-/* 사진(카드)을 옆으로 미는 동작. 왼쪽으로 밀면 다음 문제, 세로로 움직이면 평소대로 화면이 스크롤된다 */
+/* 사진(카드)을 옆으로 미는 동작. 왼쪽으로 밀면 다음 문제, 오른쪽으로 밀면 이전 문제.
+ * 세로로 움직이면 평소대로 화면이 스크롤된다 */
 let swipeGuard = false;
 function bindSwipe(card) {
   if (!card) return;
@@ -466,14 +478,14 @@ function bindSwipe(card) {
     if (!dir && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) dir = Math.abs(dx) > Math.abs(dy) ? 1 : 2;
     if (dir !== 1) return;
     e.preventDefault();                                   // 가로로 밀 때만 스크롤을 막는다
-    card.style.transform = `translateX(${dx < 0 ? dx : dx * 0.25}px)`;
+    card.style.transform = `translateX(${dx > 0 && quiz.i === 0 ? dx * 0.25 : dx}px)`;   // 첫 문제에서 오른쪽은 갈 곳이 없으므로 덜 끌린다
   }, { passive: false });
   photo.addEventListener('touchend', e => {
     if (x0 === null) return;
     const dx = (e.changedTouches[0] || {}).clientX - x0;
-    const go = dir === 1 && dx < -60;
+    const go = dir !== 1 || Math.abs(dx) <= 60 ? 0 : dx < 0 ? 1 : quiz.i > 0 ? -1 : 0;
     reset();
-    if (go) { swipeGuard = true; setTimeout(() => { swipeGuard = false; }, 500); quizNext(); }
+    if (go) { swipeGuard = true; setTimeout(() => { swipeGuard = false; }, 500); quizGo(go); }
   });
   photo.addEventListener('touchcancel', reset);
 }
@@ -529,7 +541,7 @@ function renderQuiz() {
   const p = done ? null : quizCur();
   const d = p ? state.depts.find(x => x.id === p.dept_id) : null;
   const max = p ? quizMaxHints(p) : 0;
-  const asked = quiz.i + (quiz.state === 'ask' ? 0 : 1);
+  const asked = quiz.deck.reduce((n, _, i) => n + (quizStateAt(i) === 'ask' ? 0 : 1), 0);
   const head = `
     <div class="qz-score">
       <div class="qz-score__n">${quiz.score}<small>점</small></div>
@@ -555,14 +567,12 @@ function renderQuiz() {
       <div class="qz-main">
         <div class="qz-mask" aria-live="polite" aria-label="${quiz.state === 'ask' ? `${p.name.length}글자 이름` : esc(p.name)}">${quizMask(p, quiz.hints, quiz.state !== 'ask')}</div>
         <div class="qz-hintline">${quiz.hints >= 1 || quiz.state !== 'ask' ? `${esc(p.dept_name)}${quiz.state !== 'ask' ? ` · ${esc(p.rank)}` : ''}` : ''}</div>
-        <form class="qz-form" id="qzForm" autocomplete="off">
-          <input type="text" id="qzIn" class="qz-in" placeholder="이름을 입력하세요" aria-label="이름 입력" autocomplete="off" autocapitalize="off" spellcheck="false"
-            ${quiz.state === 'ask' ? '' : `value="${esc(p.name)}" disabled`}>
-          ${speechOK() ? `<button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic ${quiz.state === 'ask' ? '' : 'disabled'} aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
+        ${speechOK() ? `<form class="qz-form" id="qzForm" autocomplete="off">
+          <button type="button" class="qz-mic ${quiz.listening ? 'on' : ''}" data-mic ${quiz.state === 'ask' ? '' : 'disabled'} aria-label="${quiz.listening ? '듣는 중 — 눌러서 중지' : '음성으로 답하기'}" title="음성으로 답하기">
             <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>` : ''}
-          <button type="submit" class="qz-btn qz-btn--go" ${quiz.state === 'ask' ? '' : 'disabled'}>확인</button>
-        </form>
+          </button>
+          <button type="submit" class="qz-btn qz-btn--go" ${quiz.state === 'ask' && quiz.heard ? '' : 'disabled'}>확인</button>
+        </form>` : `<p class="st-note">이 브라우저에서는 음성 인식을 쓸 수 없습니다 — 힌트나 정답 보기로 진행하세요.</p>`}
 
         <div class="qz-msg ${quiz.state === 'ok' ? 'ok' : quiz.state === 'give' ? 'warn' : quiz.listening ? 'live' : quiz.micErr || quiz.wrong ? 'warn' : ''}">${
           quiz.state === 'ok' ? `정답입니다 · +${quiz.gained}점${quiz.heard ? ` <span class="muted">(음성: ${esc(quiz.heard)})</span>` : ''}`
@@ -577,6 +587,7 @@ function renderQuiz() {
           ${quiz.state === 'ask'
             ? `<button type="button" class="qz-btn qz-btn--ghost" data-give>정답 보기</button>`
             : `<a class="qz-btn qz-btn--ghost" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 보기</a>`}
+          <button type="button" class="qz-btn qz-btn--ghost" data-prev ${quiz.i === 0 ? 'disabled' : ''} title="이전 문제로 돌아갑니다 (사진을 오른쪽으로 밀어도 됩니다)">← 이전</button>
           <button type="button" class="qz-btn ${quiz.state === 'ask' ? 'qz-btn--ghost' : 'qz-btn--go'}" data-skip title="${quiz.state === 'ask' ? '이 교수는 건너뜁니다 (사진을 왼쪽으로 밀어도 됩니다)' : '다음 문제'}">${quiz.state === 'ask' ? '다음 →' : quiz.i + 1 >= quiz.deck.length ? '결과 보기' : '다음 문제'}</button>
         </div>
       </div>
@@ -591,8 +602,6 @@ function renderQuiz() {
       <div class="qz-foot"><button type="button" class="btn" data-restart>처음부터 다시</button></div>
     </div>`;
   bindQuiz();
-  const inp = $app.querySelector('#qzIn');
-  if (inp && !inp.disabled && !('ontouchstart' in window)) inp.focus();
 }
 
 function bindQuiz() {
@@ -631,15 +640,16 @@ function bindQuiz() {
   });
   $app.querySelector('[data-give]')?.addEventListener('click', () => { speechStop(); quiz.heard = ''; quiz.state = 'give'; quiz.gained = 0; renderQuiz(); });
   $app.querySelector('[data-skip]')?.addEventListener('click', quizNext);
+  $app.querySelector('[data-prev]')?.addEventListener('click', quizPrev);
   $app.querySelector('[data-mic]')?.addEventListener('click', () => { quiz.micErr = ''; quiz.listening ? speechStop() : speechStart(); });
   $app.querySelector('#qzForm')?.addEventListener('submit', e => {
     e.preventDefault();
-    const p = quizCur(), inp = $app.querySelector('#qzIn'), v = quizNorm(inp.value);
-    if (!v) return;
-    speechStop(); quiz.micErr = ''; quiz.heard = '';
+    const p = quizCur(), v = quizNorm(quiz.heard);
+    if (!v || quiz.state !== 'ask') return;
+    speechStop(); quiz.micErr = '';
     if (v === quizNorm(p.name) || (p.name_en && v === quizNorm(p.name_en))) {
       quiz.gained = quizQScore(); quiz.score += quiz.gained; quiz.correct++; quiz.state = 'ok';
-    } else { quiz.wrong++; inp.value = ''; }
+    } else { quiz.wrong++; quiz.heard = ''; }
     renderQuiz();
   });
 }
@@ -774,7 +784,7 @@ function renderStats() {
         <div class="st-lists">
           ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
             <div class="st-list"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
-              ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">${esc(p.name)}</a><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+              ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">${esc(p.name)}<small>${esc(p.dept_name)} · ${esc(p.rank)}</small></a></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
             </div>`; }).join('')}
         </div>
       </section>
