@@ -829,9 +829,9 @@ function renderHome() {
               ${ratingSummary(d)}
             </div>
             <div class="drow__avs" aria-hidden="true">
-              ${d.profs.slice(0, 7).map(p => p.photo
-                ? `<i class="av"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')"></i>`
-                : `<i class="av">${esc(initial(p.name))}</i>`).join('')}
+              ${d.profs.slice(0, 7).map(p => { const f = isFav(p) ? ' av--fav' : ''; return p.photo
+                ? `<i class="av${f}"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')"></i>`
+                : `<i class="av${f}">${esc(initial(p.name))}</i>`; }).join('')}
               ${d.profs.length > 7 ? `<i class="av av--more">+${d.profs.length - 7}</i>` : ''}
             </div>
             <span class="drow__arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -989,7 +989,7 @@ function meetCounter(p) {
   const n = getMet(p);
   return `<div class="counter ${n ? '' : 'counter--zero'}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 만난 횟수">
     <button type="button" class="counter__b" data-dec aria-label="1회 줄이기">−</button>
-    <span class="counter__n" aria-live="polite">${n}</span><span class="counter__u">회</span>
+    <span class="counter__n" aria-live="polite">${n}</span>
     <button type="button" class="counter__b" data-inc aria-label="1회 늘리기">+</button>
   </div>`;
 }

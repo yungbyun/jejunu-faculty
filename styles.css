@@ -109,6 +109,9 @@ main{min-height:60vh;padding:40px 20px 72px}
 .av img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
 .av--more{background:var(--surface-2);color:var(--ink-2);font-size:12px}
 .drow:hover .av{border-color:var(--surface)}
+/* 관심 표시된 교수: 작은 사진에 금색 테두리 */
+.av--fav{border-color:#e0a10c;box-shadow:0 0 0 1px #e0a10c,0 1px 3px rgba(0,0,0,.18);z-index:1}
+.drow:hover .av--fav{border-color:#e0a10c}
 .drow__arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;color:var(--ink-2);transition:all .18s var(--ease)}
 .drow:hover .drow__arrow{background:var(--ink);color:var(--bg);border-color:var(--ink);transform:translateX(3px)}
 @media (max-width:720px){
@@ -342,7 +345,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .d-top .d-rank{margin-bottom:0}
 .rate--big .rate__b{width:30px;height:30px;font-size:12.5px}
 .filters-wrap{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.filters--rate{justify-content:flex-end}
 .filters--rate .chip{padding:5px 11px;font-size:12.5px}
+.chip--fav{margin-left:12px}
 .filters--rate .chip[data-val="확"][aria-pressed="true"]{background:#1f8a5b;border-color:#1f8a5b}
 .filters--rate .chip[data-val="중"][aria-pressed="true"]{background:#2563eb;border-color:#2563eb}
 .filters--rate .chip[data-val="모"][aria-pressed="true"]{background:#6b7280;border-color:#6b7280}
