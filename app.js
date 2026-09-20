@@ -650,6 +650,42 @@ const hasScore = p => SCORE[getRating(p)] != null;
 const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
 const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
+/* ---------- 선호도 원그래프 ----------
+ * '비'(비해당)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
+const RCOLOR = { '확': '#1f8a5b', '중': '#2563eb', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
+const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
+
+function donut(profs) {
+  const c = dist(profs);
+  const items = PIE_LABELS().map(r => ({ r, n: c[r] })).filter(x => x.n > 0);
+  const total = items.reduce((a, b) => a + b.n, 0);
+  if (!total) return '';
+  const R = 68, W = 26, C = 2 * Math.PI * R;
+  let off = 0;
+  const arcs = items.map(({ r, n }) => {
+    const len = n / total * C, seg = Math.max(0, len - (items.length > 1 ? 1.5 : 0));  // 조각 사이 얇은 틈
+    const a = `<circle class="pie__seg" r="${R}" cx="100" cy="100" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
+      stroke-dasharray="${seg.toFixed(2)} ${(C - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
+      data-rating="${esc(r)}"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%)</title></circle>`;
+    off += len;
+    return a;
+  }).join('');
+  const top = items.slice().sort((a, b) => b.n - a.n)[0];
+  return `
+    <div class="pie">
+      <svg class="pie__svg" viewBox="0 0 200 200" role="img" aria-label="선호도 분포: ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (비해당 제외, 합계 ${total}명)">
+        <circle r="${R}" cx="100" cy="100" fill="none" stroke="var(--surface-2)" stroke-width="${W}"></circle>
+        <g transform="rotate(-90 100 100)">${arcs}</g>
+        <text class="pie__n" x="100" y="96">${total}</text>
+        <text class="pie__u" x="100" y="118">명</text>
+      </svg>
+      <ul class="pie__legend">
+        ${items.map(({ r, n }) => `<li class="pie__li"><i class="sw sw--${rcls(r)}"></i><span class="pie__r">${esc(r)}${CONFIG.RATINGS.NAMES[r] ? ` <small>${esc(CONFIG.RATINGS.NAMES[r].split(' ')[0])}</small>` : ''}</span><b class="pie__v">${n}</b><span class="pie__p">${Math.round(n / total * 100)}%</span></li>`).join('')}
+      </ul>
+    </div>
+    <p class="st-note">비해당(비)은 평가 대상이 아니라 그래프에서 제외했습니다. 가장 많은 쪽은 <b>${esc(top.r)}</b> ${top.n}명입니다.</p>`;
+}
+
 function dist(profs) {
   const c = Object.fromEntries(RLABELS().map(r => [r, 0]));
   profs.forEach(p => { c[getRating(p) || '미지정']++; });
@@ -721,6 +757,7 @@ function renderStats() {
         <div class="tiles">
           ${RLABELS().map(r => `<div class="tile tile--${rcls(r)}"><span class="tile__lbl"><i class="sw sw--${rcls(r)}"></i>${esc(r)}${CONFIG.RATINGS.NAMES[r] ? `<span class="opt"> ${esc(CONFIG.RATINGS.NAMES[r].split(' ')[0])}</span>` : ''}</span><span class="tile__val">${c[r]}</span><span class="tile__pct">${all.length ? Math.round(c[r] / all.length * 100) : 0}%</span></div>`).join('')}
         </div>
+        ${donut(all)}
       </section>
 
       <section class="st-sec">
