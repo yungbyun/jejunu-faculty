@@ -685,8 +685,7 @@ function donut(profs) {
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
       </div>
-    </div>
-    <p class="st-note">비해당(비)은 평가 대상이 아니라 그래프에서 제외했습니다. 가운데 숫자는 평가 대상 ${total}명 중 확(확실)의 비율입니다.</p>`;
+    </div>`;
 }
 
 function dist(profs) {
@@ -742,21 +741,12 @@ function renderStats() {
   $app.innerHTML = `
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
-      <div class="hero"><h1>선호도 분석</h1><p>${state.session ? esc(state.session.email) + ' 계정의 ' : ''}${CONFIG.RATINGS.LABELS.join('·')} 선택을 학과·직급·전공 키워드별로 정리한 화면입니다.</p>
+      <div class="hero">
         <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(CONFIG.RATINGS.NAMES[r])}</span>`).join('')}</div></div>
 
       ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 ${CONFIG.RATINGS.LABELS.join('·')} 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
 
       <section class="st-sec">
-        <div class="st-hero">
-          <div class="st-hero__num">${rated.length}<small>/ ${all.length}명 평가</small></div>
-          <div class="meter" aria-label="평가 진행률 ${pct}%"><span style="width:${pct}%"></span></div>
-          ${(() => { const sr = sureRate(all); return `<div class="st-sure"><span class="st-sure__pct">${fmtPct(sr.pct)}</span><span class="st-sure__txt"><b>확(확실) 비율</b> — 확 ${sr.sure}명 / 평가 대상 ${sr.pool}명 <span class="muted">(전체 ${all.length}명에서 비해당 ${sr.na}명 제외)</span><br>${sr.pool ? (sr.need > 0 ? `<span class="st-sure__need">50%가 되려면 확 <b>${sr.need}명</b> 더 필요</span> <span class="muted">(${Math.ceil(sr.pool / 2)}명 이상 · 나머지 ${sr.rest}명 중에서)</span>` : `<span class="st-sure__ok">50% 달성</span> <span class="muted">(${-sr.need}명 여유)</span>`) : ''}</span></div>`; })()}
-          <div class="st-hero__sub">진행률 ${pct}% · ${state.depts.length}개 학과 · 평균 점수 <b>${fmt1(avgScore(all))}</b> <span class="muted">(확 3 · 중 2 · 모 1 · 부 −1 · 비해당·미지정은 평균에서 제외)</span></div>
-        </div>
-        <div class="tiles">
-          ${RLABELS().map(r => `<div class="tile tile--${rcls(r)}"><span class="tile__lbl"><i class="sw sw--${rcls(r)}"></i>${esc(r)}${CONFIG.RATINGS.NAMES[r] ? `<span class="opt"> ${esc(CONFIG.RATINGS.NAMES[r].split(' ')[0])}</span>` : ''}</span><span class="tile__val">${c[r]}</span><span class="tile__pct">${all.length ? Math.round(c[r] / all.length * 100) : 0}%</span></div>`).join('')}
-        </div>
         ${donut(all)}
       </section>
 
