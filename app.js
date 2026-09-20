@@ -755,7 +755,7 @@ function renderStats() {
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
-              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a><small>${d.profs.length}명 · 확 ${fmtPct(sureRate(d.profs).pct)}${(() => { const r = sureRate(d.profs); return r.pool ? (r.need > 0 ? ` (50%까지 ${r.need}명 더)` : ' (50% 달성)') : ''; })()} · 평균 ${fmt1(avgScore(d.profs))}</small></div>
+              <div class="st-row__lbl"><a href="#/dept/${encodeURIComponent(d.id)}">${esc(d.name)}</a></div>
               ${stackBar(d.profs, { deptId: d.id })}
             </div>`).join('')}
         </div>
