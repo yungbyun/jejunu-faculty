@@ -1540,7 +1540,8 @@ function donut(profs) {
   const items = PIE_LABELS().map(r => ({ r, n: c[r] })).filter(x => x.n > 0);
   const total = items.reduce((a, b) => a + b.n, 0);
   if (!total) return '';
-  const sure = c['확'] || 0, pct = Math.round(sure / total * 100);
+  const sure = c['확'] || 0, pos = c['긍'] || 0, base = sure + pos;
+  const pct = n => Math.round(n / total * 100);
   const R = 72, W = 24, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
@@ -1554,14 +1555,16 @@ function donut(profs) {
   }).join('');
   return `
     <div class="pie">
-      <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
+      <svg class="pie__svg" viewBox="0 0 200 126" role="img"
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
-        <text class="pie__n" x="100" y="100">${pct}%</text>
-        <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
+      <div class="pie__kpi">
+        <div class="pie__k pie__k--high"><span class="pie__kl">확(확실)</span><b>${pct(sure)}%</b><span class="pie__kn">${sure}명 / ${total}명</span></div>
+        <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
+      </div>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
       </div>
