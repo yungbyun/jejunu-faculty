@@ -2795,7 +2795,7 @@ function openDrawer(p, d) {
   $panel.style.setProperty('--dept-color', d.color);
   $panel.innerHTML = `
     <div class="d-head">
-      <span class="dept-pill">${esc(d.name)}</span>
+      <a class="dept-pill" href="#/dept/${encodeURIComponent(d.id)}" title="${esc(d.name)} 교수 목록으로" aria-label="${esc(d.name)} 교수 목록으로">${esc(d.name)}</a>
       <button class="iconbtn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="d-body">
@@ -2816,11 +2816,10 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
+          <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
           <div class="memo__bar">
             <button type="button" class="memo__b" data-bold title="고른 글자를 굵게 (Ctrl+B)" aria-label="고른 글자를 굵게">가</button>
-            <span class="st-note">굵게 할 곳을 고른 뒤 누르십시오</span>
           </div>
-          <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
           <div class="memo__prev"${getMemo(p).indexOf('**') < 0 ? ' hidden' : ''}>${memoHtml(getMemo(p))}</div>
           <div class="memo__st" aria-live="polite"></div>
         </div>

@@ -189,6 +189,9 @@ main{min-height:60vh;padding:40px 20px 72px}
 @keyframes slide{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
 .d-head{position:sticky;top:0;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:1}
 .d-head .dept-pill{font-size:12px;font-weight:600;color:var(--dept-color,var(--accent));background:color-mix(in srgb,var(--dept-color,var(--accent)) 12%,transparent);border-radius:999px;padding:4px 10px}
+.d-head a.dept-pill{text-decoration:none;cursor:pointer;transition:background-color .12s,box-shadow .12s}
+.d-head a.dept-pill:hover{background:color-mix(in srgb,var(--dept-color,var(--accent)) 22%,transparent)}
+.d-head a.dept-pill:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--dept-color,var(--accent)) 35%,transparent)}
 .d-body{padding:24px 26px 40px}
 .d-profile{display:flex;gap:18px;align-items:flex-start}
 .d-photo{width:112px;height:140px;flex:0 0 112px;border-radius:14px;overflow:hidden;background:var(--surface-2);position:relative;border:1px solid var(--line)}
@@ -646,8 +649,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .counter--zero .counter__n{color:var(--ink-3)}
 .counter--zero .counter__b[data-dec]{opacity:.35;pointer-events:none}
 .memo-box{position:relative}
-.memo__bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.memo__bar .st-note{margin:0;font-size:11.5px}
+.memo__bar{display:flex;align-items:center;gap:8px;margin-top:6px}
 .memo__b{width:28px;height:28px;flex:none;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);
   color:var(--ink);font:inherit;font-size:13px;font-weight:800;cursor:pointer;display:grid;place-items:center}
 .memo__b:hover{border-color:var(--brand);color:var(--brand)}
