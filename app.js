@@ -1429,15 +1429,21 @@ function bindOutreach() {
     e.target.disabled = true;
     wrap.hidden = false;
     wrap.innerHTML = `<div class="ot-impbox">
-      <p class="st-note"><b>{"학과/이름": "010-0000-0000"}</b> 꼴의 JSON 을 붙여넣으십시오.
-      <b>공개 저장소에는 저장되지 않습니다</b> — 비공개 시트로만 갑니다.</p>
-      <textarea rows="6" data-imptext placeholder='{"컴퓨터공학과/변영철": "010-0000-0000"}'></textarea>
-      <div class="ep-acts"><button type="button" class="btn" data-imprun>가져오기</button></div>
+      <p class="st-note"><b>파일을 고르시는 편이 쉽습니다.</b> 번호가 든 <code>.json</code> 파일을 그대로 고르십시오.
+      파일은 이 브라우저 안에서만 열립니다 — <b>공개 저장소에는 저장되지 않습니다.</b></p>
+      <div class="ep-acts">
+        <label class="btn imp-file">파일 고르기<input type="file" accept=".json,.txt,application/json" data-impfile hidden></label>
+        <span class="st-note" data-impname></span>
+      </div>
+      <p class="st-note imp-or">또는 <b>{"학과/이름": "010-0000-0000"}</b> 꼴의 내용을 아래에 직접 붙여넣으십시오.
+      (파일 <b>경로</b>가 아니라 파일 <b>안의 내용</b>입니다.)</p>
+      <textarea rows="5" data-imptext placeholder='{"컴퓨터공학과/변영철": "010-0000-0000"}'></textarea>
+      <div class="ep-acts"><button type="button" class="btn" data-imprun>붙여넣은 내용 가져오기</button></div>
       <p class="st-note" data-impmsg></p></div>`;
+
     const msg = wrap.querySelector('[data-impmsg]');
-    wrap.querySelector('[data-imptext]').focus();
-    wrap.querySelector('[data-imprun]').addEventListener('click', () => {
-      const r = mobileImport(wrap.querySelector('[data-imptext]').value);
+    const take = text => {
+      const r = mobileImport(text);
       if (r.err) { msg.textContent = r.err; msg.classList.add('bad'); return; }
       msg.classList.toggle('bad', r.n === 0);
       const cut = a => a.slice(0, 8).join(', ') + (a.length > 8 ? ' 외 ' + (a.length - 8) + '명' : '');
@@ -1448,7 +1454,18 @@ function bindOutreach() {
       const nEl = $app.querySelector('[data-impn]');
       if (nEl) nEl.textContent = String(Object.keys(mobiles()).length);
       if (r.n) flashStatus(`핸드폰 ${r.n}명 가져왔습니다`);
+    };
+
+    wrap.querySelector('[data-impfile]').addEventListener('change', ev => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      wrap.querySelector('[data-impname]').textContent = f.name;
+      const rd = new FileReader();
+      rd.onload = () => take(String(rd.result || ''));
+      rd.onerror = () => { msg.textContent = '파일을 읽지 못했습니다'; msg.classList.add('bad'); };
+      rd.readAsText(f, 'utf-8');
     });
+    wrap.querySelector('[data-imprun]').addEventListener('click', () => take(wrap.querySelector('[data-imptext]').value));
   });
   $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
   $app.querySelector('[data-epadd]')?.addEventListener('click', () => { OUT.edit = true; epAdd(); });
@@ -1912,7 +1929,12 @@ function setMobile(p, v) {
 function mobileImport(text) {
   let v;
   try { v = JSON.parse(String(text || '').trim()); }
-  catch { return { err: 'JSON 형식이 아닙니다 — { "컴퓨터공학과/홍길동": "010-0000-0000" } 꼴이어야 합니다' }; }
+  catch {
+    const t = String(text || '').trim();
+    if (/^[A-Za-z]:[\/]|^[\/]{2}|\.(json|txt)$/i.test(t) && t.indexOf('{') < 0)
+      return { err: '이건 파일이 있는 자리(경로)입니다. 파일 안의 내용이 필요합니다 — 위 [파일 고르기] 를 쓰시면 가장 쉽습니다' };
+    return { err: 'JSON 형식이 아닙니다 — { "컴퓨터공학과/홍길동": "010-0000-0000" } 꼴이어야 합니다' };
+  }
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { err: '객체가 아닙니다' };
 
   const by = new Map(), dupe = new Set();
