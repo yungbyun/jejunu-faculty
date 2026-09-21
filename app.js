@@ -1292,8 +1292,9 @@ function renderOutreach() {
       <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
       <div class="ot-imp">
         <button type="button" class="btn" data-impopen>핸드폰 번호 한 번에 가져오기</button>
-        <span class="st-note">지금 <b>${Object.keys(mobiles()).length}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다</span>
+        <span class="st-note">지금 <b data-impn>${Object.keys(mobiles()).length}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다</span>
       </div>
+      <div class="ot-impwrap" hidden></div>
     </div>`;
   bindOutreach();
   if (OUT.open) fillDraft(OUT.open);
@@ -1423,21 +1424,30 @@ function schedRow(p, k) {
 
 function bindOutreach() {
   $app.querySelector('[data-impopen]')?.addEventListener('click', e => {
-    const box = document.createElement('div');
-    box.className = 'ot-impbox';
-    box.innerHTML = `<p class="st-note">{"학과/slug": "010-0000-0000"} 꼴의 JSON 을 붙여넣으십시오.
+    const wrap = $app.querySelector('.ot-impwrap');
+    if (!wrap) return;
+    e.target.disabled = true;
+    wrap.hidden = false;
+    wrap.innerHTML = `<div class="ot-impbox">
+      <p class="st-note"><b>{"학과/이름": "010-0000-0000"}</b> 꼴의 JSON 을 붙여넣으십시오.
       <b>공개 저장소에는 저장되지 않습니다</b> — 비공개 시트로만 갑니다.</p>
-      <textarea rows="6" data-imptext placeholder='{"comdol/ko-seok-jun": "010-0000-0000"}'></textarea>
-      <div class="ep-acts"><button type="button" class="btn" data-imprun>가져오기</button>
-      <span class="st-note" data-impmsg></span></div>`;
-    e.target.replaceWith(box);
-    box.querySelector('[data-imprun]').addEventListener('click', () => {
-      const r = mobileImport(box.querySelector('[data-imptext]').value);
-      const msg = box.querySelector('[data-impmsg]');
-      if (r.err) { msg.textContent = r.err; return; }
-      box.querySelector('[data-imptext]').value = '';
-      flashStatus(`핸드폰 ${r.n}명 가져왔습니다${r.skip ? ` (건너뜀 ${r.skip})` : ''}`);
-      renderOutreach();
+      <textarea rows="6" data-imptext placeholder='{"컴퓨터공학과/변영철": "010-0000-0000"}'></textarea>
+      <div class="ep-acts"><button type="button" class="btn" data-imprun>가져오기</button></div>
+      <p class="st-note" data-impmsg></p></div>`;
+    const msg = wrap.querySelector('[data-impmsg]');
+    wrap.querySelector('[data-imptext]').focus();
+    wrap.querySelector('[data-imprun]').addEventListener('click', () => {
+      const r = mobileImport(wrap.querySelector('[data-imptext]').value);
+      if (r.err) { msg.textContent = r.err; msg.classList.add('bad'); return; }
+      msg.classList.toggle('bad', r.n === 0);
+      const cut = a => a.slice(0, 8).join(', ') + (a.length > 8 ? ' 외 ' + (a.length - 8) + '명' : '');
+      const parts = [`${r.total}개 중 ${r.n}명 반영했습니다`];
+      if (r.unknown.length) parts.push(`명단에 없는 이름 ${r.unknown.length}개 — ${cut(r.unknown)}`);
+      if (r.badnum.length) parts.push(`번호 모양이 이상함 ${r.badnum.length}개 — ${cut(r.badnum)}`);
+      msg.textContent = parts.join(' / ');
+      const nEl = $app.querySelector('[data-impn]');
+      if (nEl) nEl.textContent = String(Object.keys(mobiles()).length);
+      if (r.n) flashStatus(`핸드폰 ${r.n}명 가져왔습니다`);
     });
   });
   $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
@@ -1897,21 +1907,37 @@ function setMobile(p, v) {
   v ? m[k] = v : delete m[k];
   saveObj(MOBILE_KEY, m, SET_MB);
 }
-/* 한 번에 가져오기 — {"<학과>/<slug>": "010-…"} 를 붙여넣는다 */
+/* 한 번에 가져오기 — 키는 "<학과>/<이름>", "<학과>/<slug>", 또는 이름만 (겹치지 않을 때).
+ * 어느 쪽으로 줘도 받는다. 못 받은 것은 세어서 돌려주고, 화면이 그대로 보여 준다. */
 function mobileImport(text) {
-  let v; try { v = JSON.parse(text); } catch { return { err: 'JSON 형식이 아닙니다' }; }
+  let v;
+  try { v = JSON.parse(String(text || '').trim()); }
+  catch { return { err: 'JSON 형식이 아닙니다 — { "컴퓨터공학과/홍길동": "010-0000-0000" } 꼴이어야 합니다' }; }
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { err: '객체가 아닙니다' };
-  const m = mobiles();
-  let n = 0, skip = 0;
-  for (const [k, raw] of Object.entries(v)) {
-    if (!state.rows.some(p => rKey(p) === k)) { skip++; continue; }
+
+  const by = new Map(), dupe = new Set();
+  for (const p of state.rows) {
+    by.set(rKey(p), p);
+    by.set(`${p.dept_id}/${p.name}`, p);
+    by.set(`${p.dept_name}/${p.name}`, p);
+    if (by.has(p.name)) dupe.add(p.name); else by.set(p.name, p);
+  }
+  dupe.forEach(n => by.delete(n));          // 동명이인은 학과를 붙여야만 받는다
+
+  const m = mobiles(), unknown = [], badnum = [];
+  let n = 0;
+  for (const [k0, raw] of Object.entries(v)) {
+    const k = String(k0).trim();
+    const p = by.get(k) || by.get(k.replace(/\s+/g, ''));
+    if (!p) { unknown.push(k); continue; }
     const d = String(raw || '').replace(/[^\d]/g, '');
-    if (d.length !== 11 && d.length !== 10) { skip++; continue; }
-    m[k] = d.length === 11 ? d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+    if (d.length !== 11 && d.length !== 10) { badnum.push(k); continue; }
+    m[rKey(p)] = d.length === 11 ? d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')
+                                 : d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
     n++;
   }
   saveObj(MOBILE_KEY, m, SET_MB);
-  return { n, skip };
+  return { n, skip: unknown.length + badnum.length, unknown, badnum, total: Object.keys(v).length };
 }
 
 /* 메일을 몇 번 보냈는지. 학과 화면의 방문 카운터와 같은 모양이지만 저장 자리는 다르다
