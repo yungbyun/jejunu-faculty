@@ -1836,6 +1836,7 @@ function profCard(p, d, showDept = false) {
       <div class="prof__photo">
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
         ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
+        ${chickBadge(p)}
       </div>
       <div class="prof__body">
         <div class="prof__head">
@@ -2069,6 +2070,25 @@ function memoBold(t) {
   t.focus();
   return true;
 }
+
+/* ---------- 올해 부임한 교수 ----------
+ * professors.json 의 joined_year 가 이 해와 같으면 사진에 병아리를 단다.
+ * 해가 바뀌면 이 값을 고치면 된다(자동으로 올리지 않는 것은, 그 해 부임자를 다 확인한 뒤에
+ * 켜야 빠진 사람 없이 맞기 때문이다). */
+const NEW_YEAR = '2026';
+const isNewProf = p => String(p.joined_year || '') === NEW_YEAR;
+const CHICK = `<svg viewBox="0 0 32 32" width="19" height="19" aria-hidden="true">
+  <path d="M16 4.4c1 .5 1.4 1.4 1.2 2.5" stroke="#e0a800" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <ellipse cx="16" cy="20.2" rx="9.3" ry="8.2" fill="#f7c948"/>
+  <ellipse cx="11.6" cy="21.4" rx="3.2" ry="2.3" fill="#e6ad06" transform="rotate(-18 11.6 21.4)"/>
+  <circle cx="16" cy="12.4" r="6.9" fill="#ffd95e"/>
+  <circle cx="13.5" cy="11.9" r="1.25" fill="#43371a"/>
+  <circle cx="18.5" cy="11.9" r="1.25" fill="#43371a"/>
+  <path d="M16 13.9l2.4 1.6-2.4 1.5-2.4-1.5z" fill="#fb923c"/>
+</svg>`;
+const chickBadge = p => isNewProf(p)
+  ? `<span class="newp" title="${esc(NEW_YEAR)}년 부임한 신임 교수" aria-label="${esc(NEW_YEAR)}년 부임한 신임 교수">${CHICK}</span>`
+  : '';
 
 const getNote = key => state.notes.get(key) || { met: 0, memo: '' };
 const getMet = p => getNote(rKey(p)).met || 0;
@@ -2800,7 +2820,7 @@ function openDrawer(p, d) {
     </div>
     <div class="d-body">
       <div class="d-profile">
-        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}</div>
+        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}${chickBadge(p)}</div>
         <div>
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span></div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
