@@ -22,8 +22,8 @@ const OUT_MAX_PER_RUN = 8;      // 트리거가 한 번 돌 때 보내는 최대
 const OUT_MIN_QUOTA = 10;       // 남은 하루 발송 할당량이 이보다 적으면 그날은 멈춘다
 const OUT_MAX_AHEAD = 60;       // 예약은 최대 며칠 뒤까지
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
-// 선호도 값: 확(확실) · 중(보통) · 모(모름) · 부(부정) · 비(평가제외 — 연구년 등)
-const RATINGS = ['확', '중', '모', '부', '비'];
+// 선호도 값: 확(확실) · 긍(긍정) · 중(보통) · 모(모름) · 부(부정) · 비(평가제외 — 연구년 등)
+const RATINGS = ['확', '긍', '중', '모', '부', '비'];
 // 예전 값(상/하)이 시트에 남아 있어도 새 값으로 읽습니다
 const LEGACY = { '상': '확', '하': '모' };
 const norm = v => { v = String(v || ''); return LEGACY[v] || (RATINGS.indexOf(v) >= 0 ? v : ''); };

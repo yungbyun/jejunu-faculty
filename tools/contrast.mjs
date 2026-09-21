@@ -15,8 +15,8 @@ for (const theme of ['light', 'dark']) {
   await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
   await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
   await page.evaluate(() => {
-    const vals = ['확', '중', '모', '부', '비'];
-    state.rows.forEach((p, i) => state.ratings.set(rKey(p), vals[i % 5]));
+    const vals = ['확', '긍', '중', '모', '부', '비'];
+    state.rows.forEach((p, i) => state.ratings.set(rKey(p), vals[i % vals.length]));
     render();
   });
   await page.waitForTimeout(700);
@@ -36,7 +36,7 @@ for (const theme of ['light', 'dark']) {
 
     const pageBg = getComputedStyle(document.body).backgroundColor;
     const out = [];
-    for (const cls of ['rs--high', 'rs--mid', 'rs--low', 'rs--neg', 'rs--na']) {
+    for (const cls of ['rs--high', 'rs--pos', 'rs--mid', 'rs--low', 'rs--neg', 'rs--na']) {
       const el = document.querySelector('.' + cls);
       if (!el) { out.push({ cls, note: '화면에 없음' }); continue; }
       const cs = getComputedStyle(el);

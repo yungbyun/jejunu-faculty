@@ -33,8 +33,8 @@ const CONFIG = {
   RATINGS: {
     API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
     // 선호도 값과 뜻. 비(평가제외)는 연구년 등으로 이번 평가에서 빠지는 경우
-    LABELS: ['확', '중', '모', '부', '비'],
-    NAMES: { '확': '확실', '중': '보통', '모': '모름', '부': '부정', '비': '연구년 등으로 제외' },
+    LABELS: ['확', '긍', '중', '모', '부', '비'],
+    NAMES: { '확': '확실', '긍': '긍정', '중': '보통', '모': '모름', '부': '부정', '비': '연구년 등으로 제외' },
     // 예전에 저장된 값(상/하)은 자동으로 새 값으로 읽음
     LEGACY: { '상': '확', '하': '모' },
     // 다른 기기에서 바꾼 선호도를 다시 읽는 주기(초). 화면이 보일 때만 동작
@@ -1525,14 +1525,14 @@ function bindOutreach() {
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
-const SCORE = { '확': 3, '중': 2, '모': 1, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
+const SCORE = { '확': 4, '긍': 3, '중': 2, '모': 1, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
 const hasScore = p => SCORE[getRating(p)] != null;
 const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
 const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
 /* ---------- 선호도 원그래프 ----------
  * '비'(평가제외)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
-const RCOLOR = { '확': '#38831c', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
+const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 
 function donut(profs) {
@@ -1868,7 +1868,7 @@ function ratingSummary(d) {
   if (!parts.length && !fav) return '';
   return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}${fav}</div>`;
 }
-const rClass = r => ({ '확': 'high', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
+const rClass = r => ({ '확': 'high', '긍': 'pos', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
 /* 저장된 값을 현재 라벨로 정규화 (예전 값 상→확, 하→모; 모르는 값은 버림) */
 const normRating = v => { v = String(v || ''); return CONFIG.RATINGS.LEGACY[v] || (CONFIG.RATINGS.LABELS.includes(v) ? v : ''); };
 
