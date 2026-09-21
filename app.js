@@ -1316,7 +1316,7 @@ function fillDraft(k) {
       ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       : '';
     box.innerHTML = `
-      ${memo ? `<div class="oc__memo"><b>면담 메모</b> ${esc(memo)}</div>` : ''}
+      ${memo ? `<div class="oc__memo"><b>면담 메모</b> ${memoHtml(memo)}</div>` : ''}
       <div class="oc__one${one ? '' : ' oc__one--no'}"><b>연구 한 줄</b> ${one ? esc(one) : '정리된 항목이 없어 부트캠프 이야기로 대신했습니다'}</div>
       <div class="filters filters--ch">${CHANNELS.map(c =>
         `<button type="button" class="chip" data-ch="${esc(c)}" aria-pressed="${OUT.ch === c}">${esc(c)}</button>`).join('')}</div>
@@ -1859,7 +1859,7 @@ function profCard(p, d, showDept = false) {
 /* ---------- 선호도 ---------- */
 const rKey = p => `${p.dept_id}/${p.slug}`;
 /* 카드에 붙는 작은 표시: 만남 N회 · 메모 있음 */
-const noteBadge = e => e.memo ? `<span class="nb nb--memo" title="${esc(e.memo)}">메모</span>` : '';
+const noteBadge = e => e.memo ? `<span class="nb nb--memo" title="${esc(memoPlain(e.memo))}">메모</span>` : '';
 const getRating = p => state.ratings.get(rKey(p)) || '';
 const matchRating = p => state.ratingFilter === '전체' || (state.ratingFilter === '미지정' ? !getRating(p) : getRating(p) === state.ratingFilter);
 const countRating = (d, r) => r === '전체' ? d.profs.length : d.profs.filter(p => r === '미지정' ? !getRating(p) : getRating(p) === r).length;
@@ -2026,8 +2026,16 @@ function bindNotes(root) {
     setMet(key, cur + (b.hasAttribute('data-inc') ? 1 : -1));
   }));
   root.querySelectorAll('textarea.memo').forEach(t => {
-    t.addEventListener('input', () => { scheduleMemo(t.dataset.key, t.value); const st = t.parentElement.querySelector('.memo__st'); if (st) st.textContent = '입력 중…'; });
+    const box = t.closest('.memo-box');
+    const prev = box && box.querySelector('.memo__prev');
+    const draw = () => { if (!prev) return; prev.hidden = t.value.indexOf('**') < 0; prev.innerHTML = memoHtml(t.value); };
+    const typed = () => { scheduleMemo(t.dataset.key, t.value); const st = box && box.querySelector('.memo__st'); if (st) st.textContent = '입력 중…'; draw(); };
+    t.addEventListener('input', typed);
     t.addEventListener('blur', () => commitMemo(t.dataset.key, t.value));
+    t.addEventListener('keydown', ev => {
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'b' || ev.key === 'B')) { ev.preventDefault(); if (memoBold(t)) typed(); }
+    });
+    box && box.querySelector('[data-bold]')?.addEventListener('click', () => { if (memoBold(t)) typed(); });
   });
 }
 
@@ -2035,6 +2043,33 @@ function ratingsCacheKey() { return 'jnu-ratings:' + (state.session ? state.sess
 function notesCacheKey() { return 'jnu-notes:' + (state.session ? state.session.email : 'local'); }
 
 /* 교수별 개인 기록: 선호도(state.ratings) + 만남 횟수·메모(state.notes) */
+/* ---------- 메모의 굵게 ----------
+ * 시트의 memo 열과 CSV 는 평문이라야 사람이 읽을 수 있다. 그래서 **이렇게** 표시만 해 두고
+ * 보여 줄 때만 굵게 만든다. 저장 형식은 그대로이므로 서버는 손댈 것이 없다. */
+const memoHtml = s => esc(String(s || '')).replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+const memoPlain = s => String(s || '').replace(/\*\*([\s\S]+?)\*\*/g, '$1');
+
+/* 고른 글자를 ** 로 감싸거나, 이미 감싸져 있으면 푼다 */
+function memoBold(t) {
+  const v = t.value;
+  let s = t.selectionStart, e = t.selectionEnd;
+  if (s === e) return false;
+  let out, ns;
+  const inner = v.slice(s, e);
+  if (inner.length > 4 && inner.slice(0, 2) === '**' && inner.slice(-2) === '**') {
+    out = inner.slice(2, -2); ns = s;                       // 고른 덩어리가 통째로 굵은 경우
+  } else if (v.slice(s - 2, s) === '**' && v.slice(e, e + 2) === '**') {
+    s -= 2; e += 2; out = inner; ns = s;                    // 굵은 것 안쪽만 골랐을 때
+  } else {
+    out = `**${inner}**`; ns = s;
+    if (v.length + 4 > 2000) return false;                  // 시트가 받는 길이를 넘지 않게
+  }
+  t.value = v.slice(0, s) + out + v.slice(e);
+  t.selectionStart = ns; t.selectionEnd = ns + out.length;
+  t.focus();
+  return true;
+}
+
 const getNote = key => state.notes.get(key) || { met: 0, memo: '' };
 const getMet = p => getNote(rKey(p)).met || 0;
 const getMemo = p => getNote(rKey(p)).memo || '';
@@ -2781,7 +2816,12 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
+          <div class="memo__bar">
+            <button type="button" class="memo__b" data-bold title="고른 글자를 굵게 (Ctrl+B)" aria-label="고른 글자를 굵게">가</button>
+            <span class="st-note">굵게 할 곳을 고른 뒤 누르십시오</span>
+          </div>
           <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
+          <div class="memo__prev"${getMemo(p).indexOf('**') < 0 ? ' hidden' : ''}>${memoHtml(getMemo(p))}</div>
           <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>
