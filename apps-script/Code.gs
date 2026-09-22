@@ -96,7 +96,7 @@ function doPost(e) {
     upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), fields);
     return out({ ok: true });
   }
-  if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), quota: MailApp.getRemainingDailyQuota() });
+  if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), dry: outDry_(), quota: MailApp.getRemainingDailyQuota() });
   if (body.action === 'queue') return outQueue(email, body);
   if (body.action === 'unqueue') {
     if (!body.id) return out({ error: 'missing id' });

@@ -90,6 +90,29 @@ await page.click('.oc__d [data-ch="문자"]');
 await page.waitForTimeout(500);
 check('문자 채널에는 예약 줄 없음', await page.evaluate(() => !document.querySelector('.oc__at')));
 
+// 8) 위쪽 알림줄이 상태를 정확히 말한다.
+//    outboxDryRun() 이 OUTBOX 를 'on' 으로 켜므로 연습 모드를 '켜짐' 이라 하면 안 된다.
+const banner = async (on, dry, nq, nd) => await page.evaluate(([on, dry, nq, nd]) => {
+  const m = new Map();
+  for (let i = 0; i < nq; i++) m.set('k' + i, { status: 'queued', sendAt: new Date().toISOString(), key: 'k' + i });
+  Object.assign(OB, { loaded: true, needDeploy: nd, on, dry, quota: 97, rows: m });
+  renderOutreach();
+  const el = document.querySelector('.ot-ok, .ot-warn');
+  return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+}, [on, dry, nq, nd]);
+
+const bOff = await banner(false, false, 0, false);
+check('꺼져 있으면 꺼졌다고 한다', bOff.includes('꺼져 있습니다'), bOff);
+const bDry = await banner(true, true, 0, false);
+check('연습 모드를 켜짐이라 하지 않음', bDry.includes('연습 모드') && !bDry.includes('<b>켜짐'), bDry);
+check('연습 모드는 안 나간다고 못박음', bDry.includes('실제로는 나가지 않습니다'));
+const bOn0 = await banner(true, false, 0, false);
+check('켜졌어도 예약 0이면 그렇게 말함', bOn0.includes('나갈 메일이 없습니다'), bOn0);
+const bOn2 = await banner(true, false, 2, false);
+check('예약이 있으면 건수를 말함', bOn2.includes('예약 2건'), bOn2);
+const bNd = await banner(false, false, 0, true);
+check('재배포가 필요하면 그것부터', bNd.includes('다시 배포'), bNd);
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);

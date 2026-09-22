@@ -1124,7 +1124,7 @@ async function obLoad(force) {
       const prev = m.get(x.key);
       if (!prev || new Date(x.sendAt) > new Date(prev.sendAt)) m.set(x.key, x);
     });
-    Object.assign(OB, { rows: m, on: !!r.on, quota: r.quota, loaded: true, needDeploy: false });
+    Object.assign(OB, { rows: m, on: !!r.on, dry: !!r.dry, quota: r.quota, loaded: true, needDeploy: false });
     if (route().view === 'outreach') renderOutreach();
   } catch (e) { console.warn('예약 목록을 읽지 못했습니다:', e.message); }
 }
@@ -1229,7 +1229,11 @@ function obNotice() {
   if (OB.needDeploy) return `<p class="ot-warn">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다 — 편집기에서 <b>배포 → 배포 관리 → 새 버전</b>.</p>`;
   if (!OB.loaded) return '';
   if (!OB.on) return `<p class="ot-warn">서버에서 보내기가 <b>꺼져 있습니다</b>. 예약은 쌓이지만 나가지 않습니다 — Apps Script 편집기에서 <b>outboxStart()</b> 를 실행하십시오.</p>`;
-  return `<p class="ot-ok">예약 발송 <b>켜짐</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
+  const nq = obCount();
+  /* outboxDryRun() 도 OUTBOX 를 켜므로, 연습 모드를 '켜짐' 이라고 하면 안 된다 */
+  if (OB.dry) return `<p class="ot-warn">예약 발송 <b>연습 모드</b> · 예약 ${nq}건 — 보낸 것으로 표시만 하고 <b>실제로는 나가지 않습니다</b>. 진짜로 보내려면 <b>outboxStart()</b> 를 실행하십시오.</p>`;
+  if (!nq) return `<p class="ot-ok">예약 발송 켜짐 · <b>예약된 것이 없어 나갈 메일이 없습니다</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''}.</p>`;
+  return `<p class="ot-ok">예약 발송 <b>켜짐</b> · 예약 <b>${nq}건</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
 }
 
 function renderOutreach() {
