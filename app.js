@@ -3069,7 +3069,7 @@ function renderUser(s) {
   $user.innerHTML = `
     ${s.picture ? `<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="user__initial">${esc(initial(s.name || s.email))}</span>`}
     <span class="user__email">${esc(s.email)}</span>
-    <button type="button" class="user__out" id="logoutBtn">로그아웃</button>`;
+    <button type="button" class="user__out" id="logoutBtn" title="로그아웃" aria-label="로그아웃"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 8l4 4-4 4M20 12H10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
   document.getElementById('logoutBtn').addEventListener('click', logout);
 }
 
