@@ -1165,7 +1165,7 @@ function epBar() {
   const ep = epOf(OUT.ep);
   const doneN = state.rows.filter(p => epDone(p, OUT.ep)).length;
   const tabs = nos.map(n => `<button type="button" class="chip" data-ep="${n}" aria-pressed="${OUT.ep === n}">${n}회차</button>`).join('');
-  const head = `<div class="ot-f__r"><span class="ot-f__l">회차</span><div class="filters">
+  const head = `<div class="ot-f__r"><span class="ot-f__l">회차<a class="chip ep-tab" href="#/letters" title="원고 탭에서 회차 전체를 보고 고칩니다">원고 탭 ↗</a></span><div class="filters">
       ${tabs}
       <button type="button" class="chip ep-add" data-epadd title="회차 추가">+</button>
       ${ep ? `<button type="button" class="btn" data-epedit>${OUT.edit ? '원고 닫기' : '원고 고치기'}</button>` : ''}
@@ -2091,22 +2091,39 @@ function bindNotes(root) {
     const key = c.dataset.key, cur = getNote(key).met || 0;
     setMet(key, cur + (b.hasAttribute('data-inc') ? 1 : -1));
   }));
-  root.querySelectorAll('textarea.memo').forEach(t => {
+  root.querySelectorAll('.memo[contenteditable]').forEach(t => {
     const box = t.closest('.memo-box');
-    const prev = box && box.querySelector('.memo__prev');
-    const draw = () => { if (!prev) return; prev.hidden = !memoFancy(t.value); prev.innerHTML = memoHtml(t.value); };
-    const typed = () => { scheduleMemo(t.dataset.key, t.value); const st = box && box.querySelector('.memo__st'); if (st) st.textContent = '입력 중…'; draw(); };
+    /* 글 쓰는 동안 innerHTML 을 다시 그리지 않는다 — 다시 그리면 한글 입력기에서 커서가 튄다 */
+    const typed = () => {
+      scheduleMemo(t.dataset.key, memoRead(t));
+      const st = box && box.querySelector('.memo__st');
+      if (st) st.textContent = '입력 중…';
+    };
     t.addEventListener('input', typed);
-    t.addEventListener('blur', () => commitMemo(t.dataset.key, t.value));
+    t.addEventListener('blur', () => commitMemo(t.dataset.key, memoRead(t)));
+    /* 붙여넣기는 글자만 받는다 — 남의 서식이 딸려 들어오면 읽을 수 없는 메모가 된다 */
+    t.addEventListener('paste', ev => {
+      ev.preventDefault();
+      const txt = (ev.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, String(txt || ''));
+    });
+    const run = cmd => {
+      t.focus();
+      try { document.execCommand('styleWithCSS', false, false); } catch {}
+      document.execCommand(cmd, false, null);
+      typed();
+    };
     t.addEventListener('keydown', ev => {
       if (!(ev.ctrlKey || ev.metaKey)) return;
       const m = MEMO_MARKS.find(x => x.key === String(ev.key).toLowerCase());
       if (!m) return;
       ev.preventDefault();
-      if (memoMark(t, m.mk)) typed();
+      run(m.cmd);
     });
-    box && box.querySelectorAll('[data-mk]').forEach(btn =>
-      btn.addEventListener('click', () => { if (memoMark(t, btn.dataset.mk)) typed(); }));
+    box && box.querySelectorAll('[data-cmd]').forEach(btn =>
+      btn.addEventListener('mousedown', ev => ev.preventDefault()));   // 누를 때 고른 글자가 풀리지 않게
+    box && box.querySelectorAll('[data-cmd]').forEach(btn =>
+      btn.addEventListener('click', () => run(btn.dataset.cmd)));
   });
 }
 
@@ -2119,9 +2136,9 @@ function notesCacheKey() { return 'jnu-notes:' + (state.session ? state.session.
  * 처럼 표시만 해 두고, 보여 줄 때만 꾸민다. 저장 형식은 그대로이므로 서버는 손댈 것이 없다.
  * ** 를 먼저 처리해야 * 와 섞이지 않는다. */
 const MEMO_MARKS = [
-  { mk: '**', tag: 'b', name: '굵게', key: 'b' },
-  { mk: '__', tag: 'u', name: '밑줄', key: 'u' },
-  { mk: '*',  tag: 'i', name: '기울임', key: 'i' },
+  { mk: '**', tag: 'b', name: '굵게', key: 'b', cmd: 'bold' },
+  { mk: '__', tag: 'u', name: '밑줄', key: 'u', cmd: 'underline' },
+  { mk: '*',  tag: 'i', name: '기울임', key: 'i', cmd: 'italic' },
 ];
 const memoHtml = s => esc(String(s || ''))
   .replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>')
@@ -2134,26 +2151,21 @@ const memoPlain = s => String(s || '')
   .replace(/\*([^*\n]+?)\*/g, '$1');
 const memoFancy = s => /\*\*|__|\*/.test(String(s || ''));
 
-/* 고른 글자를 표시로 감싸거나, 이미 감싸져 있으면 푼다 */
-function memoMark(t, mk) {
-  const v = t.value, n = mk.length;
-  let s = t.selectionStart, e = t.selectionEnd;
-  if (s === e) return false;
-  let out, ns;
-  const inner = v.slice(s, e);
-  if (inner.length > n * 2 && inner.slice(0, n) === mk && inner.slice(-n) === mk) {
-    out = inner.slice(n, -n); ns = s;                       // 고른 덩어리가 통째로 꾸며진 경우
-  } else if (v.slice(s - n, s) === mk && v.slice(e, e + n) === mk) {
-    s -= n; e += n; out = inner; ns = s;                    // 꾸민 것 안쪽만 골랐을 때
-  } else {
-    out = mk + inner + mk; ns = s;
-    if (v.length + n * 2 > 2000) return false;              // 시트가 받는 길이를 넘지 않게
-  }
-  t.value = v.slice(0, s) + out + v.slice(e);
-  t.selectionStart = ns; t.selectionEnd = ns + out.length;
-  t.focus();
-  return true;
+/* 편집기 안(꾸며진 DOM)을 저장용 평문으로 바꾼다 */
+function memoFromDom(node) {
+  if (node.nodeType === 3) return node.nodeValue.replace(/\u00a0/g, ' ');
+  if (node.nodeName === 'BR') return '\n';
+  let inner = '';
+  node.childNodes.forEach(c => { inner += memoFromDom(c); });
+  const t = node.nodeName;
+  if (!inner.trim()) return inner;                       // 빈 껍데기는 표시를 붙이지 않는다
+  if (t === 'B' || t === 'STRONG') return '**' + inner + '**';
+  if (t === 'U') return '__' + inner + '__';
+  if (t === 'I' || t === 'EM') return '*' + inner + '*';
+  if (t === 'DIV' || t === 'P') return inner + '\n';
+  return inner;
 }
+const memoRead = el => memoFromDom(el).replace(/\n+$/, '');
 
 /* ---------- 올해 부임한 교수 ----------
  * professors.json 의 joined_year 가 이 해와 같으면 사진에 병아리를 단다.
@@ -2460,7 +2472,10 @@ function commitMemo(key, text) {
   saveEntry(key, { memo: text });
 }
 function flushMemo() {
-  document.querySelectorAll('textarea.memo[data-key]').forEach(t => { if (memoTimers.has(t.dataset.key) || getNote(t.dataset.key).memo !== normMemo(t.value)) commitMemo(t.dataset.key, t.value); });
+  document.querySelectorAll('.memo[contenteditable][data-key]').forEach(t => {
+    const v = memoRead(t);
+    if (memoTimers.has(t.dataset.key) || getNote(t.dataset.key).memo !== normMemo(v)) commitMemo(t.dataset.key, v);
+  });
 }
 
 /* 카드·드로어의 칩 묶음·메모칸에 저장 상태 표시 (saving → saved/error) */
@@ -2545,7 +2560,9 @@ function refreshRatingUI(key, val) {
   const note = getNote(key);
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"] .counter__n`).forEach(el => { el.textContent = note.met; });
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"]`).forEach(el => el.classList.toggle('counter--zero', !note.met));
-  document.querySelectorAll(`textarea.memo[data-key="${CSS.escape(key)}"]`).forEach(t => { if (document.activeElement !== t && !memoTimers.has(key) && t.value !== note.memo) t.value = note.memo; });
+  document.querySelectorAll(`.memo[contenteditable][data-key="${CSS.escape(key)}"]`).forEach(t => {
+    if (document.activeElement !== t && !memoTimers.has(key) && memoRead(t) !== note.memo) t.innerHTML = memoHtml(note.memo);
+  });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"] .prof__note`).forEach(el => { el.innerHTML = noteBadge(entryOf(key)); });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
   const r = route();
@@ -2924,11 +2941,10 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
-          <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
+          <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           <div class="memo__bar">
-            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-mk="${esc(m.mk)}" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
+            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
           </div>
-          <div class="memo__prev"${memoFancy(getMemo(p)) ? '' : ' hidden'}>${memoHtml(getMemo(p))}</div>
           <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>
