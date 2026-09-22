@@ -17,17 +17,23 @@ t('줄바꿈은 <br>', await page.evaluate(()=>memoHtml('a\nb')==='a<br>b'));
 t('여러 군데', await page.evaluate(()=>memoHtml('**하나** 와 **둘**')==='<b>하나</b> 와 <b>둘</b>'));
 t('짝이 안 맞으면 그대로', await page.evaluate(()=>memoHtml('**열기만')==='**열기만'));
 t('표시 기호 없애기', await page.evaluate(()=>memoPlain('앞 **여기** 뒤')==='앞 여기 뒤'));
+t('__밑줄__ 이 <u> 로', await page.evaluate(()=>memoHtml('앞 __여기__ 뒤')==='앞 <u>여기</u> 뒤'));
+t('*기울임* 이 <i> 로', await page.evaluate(()=>memoHtml('앞 *여기* 뒤')==='앞 <i>여기</i> 뒤'));
+t('굵게와 기울임이 안 섞임', await page.evaluate(()=>memoHtml('**굵게** 와 *기울임*')==='<b>굵게</b> 와 <i>기울임</i>'),
+  await page.evaluate(()=>memoHtml('**굵게** 와 *기울임*')));
+t('셋 다 지워짐', await page.evaluate(()=>memoPlain('**가** __나__ *다*')==='가 나 다'));
 
 // 드로어에서 실제로
 const info = await page.evaluate(()=>{ const p=state.rows[0]; return {k:rKey(p), h:`#/dept/${p.dept_id}/prof/${p.slug}`}; });
 await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('textarea.memo',{timeout:10000});
-t('굵게 단추 있음', await page.locator('.memo__b').count()===1);
+t('단추 세 개 (굵게·밑줄·기울임)', await page.locator('.memo__b').count()===3,
+  await page.evaluate(()=>[...document.querySelectorAll('.memo__b')].map(b=>b.dataset.mk).join(' ')));
 t('처음엔 미리보기 숨김', await page.evaluate(()=>document.querySelector('.memo__prev').hidden));
 
 await page.fill('textarea.memo','오고 출신, 강창남 교수 후배.');
 await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); const i=t.value.indexOf('강창남 교수'); t.selectionStart=i; t.selectionEnd=i+'강창남 교수'.length; });
-await page.click('.memo__b');
+await page.click('[data-mk="**"]');
 await page.waitForTimeout(300);
 t('단추로 ** 가 붙음', await page.evaluate(()=>document.querySelector('textarea.memo').value)==='오고 출신, **강창남 교수** 후배.',
   await page.evaluate(()=>document.querySelector('textarea.memo').value));
@@ -36,7 +42,7 @@ t('미리보기가 굵게', await page.evaluate(()=>document.querySelector('.mem
 
 // 다시 누르면 풀린다
 await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); const i=t.value.indexOf('**강창남 교수**'); t.selectionStart=i; t.selectionEnd=i+'**강창남 교수**'.length; });
-await page.click('.memo__b');
+await page.click('[data-mk="**"]');
 await page.waitForTimeout(300);
 t('다시 누르면 풀림', await page.evaluate(()=>document.querySelector('textarea.memo').value)==='오고 출신, 강창남 교수 후배.',
   await page.evaluate(()=>document.querySelector('textarea.memo').value));
@@ -53,10 +59,30 @@ await page.evaluate(()=>document.querySelector('textarea.memo').blur());
 await page.waitForTimeout(400);
 t('저장값에 ** 가 그대로', await page.evaluate(k=>getNote(k).memo.indexOf('**')>=0, info.k));
 
+// 밑줄·기울임도 같은 방식
+await page.fill('textarea.memo','밑줄 칠 곳과 기울일 곳');
+await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); const i=t.value.indexOf('밑줄 칠 곳'); t.selectionStart=i; t.selectionEnd=i+6; });
+await page.click('[data-mk="__"]');
+await page.waitForTimeout(250);
+t('밑줄 단추', await page.evaluate(()=>document.querySelector('textarea.memo').value.startsWith('__밑줄 칠 곳__')),
+  await page.evaluate(()=>document.querySelector('textarea.memo').value));
+await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); const i=t.value.indexOf('기울일 곳'); t.selectionStart=i; t.selectionEnd=i+5; });
+await page.click('[data-mk="*"]');
+await page.waitForTimeout(250);
+t('기울임 단추', await page.evaluate(()=>document.querySelector('textarea.memo').value.includes('*기울일 곳*')),
+  await page.evaluate(()=>document.querySelector('textarea.memo').value));
+t('미리보기에 밑줄·기울임', await page.evaluate(()=>{ const h=document.querySelector('.memo__prev').innerHTML; return h.includes('<u>')&&h.includes('<i>'); }),
+  await page.evaluate(()=>document.querySelector('.memo__prev').innerHTML));
+await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); t.focus(); const i=t.value.indexOf('기울일 곳'); t.selectionStart=i-1; t.selectionEnd=i+6; });
+await page.keyboard.press('Control+i');
+await page.waitForTimeout(250);
+t('Ctrl+I 로 풀림', await page.evaluate(()=>!document.querySelector('textarea.memo').value.includes('*기울일 곳*')),
+  await page.evaluate(()=>document.querySelector('textarea.memo').value));
+
 // 굵은 것 안쪽만 골라도 풀린다
 await page.fill('textarea.memo','앞 **가운데** 뒤');
 await page.evaluate(()=>{ const t=document.querySelector('textarea.memo'); const i=t.value.indexOf('가운데'); t.selectionStart=i; t.selectionEnd=i+3; });
-await page.click('.memo__b');
+await page.click('[data-mk="**"]');
 await page.waitForTimeout(250);
 t('안쪽만 골라도 풀림', await page.evaluate(()=>document.querySelector('textarea.memo').value)==='앞 가운데 뒤',
   await page.evaluate(()=>document.querySelector('textarea.memo').value));

@@ -2094,14 +2094,19 @@ function bindNotes(root) {
   root.querySelectorAll('textarea.memo').forEach(t => {
     const box = t.closest('.memo-box');
     const prev = box && box.querySelector('.memo__prev');
-    const draw = () => { if (!prev) return; prev.hidden = t.value.indexOf('**') < 0; prev.innerHTML = memoHtml(t.value); };
+    const draw = () => { if (!prev) return; prev.hidden = !memoFancy(t.value); prev.innerHTML = memoHtml(t.value); };
     const typed = () => { scheduleMemo(t.dataset.key, t.value); const st = box && box.querySelector('.memo__st'); if (st) st.textContent = '입력 중…'; draw(); };
     t.addEventListener('input', typed);
     t.addEventListener('blur', () => commitMemo(t.dataset.key, t.value));
     t.addEventListener('keydown', ev => {
-      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'b' || ev.key === 'B')) { ev.preventDefault(); if (memoBold(t)) typed(); }
+      if (!(ev.ctrlKey || ev.metaKey)) return;
+      const m = MEMO_MARKS.find(x => x.key === String(ev.key).toLowerCase());
+      if (!m) return;
+      ev.preventDefault();
+      if (memoMark(t, m.mk)) typed();
     });
-    box && box.querySelector('[data-bold]')?.addEventListener('click', () => { if (memoBold(t)) typed(); });
+    box && box.querySelectorAll('[data-mk]').forEach(btn =>
+      btn.addEventListener('click', () => { if (memoMark(t, btn.dataset.mk)) typed(); }));
   });
 }
 
@@ -2109,26 +2114,40 @@ function ratingsCacheKey() { return 'jnu-ratings:' + (state.session ? state.sess
 function notesCacheKey() { return 'jnu-notes:' + (state.session ? state.session.email : 'local'); }
 
 /* 교수별 개인 기록: 선호도(state.ratings) + 만남 횟수·메모(state.notes) */
-/* ---------- 메모의 굵게 ----------
- * 시트의 memo 열과 CSV 는 평문이라야 사람이 읽을 수 있다. 그래서 **이렇게** 표시만 해 두고
- * 보여 줄 때만 굵게 만든다. 저장 형식은 그대로이므로 서버는 손댈 것이 없다. */
-const memoHtml = s => esc(String(s || '')).replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-const memoPlain = s => String(s || '').replace(/\*\*([\s\S]+?)\*\*/g, '$1');
+/* ---------- 메모 꾸미기 ----------
+ * 시트의 memo 열과 CSV 는 평문이라야 사람이 읽을 수 있다. 그래서 **굵게** __밑줄__ *기울임*
+ * 처럼 표시만 해 두고, 보여 줄 때만 꾸민다. 저장 형식은 그대로이므로 서버는 손댈 것이 없다.
+ * ** 를 먼저 처리해야 * 와 섞이지 않는다. */
+const MEMO_MARKS = [
+  { mk: '**', tag: 'b', name: '굵게', key: 'b' },
+  { mk: '__', tag: 'u', name: '밑줄', key: 'u' },
+  { mk: '*',  tag: 'i', name: '기울임', key: 'i' },
+];
+const memoHtml = s => esc(String(s || ''))
+  .replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>')
+  .replace(/__([\s\S]+?)__/g, '<u>$1</u>')
+  .replace(/\*([^*\n]+?)\*/g, '<i>$1</i>')
+  .replace(/\n/g, '<br>');
+const memoPlain = s => String(s || '')
+  .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
+  .replace(/__([\s\S]+?)__/g, '$1')
+  .replace(/\*([^*\n]+?)\*/g, '$1');
+const memoFancy = s => /\*\*|__|\*/.test(String(s || ''));
 
-/* 고른 글자를 ** 로 감싸거나, 이미 감싸져 있으면 푼다 */
-function memoBold(t) {
-  const v = t.value;
+/* 고른 글자를 표시로 감싸거나, 이미 감싸져 있으면 푼다 */
+function memoMark(t, mk) {
+  const v = t.value, n = mk.length;
   let s = t.selectionStart, e = t.selectionEnd;
   if (s === e) return false;
   let out, ns;
   const inner = v.slice(s, e);
-  if (inner.length > 4 && inner.slice(0, 2) === '**' && inner.slice(-2) === '**') {
-    out = inner.slice(2, -2); ns = s;                       // 고른 덩어리가 통째로 굵은 경우
-  } else if (v.slice(s - 2, s) === '**' && v.slice(e, e + 2) === '**') {
-    s -= 2; e += 2; out = inner; ns = s;                    // 굵은 것 안쪽만 골랐을 때
+  if (inner.length > n * 2 && inner.slice(0, n) === mk && inner.slice(-n) === mk) {
+    out = inner.slice(n, -n); ns = s;                       // 고른 덩어리가 통째로 꾸며진 경우
+  } else if (v.slice(s - n, s) === mk && v.slice(e, e + n) === mk) {
+    s -= n; e += n; out = inner; ns = s;                    // 꾸민 것 안쪽만 골랐을 때
   } else {
-    out = `**${inner}**`; ns = s;
-    if (v.length + 4 > 2000) return false;                  // 시트가 받는 길이를 넘지 않게
+    out = mk + inner + mk; ns = s;
+    if (v.length + n * 2 > 2000) return false;              // 시트가 받는 길이를 넘지 않게
   }
   t.value = v.slice(0, s) + out + v.slice(e);
   t.selectionStart = ns; t.selectionEnd = ns + out.length;
@@ -2907,9 +2926,9 @@ function openDrawer(p, d) {
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
           <div class="memo__bar">
-            <button type="button" class="memo__b" data-bold title="고른 글자를 굵게 (Ctrl+B)" aria-label="고른 글자를 굵게">가</button>
+            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-mk="${esc(m.mk)}" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
           </div>
-          <div class="memo__prev"${getMemo(p).indexOf('**') < 0 ? ' hidden' : ''}>${memoHtml(getMemo(p))}</div>
+          <div class="memo__prev"${memoFancy(getMemo(p)) ? '' : ' hidden'}>${memoHtml(getMemo(p))}</div>
           <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>
