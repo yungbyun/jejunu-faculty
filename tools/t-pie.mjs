@@ -77,6 +77,26 @@ t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
 t('기준선은 모수의 절반(올림)', maj.ks[1].includes(`${Math.ceil((maj.n-3)/2)-30}명`), maj.ks[1]);
 t('아직 안 매긴 사람도 같이 적는다', maj.ks[1].includes('미지정'), maj.ks[1]);
 
+// 6) 만난 적이 있으면 이름 칩 안에 초록 불
+const lit = await page.evaluate(()=>{
+  state.ratings.clear(); state.notes.clear();
+  const v=['확','긍','중','모','부'];
+  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%5]); if(i%3===0) state.notes.set(rKey(p),{met:2,memo:''}); });
+  render();
+  const want = state.rows.filter(p=>getMet(p)>0).length;
+  const got = document.querySelectorAll('.st-list .metlit').length;
+  const a = [...document.querySelectorAll('.st-list li a')];
+  const withLit = a.filter(el=>el.querySelector('.metlit'));
+  const okPos = withLit.length > 0 && withLit.every(el=>
+    el.lastElementChild && el.lastElementChild.classList.contains('metlit'));
+  const first = a.find(el=>el.querySelector('.metlit'));
+  return { want, got, okPos, title: first ? first.getAttribute('title') : '' };
+});
+t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / ${lit.want}`);
+t('불은 이름 오른쪽 끝에', lit.okPos);
+t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
+t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);
