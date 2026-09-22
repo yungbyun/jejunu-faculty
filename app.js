@@ -1226,14 +1226,15 @@ function epDeptEdit(ep) {
 /* 예약 발송이 지금 어떤 상태인지 한 줄로 알려 준다 */
 function obNotice() {
   if (!CONFIG.RATINGS.API_URL || !state.session) return '';
-  if (OB.needDeploy) return `<p class="ot-warn">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다 — 편집기에서 <b>배포 → 배포 관리 → 새 버전</b>.</p>`;
   if (!OB.loaded) return '';
-  if (!OB.on) return `<p class="ot-warn">서버에서 보내기가 <b>꺼져 있습니다</b>. 예약은 쌓이지만 나가지 않습니다 — Apps Script 편집기에서 <b>outboxStart()</b> 를 실행하십시오.</p>`;
   const nq = obCount();
-  /* outboxDryRun() 도 OUTBOX 를 켜므로, 연습 모드를 '켜짐' 이라고 하면 안 된다 */
-  if (OB.dry) return `<p class="ot-warn">예약 발송 <b>연습 모드</b> · 예약 ${nq}건 — 보낸 것으로 표시만 하고 <b>실제로는 나가지 않습니다</b>. 진짜로 보내려면 <b>outboxStart()</b> 를 실행하십시오.</p>`;
-  if (!nq) return `<p class="ot-ok">예약 발송 켜짐 · <b>예약된 것이 없어 나갈 메일이 없습니다</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''}.</p>`;
-  return `<p class="ot-ok">예약 발송 <b>켜짐</b> · 예약 <b>${nq}건</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
+  /* 예약한 것이 없으면 아무 말도 하지 않는다. 쓰지도 않는 기능이 '켜짐' 이라고 떠 있으면
+   * 메일이 나갈 것처럼 읽혀 불안하다. 재배포 안내는 실제로 예약을 걸려 할 때 초안 안에서 뜬다. */
+  if (!nq) return '';
+  if (OB.needDeploy) return `<p class="ot-warn">예약 ${nq}건이 있지만 Apps Script 를 다시 배포해야 나갑니다 — 편집기에서 <b>배포 → 배포 관리 → 새 버전</b>.</p>`;
+  if (!OB.on) return `<p class="ot-warn">예약 <b>${nq}건</b>이 쌓여 있지만 서버에서 보내기가 <b>꺼져 있습니다</b> — 보내려면 Apps Script 편집기에서 <b>outboxStart()</b> 를 실행하십시오.</p>`;
+  if (OB.dry) return `<p class="ot-warn">예약 <b>${nq}건</b> · <b>연습 모드</b> — 보낸 것으로 표시만 하고 실제로는 나가지 않습니다.</p>`;
+  return `<p class="ot-ok">예약 <b>${nq}건</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
 }
 
 function renderOutreach() {
@@ -1298,7 +1299,7 @@ function renderOutreach() {
       <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
       <div class="ot-imp">
         <button type="button" class="btn" data-impopen>핸드폰 번호 한 번에 가져오기</button>
-        <span class="st-note">지금 <b data-impn>${Object.keys(mobiles()).length}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다</span>
+        <span class="st-note">지금 <b data-impn>${mobileCount()}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다${mobileStale() ? ` · <b data-impold>명단에 없는 번호 ${mobileStale()}건</b>` : ''}</span>
       </div>
       <div class="ot-impwrap" hidden></div>
     </div>`;
@@ -1452,9 +1453,10 @@ function bindOutreach() {
       const parts = [`${r.total}개 중 ${r.n}명 반영했습니다${r.del ? ` (${r.del}명 지움)` : ''}`];
       if (r.unknown.length) parts.push(`명단에 없는 이름 ${r.unknown.length}개 — ${cut(r.unknown)}`);
       if (r.badnum.length) parts.push(`번호 모양이 이상함 ${r.badnum.length}개 — ${cut(r.badnum)}`);
+      if (mobileStale()) parts.push(`명단에 없는 번호 ${mobileStale()}건이 남아 있습니다 (퇴직 등)`);
       msg.textContent = parts.join(' / ');
       const nEl = $app.querySelector('[data-impn]');
-      if (nEl) nEl.textContent = String(Object.keys(mobiles()).length);
+      if (nEl) nEl.textContent = String(mobileCount());
       if (r.n) flashStatus(`핸드폰 ${r.n}명 가져왔습니다`);
     };
 
@@ -1964,6 +1966,11 @@ function mails() { if (!mailMap) mailMap = loadObj(MAIL_KEY); return mailMap; }
  * 그쪽에 절대 넣지 않고, 선호도·메모와 같은 길로 비공개 시트(settings 탭)에만 둔다.
  * 로그인한 본인에게만 보인다. */
 function mobiles() { if (!mobileMap) mobileMap = loadObj(MOBILE_KEY); return mobileMap; }
+/* 지금 명단에 있는 교수 중 번호가 있는 사람 수. 저장된 항목을 그냥 세면, 퇴직 등으로 명단에서
+ * 빠진 교수의 번호까지 세어 숫자가 부풀려진다. */
+const mobileCount = () => state.rows.filter(p => mobileOf(p)).length;
+/* 명단에 없는데 남아 있는 번호 (퇴직·소속 변경) */
+const mobileStale = () => Object.keys(mobiles()).length - mobileCount();
 const mobileOf = p => mobiles()[rKey(p)] || '';
 /* 010-0000-0000 꼴로 맞춘다. 자릿수가 안 맞으면 빈 문자열 */
 function fmtMobile(v) {

@@ -35,21 +35,15 @@ const install = (mode) => page.evaluate(m => {
   location.hash = '#/outreach'; OUT.open = ''; render();
 }, mode);
 
-// 1) 서버가 아직 옛 버전일 때
-await install('olddeploy');
-await page.waitForTimeout(700);
-check('옛 배포면 재배포 안내', await page.evaluate(() => /다시 배포/.test(document.querySelector('.ot-warn')?.textContent || '')));
-
-// 2) 서버는 새 버전인데 보내기가 꺼져 있을 때
-await install('off');
-await page.waitForTimeout(700);
-check('보내기 꺼짐 경고', await page.evaluate(() => /꺼져 있습니다/.test(document.querySelector('.ot-warn')?.textContent || '')));
-
-// 3) 켜져 있을 때
-await install('on');
-await page.waitForTimeout(700);
-check('보내기 켜짐 표시', await page.evaluate(() => /켜짐/.test(document.querySelector('.ot-ok')?.textContent || '')));
-check('남은 한도 표시', await page.evaluate(() => /87통/.test(document.querySelector('.ot-ok')?.textContent || '')));
+// 1~3) 예약한 것이 없으면 서버 상태가 어떻든 알림줄을 띄우지 않는다.
+//      쓰지도 않는 기능이 '켜짐' 이라고 떠 있으면 메일이 나갈 것처럼 읽혀 불안하다.
+const noBanner = async () => await page.evaluate(() => !document.querySelector('.ot-ok, .ot-warn'));
+await install('olddeploy'); await page.waitForTimeout(700);
+check('옛 배포여도 예약 0이면 조용', await noBanner());
+await install('off'); await page.waitForTimeout(700);
+check('꺼져 있어도 예약 0이면 조용', await noBanner());
+await install('on'); await page.waitForTimeout(700);
+check('켜져 있어도 예약 0이면 조용', await noBanner());
 
 // 4) 초안 패널의 예약 줄
 const k = await page.evaluate(() => rKey(state.rows.find(p => p.email)));
@@ -101,16 +95,18 @@ const banner = async (on, dry, nq, nd) => await page.evaluate(([on, dry, nq, nd]
   return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
 }, [on, dry, nq, nd]);
 
-const bOff = await banner(false, false, 0, false);
-check('꺼져 있으면 꺼졌다고 한다', bOff.includes('꺼져 있습니다'), bOff);
-const bDry = await banner(true, true, 0, false);
-check('연습 모드를 켜짐이라 하지 않음', bDry.includes('연습 모드') && !bDry.includes('<b>켜짐'), bDry);
+check('예약 0 · 꺼짐 — 아무 말 안 함', (await banner(false, false, 0, false)) === '');
+check('예약 0 · 켜짐 — 아무 말 안 함', (await banner(true, false, 0, false)) === '');
+check('예약 0 · 연습 모드 — 아무 말 안 함', (await banner(true, true, 0, false)) === '');
+check('예약 0 · 재배포 필요 — 아무 말 안 함', (await banner(false, false, 0, true)) === '');
+const bOff = await banner(false, false, 2, false);
+check('예약이 있는데 꺼졌으면 알려 줌', bOff.includes('꺼져 있습니다') && bOff.includes('2건'), bOff);
+const bDry = await banner(true, true, 2, false);
+check('연습 모드를 켜짐이라 하지 않음', bDry.includes('연습 모드'), bDry);
 check('연습 모드는 안 나간다고 못박음', bDry.includes('실제로는 나가지 않습니다'));
-const bOn0 = await banner(true, false, 0, false);
-check('켜졌어도 예약 0이면 그렇게 말함', bOn0.includes('나갈 메일이 없습니다'), bOn0);
 const bOn2 = await banner(true, false, 2, false);
 check('예약이 있으면 건수를 말함', bOn2.includes('예약 2건'), bOn2);
-const bNd = await banner(false, false, 0, true);
+const bNd = await banner(false, false, 2, true);
 check('재배포가 필요하면 그것부터', bNd.includes('다시 배포'), bNd);
 
 let bad = 0;

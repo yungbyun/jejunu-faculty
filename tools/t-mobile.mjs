@@ -87,6 +87,23 @@ check('한 사람만 고칠 수 있다', await page.evaluate(() => {
 }));
 
 // 5) 설정 동기화 경로에 얹혀 있다 (시트로 나간다)
+// 6) 명단에서 빠진 교수의 번호는 세지 않는다 (퇴직 등)
+check('명단에 없는 번호는 안 센다', await page.evaluate(() => {
+  mobileMap = {}; localStorage.removeItem('jnu-mobile');
+  const m = mobiles();
+  state.rows.forEach(p => { m[rKey(p)] = '010-0000-0000'; });
+  m['archidesign/park-chul-min'] = '010-9999-9999';       // 퇴직해서 명단에 없는 사람
+  return mobileCount() === state.rows.length && mobileStale() === 1;
+}), `센 수 ${await page.evaluate(() => mobileCount())} / 교수 ${await page.evaluate(() => state.rows.length)}`);
+await page.evaluate(() => { location.hash = '#/outreach'; render(); });
+await page.waitForTimeout(600);
+check('화면 숫자도 교수 수와 같음', await page.evaluate(() =>
+  document.querySelector('[data-impn]').textContent === String(state.rows.length)),
+  await page.evaluate(() => document.querySelector('[data-impn]').textContent));
+check('남은 번호가 있으면 알려 준다', await page.evaluate(() =>
+  !!document.querySelector('[data-impold]') && document.querySelector('[data-impold]').textContent.includes('1건')));
+await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
+
 check('settings 키로 등록됨', await page.evaluate(() =>
   setKeys().includes('mobile') && SET_OBJ.includes('mobile')));
 
