@@ -1272,8 +1272,10 @@ function renderOutreach() {
     return `
     <div class="oc ${open ? 'oc--open' : ''}" data-k="${esc(k)}">
       <div class="oc__h">
-        <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
-        <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
+        <button type="button" class="oc__who" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기" aria-label="${esc(p.name)} 교수 상세 보기">
+          <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
+          <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
+        </button>
         ${epOf(OUT.ep) && epDone(p, OUT.ep) ? `<span class="oc__ep">${OUT.ep}회차 보냄</span>` : ''}
         ${mailOf(p) ? `<span class="oc__mc">메일 ${mailOf(p)}회</span>` : ''}
         ${obTag}
@@ -1429,17 +1431,12 @@ function bindOutreach() {
     e.target.disabled = true;
     wrap.hidden = false;
     wrap.innerHTML = `<div class="ot-impbox">
-      <p class="st-note"><b>파일을 고르시는 편이 쉽습니다.</b> 번호가 든 <code>.json</code> 파일을 그대로 고르십시오.
+      <p class="st-note">번호가 든 <code>.json</code> 파일을 고르십시오.
       파일은 이 브라우저 안에서만 열립니다 — <b>공개 저장소에는 저장되지 않습니다.</b></p>
       <div class="ep-acts">
-        <label class="btn imp-file">파일 고르기<input type="file" accept=".json,.txt,application/json" data-impfile hidden></label>
+        <label class="btn imp-file">파일 선택<input type="file" accept=".json,.txt,application/json" data-impfile hidden></label>
         <span class="st-note" data-impname></span>
       </div>
-      <p class="st-note imp-or">또는 <b>{"학과/이름": "010-0000-0000"}</b> 꼴의 내용을 아래에 직접 붙여넣으십시오.
-      (파일 <b>경로</b>가 아니라 파일 <b>안의 내용</b>입니다.)
-      한 사람만 넣거나 고칠 때도 이렇게 하시면 되고, <b>번호를 비워 두면 지웁니다.</b></p>
-      <textarea rows="5" data-imptext placeholder='{"컴퓨터공학과/변영철": "010-0000-0000"}'></textarea>
-      <div class="ep-acts"><button type="button" class="btn" data-imprun>붙여넣은 내용 가져오기</button></div>
       <p class="st-note" data-impmsg></p></div>`;
 
     const msg = wrap.querySelector('[data-impmsg]');
@@ -1466,7 +1463,6 @@ function bindOutreach() {
       rd.onerror = () => { msg.textContent = '파일을 읽지 못했습니다'; msg.classList.add('bad'); };
       rd.readAsText(f, 'utf-8');
     });
-    wrap.querySelector('[data-imprun]').addEventListener('click', () => take(wrap.querySelector('[data-imptext]').value));
   });
   $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
   $app.querySelector('[data-epadd]')?.addEventListener('click', () => { OUT.edit = true; epAdd(); });
@@ -1519,6 +1515,12 @@ function bindOutreach() {
   });
   $app.querySelectorAll('[data-of]').forEach(b => b.addEventListener('click', () => {
     OUT[b.dataset.of] = b.dataset.v; OUT.open = ''; renderOutreach();
+  }));
+  /* 사진·이름을 누르면 상세를 띄운다. 주소는 그대로 두어, 닫으면 보던 목록으로 돌아온다. */
+  $app.querySelectorAll('[data-prof]').forEach(b => b.addEventListener('click', () => {
+    const p = state.rows.find(x => rKey(x) === b.dataset.prof);
+    const d = p && state.depts.find(x => x.id === p.dept_id);
+    if (p && d) openDrawer(p, d);
   }));
   $app.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
     OUT.open = OUT.open === b.dataset.open ? '' : b.dataset.open; renderOutreach();
@@ -1942,7 +1944,7 @@ function mobileImport(text) {
   catch {
     const t = String(text || '').trim();
     if (/^[A-Za-z]:[\/]|^[\/]{2}|\.(json|txt)$/i.test(t) && t.indexOf('{') < 0)
-      return { err: '이건 파일이 있는 자리(경로)입니다. 파일 안의 내용이 필요합니다 — 위 [파일 고르기] 를 쓰시면 가장 쉽습니다' };
+      return { err: '파일 안의 내용이 아니라 파일이 있는 자리(경로)입니다. [파일 선택] 을 눌러 그 파일을 고르십시오' };
     return { err: 'JSON 형식이 아닙니다 — { "컴퓨터공학과/홍길동": "010-0000-0000" } 꼴이어야 합니다' };
   }
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { err: '객체가 아닙니다' };
