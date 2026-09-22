@@ -74,7 +74,7 @@ const maj = await page.evaluate(()=>{
   return { ks, u, n: state.rows.length };
 });
 t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
-t('과반은 모수의 절반+1 기준', maj.ks[1].includes(`${Math.floor((maj.n-3)/2)+1-30}명`), maj.ks[1]);
+t('기준선은 모수의 절반(올림)', maj.ks[1].includes(`${Math.ceil((maj.n-3)/2)-30}명`), maj.ks[1]);
 t('아직 안 매긴 사람도 같이 적는다', maj.ks[1].includes('미지정'), maj.ks[1]);
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }

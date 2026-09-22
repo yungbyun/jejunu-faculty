@@ -1545,10 +1545,13 @@ function donut(profs) {
   if (!total) return '';
   const sure = c['확'] || 0, pos = c['긍'] || 0, base = sure + pos;
   const pct = n => Math.round(n / total * 100);
-  /* 과반 = 절반보다 한 명 더. 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다.
-   * 부(부정)는 세지 않는다 — 돌려세우는 것은 다른 일이다. */
+  /* 기준선은 모수의 절반(올림)이다. 66명이면 33명 — 이것은 '절반' 이지 '과반' 이 아니다.
+   * 과반(절반을 넘음)은 34명부터이고, 33 대 33 이면 동수라 이기지 못한다. 그래도 눈에 익은
+   * 숫자가 절반이어서 기준을 절반에 두고, 말도 절반이라고 쓴다.
+   * 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다. 부(부정)는 세지
+   * 않는다 — 돌려세우는 것은 다른 일이다. */
   const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
-  const half = Math.floor(total / 2) + 1;
+  const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
@@ -1587,8 +1590,10 @@ function donut(profs) {
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
         ${need > 0
-          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">과반까지</span><b>${need}명</b><span class="pie__kn">${pool}</span></div>`
-          : `<div class="pie__k pie__k--over"><span class="pie__kl">과반 넘음</span><b>+${-need}명</b><span class="pie__kn">과반 ${half}명 기준</span></div>`}
+          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">절반까지</span><b>${need}명</b><span class="pie__kn">${pool}</span></div>`
+          : need === 0
+          ? `<div class="pie__k pie__k--over"><span class="pie__kl">절반 딱 맞음</span><b>${base}명</b><span class="pie__kn">절반 ${half}명 기준</span></div>`
+          : `<div class="pie__k pie__k--over"><span class="pie__kl">절반 넘음</span><b>+${-need}명</b><span class="pie__kn">절반 ${half}명 기준</span></div>`}
       </div>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
