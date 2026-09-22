@@ -60,9 +60,9 @@ await page.waitForTimeout(400);
 check('학과 필터', await page.evaluate(n => document.querySelectorAll('.oc').length === n, nComdol), `전자공학과 ${nComdol}명`);
 await page.click('[data-of="dept"][data-v="전체"]');
 await page.waitForTimeout(400);
-check('필터 해제', await page.evaluate(() => document.querySelectorAll('.oc').length === 70));
+check('필터 해제', await page.evaluate(() => document.querySelectorAll('.oc').length === state.rows.length));
 
-// 6) 이메일 없는 교수 표시 — 지금은 70명 모두 이메일이 있어 0명이 정상이다
+// 6) 이메일 없는 교수 표시 — 지금은 모두 이메일이 있어 0명이 정상이다
 const noMail = await page.evaluate(() => ({
   data: state.rows.filter(p => !p.email).length,
   shown: document.querySelectorAll('.oc__no').length,

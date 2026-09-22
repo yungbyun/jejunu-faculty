@@ -1545,6 +1545,11 @@ function donut(profs) {
   if (!total) return '';
   const sure = c['확'] || 0, pos = c['긍'] || 0, base = sure + pos;
   const pct = n => Math.round(n / total * 100);
+  /* 과반 = 절반보다 한 명 더. 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다.
+   * 부(부정)는 세지 않는다 — 돌려세우는 것은 다른 일이다. */
+  const midlow = (c['중'] || 0) + (c['모'] || 0);
+  const half = Math.floor(total / 2) + 1;
+  const need = half - base;
   const R = 72, W = 24, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
@@ -1567,6 +1572,9 @@ function donut(profs) {
       <div class="pie__kpi">
         <div class="pie__k pie__k--high"><span class="pie__kl">확(확실)</span><b>${pct(sure)}%</b><span class="pie__kn">${sure}명 / ${total}명</span></div>
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
+        ${need > 0
+          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">과반까지</span><b>${need}명</b><span class="pie__kn">중·모 ${midlow}명 중에서</span></div>`
+          : `<div class="pie__k pie__k--over"><span class="pie__kl">과반 넘음</span><b>+${-need}명</b><span class="pie__kn">과반 ${half}명 기준</span></div>`}
       </div>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
@@ -1746,7 +1754,6 @@ function renderHome() {
             <div class="drow__num">${d.profs.length}<small>명</small></div>
             <div class="drow__main">
               <h2 class="drow__name">${esc(d.name)}</h2>
-              <div class="drow__tags">${d.topTags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
               ${ratingSummary(d)}
             </div>
             <div class="drow__avs" aria-hidden="true">
@@ -2009,6 +2016,16 @@ function rateChips(p, big = false) {
   const cur = getRating(p);
   return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
     ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(r)} · ${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
+  </div>`;
+}
+
+/* 상세 화면용 — 이름을 함께 보여 주는 넓은 선호도 줄. 고르는 동작은 bindRates 가 그대로 맡는다
+ * (`.rate[data-key]` 만 있으면 눌러도 되고 저장·갱신도 알아서 된다). */
+const RATE_WIDE = CONFIG.RATINGS.LABELS.filter(r => r !== '비');   // 비(평가제외)는 학과 카드에서만
+function rateWide(p) {
+  const cur = getRating(p);
+  return `<div class="rate rate--wide" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
+    ${RATE_WIDE.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})"><b>${esc(r)}</b><small>${esc(CONFIG.RATINGS.NAMES[r] || '')}</small></button>`).join('')}
   </div>`;
 }
 
@@ -2839,6 +2856,11 @@ function openDrawer(p, d) {
           <div class="d-en">${esc(p.name_en || '')}</div>
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         </div>
+      </div>
+
+      <div class="d-section"><h3>선호도</h3>
+        ${rateWide(p)}
+        ${getRating(p) === '비' ? `<p class="st-note">지금 <b>비(연구년 등으로 제외)</b> 로 되어 있습니다. 이 값은 학과 화면의 카드에서 바꿀 수 있습니다.</p>` : ''}
       </div>
 
       <div class="d-section"><h3>메모</h3>

@@ -102,8 +102,6 @@ main{min-height:60vh;padding:40px 20px 72px}
 .drow__num small{font-size:12px;color:var(--ink-3);font-weight:600;margin-left:3px;letter-spacing:0}
 .drow__name{font-size:23px;font-weight:800;letter-spacing:-.5px;margin:0;line-height:1.2}
 .drow__en{font-size:var(--fs-s);color:var(--ink-3);margin:3px 0 10px}
-.drow__tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.drow__tags .tag{background:var(--surface);border-color:var(--line-2)}
 .drow__avs{display:flex}
 .av{width:40px;height:40px;border-radius:50%;margin-left:-11px;border:2px solid var(--bg);display:grid;place-items:center;overflow:hidden;font-style:normal;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--dept-color),color-mix(in srgb,var(--dept-color) 60%,#000));box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .18s var(--ease)}
 .av:first-child{margin-left:0}
@@ -351,6 +349,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .chip--fav svg{width:12px;height:12px}
 .chip--fav[aria-pressed="true"]{background:#e0a10c;border-color:#e0a10c;color:#fff}
 .prof[data-rating="부"]:hover,.prof[data-rating="비"]:hover{opacity:1}
+.rate--wide{position:static;display:flex;flex-wrap:wrap;gap:6px;padding:0;border:0;border-radius:0;
+  background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.rate--wide .rate__b{width:auto;height:auto;border-radius:999px;padding:7px 12px;gap:5px;
+  display:inline-flex;align-items:center;border:1px solid var(--line-2);background:var(--surface);
+  color:var(--ink-2);font-size:13.5px;font-weight:800}
+.rate--wide .rate__b small{font-weight:600;font-size:12px;color:var(--ink-3)}
+.rate--wide .rate__b:hover{background:var(--surface);border-color:var(--rc);color:var(--rc)}
+.rate--wide .rate__b:hover small{color:var(--rc)}
+/* 뒤에 오는 규칙이 이기므로 눌린 모습을 여기서 다시 적어 준다 */
+.rate--wide .rate__b[aria-pressed="true"]{background:var(--rc);border-color:var(--rc);color:#fff}
+.rate--wide .rate__b[aria-pressed="true"] small{color:#fff;opacity:.9}
 .rate--big{position:static;display:inline-flex;box-shadow:none;background:var(--surface-2)}
 .d-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .d-top .d-rank{margin-bottom:0}
@@ -444,7 +453,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__seg:hover{opacity:1}
 .pie__n{text-anchor:middle;font-size:36px;font-weight:800;fill:var(--ink)}
 .pie__u{text-anchor:middle;font-size:11.5px;font-weight:600;fill:var(--ink-3)}
-.pie__kpi{display:flex;gap:10px;width:100%;max-width:420px}
+.pie__kpi{display:flex;gap:10px;width:100%;max-width:560px}
 .pie__k{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 8px;
   border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface)}
 .pie__k b{font-size:30px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
@@ -452,6 +461,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__kn{font-size:11.5px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .pie__k--high b{color:var(--rs-high)}
 .pie__k--pos b{color:var(--rs-pos)}
+.pie__k--goal b{color:var(--brand)}
+.pie__k--over b{color:var(--rs-high)}
+.pie__k--goal,.pie__k--over{border-color:color-mix(in srgb,var(--brand) 30%,var(--line))}
 .pie__legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
 .pie__li{display:inline-flex;align-items:center;gap:5px;font-size:13.5px;font-weight:600}
 .pie__li b{font-size:15px;font-variant-numeric:tabular-nums}

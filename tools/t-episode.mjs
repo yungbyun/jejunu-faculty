@@ -22,7 +22,8 @@ const segs = await page.evaluate(() => {
 check('갈래 A 전자·통신 11명', segs.A === 11, JSON.stringify(segs));
 check('갈래 E 인공지능학과 5명', segs.E === 5);
 check('갈래 D 컴퓨터공학과 6명', segs.D === 6);
-check('모든 교수가 갈래를 가짐', Object.values(segs).reduce((a, b) => a + b, 0) === 70);
+const nAll = await page.evaluate(() => state.rows.length);
+check('모든 교수가 갈래를 가짐', Object.values(segs).reduce((a, b) => a + b, 0) === nAll, `${nAll}명`);
 
 // 2) 1회차가 기본으로 들어 있다
 check('1회차 기본 제공', await page.evaluate(() => epNos().length >= 1 && !!epOf(1)));
