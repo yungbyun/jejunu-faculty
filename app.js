@@ -1553,24 +1553,36 @@ function donut(profs) {
   const R = 72, W = 24, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
+  /* 조각 한가운데 좌표. 파선은 9시에서 시작해 위로 도는 반원이므로, 시작점에서 잰 호 길이를
+   * 각도로 바꿔 놓으면 된다(θ = 길이 / 반지름). */
+  const midXY = (a, b) => {
+    const t = (a + b / 2) / R;
+    return [CX - R * Math.cos(t), CY - R * Math.sin(t)];
+  };
   const arcs = items.map(({ r, n }) => {
     const len = n / total * HALF, seg = Math.max(0, len - (items.length > 1 ? 1.5 : 0));
-    const a = `<circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
-      stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
-      transform="rotate(180 ${CX} ${CY})"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%)</title></circle>`;
+    const [tx, ty] = midXY(off, len);
+    const a = `<g class="pie__hit" data-rs="${esc(r)}" role="button" tabindex="0"
+      aria-label="${esc(r)} ${n}명 — 아래 선호도별 교수 목록으로">
+      <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
+        stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
+        transform="rotate(180 ${CX} ${CY})"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%) — 눌러서 명단 보기</title></circle>
+      ${len >= 13 ? `<text class="pie__sn" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}">${n}</text>` : ''}
+    </g>`;
     off += len;
     return a;
   }).join('');
   return `
     <div class="pie">
-      <svg class="pie__svg" viewBox="0 0 200 126" role="img"
+      <svg class="pie__svg" viewBox="0 0 200 138" role="img"
         aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
+        <text class="pie__n" x="100" y="100">${pct(sure)}%</text>
+        <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
       <div class="pie__kpi">
-        <div class="pie__k pie__k--high"><span class="pie__kl">확(확실)</span><b>${pct(sure)}%</b><span class="pie__kn">${sure}명 / ${total}명</span></div>
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
         ${need > 0
           ? `<div class="pie__k pie__k--goal"><span class="pie__kl">과반까지</span><b>${need}명</b><span class="pie__kn">중·모 ${midlow}명 중에서</span></div>`
@@ -1667,7 +1679,7 @@ function renderStats() {
         <div class="st-head"><h2>선호도별 교수 목록</h2><button class="btn" type="button" id="csvBtn">CSV 내보내기</button></div>
         <div class="st-lists">
           ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
-            <div class="st-list"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
+            <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
               ${ps.length ? `<ul>${ps.map(p => `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}</a></li>`).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
             </div>`; }).join('')}
         </div>
@@ -1676,6 +1688,19 @@ function renderStats() {
 
   $app.querySelectorAll('[data-go]').forEach(el => {
     const go = () => { state.ratingFilter = el.dataset.rating; state._keepRating = true; location.hash = `#/dept/${encodeURIComponent(el.dataset.go)}`; };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  /* 도넛 조각 → 아래 명단의 그 줄로. 화면을 옮기지 않고 같은 페이지 안에서 내려간다. */
+  $app.querySelectorAll('[data-rs]').forEach(el => {
+    const go = () => {
+      const box = $app.querySelector(`[data-rslist="${CSS.escape(el.dataset.rs)}"]`);
+      if (!box) return;
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      box.classList.remove('st-list--hit');
+      void box.offsetWidth;                       // 같은 곳을 다시 눌러도 다시 번쩍이게
+      box.classList.add('st-list--hit');
+    };
     el.addEventListener('click', go);
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   });
