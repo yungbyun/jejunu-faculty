@@ -449,8 +449,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:18px}
 .pie__svg{width:280px;height:193px;max-width:100%;flex:none}
 .pie__seg{transition:opacity .15s,stroke-width .15s}
+/* 조각 색이 옅어도(미지정 같은) 읽히도록 글자에 어두운 테를 두른다 */
 .pie__sn{text-anchor:middle;dominant-baseline:central;font-size:13px;font-weight:800;fill:#fff;
-  paint-order:stroke;pointer-events:none;letter-spacing:-.3px}
+  paint-order:stroke;stroke:rgba(15,19,25,.5);stroke-width:3px;stroke-linejoin:round;
+  pointer-events:none;letter-spacing:-.3px}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
 .pie__hit:focus-visible .pie__seg{stroke-width:30}

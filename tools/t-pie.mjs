@@ -63,6 +63,20 @@ await page.waitForTimeout(1200);
 t('키보드로도 내려감', await page.evaluate(()=>window.scrollY)>0);
 t('주소는 그대로', await page.evaluate(()=>location.hash)==='#/stats', await page.evaluate(()=>location.hash));
 
+// 5) 비(평가제외)는 과반 계산의 모수에서 빠진다
+const maj = await page.evaluate(()=>{
+  state.ratings.clear();
+  state.rows.slice(0,3).forEach(p=>state.ratings.set(rKey(p),'비'));
+  state.rows.slice(3,33).forEach(p=>state.ratings.set(rKey(p),'확'));
+  render();
+  const ks=[...document.querySelectorAll('.pie__k')].map(k=>k.innerText.split(String.fromCharCode(10)).join(' '));
+  const u=document.querySelector('.pie__u').textContent;
+  return { ks, u, n: state.rows.length };
+});
+t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
+t('과반은 모수의 절반+1 기준', maj.ks[1].includes(`${Math.floor((maj.n-3)/2)+1-30}명`), maj.ks[1]);
+t('아직 안 매긴 사람도 같이 적는다', maj.ks[1].includes('미지정'), maj.ks[1]);
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);

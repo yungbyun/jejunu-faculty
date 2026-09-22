@@ -1547,9 +1547,11 @@ function donut(profs) {
   const pct = n => Math.round(n / total * 100);
   /* 과반 = 절반보다 한 명 더. 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다.
    * 부(부정)는 세지 않는다 — 돌려세우는 것은 다른 일이다. */
-  const midlow = (c['중'] || 0) + (c['모'] || 0);
+  const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
   const half = Math.floor(total / 2) + 1;
   const need = half - base;
+  /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
+  const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
   const R = 72, W = 24, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
@@ -1585,7 +1587,7 @@ function donut(profs) {
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
         ${need > 0
-          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">과반까지</span><b>${need}명</b><span class="pie__kn">중·모 ${midlow}명 중에서</span></div>`
+          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">과반까지</span><b>${need}명</b><span class="pie__kn">${pool}</span></div>`
           : `<div class="pie__k pie__k--over"><span class="pie__kl">과반 넘음</span><b>+${-need}명</b><span class="pie__kn">과반 ${half}명 기준</span></div>`}
       </div>
       <div class="pie__legend">
