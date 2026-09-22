@@ -1535,7 +1535,7 @@ const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
 /* ---------- 선호도 원그래프 ----------
  * '비'(평가제외)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
-const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '미지정': '#b9c0cc' };
+const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 
 function donut(profs) {
@@ -1687,7 +1687,7 @@ function renderStats() {
         <div class="st-lists">
           ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
             <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
-              ${ps.length ? `<ul>${ps.map(p => { const met = getMet(p); return `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}">${esc(p.name)}${met ? `<i class="metlit" role="img" aria-label="만난 적 있음 ${met}회"></i>` : ''}</a></li>`; }).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+              ${ps.length ? `<ul>${ps.map(p => { const met = getMet(p); return `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}">${esc(p.name)}${met ? `<i class="metlit" style="--lit:${esc(RCOLOR[r] || '#22c55e')}" role="img" aria-label="만난 적 있음 ${met}회"></i>` : ''}</a></li>`; }).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
             </div>`; }).join('')}
         </div>
       </section>

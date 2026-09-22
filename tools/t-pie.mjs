@@ -96,6 +96,18 @@ t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / $
 t('불은 이름 오른쪽 끝에', lit.okPos);
 t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
 t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
+const cols = await page.evaluate(()=>{
+  const v=['확','긍','중','모','부','비']; state.ratings.clear(); state.notes.clear();
+  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%6]); state.notes.set(rKey(p),{met:1,memo:''}); });
+  render();
+  const hex = x => '#'+x.match(/\d+/g).slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join('');
+  return [...document.querySelectorAll('.st-list')].map(box=>{
+    const r=box.dataset.rslist, lit=box.querySelector('.metlit');
+    return { r, got: lit?hex(getComputedStyle(lit).backgroundColor):'', want: RCOLOR[r] };
+  });
+});
+t('불 색이 그 선호도 대표색', cols.length===6 && cols.every(c=>c.got===c.want),
+  cols.map(c=>`${c.r} ${c.got}${c.got===c.want?'':'≠'+c.want}`).join(' '));
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
