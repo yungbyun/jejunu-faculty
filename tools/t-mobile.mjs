@@ -48,18 +48,15 @@ check('연구실 전화 다음에 온다', await page.evaluate(() => {
 }));
 check('tel: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'tel:01012345678'));
 
-// 3) 상세 드로어에서 고칠 수 있다
+// 3) 상세 드로어에는 더 이상 핸드폰 칸이 없다 (학과 카드에서 보이므로 뺐다)
 await page.evaluate(x => {
   const p = state.rows.find(y => rKey(y) === x);
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 }, k);
-await page.waitForSelector('.d-mob', { timeout: 10000 });
-check('드로어에 입력칸', await page.evaluate(() => document.querySelector('.d-mob').value === '010-1234-5678'));
-await page.fill('.d-mob', '01099998888');
-await page.evaluate(() => document.querySelector('.d-mob').dispatchEvent(new Event('change')));
-await page.waitForTimeout(500);
-check('드로어에서 고치면 저장됨', await page.evaluate(x =>
-  mobileOf(state.rows.find(y => rKey(y) === x)) === '010-9999-8888', k));
+await page.waitForSelector('.d-name', { timeout: 10000 });
+check('드로어에 핸드폰 칸 없음', await page.evaluate(() => !document.querySelector('.d-mob')));
+check('드로어에 핸드폰 제목도 없음', await page.evaluate(() =>
+  ![...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '핸드폰')));
 
 // 4) 한 번에 가져오기
 const imp = await page.evaluate(() => {
@@ -71,6 +68,23 @@ check('가져오기 2건 반영', imp.r.n === 2, JSON.stringify(imp.r));
 check('없는 교수·이상한 값은 건너뜀', imp.r.skip === 2);
 check('하이픈 없이 준 것도 정리됨', imp.av === '010-1111-2222' && imp.cv === '010-3333-4444');
 check('JSON 이 아니면 오류', await page.evaluate(() => !!mobileImport('{어쩌고').err));
+check('경로를 붙여넣으면 알려 준다', await page.evaluate(() =>
+  (mobileImport('C:\Users\a\b.json').err || '').indexOf('경로') >= 0));
+
+// 4-1) 빈 값이면 지운다 — 드로어 칸을 뺀 뒤로 여기가 유일한 수정·삭제 자리다
+check('빈 값이면 지운다', await page.evaluate(() => {
+  const a = rKey(state.rows[0]);
+  mobileImport(JSON.stringify({ [a]: '010-7777-8888' }));
+  const had = mobileOf(state.rows[0]) === '010-7777-8888';
+  const r = mobileImport(JSON.stringify({ [a]: '' }));
+  return had && r.del === 1 && !mobileOf(state.rows[0]);
+}));
+check('한 사람만 고칠 수 있다', await page.evaluate(() => {
+  const a = rKey(state.rows[0]);
+  mobileImport(JSON.stringify({ [a]: '01011112222' }));
+  const r = mobileImport(JSON.stringify({ [a]: '010-5555-6666' }));
+  return r.n === 1 && mobileOf(state.rows[0]) === '010-5555-6666';
+}));
 
 // 5) 설정 동기화 경로에 얹혀 있다 (시트로 나간다)
 check('settings 키로 등록됨', await page.evaluate(() =>

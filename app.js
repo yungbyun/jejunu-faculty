@@ -1436,7 +1436,8 @@ function bindOutreach() {
         <span class="st-note" data-impname></span>
       </div>
       <p class="st-note imp-or">또는 <b>{"학과/이름": "010-0000-0000"}</b> 꼴의 내용을 아래에 직접 붙여넣으십시오.
-      (파일 <b>경로</b>가 아니라 파일 <b>안의 내용</b>입니다.)</p>
+      (파일 <b>경로</b>가 아니라 파일 <b>안의 내용</b>입니다.)
+      한 사람만 넣거나 고칠 때도 이렇게 하시면 되고, <b>번호를 비워 두면 지웁니다.</b></p>
       <textarea rows="5" data-imptext placeholder='{"컴퓨터공학과/변영철": "010-0000-0000"}'></textarea>
       <div class="ep-acts"><button type="button" class="btn" data-imprun>붙여넣은 내용 가져오기</button></div>
       <p class="st-note" data-impmsg></p></div>`;
@@ -1447,7 +1448,7 @@ function bindOutreach() {
       if (r.err) { msg.textContent = r.err; msg.classList.add('bad'); return; }
       msg.classList.toggle('bad', r.n === 0);
       const cut = a => a.slice(0, 8).join(', ') + (a.length > 8 ? ' 외 ' + (a.length - 8) + '명' : '');
-      const parts = [`${r.total}개 중 ${r.n}명 반영했습니다`];
+      const parts = [`${r.total}개 중 ${r.n}명 반영했습니다${r.del ? ` (${r.del}명 지움)` : ''}`];
       if (r.unknown.length) parts.push(`명단에 없는 이름 ${r.unknown.length}개 — ${cut(r.unknown)}`);
       if (r.badnum.length) parts.push(`번호 모양이 이상함 ${r.badnum.length}개 — ${cut(r.badnum)}`);
       msg.textContent = parts.join(' / ');
@@ -1919,14 +1920,19 @@ function mails() { if (!mailMap) mailMap = loadObj(MAIL_KEY); return mailMap; }
  * 로그인한 본인에게만 보인다. */
 function mobiles() { if (!mobileMap) mobileMap = loadObj(MOBILE_KEY); return mobileMap; }
 const mobileOf = p => mobiles()[rKey(p)] || '';
+/* 010-0000-0000 꼴로 맞춘다. 자릿수가 안 맞으면 빈 문자열 */
+function fmtMobile(v) {
+  const d = String(v == null ? '' : v).replace(/[^\d]/g, '');
+  if (d.length === 11) return d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  if (d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  return '';
+}
+/* 한 사람 번호를 넣거나(값) 지운다(빈 값) */
 function setMobile(p, v) {
-  const m = mobiles(), k = rKey(p);
-  v = String(v || '').replace(/[^\d]/g, '');
-  if (v.length === 11) v = v.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-  else if (v.length === 10) v = v.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-  else v = '';
-  v ? m[k] = v : delete m[k];
+  const m = mobiles(), k = rKey(p), f = fmtMobile(v);
+  f ? m[k] = f : delete m[k];
   saveObj(MOBILE_KEY, m, SET_MB);
+  return f;
 }
 /* 한 번에 가져오기 — 키는 "<학과>/<이름>", "<학과>/<slug>", 또는 이름만 (겹치지 않을 때).
  * 어느 쪽으로 줘도 받는다. 못 받은 것은 세어서 돌려주고, 화면이 그대로 보여 준다. */
@@ -1951,19 +1957,23 @@ function mobileImport(text) {
   dupe.forEach(n => by.delete(n));          // 동명이인은 학과를 붙여야만 받는다
 
   const m = mobiles(), unknown = [], badnum = [];
-  let n = 0;
+  let n = 0, del = 0;
   for (const [k0, raw] of Object.entries(v)) {
     const k = String(k0).trim();
     const p = by.get(k) || by.get(k.replace(/\s+/g, ''));
     if (!p) { unknown.push(k); continue; }
-    const d = String(raw || '').replace(/[^\d]/g, '');
-    if (d.length !== 11 && d.length !== 10) { badnum.push(k); continue; }
-    m[rKey(p)] = d.length === 11 ? d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')
-                                 : d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+    if (String(raw == null ? '' : raw).trim() === '') {   // 빈 값이면 지운다
+      if (m[rKey(p)]) del++;
+      delete m[rKey(p)];
+      continue;
+    }
+    const f = fmtMobile(raw);
+    if (!f) { badnum.push(k); continue; }
+    m[rKey(p)] = f;
     n++;
   }
   saveObj(MOBILE_KEY, m, SET_MB);
-  return { n, skip: unknown.length + badnum.length, unknown, badnum, total: Object.keys(v).length };
+  return { n, del, skip: unknown.length + badnum.length, unknown, badnum, total: Object.keys(v).length };
 }
 
 /* 메일을 몇 번 보냈는지. 학과 화면의 방문 카운터와 같은 모양이지만 저장 자리는 다르다
@@ -2829,11 +2839,6 @@ function openDrawer(p, d) {
         </div>
       </div>
 
-      <div class="d-section"><h3>핸드폰</h3>
-        <input type="tel" class="d-mob" data-key="${esc(rKey(p))}" value="${esc(mobileOf(p))}" placeholder="010-0000-0000" aria-label="${esc(p.name)} 핸드폰 번호" autocomplete="off">
-        <p class="st-note">비공개 시트에만 저장됩니다. 공개되는 파일에는 들어가지 않습니다.</p>
-      </div>
-
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <textarea class="memo" data-key="${esc(rKey(p))}" rows="3" maxlength="2000" placeholder="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${esc(getMemo(p))}</textarea>
@@ -2855,13 +2860,6 @@ function openDrawer(p, d) {
     </div>`;
   bindRates($panel);
   bindNotes($panel);
-  const mob = $panel.querySelector('.d-mob');
-  mob?.addEventListener('change', () => {
-    setMobile(p, mob.value);
-    mob.value = mobileOf(p);
-    flashStatus(mobileOf(p) ? `${p.name} 교수님 핸드폰을 저장했습니다` : '핸드폰 번호를 지웠습니다');
-    render();
-  });
   bindAix($panel, p, d);
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
