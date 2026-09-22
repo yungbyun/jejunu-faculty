@@ -351,15 +351,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .prof[data-rating="부"]:hover,.prof[data-rating="비"]:hover{opacity:1}
 .rate--wide{position:static;display:flex;flex-wrap:wrap;gap:6px;padding:0;border:0;border-radius:0;
   background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-.rate--wide .rate__b{width:auto;height:auto;border-radius:999px;padding:7px 12px;gap:5px;
-  display:inline-flex;align-items:center;border:1px solid var(--line-2);background:var(--surface);
-  color:var(--ink-2);font-size:13.5px;font-weight:800}
-.rate--wide .rate__b small{font-weight:600;font-size:12px;color:var(--ink-3)}
+.rate--wide .rate__b{width:38px;height:38px;border-radius:50%;
+  display:inline-grid;place-items:center;border:1px solid var(--line-2);background:var(--surface);
+  color:var(--ink-2);font-size:14.5px;font-weight:800}
 .rate--wide .rate__b:hover{background:var(--surface);border-color:var(--rc);color:var(--rc)}
-.rate--wide .rate__b:hover small{color:var(--rc)}
 /* 뒤에 오는 규칙이 이기므로 눌린 모습을 여기서 다시 적어 준다 */
 .rate--wide .rate__b[aria-pressed="true"]{background:var(--rc);border-color:var(--rc);color:#fff}
-.rate--wide .rate__b[aria-pressed="true"] small{color:#fff;opacity:.9}
 .rate--big{position:static;display:inline-flex;box-shadow:none;background:var(--surface-2)}
 .d-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .d-top .d-rank{margin-bottom:0}

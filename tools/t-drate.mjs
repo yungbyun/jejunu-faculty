@@ -22,7 +22,21 @@ await page.waitForSelector('.rate--wide',{timeout:10000});
 t('선호도 단추 5개', await page.locator('.rate--wide .rate__b').count()===5, String(await page.locator('.rate--wide .rate__b').count()));
 t('비(평가제외)는 없음', await page.evaluate(()=>![...document.querySelectorAll('.rate--wide .rate__b')].some(b=>b.dataset.val==='비')));
 t('확·긍·중·모·부 순서', await page.evaluate(()=>[...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join(''))==='확긍중모부');
-t('이름도 함께 보임', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').textContent.replace(/\s+/g,''))==='확확실');
+t('글자만 (이름 없음)', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').textContent.trim())==='확');
+t('뜻은 도움말로', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').getAttribute('title'))==='확실');
+
+// 만난 횟수 카운터
+t('상세에 만난 횟수', await page.locator('#drawer .counter').count()===1);
+const dk = await page.evaluate(()=>document.querySelector('#drawer .counter').dataset.key);
+await page.locator('#drawer .counter [data-inc]').click();
+await page.waitForTimeout(300);
+await page.locator('#drawer .counter [data-inc]').click();
+await page.waitForTimeout(300);
+t('+ 를 두 번 누르면 2', await page.evaluate(k=>getNote(k).met===2, dk), String(await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent)));
+await page.locator('#drawer .counter [data-dec]').click();
+await page.waitForTimeout(300);
+t('− 로 줄어듦', await page.evaluate(k=>getNote(k).met===1, dk));
+t('화면 숫자도 같이', await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent)==='1');
 
 // 2) 고르면 저장된다
 await page.locator('.rate--wide .rate__b[data-val="긍"]').click();

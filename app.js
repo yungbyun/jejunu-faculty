@@ -2051,13 +2051,13 @@ function rateChips(p, big = false) {
   </div>`;
 }
 
-/* 상세 화면용 — 이름을 함께 보여 주는 넓은 선호도 줄. 고르는 동작은 bindRates 가 그대로 맡는다
+/* 상세 화면용 — 카드보다 큼직한 선호도 줄. 고르는 동작은 bindRates 가 그대로 맡는다
  * (`.rate[data-key]` 만 있으면 눌러도 되고 저장·갱신도 알아서 된다). */
 const RATE_WIDE = CONFIG.RATINGS.LABELS.filter(r => r !== '비');   // 비(평가제외)는 학과 카드에서만
 function rateWide(p) {
   const cur = getRating(p);
   return `<div class="rate rate--wide" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
-    ${RATE_WIDE.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})"><b>${esc(r)}</b><small>${esc(CONFIG.RATINGS.NAMES[r] || '')}</small></button>`).join('')}
+    ${RATE_WIDE.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
   </div>`;
 }
 
@@ -2893,6 +2893,10 @@ function openDrawer(p, d) {
       <div class="d-section"><h3>선호도</h3>
         ${rateWide(p)}
         ${getRating(p) === '비' ? `<p class="st-note">지금 <b>비(연구년 등으로 제외)</b> 로 되어 있습니다. 이 값은 학과 화면의 카드에서 바꿀 수 있습니다.</p>` : ''}
+      </div>
+
+      <div class="d-section"><h3>만난 횟수</h3>
+        ${meetCounter(p)}
       </div>
 
       <div class="d-section"><h3>메모</h3>
