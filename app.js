@@ -1299,7 +1299,7 @@ function renderOutreach() {
       <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
       <div class="ot-imp">
         <button type="button" class="btn" data-impopen>핸드폰 번호 한 번에 가져오기</button>
-        <span class="st-note">지금 <b data-impn>${mobileCount()}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다${mobileStale() ? ` · <b data-impold>명단에 없는 번호 ${mobileStale()}건</b>` : ''}</span>
+        <span class="st-note">지금 <b data-impn>${mobileCount()}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다${mobileStale() ? ` · <b data-impold>명단에 없는 번호 ${mobileStale()}건</b> <button type="button" class="ot-imp__x" data-impclean title="명단에 없는 번호를 지웁니다">지우기</button>` : ''}</span>
       </div>
       <div class="ot-impwrap" hidden></div>
     </div>`;
@@ -1430,6 +1430,13 @@ function schedRow(p, k) {
 }
 
 function bindOutreach() {
+  $app.querySelector('[data-impclean]')?.addEventListener('click', () => {
+    const n = mobileStale();
+    if (!n) return;
+    if (!confirm(`명단에 없는 번호 ${n}건을 지울까요? 퇴직 등으로 명단에서 빠진 교수의 번호입니다.`)) return;
+    flashStatus(`명단에 없는 번호 ${mobilePrune()}건을 지웠습니다`);
+    renderOutreach();
+  });
   $app.querySelector('[data-impopen]')?.addEventListener('click', e => {
     const wrap = $app.querySelector('.ot-impwrap');
     if (!wrap) return;
@@ -1971,6 +1978,14 @@ function mobiles() { if (!mobileMap) mobileMap = loadObj(MOBILE_KEY); return mob
 const mobileCount = () => state.rows.filter(p => mobileOf(p)).length;
 /* 명단에 없는데 남아 있는 번호 (퇴직·소속 변경) */
 const mobileStale = () => Object.keys(mobiles()).length - mobileCount();
+/* 그 번호들을 지운다. 가져오기는 명단에 없는 이름을 건너뛰므로 이 길이 없으면 지울 수 없다. */
+function mobilePrune() {
+  const m = mobiles(), live = new Set(state.rows.map(rKey));
+  let n = 0;
+  for (const k of Object.keys(m)) if (!live.has(k)) { delete m[k]; n++; }
+  if (n) saveObj(MOBILE_KEY, m, SET_MB);
+  return n;
+}
 const mobileOf = p => mobiles()[rKey(p)] || '';
 /* 010-0000-0000 꼴로 맞춘다. 자릿수가 안 맞으면 빈 문자열 */
 function fmtMobile(v) {

@@ -102,6 +102,15 @@ check('화면 숫자도 교수 수와 같음', await page.evaluate(() =>
   await page.evaluate(() => document.querySelector('[data-impn]').textContent));
 check('남은 번호가 있으면 알려 준다', await page.evaluate(() =>
   !!document.querySelector('[data-impold]') && document.querySelector('[data-impold]').textContent.includes('1건')));
+
+check('지우기 단추가 보인다', await page.evaluate(() => !!document.querySelector('[data-impclean]')));
+await page.evaluate(() => { window.confirm = () => true; });
+await page.click('[data-impclean]');
+await page.waitForTimeout(500);
+check('명단에 없는 번호가 지워짐', await page.evaluate(() => mobileStale() === 0));
+check('명단에 있는 번호는 그대로', await page.evaluate(() => mobileCount() === state.rows.length),
+  `${await page.evaluate(() => mobileCount())} / ${await page.evaluate(() => state.rows.length)}`);
+check('다 지우면 단추도 사라짐', await page.evaluate(() => !document.querySelector('[data-impclean]')));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
 
 check('settings 키로 등록됨', await page.evaluate(() =>
