@@ -776,10 +776,21 @@ function smsTest() {
   Logger.log(r.ok ? ('보냈습니다 → ' + to) : ('보내지 못했습니다 — ' + r.error));
 }
 
-/* 대기열에 시험용 문자 한 건을 1분 뒤로 넣습니다. 트리거가 실제로 집어 가는지 보려는 것입니다. */
+/* 대기열에 시험용 문자 한 건을 1분 뒤로 넣습니다. 트리거가 실제로 집어 가는지 보려는 것입니다.
+ * 연습 모드에서는 어디로도 나가지 않으므로 번호가 없어도 됩니다 — 가짜 번호로 넣습니다.
+ * 진짜로 보내는 상태라면 SMS_TEST_TO 가 반드시 있어야 하고, 없으면 넣지 않습니다. */
 function smsQueueTest() {
-  const to = smsProps_().getProperty('SMS_TEST_TO');
-  if (!to) { Logger.log('SMS_TEST_TO 를 먼저 넣으십시오.'); return; }
+  let to = smsProps_().getProperty('SMS_TEST_TO');
+  if (!to) {
+    if (!outDry_()) {
+      Logger.log('지금은 연습 모드가 아닙니다. 진짜로 나갈 수 있으므로 넣지 않았습니다.'
+        + String.fromCharCode(10)
+        + 'SMS_TEST_TO 에 본인 번호를 넣거나, outboxDryRun() 으로 연습 모드로 바꾸십시오.');
+      return;
+    }
+    to = '01000000000';
+    Logger.log('SMS_TEST_TO 가 없어 가짜 번호(010-0000-0000)로 넣습니다. 연습 모드라 어디로도 안 나갑니다.');
+  }
   const email = Session.getEffectiveUser().getEmail().toLowerCase();
   const sh = outSheet();
   const at = new Date(Date.now() + 60000);
