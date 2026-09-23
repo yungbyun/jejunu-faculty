@@ -20,7 +20,8 @@ const OUT_HEADER = ['id', 'email', 'to', 'key', 'subject', 'body', 'send_at', 's
 const OUT_CH = 10;              // channel 열 (0부터). 'mail' 또는 'sms'
 // status: queued(대기) / sent(보냄) / error(실패) / canceled(취소)
 const OUT_MAX_PER_RUN = 8;      // 트리거가 한 번 돌 때 보내는 최대 통수 — 한꺼번에 우르르 나가지 않게
-const OUT_MIN_QUOTA = 10;       // 남은 하루 발송 할당량이 이보다 적으면 그날은 멈춘다
+const OUT_MIN_QUOTA = 10;
+const OUT_MAX_BULK = 200;       // 한 번에 예약할 수 있는 최대 인원 — 실수로 수천 건이 들어가지 않게       // 남은 하루 발송 할당량이 이보다 적으면 그날은 멈춘다
 const OUT_MAX_AHEAD = 60;       // 예약은 최대 며칠 뒤까지
 const HEADER = ['email', 'dept_id', 'slug', 'name', 'rating', 'updated_at', 'met', 'memo']; // met: 만난 횟수, memo: 메모 (열이 없으면 자동 추가)
 // 선호도 값: 확(확실) · 긍(긍정) · 중(보통) · 모(모름) · 부(부정) · 비(평가제외 — 연구년 등)
@@ -99,6 +100,7 @@ function doPost(e) {
   }
   if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), dry: outDry_(), sms: smsReady_(), quota: MailApp.getRemainingDailyQuota() });
   if (body.action === 'queue') return outQueue(email, body);
+  if (body.action === 'queueMany') return outQueueMany(email, body);
   if (body.action === 'unqueue') {
     if (!body.id) return out({ error: 'missing id' });
     return out({ ok: outCancel(email, String(body.id)) });
@@ -434,6 +436,53 @@ function airewrite(email, body) {
 function outProps_() { return PropertiesService.getScriptProperties(); }
 function outboxOn_() { return outProps_().getProperty('OUTBOX') === 'on'; }
 function outDry_() { return outProps_().getProperty('OUTBOX_DRYRUN') === 'yes'; }
+
+/* 여러 사람에게 한 번에 예약합니다. 한 사람씩 69번 부르면 느리고 중간에 끊기기 쉽습니다.
+ * 같은 사람에게 아직 안 나간 같은 채널 예약이 있으면 그것을 새 내용으로 덮습니다. */
+function outQueueMany(email, b) {
+  const items = b.items;
+  if (!Array.isArray(items) || !items.length) return out({ error: 'no items' });
+  if (items.length > OUT_MAX_BULK) return out({ error: 'too many' });
+  const ch = String(b.channel || 'sms') === 'sms' ? 'sms' : 'mail';
+  const at = new Date(String(b.sendAt || ''));
+  if (isNaN(at.getTime())) return out({ error: 'bad sendAt' });
+  if (at.getTime() > Date.now() + OUT_MAX_AHEAD * 86400000) return out({ error: 'too far ahead' });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = outSheet(), last = sh.getLastRow();
+    const vals = last >= 2 ? sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues() : [];
+    const add = [];
+    let n = 0, skip = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i] || {};
+      let to = String(it.to || '').trim();
+      if (ch === 'sms') {
+        to = to.replace(/[^\d]/g, '');
+        if (!/^01[016789]\d{7,8}$/.test(to)) { skip++; continue; }
+      } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { skip++; continue; }
+      const text = String(it.body || '').slice(0, ch === 'sms' ? 2000 : 20000);
+      if (!text.trim()) { skip++; continue; }
+      const subject = ch === 'sms' ? '' : String(it.subject || '').slice(0, 300);
+      const row = [Utilities.getUuid().slice(0, 8), email, to, String(it.key || ''),
+                   subject, text, at, 'queued', '', '', ch];
+      let replaced = false;
+      for (let r = 0; r < vals.length; r++) {
+        if (String(vals[r][1]).toLowerCase() === email && String(vals[r][2]) === to
+            && String(vals[r][OUT_CH] || 'mail') === ch && String(vals[r][7]) === 'queued') {
+          sh.getRange(r + 2, 1, 1, OUT_HEADER.length).setValues([row]);
+          vals[r] = row;
+          replaced = true; break;
+        }
+      }
+      if (!replaced) add.push(row);
+      n++;
+    }
+    if (add.length) sh.getRange(last + 1, 1, add.length, OUT_HEADER.length).setValues(add);
+    return out({ ok: true, n: n, skip: skip });
+  } finally { lock.releaseLock(); }
+}
 
 function outSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();

@@ -75,14 +75,12 @@ t('붙여넣기 막음(서식 제거)', await page.evaluate(()=>{
   return blocked;
 }));
 
-// 접촉 화면에도 그대로
-await page.evaluate(()=>{ location.hash='#/outreach'; render(); });
-await page.waitForTimeout(800);
+// 상세 화면을 다시 열어도 꾸밈이 그대로 보인다
 await page.evaluate(k=>applyEntry(k,{memo:'오고 출신, **강창남 교수** 후배.'}), info.k);
-await page.evaluate(k=>{ OUT.open=k; renderOutreach(); }, info.k);
-await page.waitForSelector('.oc__memo',{timeout:15000});
-const ocm = await page.evaluate(()=>document.querySelector('.oc__memo')?.innerHTML ?? '');
-t('접촉 화면에도 굵게', ocm.includes('<b>강창남 교수</b>'), ocm);
+await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
+await page.waitForSelector('.memo[contenteditable]',{timeout:10000});
+const html = await page.evaluate(()=>document.querySelector('.memo').innerHTML);
+t('다시 열어도 굵게 그대로', html.includes('<b>강창남 교수</b>'), html);
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);

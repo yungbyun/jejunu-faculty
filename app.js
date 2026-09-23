@@ -861,8 +861,7 @@ function bindLetters() {
 /* ---------- 화면: 접촉 (지지 요청 메시지 만들고 관리하기) ----------
  * 교수마다 성향(연·강·둘)을 달아 두고, 그 성향과 data/insights 의 "AI 융합 방향"을 끼워
  * 메일·문자·카톡 초안을 그 자리에서 조립한다. 초안은 만들고 복사할 뿐, 이 앱이 보내지는 않는다. */
-const CHANNELS = ['메일', '문자', '카톡'];
-const OUT = { dept: '전체', open: '', ch: '메일', ep: 1, edit: false };
+const CHANNELS = ['메일', '문자', '카톡'];   // 원고 탭에서 채널별 원고를 쓰는 데 쓴다
 const ME = { name: '변영철', dept: '컴퓨터공학과', room: '공과대학 4호관 D407', email: 'ycb@jejunu.ac.kr' };
 
 /* 그 교수 연구에 AI 가 어떻게 붙는지 한 줄. insights 의 결론 문장을 그대로 쓴다. */
@@ -872,7 +871,6 @@ function insLine(p, data) {
   const it = ((v.ai || {}).items || [])[0];
   return (it && it.concl) || (v.ai || {}).sum || '';
 }
-const outFilter = p => OUT.dept === '전체' || p.dept_id === OUT.dept;
 
 
 
@@ -921,13 +919,6 @@ function epRaw(n, p, ch) {
   if (pr[f]) return pr[f];
   if (dp[f]) return dp[f];
   return f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
-}
-/* 어느 단계 글이 쓰이고 있는지 */
-function epLevel(n, p, ch) {
-  const f = CH_FIELD[ch] || 'body', ov = epov(n);
-  if (((ov.prof || {})[rKey(p)] || {})[f]) return '교수';
-  if (((ov.dept || {})[p.dept_id] || {})[f]) return '학과';
-  return '전체';
 }
 function epSetOv(n, kind, id, ch, text) {
   const ov = epov(n), f = CH_FIELD[ch] || 'body';
@@ -1110,7 +1101,7 @@ const EP1 = {
 const OB = { rows: new Map(), on: false, dry: false, sms: false, quota: null, loaded: false, needDeploy: false };
 /* 같은 교수라도 메일 예약과 문자 예약은 따로 잡힌다 */
 const obKey = (p, ch) => `${rKey(p)}::${ch === '문자' ? 'sms' : 'mail'}`;
-const obOf = (p, ch) => OB.rows.get(obKey(p, ch || OUT.ch)) || null;
+const obOf = (p, ch) => OB.rows.get(obKey(p, ch || '문자')) || null;
 const obCount = () => [...OB.rows.values()].filter(x => x.status === 'queued').length;
 
 async function obLoad(force) {
@@ -1135,7 +1126,7 @@ async function obLoad(force) {
 async function obQueue(p, subject, body, whenLocal, ch) {
   const at = new Date(whenLocal);
   if (isNaN(at.getTime())) { flashStatus('보낼 시각을 확인해 주세요', true); return; }
-  const sms = (ch || OUT.ch) === '문자';
+  const sms = (ch || '문자') === '문자';
   const to = sms ? mobileOf(p) : p.email;
   if (!to) { flashStatus(sms ? '이 교수님은 핸드폰 번호가 없습니다' : '이 교수님은 메일 주소가 없습니다', true); return; }
   try {
@@ -1161,74 +1152,6 @@ const dtLocal = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getD
 /* 기본값은 내일 오전 9시 — 평일 아침이 가장 열어 볼 만한 시간이다 */
 function nextMorning() { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }
 
-const ochips = (name, vals, cur) => vals.map(v =>
-  `<button type="button" class="chip" data-of="${esc(name)}" data-v="${esc(v)}" aria-pressed="${cur === v}">${esc(v)}</button>`).join('');
-
-/* 회차 고르기 줄과 원고 편집 패널 */
-function epBar() {
-  const nos = epNos();
-  if (!nos.includes(OUT.ep)) OUT.ep = nos[0] || 0;
-  const ep = epOf(OUT.ep);
-  const doneN = state.rows.filter(p => epDone(p, OUT.ep)).length;
-  const tabs = nos.map(n => `<button type="button" class="chip" data-ep="${n}" aria-pressed="${OUT.ep === n}">${n}회차</button>`).join('');
-  const head = `<div class="ot-f__r"><span class="ot-f__l">회차<a class="chip ep-tab" href="#/letters" title="원고 탭에서 회차 전체를 보고 고칩니다">원고 탭 ↗</a></span><div class="filters">
-      ${tabs}
-      <button type="button" class="chip ep-add" data-epadd title="회차 추가">+</button>
-      ${ep ? `<button type="button" class="btn" data-epedit>${OUT.edit ? '원고 닫기' : '원고 고치기'}</button>` : ''}
-      ${ep ? `<span class="st-note">이 회차 발송 <b>${doneN}</b>/${state.rows.length}</span>` : ''}
-    </div></div>`;
-  if (!ep || !OUT.edit) return `<div class="ot-f ot-ep">${head}</div>`;
-  if (OUT.dept !== '전체') return `<div class="ot-f ot-ep">${head}${epDeptEdit(ep)}</div>`;
-  const segRows = SEG_KEYS.map(k => {
-    const n = state.rows.filter(p => segOf(p) === k).length;
-    return `<label class="ep-seg"><span>${esc(SEG[k].name)} <i>${n}명</i></span>
-      <textarea rows="2" data-seg="${k}">${esc((ep.seg || {})[k] || '')}</textarea></label>`;
-  }).join('');
-  return `<div class="ot-f ot-ep">${head}
-    <div class="ep-edit">
-      <label class="ep-f"><span>제목</span><input type="text" data-epf="subject" value="${esc(ep.subject || '')}"></label>
-      <label class="ep-f"><span>메일 본문</span><textarea rows="14" data-epf="body">${esc(ep.body || '')}</textarea></label>
-      <label class="ep-f"><span>문자 본문 <i>짧게 — 길면 안 읽힙니다</i></span><textarea rows="7" data-epf="sms">${esc(ep.sms || '')}</textarea></label>
-      <label class="ep-f"><span>카톡 본문 <i>비워 두면 문자 본문을 씁니다</i></span><textarea rows="9" data-epf="kakao">${esc(ep.kakao || '')}</textarea></label>
-      <p class="st-note">본문 안에 <b>{이름}</b> <b>{학과}</b> <b>{개인화}</b> <b>{연구}</b> 를 쓰면 사람마다 바뀝니다. {개인화} 자리에 아래 갈래 문장이, {연구} 자리에 그 교수님 "AI 융합 방향" 한 줄이 들어갑니다.</p>
-      <div class="ep-segs">${segRows}</div>
-      <div class="ep-acts">
-        <button type="button" class="btn" data-epsave>저장</button>
-        ${epNos().length > 1 ? `<button type="button" class="btn" data-epdel>이 회차 지우기</button>` : ''}
-      </div>
-    </div></div>`;
-}
-
-/* 학과 하나를 골랐을 때의 원고 편집 — 비워 두면 전체 원고를 그대로 쓴다 */
-function epDeptEdit(ep) {
-  const id = OUT.dept, d = state.depts.find(x => x.id === id);
-  if (!d) return '';
-  const ov = ((epov(OUT.ep).dept || {})[id]) || {};
-  const sample = d.profs[0];
-  const rows = CHANNELS.map(ch => {
-    const f = CH_FIELD[ch];
-    const base = ch === '카톡' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
-    return `<label class="ep-f"><span>${esc(ch)} 원고 ${ov[f] ? '<i>이 학과 전용</i>' : '<i>비어 있음 — 전체 원고를 씁니다</i>'}</span>
-      <textarea rows="${ch === '메일' ? 12 : 7}" data-dov="${esc(f)}" placeholder="${esc(base.slice(0, 400))}">${esc(ov[f] || '')}</textarea></label>`;
-  }).join('');
-  return `<div class="ep-edit">
-    <p class="ep-who"><b>${esc(d.name)}</b> 교수 ${d.profs.length}명에게 나갈 원고입니다. 비워 두면 전체 원고가 그대로 나갑니다.</p>
-    <label class="ep-f"><span>개인화 한 줄 <i>{개인화} 자리에 들어갑니다. 비우면 갈래 문장(${esc(SEG[segOf(sample)].name)})을 씁니다</i></span>
-      <input type="text" data-dline value="${esc((ep.dept || {})[id] || '')}"></label>
-    ${rows}
-    <div class="ep-ai">
-      <input type="text" class="ep-how" data-how placeholder="AI에게 줄 주문 (비우면 '이 학과에 맞게 자연스럽게')">
-      <button type="button" class="btn" data-aidept>AI로 이 학과에 맞게 다시 쓰기</button>
-      <span class="st-note" data-aimsg></span>
-    </div>
-    <div class="ep-acts">
-      <button type="button" class="btn" data-dsave>저장</button>
-      <button type="button" class="btn" data-dcopy>전체 원고 가져오기</button>
-      <button type="button" class="btn" data-dclear>이 학과 원고 비우기</button>
-    </div>
-  </div>`;
-}
-
 /* 예약 발송이 지금 어떤 상태인지 한 줄로 알려 준다 */
 function obNotice() {
   if (!CONFIG.RATINGS.API_URL || !state.session) return '';
@@ -1243,66 +1166,88 @@ function obNotice() {
   return `<p class="ot-ok">예약 <b>${nq}건</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
 }
 
+/* ---------- 화면: 접촉 (문자 보내기) ----------
+ * 예전에는 회차 원고를 사람마다 펼쳐 보며 AI 로 고쳐 쓰는 화면이었다. 지금은 그 반대다 —
+ * 본문 하나를 직접 쓰고, 보낼 사람을 골라, 한 번에 예약한다.
+ * 원고를 다듬는 일은 원고 탭이 맡는다. */
+const OUT = { ep: 1, depts: new Set(), off: new Set(), text: '', at: '' };
+
+/* 지금 화면에 보이는 대상 (학과를 고르지 않았으면 전원) */
+const outTargets = () => state.rows.filter(p => !OUT.depts.size || OUT.depts.has(p.dept_id));
+/* 그중 실제로 나갈 사람 — 번호가 있고 해제하지 않은 사람 */
+const outPicked = () => outTargets().filter(p => mobileOf(p) && !OUT.off.has(rKey(p)));
+/* 사람마다 이름·학과를 넣어 완성한 문장 */
+const outBody = (p, t) => String(t == null ? OUT.text : t)
+  .replace(/\{이름\}/g, p.name)
+  .replace(/\{학과\}/g, p.dept_name);
+const outLenNote = n => `${n}자${n > 45 ? ' — 45자를 넘어 장문(LMS)으로 나갑니다' : ''}`;
+const OUT_SAMPLE = { name: '○○○', dept_name: '○○학과' };
+
 function renderOutreach() {
   obLoad();
-  const all = state.rows;
-  const rows = all.filter(outFilter);
-  const done = epOf(OUT.ep) ? all.filter(p => epDone(p, OUT.ep)).length : 0;
-  const mailed = all.filter(p => mailOf(p)).length;
-
-  const head = `
-    <div class="ot-head">
-      <div class="ot-head__n">${done}<small>/${all.length}명</small></div>
-      <div class="ot-head__m">
-        <span>${OUT.ep}회차 보냄 <b>${done}</b></span>
-        <span>남음 <b>${all.length - done}</b></span>
-        <span>메일 보낸 분 <b>${mailed}</b></span>
-        ${OB.loaded && !OB.needDeploy ? `<span>예약 <b>${obCount()}</b></span>` : ''}
-      </div>
-      <div class="meter" aria-label="이 회차 발송률"><span style="width:${Math.round(done / all.length * 100)}%"></span></div>
-    </div>`;
-
-  const deptName = id => id === '전체' ? '전체' : (state.depts.find(d => d.id === id) || {}).name || id;
-  const filters = `
-    <div class="ot-f">
-      <div class="ot-f__r"><span class="ot-f__l">학과</span><div class="filters">${
-        ['전체', ...state.depts.map(d => d.id)].map(id =>
-          `<button type="button" class="chip" data-of="dept" data-v="${esc(id)}" aria-pressed="${OUT.dept === id}">${esc(deptName(id))}</button>`).join('')}</div></div>
-    </div>
-    ${epBar()}
-    ${obNotice()}
-`;
-
-  const list = rows.length ? rows.map(p => {
-    const k = rKey(p), open = OUT.open === k;
-    const ob = obOf(p);
-    const obTag = !ob ? ''
-      : ob.status === 'queued' ? `<span class="oc__ob oc__ob--q">예약 ${esc(fmtWhen(new Date(ob.sendAt)))}</span>`
-      : ob.status === 'sent' ? `<span class="oc__ob oc__ob--s">발송됨</span>`
-      : `<span class="oc__ob oc__ob--e" title="${esc(ob.error || '')}">발송 실패</span>`;
-    return `
-    <div class="oc ${open ? 'oc--open' : ''}" data-k="${esc(k)}">
-      <div class="oc__h">
-        <button type="button" class="oc__who" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기" aria-label="${esc(p.name)} 교수 상세 보기">
-          <span class="oc__ph"><img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" onload="this.classList.add('loaded')" onerror="photoErr(this,'hide')"></span>
-          <span class="oc__n"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small></span>
-        </button>
-        ${epOf(OUT.ep) && epDone(p, OUT.ep) ? `<span class="oc__ep">${OUT.ep}회차 보냄</span>` : ''}
-        ${mailOf(p) ? `<span class="oc__mc">메일 ${mailOf(p)}회</span>` : ''}
-        ${obTag}
-        ${p.email ? '' : '<span class="oc__no">메일 없음</span>'}
-        <button type="button" class="btn oc__go" data-open="${esc(k)}" aria-expanded="${open}">${open ? '접기' : '초안'}</button>
-      </div>
-      ${open ? `<div class="oc__d" data-draft="${esc(k)}"><p class="st-note">초안을 만드는 중…</p></div>` : ''}
-    </div>`;
-  }).join('') : `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong>필터를 바꿔 보세요.</div>`;
+  const targets = outTargets();
+  const picked = outPicked();
+  const noNum = targets.filter(p => !mobileOf(p));
+  const first = picked[0];
 
   $app.innerHTML = `
-    <div class="view outreach">
-      <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>접촉</span></div>
-      ${head}${filters}
-      <div class="ot-list">${list}</div>
-      <p class="st-note ot-foot">초안은 만들고 복사할 뿐입니다. 보내는 것은 직접 하셔야 합니다.</p>
+    <div class="view">
+      <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
+
+      <section class="ot-sec">
+        <div class="ot-sec__h"><h2>① 문자 쓰기</h2>
+          <a class="chip ep-tab" href="#/letters" title="원고 탭에서 회차를 보고 고칩니다">원고 탭 ↗</a>
+          <span class="st-note">{이름} 과 {학과} 는 사람마다 바뀝니다</span></div>
+        <textarea class="ot-msg" data-sms rows="7" placeholder="보낼 문자를 쓰십시오.">${esc(OUT.text)}</textarea>
+        <div class="ot-msg__b">
+          <span class="st-note" data-len>${esc(outLenNote(outBody(first || OUT_SAMPLE).length))}</span>
+          ${epNos().length ? `<span class="ot-load">
+            <select data-epsel aria-label="불러올 회차">${epNos().map(n =>
+              `<option value="${n}"${n === OUT.ep ? ' selected' : ''}>${n}회차 ${esc((epOf(n) || {}).name || '')}</option>`).join('')}</select>
+            <button type="button" class="btn" data-epload>원고 불러오기</button></span>` : ''}
+        </div>
+      </section>
+
+      <section class="ot-sec">
+        <div class="ot-sec__h"><h2>② 보낼 학과</h2>
+          <span class="st-note">여러 학과를 함께 고를 수 있습니다</span></div>
+        <div class="filters">
+          <button type="button" class="chip" data-dall aria-pressed="${!OUT.depts.size}">전체</button>
+          ${state.depts.map(d => `<button type="button" class="chip" data-dept="${esc(d.id)}" aria-pressed="${OUT.depts.has(d.id)}">${esc(d.name)} ${d.profs.length}</button>`).join('')}
+        </div>
+      </section>
+
+      <section class="ot-sec">
+        <div class="ot-sec__h"><h2>③ 받을 분</h2>
+          <span class="st-note"><b data-nsel>${picked.length}</b>명 선택됨${noNum.length ? ` · 번호 없어 제외 ${noNum.length}명` : ''}</span></div>
+        <div class="ot-acts">
+          <button type="button" class="btn" data-allon>전체 선택</button>
+          <button type="button" class="btn" data-alloff>전체 해제</button>
+        </div>
+        ${targets.length ? `<div class="ot-people">${targets.map(p => {
+          const k = rKey(p), num = mobileOf(p), on = num && !OUT.off.has(k);
+          return `<div class="ot-p${num ? '' : ' ot-p--no'}">
+            <label class="ot-p__c"><input type="checkbox" data-pick="${esc(k)}"${on ? ' checked' : ''}${num ? '' : ' disabled'}></label>
+            <button type="button" class="ot-p__n" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기">${esc(p.name)}</button>
+            <span class="ot-p__d">${esc(p.dept_name)}</span>
+            <span class="ot-p__m">${num ? esc(num) : '번호 없음'}</span>
+          </div>`; }).join('')}</div>` : `<div class="empty"><strong>고른 학과에 교수가 없습니다</strong></div>`}
+      </section>
+
+      <section class="ot-sec">
+        <div class="ot-sec__h"><h2>④ 보내기</h2></div>
+        <div class="ot-prev"><span class="ot-prev__h">${first ? `${esc(first.name)} 교수님께 이렇게 나갑니다` : '받을 분을 고르면 미리보기가 나옵니다'}</span>
+          <div class="ot-prev__b" data-prev>${esc(first ? outBody(first) : '')}</div></div>
+        <div class="ot-send">
+          <label class="ot-when"><span>보낼 시각</span>
+            <input type="datetime-local" data-at value="${esc(OUT.at || dtLocal(nextMorning()))}"></label>
+          <button type="button" class="btn btn--go" data-send${picked.length && OUT.text.trim() ? '' : ' disabled'}>${picked.length}명에게 보내기</button>
+        </div>
+        ${obNotice()}
+        <p class="st-note">예약해 두면 5분마다 도는 트리거가 조금씩 내보냅니다. 잘못 보냈다 싶으면 Apps Script 에서 <b>outboxStop()</b> 으로 남은 것을 막을 수 있습니다.</p>
+      </section>
+
+      <p class="st-note ot-foot">보내는 것은 서버가 합니다. 이 화면은 예약만 겁니다.</p>
       <div class="ot-imp">
         <button type="button" class="btn" data-impopen>핸드폰 번호 한 번에 가져오기</button>
         <span class="st-note">지금 <b data-impn>${mobileCount()}</b>명 저장돼 있습니다 — 비공개 시트에만 있습니다${mobileStale() ? ` · <b data-impold>명단에 없는 번호 ${mobileStale()}건</b> <button type="button" class="ot-imp__x" data-impclean title="명단에 없는 번호를 지웁니다">지우기</button>` : ''}</span>
@@ -1310,144 +1255,91 @@ function renderOutreach() {
       <div class="ot-impwrap" hidden></div>
     </div>`;
   bindOutreach();
-  if (OUT.open) fillDraft(OUT.open);
 }
 
-/* 펼친 행의 초안 채우기. 그 학과 insights 를 그때 한 번만 읽어 온다. */
-function fillDraft(k) {
-  const box = $app.querySelector(`[data-draft="${CSS.escape(k)}"]`);
-  const p = state.rows.find(x => rKey(x) === k);
-  if (!box || !p) return;
-  loadInsights(p.dept_id).then(data => {
-    if (OUT.open !== k) return;
-    const one = insLine(p, data);
-    const memo = (getNote(k) || {}).memo || '';
-    const ep = epOf(OUT.ep);
-    const body = epFinal(OUT.ep, p, OUT.ch, one);
-    const subject = epFill((ep || {}).subject || '', p, '');
-    const mailto = p.email
-      ? `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-      : '';
-    box.innerHTML = `
-      ${memo ? `<div class="oc__memo"><b>면담 메모</b> ${memoHtml(memo)}</div>` : ''}
-      <div class="oc__one${one ? '' : ' oc__one--no'}"><b>연구 한 줄</b> ${one ? esc(one) : '정리된 항목이 없어 부트캠프 이야기로 대신했습니다'}</div>
-      <div class="filters filters--ch">${CHANNELS.map(c =>
-        `<button type="button" class="chip" data-ch="${esc(c)}" aria-pressed="${OUT.ch === c}">${esc(c)}</button>`).join('')}</div>
-      ${OUT.ch === '메일' ? `<input type="text" class="oc__sub" value="${esc(subject)}" aria-label="제목">` : ''}
-      <textarea class="oc__ta" rows="${OUT.ch === '메일' ? 16 : 7}" aria-label="초안">${esc(body)}</textarea>
-      <div class="oc__len">${body.length}자${OUT.ch === '문자' && body.length > 45 ? ' — 45자를 넘으므로 장문(LMS)으로 나갑니다' : ''}</div>
-      <div class="oc__ai">
-        <span class="oc__lv">지금 쓰는 원고: <b>${esc(epLevel(OUT.ep, p, OUT.ch))}</b> 단계</span>
-        <input type="text" class="ep-how" data-how placeholder="AI에게 줄 주문 (비우면 '이 교수님께 맞게')">
-        <button type="button" class="btn" data-aiprof>AI로 다시 쓰기</button>
-        <button type="button" class="btn" data-psave>이 교수님 원고로 저장</button>
-        ${epLevel(OUT.ep, p, OUT.ch) === '교수' ? `<button type="button" class="btn" data-pclear>되돌리기</button>` : ''}
-        <span class="st-note" data-aimsg></span>
-      </div>
-      <div class="oc__acts">
-        <button type="button" class="btn" data-copy>복사</button>
-        ${mailto ? `<a class="btn" href="${mailto}">메일 앱에서 열기</a>` : `<span class="st-note">이메일 주소가 없어 문자·카톡으로 보내셔야 합니다</span>`}
-      </div>
-      ${epOf(OUT.ep) ? `<div class="oc__cnt">
-        <span class="ot-f__l">${OUT.ep}회차</span>
-        <button type="button" class="chip" data-epmark aria-pressed="${epDone(p, OUT.ep)}">${epDone(p, OUT.ep) ? '보냄 ✓' : '보냄으로 표시'}</button>
-        <span class="st-note">갈래: ${esc(SEG[segOf(p)].name)}</span>
-      </div>` : ''}
-      <div class="oc__cnt">
-        <span class="ot-f__l">보낸 횟수</span>
-        <div class="counter mailc ${mailOf(p) ? '' : 'counter--zero'}" data-mk="${esc(k)}" role="group" aria-label="${esc(p.name)} 메일 보낸 횟수">
-          <button type="button" class="counter__b" data-dec aria-label="1회 줄이기">−</button>
-          <span class="counter__n" aria-live="polite">${mailOf(p)}</span>
-          <button type="button" class="counter__b" data-inc aria-label="1회 늘리기">+</button>
-        </div>
-        <span class="st-note">'메일 앱에서 열기'를 누르면 저절로 1 늘어납니다.</span>
-      </div>
-      ${schedRow(p, k)}
-`;
-    box.querySelector('[data-copy]')?.addEventListener('click', async e => {
-      const ta = box.querySelector('.oc__ta');
-      try { await navigator.clipboard.writeText(ta.value); }
-      catch { ta.select(); try { document.execCommand('copy'); } catch {} }
-      e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
-    });
-    const ta = () => box.querySelector('.oc__ta');
-    const msg = (t, bad) => { const el = box.querySelector('[data-aimsg]'); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } };
-    box.querySelector('[data-psave]')?.addEventListener('click', () => {
-      epSetOv(OUT.ep, 'prof', k, OUT.ch, ta().value);
-      flashStatus(`${p.name} 교수님 ${OUT.ch} 원고를 따로 저장했습니다`);
-      renderOutreach();
-    });
-    box.querySelector('[data-pclear]')?.addEventListener('click', () => {
-      epSetOv(OUT.ep, 'prof', k, OUT.ch, '');
-      flashStatus('위 단계 원고로 되돌렸습니다');
-      renderOutreach();
-    });
-    box.querySelector('[data-aiprof]')?.addEventListener('click', async e => {
-      const btn = e.target; btn.disabled = true; msg('다시 쓰는 중…');
-      try {
-        const how = box.querySelector('[data-how]').value.trim() || '이 교수님께 맞게 자연스럽게 다듬어 주십시오.';
-        const t = await aiRewrite(epRaw(OUT.ep, p, OUT.ch), whoProf(p), how);
-        ta().value = t; msg('다 됐습니다. 확인하시고 저장하세요.');
-      } catch (err) { msg(err.message, true); }
-      btn.disabled = false;
-    });
-    box.querySelector('[data-epmark]')?.addEventListener('click', () => { epMark(p, OUT.ep, !epDone(p, OUT.ep)); renderOutreach(); });
-    box.querySelector('.mailc')?.addEventListener('click', e => {
-      const btn = e.target.closest('.counter__b'); if (!btn) return;
-      setMail(p, mailOf(p) + (btn.hasAttribute('data-inc') ? 1 : -1));
-      renderOutreach();
-    });
-    // 메일 앱을 여는 것은 보내러 간다는 뜻이므로 한 번 센다. 잘못 세면 − 로 줄이면 된다.
-    box.querySelector('.oc__acts a.btn')?.addEventListener('click', () => {
-      setMail(p, mailOf(p) + 1);
-      setTimeout(() => { if (OUT.open === k) renderOutreach(); }, 400);
-    });
-    box.querySelector('[data-queue]')?.addEventListener('click', () => {
-      const when = box.querySelector('.oc__at')?.value;
-      obQueue(p, box.querySelector('.oc__sub')?.value || '', box.querySelector('.oc__ta').value, when, OUT.ch);
-    });
-    box.querySelector('[data-unq]')?.addEventListener('click', e => obCancel(p, e.target.dataset.unq));
-    box.querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => { OUT.ch = b.dataset.ch; fillDraft(k); }));
-  });
-}
-
-/* 초안 패널의 예약 줄. 메일은 주소가, 문자는 번호가 있어야 나온다. 카톡은 보낼 길이 없다. */
-function schedRow(p, k) {
-  const sms = OUT.ch === '문자';
-  if (OUT.ch === '카톡') return '';
-  if (sms ? !mobileOf(p) : !p.email) return '';
-  if (!CONFIG.RATINGS.API_URL || !state.session) return `<p class="st-note oc__sch">로그인하면 이 자리에서 예약 발송을 걸 수 있습니다.</p>`;
-  if (OB.needDeploy) return `<p class="st-note oc__sch">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다.</p>`;
-  if (sms && !OB.sms) return `<p class="st-note oc__sch">문자를 보내려면 Apps Script 스크립트 속성에 <b>SMS_KEY · SMS_USER · SMS_FROM</b> 을 넣으십시오. 넣기 전에도 <b>연습 모드</b>로 대기열은 시험해 볼 수 있습니다.</p>`;
-  const ob = obOf(p);
-  if (ob && ob.status === 'queued') {
-    return `<div class="oc__sch"><span class="ot-f__l">예약</span>
-      <span class="oc__schw">${esc(fmtWhen(new Date(ob.sendAt)))}에 보냄</span>
-      <button type="button" class="btn" data-unq="${esc(ob.id)}">예약 취소</button>
-      <span class="st-note">취소는 아직 안 나간 것만 됩니다.</span></div>`;
-  }
-  if (ob && ob.status === 'sent') {
-    return `<div class="oc__sch"><span class="ot-f__l">예약</span>
-      <span class="oc__schw">${esc(fmtWhen(new Date(ob.sentAt || ob.sendAt)))}에 보냈습니다</span>
-      <input type="datetime-local" class="oc__at" value="${esc(dtLocal(nextMorning()))}" aria-label="다시 보낼 시각">
-      <button type="button" class="btn" data-queue>다시 예약</button></div>`;
-  }
-  return `<div class="oc__sch"><span class="ot-f__l">예약</span>
-    <input type="datetime-local" class="oc__at" value="${esc(dtLocal(nextMorning()))}" aria-label="보낼 시각">
-    <button type="button" class="btn" data-queue>이 시각에 보내기</button>
-    <span class="st-note">${sms ? '위 본문 그대로 문자로 나갑니다.' : '위 제목과 본문 그대로 예약됩니다.'}</span></div>`;
+/* 고른 사람들에게 한 번에 예약한다 */
+async function outSend() {
+  const picked = outPicked();
+  const text = OUT.text.trim();
+  if (!picked.length || !text) return;
+  const at = new Date(OUT.at || dtLocal(nextMorning()));
+  if (isNaN(at.getTime())) { flashStatus('보낼 시각을 확인해 주세요', true); return; }
+  const f = picked[0], sample = outBody(f);
+  const ask = `${picked.length}명에게 ${fmtWhen(at)} 에 문자를 보냅니다.\n\n`
+    + `첫 대상: ${f.name} (${f.dept_name})\n\n`
+    + sample.slice(0, 120) + (sample.length > 120 ? '…' : '') + '\n\n보낼까요?';
+  if (!confirm(ask)) return;
+  try {
+    const items = picked.map(p => ({ to: mobileOf(p), key: rKey(p), body: outBody(p) }));
+    const r = await ratingsApi('queueMany', { items, sendAt: at.toISOString(), channel: 'sms' });
+    if (!r || !r.ok) throw new Error((r && r.error) === 'bad action'
+      ? 'Apps Script 를 다시 배포해야 합니다' : ((r && r.error) || '예약 실패'));
+    await obLoad(true);
+    flashStatus(`${r.n}명에게 예약했습니다${r.skip ? ` (건너뜀 ${r.skip})` : ''}`);
+    renderOutreach();
+  } catch (e) { flashStatus('예약하지 못했습니다 — ' + e.message, true); }
 }
 
 function bindOutreach() {
-  $app.querySelector('[data-impclean]')?.addEventListener('click', () => {
+  const $ = s => $app.querySelector(s);
+  /* 글을 쓰는 동안 화면을 다시 그리지 않는다 — 다시 그리면 커서가 튄다. 숫자만 고쳐 준다. */
+  const draw = () => {
+    const picked = outPicked(), first = picked[0];
+    const el = $('[data-len]');
+    if (el) el.textContent = outLenNote(outBody(first || OUT_SAMPLE).length);
+    const pv = $('[data-prev]');
+    if (pv) pv.textContent = first ? outBody(first) : '';
+    const n = $('[data-nsel]');
+    if (n) n.textContent = String(picked.length);
+    const go = $('[data-send]');
+    if (go) { go.textContent = `${picked.length}명에게 보내기`; go.disabled = !(picked.length && OUT.text.trim()); }
+  };
+
+  const ta = $('[data-sms]');
+  ta?.addEventListener('input', () => { OUT.text = ta.value; draw(); });
+  $('[data-at]')?.addEventListener('change', e => { OUT.at = e.target.value; });
+
+  $('[data-epload]')?.addEventListener('click', () => {
+    const n = Number($('[data-epsel]').value), ep = epOf(n);
+    if (!ep) return;
+    if (OUT.text.trim() && !confirm(`${n}회차 문자 원고를 불러옵니다. 지금 쓰신 내용은 지워집니다.`)) return;
+    OUT.ep = n;
+    OUT.text = ep.sms || ep.body || '';
+    renderOutreach();
+  });
+
+  $('[data-dall]')?.addEventListener('click', () => { OUT.depts.clear(); renderOutreach(); });
+  $app.querySelectorAll('[data-dept]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.dept;
+    OUT.depts.has(id) ? OUT.depts.delete(id) : OUT.depts.add(id);
+    renderOutreach();
+  }));
+
+  $('[data-allon]')?.addEventListener('click', () => { outTargets().forEach(p => OUT.off.delete(rKey(p))); renderOutreach(); });
+  $('[data-alloff]')?.addEventListener('click', () => { outTargets().forEach(p => OUT.off.add(rKey(p))); renderOutreach(); });
+  $app.querySelectorAll('[data-pick]').forEach(c => c.addEventListener('change', () => {
+    c.checked ? OUT.off.delete(c.dataset.pick) : OUT.off.add(c.dataset.pick);
+    draw();
+  }));
+
+  /* 이름을 누르면 상세를 띄운다. 주소는 그대로 둬서 닫으면 보던 목록으로 돌아온다. */
+  $app.querySelectorAll('[data-prof]').forEach(b => b.addEventListener('click', () => {
+    const p = state.rows.find(x => rKey(x) === b.dataset.prof);
+    const d = p && state.depts.find(x => x.id === p.dept_id);
+    if (p && d) openDrawer(p, d);
+  }));
+
+  $('[data-send]')?.addEventListener('click', outSend);
+
+  $('[data-impclean]')?.addEventListener('click', () => {
     const n = mobileStale();
     if (!n) return;
     if (!confirm(`명단에 없는 번호 ${n}건을 지울까요? 퇴직 등으로 명단에서 빠진 교수의 번호입니다.`)) return;
     flashStatus(`명단에 없는 번호 ${mobilePrune()}건을 지웠습니다`);
     renderOutreach();
   });
-  $app.querySelector('[data-impopen]')?.addEventListener('click', e => {
-    const wrap = $app.querySelector('.ot-impwrap');
+  $('[data-impopen]')?.addEventListener('click', e => {
+    const wrap = $('.ot-impwrap');
     if (!wrap) return;
     e.target.disabled = true;
     wrap.hidden = false;
@@ -1459,7 +1351,6 @@ function bindOutreach() {
         <span class="st-note" data-impname></span>
       </div>
       <p class="st-note" data-impmsg></p></div>`;
-
     const msg = wrap.querySelector('[data-impmsg]');
     const take = text => {
       const r = mobileImport(text);
@@ -1471,11 +1362,10 @@ function bindOutreach() {
       if (r.badnum.length) parts.push(`번호 모양이 이상함 ${r.badnum.length}개 — ${cut(r.badnum)}`);
       if (mobileStale()) parts.push(`명단에 없는 번호 ${mobileStale()}건이 남아 있습니다 (퇴직 등)`);
       msg.textContent = parts.join(' / ');
-      const nEl = $app.querySelector('[data-impn]');
+      const nEl = $('[data-impn]');
       if (nEl) nEl.textContent = String(mobileCount());
       if (r.n) flashStatus(`핸드폰 ${r.n}명 가져왔습니다`);
     };
-
     wrap.querySelector('[data-impfile]').addEventListener('change', ev => {
       const f = ev.target.files && ev.target.files[0];
       if (!f) return;
@@ -1486,67 +1376,6 @@ function bindOutreach() {
       rd.readAsText(f, 'utf-8');
     });
   });
-  $app.querySelectorAll('[data-ep]').forEach(b => b.addEventListener('click', () => { OUT.ep = Number(b.dataset.ep); OUT.open = ''; renderOutreach(); }));
-  $app.querySelector('[data-epadd]')?.addEventListener('click', () => { OUT.edit = true; epAdd(); });
-  $app.querySelector('[data-epedit]')?.addEventListener('click', () => { OUT.edit = !OUT.edit; renderOutreach(); });
-  $app.querySelector('[data-epdel]')?.addEventListener('click', () => {
-    if (confirm(`${OUT.ep}회차 원고를 지울까요? 발송 기록은 남습니다.`)) epDel(OUT.ep);
-  });
-  const dmsg = (t, bad) => { const el = $app.querySelector('[data-aimsg]'); if (el) { el.textContent = t; el.classList.toggle('bad', !!bad); } };
-  $app.querySelector('[data-dsave]')?.addEventListener('click', () => {
-    const ep = epOf(OUT.ep);
-    $app.querySelectorAll('[data-dov]').forEach(el => epSetOv(OUT.ep, 'dept', OUT.dept,
-      Object.keys(CH_FIELD).find(c => CH_FIELD[c] === el.dataset.dov), el.value));
-    const line = $app.querySelector('[data-dline]');
-    if (line) { ep.dept = ep.dept || {}; line.value.trim() ? ep.dept[OUT.dept] = line.value.trim() : delete ep.dept[OUT.dept]; epSave(); }
-    flashStatus('학과 원고를 저장했습니다'); renderOutreach();
-  });
-  $app.querySelector('[data-dcopy]')?.addEventListener('click', () => {
-    const ep = epOf(OUT.ep);
-    $app.querySelectorAll('[data-dov]').forEach(el => {
-      const f = el.dataset.dov;
-      el.value = f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body);
-    });
-    dmsg('전체 원고를 가져왔습니다. 고치신 뒤 저장하세요.');
-  });
-  $app.querySelector('[data-dclear]')?.addEventListener('click', () => {
-    CHANNELS.forEach(ch => epSetOv(OUT.ep, 'dept', OUT.dept, ch, ''));
-    flashStatus('이 학과 원고를 비웠습니다 — 전체 원고를 씁니다'); renderOutreach();
-  });
-  $app.querySelector('[data-aidept]')?.addEventListener('click', async e => {
-    const btn = e.target; btn.disabled = true; dmsg('다시 쓰는 중…');
-    try {
-      const ep = epOf(OUT.ep);
-      const how = $app.querySelector('[data-how]').value.trim() || '이 학과 교수님들께 맞게 자연스럽게 다듬어 주십시오.';
-      for (const el of $app.querySelectorAll('[data-dov]')) {
-        const f = el.dataset.dov;
-        const src = el.value.trim() || (f === 'kakao' ? (ep.kakao || ep.sms || ep.body) : (ep[f] || ep.body));
-        el.value = await aiRewrite(src, whoDept(OUT.dept), how);
-      }
-      dmsg('다 됐습니다. 확인하시고 저장하세요.');
-    } catch (err) { dmsg(err.message, true); }
-    btn.disabled = false;
-  });
-  $app.querySelector('[data-epsave]')?.addEventListener('click', () => {
-    const ep = epOf(OUT.ep); if (!ep) return;
-    $app.querySelectorAll('[data-epf]').forEach(el => { ep[el.dataset.epf] = el.value; });
-    ep.seg = ep.seg || {};
-    $app.querySelectorAll('[data-seg]').forEach(el => { ep.seg[el.dataset.seg] = el.value; });
-    epSave(); OUT.edit = false; renderOutreach();
-    flashStatus(`${OUT.ep}회차 원고를 저장했습니다`);
-  });
-  $app.querySelectorAll('[data-of]').forEach(b => b.addEventListener('click', () => {
-    OUT[b.dataset.of] = b.dataset.v; OUT.open = ''; renderOutreach();
-  }));
-  /* 사진·이름을 누르면 상세를 띄운다. 주소는 그대로 두어, 닫으면 보던 목록으로 돌아온다. */
-  $app.querySelectorAll('[data-prof]').forEach(b => b.addEventListener('click', () => {
-    const p = state.rows.find(x => rKey(x) === b.dataset.prof);
-    const d = p && state.depts.find(x => x.id === p.dept_id);
-    if (p && d) openDrawer(p, d);
-  }));
-  $app.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
-    OUT.open = OUT.open === b.dataset.open ? '' : b.dataset.open; renderOutreach();
-  }));
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */

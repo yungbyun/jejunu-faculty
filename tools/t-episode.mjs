@@ -27,7 +27,6 @@ check('모든 교수가 갈래를 가짐', Object.values(segs).reduce((a, b) => 
 
 // 2) 1회차가 기본으로 들어 있다
 check('1회차 기본 제공', await page.evaluate(() => epNos().length >= 1 && !!epOf(1)));
-check('회차 탭이 보임', await page.evaluate(() => !!document.querySelector('[data-ep="1"]')));
 
 // 3) 갈래마다 다른 본문이 조립된다
 const bodies = await page.evaluate(() => {
@@ -64,37 +63,45 @@ const ph = await page.evaluate(() => {
 check('{이름}{학과}{개인화}{연구} 치환',
   ph.out === `${ph.name}/${ph.dept}/갈래문장/연구한줄`, ph.out);
 
-// 6) 발송 기록
-const k = await page.evaluate(() => rKey(state.rows[0]));
-await page.click(`[data-open="${k}"]`);
-await page.waitForSelector('[data-epmark]', { timeout: 10000 });
-await page.click('[data-epmark]');
-await page.waitForTimeout(500);
+// 6) 발송 기록 — 접촉 화면의 단추는 없어졌으므로 자료 쪽으로 확인한다
+const k = await page.evaluate(() => {
+  const p = state.rows[0];
+  epMark(p, 1, true);
+  return rKey(p);
+});
+await page.waitForTimeout(400);
 check('1회차 보냄으로 표시', await page.evaluate(k2 => epDone(state.rows.find(p => rKey(p) === k2), 1), k));
-check('행에 회차 배지', await page.evaluate(() => !!document.querySelector('.oc__ep')));
-check('머리말 집계', await page.evaluate(() => /이 회차 발송/.test(document.querySelector('.ot-ep').textContent)));
 check('localStorage 저장', await page.evaluate(k2 => {
   try { return (JSON.parse(localStorage.getItem('jnu-epsent') || '{}'))[k2].includes(1); } catch { return false; }
 }, k));
+check('해제도 된다', await page.evaluate(k2 => {
+  const p = state.rows.find(x => rKey(x) === k2);
+  epMark(p, 1, false);
+  const off = !epDone(p, 1);
+  epMark(p, 1, true);
+  return off;
+}, k));
 
-// 7) 회차 추가 / 원고 편집 — 기본으로 10회차까지 있으므로 새 회차는 그다음 번호다
+// 7) 회차 추가 / 원고 저장 — 기본으로 10회차까지 있으므로 새 회차는 그다음 번호다
 const before = await page.evaluate(() => epNos().slice(-1)[0]);
-await page.click('[data-epadd]');
-await page.waitForTimeout(600);
-const added = await page.evaluate(() => OUT.ep);
-check('회차 추가', added === before + 1 && await page.evaluate(n => epNos().includes(n), added), `${before}회차 다음 → ${added}회차`);
-check('원고 편집 패널 열림', await page.evaluate(() => !!document.querySelector('.ep-edit')));
-await page.fill('[data-epf="subject"]', '새 회차 제목');
-await page.fill('[data-epf="body"]', '{이름} 교수님, 새 회차입니다. {개인화}');
-await page.fill('[data-seg="B"]', '새 갈래 문장');
-await page.click('[data-epsave]');
-await page.waitForTimeout(600);
+const added = await page.evaluate(() => { epAdd(); return epNos().slice(-1)[0]; });
+await page.waitForTimeout(400);
+check('회차 추가', added === before + 1, `${before}회차 다음 → ${added}회차`);
+check('추가한 회차가 목록에 있다', await page.evaluate(n => epNos().includes(n), added));
+await page.evaluate(n => {
+  const e = epOf(n);
+  e.subject = '새 회차 제목';
+  e.body = '{이름} 교수님, 새 회차입니다. {개인화}';
+  e.seg = Object.assign({}, e.seg, { B: '새 갈래 문장' });
+  epSave();
+}, added);
+await page.waitForTimeout(400);
 check('원고 저장됨', await page.evaluate(n => epOf(n).subject === '새 회차 제목', added));
 check('저장 뒤 조립', await page.evaluate(n => {
   const p = state.rows.find(x => segOf(x) === 'B');
   return epBody(epOf(n), p, '메일', '') === `${p.name} 교수님, 새 회차입니다. 새 갈래 문장`;
 }, added));
-check('1회차 발송 기록은 새 회차에 안 보임', await page.evaluate(() => !document.querySelector('.oc__ep')));
+check('새 회차는 아직 아무에게도 안 나감', await page.evaluate(n => !state.rows.some(p => epDone(p, n)), added));
 
 // 8) 채널마다 본문이 다르다 — 문자는 짧게, 카톡은 메일에 가깝게
 const ch = await page.evaluate(() => {

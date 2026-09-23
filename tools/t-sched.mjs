@@ -36,8 +36,8 @@ const install = (mode) => page.evaluate(m => {
   location.hash = '#/outreach'; OUT.open = ''; render();
 }, mode);
 
-// 1~3) 예약한 것이 없으면 서버 상태가 어떻든 알림줄을 띄우지 않는다.
-//      쓰지도 않는 기능이 '켜짐' 이라고 떠 있으면 메일이 나갈 것처럼 읽혀 불안하다.
+// 예약한 것이 없으면 서버 상태가 어떻든 알림줄을 띄우지 않는다.
+// (사람별 초안·예약 화면은 없어졌고, 한 번에 예약하는 것은 t-outreach 가 본다)
 const noBanner = async () => await page.evaluate(() => !document.querySelector('.ot-ok, .ot-warn'));
 await install('olddeploy'); await page.waitForTimeout(700);
 check('옛 배포여도 예약 0이면 조용', await noBanner());
@@ -45,61 +45,6 @@ await install('off'); await page.waitForTimeout(700);
 check('꺼져 있어도 예약 0이면 조용', await noBanner());
 await install('on'); await page.waitForTimeout(700);
 check('켜져 있어도 예약 0이면 조용', await noBanner());
-
-// 4) 초안 패널의 예약 줄
-const k = await page.evaluate(() => rKey(state.rows.find(p => p.email)));
-await page.click(`[data-open="${k}"]`);
-await page.waitForSelector('.oc__ta', { timeout: 10000 });
-check('예약 입력칸이 나옴', await page.evaluate(() => !!document.querySelector('.oc__at')));
-check('기본값은 내일 오전 9시', await page.evaluate(() => {
-  const v = document.querySelector('.oc__at').value;
-  const d = new Date(); d.setDate(d.getDate() + 1);
-  return v.endsWith('T09:00') && v.startsWith(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-}), await page.evaluate(() => document.querySelector('.oc__at').value));
-
-// 5) 예약하기
-await page.click('[data-queue]');
-await page.waitForTimeout(800);
-const call = await page.evaluate(() => (window.__calls.find(c => c.action === 'queue') || {}).payload);
-check('queue 호출됨', !!call);
-check('받는 주소가 그 교수', await page.evaluate(k2 => {
-  const p = state.rows.find(x => rKey(x) === k2);
-  return (window.__calls.find(c => c.action === 'queue') || {}).payload.to === p.email;
-}, k));
-check('본문이 초안 그대로', !!call && call.body && call.body.includes('교수님께'));
-check('sendAt 이 UTC ISO', !!call && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(call.sendAt), call && call.sendAt);
-check('예약 뒤 목록 갱신', await page.evaluate(() => obCount() === 1));
-check('행에 예약 배지', await page.evaluate(() => !!document.querySelector('.oc__ob--q')));
-check('머리말에 예약 수', await page.evaluate(() => /예약 1/.test(document.querySelector('.ot-head__m').textContent)));
-
-// 6) 취소 — 예약 뒤에도 패널은 열린 채로 남는다
-await page.waitForSelector('[data-unq]', { timeout: 10000 });
-check('예약된 상태면 취소 버튼', true);
-await page.click('[data-unq]');
-await page.waitForTimeout(900);
-check('취소되면 배지 사라짐', await page.evaluate(() => !document.querySelector('.oc__ob--q') && obCount() === 0));
-
-// 7) 문자도 예약할 수 있다 (핸드폰 번호가 있을 때). 카톡은 보낼 길이 없어 예약 줄이 없다.
-await page.waitForSelector('.oc__ta', { timeout: 10000 });
-await page.evaluate(() => { const p = state.rows.find(x => rKey(x) === OUT.open); setMobile(p, '010-1234-5678'); renderOutreach(); });
-await page.waitForTimeout(400);
-await page.click('.oc__d [data-ch="문자"]');
-await page.waitForTimeout(500);
-check('문자에도 예약 줄이 있다', await page.evaluate(() => !!document.querySelector('.oc__at')));
-await page.click('.oc__d [data-queue]');
-await page.waitForTimeout(700);
-const smsCall = await page.evaluate(() => (window.__calls.filter(c => c.action === 'queue').pop() || {}).payload || {});
-check('문자는 channel=sms 로 나간다', smsCall.channel === 'sms', JSON.stringify(smsCall.channel));
-check('문자는 번호로 보낸다', smsCall.to === '010-1234-5678', String(smsCall.to));
-check('문자는 제목이 없다', !smsCall.subject);
-check('메일 예약과 따로 잡힌다', await page.evaluate(() => {
-  const p = state.rows.find(x => rKey(x) === OUT.open);
-  return !!obOf(p, '문자') && !obOf(p, '메일');
-}));
-await page.click('.oc__d [data-ch="카톡"]');
-await page.waitForTimeout(400);
-check('카톡에는 예약 줄 없음', await page.evaluate(() => !document.querySelector('.oc__at')));
-await page.evaluate(() => { const p = state.rows.find(x => rKey(x) === OUT.open); setMobile(p, ''); });
 
 // 8) 위쪽 알림줄이 상태를 정확히 말한다.
 //    outboxDryRun() 이 OUTBOX 를 'on' 으로 켜므로 연습 모드를 '켜짐' 이라 하면 안 된다.

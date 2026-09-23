@@ -813,6 +813,49 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .let-targets .chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .let-segs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 
+/* ---------- 접촉: 문자 보내기 ---------- */
+.ot-sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:14px 16px;margin-bottom:12px}
+.ot-sec__h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ot-sec__h h2{margin:0;font-size:15px;font-weight:800}
+.ot-sec__h .st-note{margin:0}
+.ot-msg{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);
+  background:var(--bg);color:var(--ink);font:inherit;font-size:14.5px;line-height:1.7;resize:vertical}
+.ot-msg:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
+.ot-msg__b{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.ot-msg__b .st-note{margin:0}
+.ot-load{margin-left:auto;display:flex;align-items:center;gap:6px}
+.ot-load select{padding:6px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px;max-width:200px}
+.ot-acts{display:flex;gap:6px;margin-bottom:8px}
+.ot-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px;max-height:360px;overflow:auto}
+.ot-p{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);font-size:13px;cursor:pointer}
+.ot-p:hover{border-color:var(--line-2)}
+.ot-p__c{flex:none;display:grid;place-items:center;cursor:pointer}
+.ot-p input{width:16px;height:16px;accent-color:var(--brand);cursor:pointer}
+.ot-p__n{font-weight:700;flex:none;border:0;background:none;padding:0;font:inherit;font-weight:700;
+  color:inherit;cursor:pointer;border-radius:4px}
+.ot-p__n:hover{text-decoration:underline;text-underline-offset:2px}
+.ot-p--no .ot-p__n{cursor:pointer}
+.ot-p__d{color:var(--ink-3);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ot-p__m{margin-left:auto;color:var(--ink-3);font-size:11.5px;flex:none;font-variant-numeric:tabular-nums}
+.ot-p--no{opacity:.5;cursor:default}
+.ot-prev{border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px;background:var(--surface-2);margin-bottom:10px}
+.ot-prev__h{font-size:11.5px;font-weight:700;color:var(--ink-3)}
+.ot-prev__b{margin-top:4px;font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+.ot-send{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.ot-when{display:flex;flex-direction:column;gap:4px}
+.ot-when span{font-size:11.5px;font-weight:700;color:var(--ink-3)}
+.ot-when input{padding:8px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);font:inherit;font-size:13px}
+.btn--go{margin-left:auto;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:800;padding:10px 18px}
+.btn--go:hover:not(:disabled){filter:brightness(1.08)}
+.btn--go:disabled{opacity:.45;cursor:default}
+@media (max-width:720px){
+  .ot-people{grid-template-columns:1fr;max-height:300px}
+  .ot-load{margin-left:0;width:100%}
+  .ot-load select{flex:1}
+  .btn--go{margin-left:0;width:100%}
+}
+
 /* ---------- 접촉 화면 ----------
    한 줄에 교수 한 명. 성향 칩은 늘 보이고, '초안'을 누르면 그 아래가 펼쳐진다. */
 .ot-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:14px 16px}
