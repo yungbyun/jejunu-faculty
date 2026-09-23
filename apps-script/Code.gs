@@ -769,11 +769,25 @@ function smsTest() {
   if (!to) { Logger.log('SMS_TEST_TO 에 본인 휴대폰 번호를 먼저 넣으십시오.'); return; }
   const text = '[시험] 제주대 공과대학 학장 선거 문자 발송 시험입니다. 이 문자가 보이면 설정이 끝난 것입니다.';
   if (outDry_()) {
-    Logger.log('연습 모드입니다. 실제로 보내지 않았습니다.\n받는 번호: ' + to + '\n내용: ' + text);
+    Logger.log('연습 모드입니다. 실제로 보내지 않았습니다.' + String.fromCharCode(10) + '받는 번호: ' + to + String.fromCharCode(10) + '내용: ' + text + String.fromCharCode(10) + '진짜로 한 통 받아 보시려면 smsTestReal() 을 실행하십시오.');
     return;
   }
   const r = smsSend_(to, text);
   Logger.log(r.ok ? ('보냈습니다 → ' + to) : ('보내지 못했습니다 — ' + r.error));
+}
+
+/* 대기열과 상관없이 본인 번호로 딱 한 통 보냅니다.
+ * 보내기 스위치(OUTBOX)를 켜지 않아도 되고, 연습 모드여도 이것만은 진짜로 나갑니다.
+ * 한 통 시험하려고 전체 발송을 켜는 일이 없도록 따로 둔 함수입니다. */
+function smsTestReal() {
+  const to = smsProps_().getProperty('SMS_TEST_TO');
+  if (!to) { Logger.log('SMS_TEST_TO 에 본인 휴대폰 번호를 먼저 넣으십시오.'); return; }
+  if (!smsReady_()) { Logger.log('문자 설정이 아직 없습니다 — SMS_KEY · SMS_USER · SMS_FROM 을 넣으십시오.'); return; }
+  const text = '[시험] 제주대 공과대학 학장 선거 문자 발송 시험입니다. 이 문자가 보이면 설정이 끝난 것입니다.';
+  const r = smsSend_(to, text);
+  Logger.log(r.ok
+    ? ('보냈습니다 -> ' + to + ' (대기열은 건드리지 않았습니다)')
+    : ('보내지 못했습니다 — ' + r.error));
 }
 
 /* 대기열에 시험용 문자 한 건을 1분 뒤로 넣습니다. 트리거가 실제로 집어 가는지 보려는 것입니다.
