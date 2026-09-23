@@ -733,17 +733,28 @@ function smsSend_(to, text) {
   const body = String(text || '').slice(0, 2000);
   if (!body.trim()) return { ok: false, error: '내용이 비었습니다' };
   try {
+    /* 값을 객체로 주면 Apps Script 가 multipart/form-data 로 보낸다. 이 서버는 그걸 못 읽어
+     * '키가 입력되지 않았습니다'(-101) 로 답한다. 그래서 직접 폼 문자열로 만들어 보낸다. */
+    const form = {
+      key: key, user_id: user, sender: from, receiver: num,
+      msg: body, msg_type: 'LMS', title: '',
+    };
+    const payload = Object.keys(form)
+      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(form[k]))
+      .join('&');
     const res = UrlFetchApp.fetch(SMS_URL, {
       method: 'post',
-      payload: { key: key, user_id: user, sender: from, receiver: num, msg: body, msg_type: 'LMS', title: '' },
+      contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+      payload: payload,
       muteHttpExceptions: true,
     });
     const txt = res.getContentText();
     let j = null; try { j = JSON.parse(txt); } catch (e) {}
     if (!j) return { ok: false, error: '응답을 읽지 못했습니다: ' + txt.slice(0, 200) };
     // 이 서비스는 result_code 가 1 이상이면 접수된 것입니다
-    if (Number(j.result_code) > 0) return { ok: true };
-    return { ok: false, error: (j.result_code + ' ' + (j.message || '')).slice(0, 200) };
+    if (Number(j.result_code) > 0) return { ok: true, id: String(j.msg_id || '') };
+    return { ok: false, error: (j.result_code + ' ' + (j.message || '') + ' / 보낸 값: '
+      + Object.keys(form).map(k => k + '=' + (k === 'key' ? '(가림)' : form[k])).join(', ')).slice(0, 400) };
   } catch (err) {
     return { ok: false, error: String(err).slice(0, 200) };
   }
