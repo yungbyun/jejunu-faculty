@@ -1107,8 +1107,10 @@ const EP1 = {
 /* ---------- 예약 발송 ----------
  * 이 앱은 예약만 쌓는다. 실제 발송은 Apps Script 의 시간 트리거(sendDue)가 하고,
  * 서버에서 outboxStart() 를 실행하기 전에는 한 통도 나가지 않는다. */
-const OB = { rows: new Map(), on: false, dry: false, quota: null, loaded: false, needDeploy: false };
-const obOf = p => OB.rows.get(rKey(p)) || null;
+const OB = { rows: new Map(), on: false, dry: false, sms: false, quota: null, loaded: false, needDeploy: false };
+/* 같은 교수라도 메일 예약과 문자 예약은 따로 잡힌다 */
+const obKey = (p, ch) => `${rKey(p)}::${ch === '문자' ? 'sms' : 'mail'}`;
+const obOf = (p, ch) => OB.rows.get(obKey(p, ch || OUT.ch)) || null;
 const obCount = () => [...OB.rows.values()].filter(x => x.status === 'queued').length;
 
 async function obLoad(force) {
@@ -1121,22 +1123,26 @@ async function obLoad(force) {
     const m = new Map();
     (r.rows || []).forEach(x => {
       if (x.status === 'canceled' || !x.key) return;
-      const prev = m.get(x.key);
-      if (!prev || new Date(x.sendAt) > new Date(prev.sendAt)) m.set(x.key, x);
+      const k = `${x.key}::${x.channel === 'sms' ? 'sms' : 'mail'}`;
+      const prev = m.get(k);
+      if (!prev || new Date(x.sendAt) > new Date(prev.sendAt)) m.set(k, x);
     });
-    Object.assign(OB, { rows: m, on: !!r.on, dry: !!r.dry, quota: r.quota, loaded: true, needDeploy: false });
+    Object.assign(OB, { rows: m, on: !!r.on, dry: !!r.dry, sms: !!r.sms, quota: r.quota, loaded: true, needDeploy: false });
     if (route().view === 'outreach') renderOutreach();
   } catch (e) { console.warn('예약 목록을 읽지 못했습니다:', e.message); }
 }
 
-async function obQueue(p, subject, body, whenLocal) {
+async function obQueue(p, subject, body, whenLocal, ch) {
   const at = new Date(whenLocal);
   if (isNaN(at.getTime())) { flashStatus('보낼 시각을 확인해 주세요', true); return; }
+  const sms = (ch || OUT.ch) === '문자';
+  const to = sms ? mobileOf(p) : p.email;
+  if (!to) { flashStatus(sms ? '이 교수님은 핸드폰 번호가 없습니다' : '이 교수님은 메일 주소가 없습니다', true); return; }
   try {
-    const r = await ratingsApi('queue', { to: p.email, key: rKey(p), subject, body, sendAt: at.toISOString() });
+    const r = await ratingsApi('queue', { to, key: rKey(p), subject: sms ? '' : subject, body, sendAt: at.toISOString(), channel: sms ? 'sms' : 'mail' });
     if (!r || !r.ok) throw new Error((r && r.error) || '예약 실패');
     await obLoad(true);
-    flashStatus(`${p.name} 교수님 메일을 ${fmtWhen(at)}에 보내도록 예약했습니다`);
+    flashStatus(`${p.name} 교수님 ${sms ? '문자' : '메일'}를 ${fmtWhen(at)}에 보내도록 예약했습니다`);
   } catch (e) { flashStatus('예약하지 못했습니다 — ' + e.message, true); }
 }
 
@@ -1398,18 +1404,21 @@ function fillDraft(k) {
     });
     box.querySelector('[data-queue]')?.addEventListener('click', () => {
       const when = box.querySelector('.oc__at')?.value;
-      obQueue(p, box.querySelector('.oc__sub').value, box.querySelector('.oc__ta').value, when);
+      obQueue(p, box.querySelector('.oc__sub')?.value || '', box.querySelector('.oc__ta').value, when, OUT.ch);
     });
     box.querySelector('[data-unq]')?.addEventListener('click', e => obCancel(p, e.target.dataset.unq));
     box.querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => { OUT.ch = b.dataset.ch; fillDraft(k); }));
   });
 }
 
-/* 초안 패널의 예약 줄. 메일 채널이고 주소가 있을 때만 나온다. */
+/* 초안 패널의 예약 줄. 메일은 주소가, 문자는 번호가 있어야 나온다. 카톡은 보낼 길이 없다. */
 function schedRow(p, k) {
-  if (OUT.ch !== '메일' || !p.email) return '';
+  const sms = OUT.ch === '문자';
+  if (OUT.ch === '카톡') return '';
+  if (sms ? !mobileOf(p) : !p.email) return '';
   if (!CONFIG.RATINGS.API_URL || !state.session) return `<p class="st-note oc__sch">로그인하면 이 자리에서 예약 발송을 걸 수 있습니다.</p>`;
   if (OB.needDeploy) return `<p class="st-note oc__sch">예약 발송을 쓰려면 Apps Script 를 다시 배포해야 합니다.</p>`;
+  if (sms && !OB.sms) return `<p class="st-note oc__sch">문자를 보내려면 Apps Script 스크립트 속성에 <b>SMS_KEY · SMS_USER · SMS_FROM</b> 을 넣으십시오. 넣기 전에도 <b>연습 모드</b>로 대기열은 시험해 볼 수 있습니다.</p>`;
   const ob = obOf(p);
   if (ob && ob.status === 'queued') {
     return `<div class="oc__sch"><span class="ot-f__l">예약</span>
@@ -1426,7 +1435,7 @@ function schedRow(p, k) {
   return `<div class="oc__sch"><span class="ot-f__l">예약</span>
     <input type="datetime-local" class="oc__at" value="${esc(dtLocal(nextMorning()))}" aria-label="보낼 시각">
     <button type="button" class="btn" data-queue>이 시각에 보내기</button>
-    <span class="st-note">위 제목과 본문 그대로 예약됩니다.</span></div>`;
+    <span class="st-note">${sms ? '위 본문 그대로 문자로 나갑니다.' : '위 제목과 본문 그대로 예약됩니다.'}</span></div>`;
 }
 
 function bindOutreach() {

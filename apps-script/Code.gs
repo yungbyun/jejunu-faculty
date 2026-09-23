@@ -16,7 +16,8 @@ const SHEET_NAME = 'ratings';
 const SET_SHEET = 'settings';                     // 퀴즈 학과·교수 선택 등 개인 설정
 const SET_HEADER = ['email', 'key', 'value', 'updated_at'];
 const OUT_SHEET = 'outbox';                        // 예약 발송 대기열
-const OUT_HEADER = ['id', 'email', 'to', 'key', 'subject', 'body', 'send_at', 'status', 'sent_at', 'error'];
+const OUT_HEADER = ['id', 'email', 'to', 'key', 'subject', 'body', 'send_at', 'status', 'sent_at', 'error', 'channel'];
+const OUT_CH = 10;              // channel 열 (0부터). 'mail' 또는 'sms'
 // status: queued(대기) / sent(보냄) / error(실패) / canceled(취소)
 const OUT_MAX_PER_RUN = 8;      // 트리거가 한 번 돌 때 보내는 최대 통수 — 한꺼번에 우르르 나가지 않게
 const OUT_MIN_QUOTA = 10;       // 남은 하루 발송 할당량이 이보다 적으면 그날은 멈춘다
@@ -96,7 +97,7 @@ function doPost(e) {
     upsert(email, String(body.dept_id), String(body.slug), String(body.name || ''), fields);
     return out({ ok: true });
   }
-  if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), dry: outDry_(), quota: MailApp.getRemainingDailyQuota() });
+  if (body.action === 'outbox') return out({ ok: true, rows: outList(email), on: outboxOn_(), dry: outDry_(), sms: smsReady_(), quota: MailApp.getRemainingDailyQuota() });
   if (body.action === 'queue') return outQueue(email, body);
   if (body.action === 'unqueue') {
     if (!body.id) return out({ error: 'missing id' });
@@ -437,7 +438,10 @@ function outDry_() { return outProps_().getProperty('OUTBOX_DRYRUN') === 'yes'; 
 function outSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(OUT_SHEET);
-  if (!sh) { sh = ss.insertSheet(OUT_SHEET); sh.appendRow(OUT_HEADER); sh.setFrozenRows(1); }
+  if (!sh) { sh = ss.insertSheet(OUT_SHEET); sh.appendRow(OUT_HEADER); sh.setFrozenRows(1); return sh; }
+  // 예전에 만든 시트에는 channel 열이 없다. 있으면 그대로 두고, 없으면 붙인다.
+  const head = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  for (let i = head.length; i < OUT_HEADER.length; i++) sh.getRange(1, i + 1).setValue(OUT_HEADER[i]);
   return sh;
 }
 
@@ -449,7 +453,7 @@ function outList(email) {
     .map(r => ({
       id: String(r[0]), to: String(r[2]), key: String(r[3]), subject: String(r[4]),
       sendAt: r[6] instanceof Date ? r[6].toISOString() : String(r[6]),
-      status: String(r[7]),
+      status: String(r[7]), channel: String(r[OUT_CH] || 'mail'),
       sentAt: r[8] instanceof Date ? r[8].toISOString() : String(r[8] || ''),
       error: String(r[9] || ''),
     }));
@@ -457,11 +461,15 @@ function outList(email) {
 
 /* 예약 넣기. 같은 사람에게 대기 중인 예약이 이미 있으면 그 줄을 갈아 끼운다(중복 발송 방지). */
 function outQueue(email, b) {
-  const to = String(b.to || '').trim();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return out({ error: 'bad to' });
-  const subject = String(b.subject || '').slice(0, 300);
-  const text = String(b.body || '').slice(0, 20000);
-  if (!subject || !text) return out({ error: 'empty mail' });
+  const ch = String(b.channel || 'mail') === 'sms' ? 'sms' : 'mail';
+  let to = String(b.to || '').trim();
+  if (ch === 'sms') {
+    to = to.replace(/[^\d]/g, '');
+    if (!/^01[016789]\d{7,8}$/.test(to)) return out({ error: 'bad phone' });
+  } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return out({ error: 'bad to' });
+  const subject = ch === 'sms' ? '' : String(b.subject || '').slice(0, 300);
+  const text = String(b.body || '').slice(0, ch === 'sms' ? 2000 : 20000);
+  if ((ch === 'mail' && !subject) || !text) return out({ error: 'empty mail' });
   const at = new Date(String(b.sendAt || ''));
   if (isNaN(at.getTime())) return out({ error: 'bad sendAt' });
   if (at.getTime() > Date.now() + OUT_MAX_AHEAD * 86400000) return out({ error: 'too far ahead' });
@@ -471,11 +479,12 @@ function outQueue(email, b) {
   try {
     const sh = outSheet(), last = sh.getLastRow();
     const id = Utilities.getUuid().slice(0, 8);
-    const row = [id, email, to, String(b.key || ''), subject, text, at, 'queued', '', ''];
+    const row = [id, email, to, String(b.key || ''), subject, text, at, 'queued', '', '', ch];
     if (last >= 2) {
       const vals = sh.getRange(2, 1, last - 1, OUT_HEADER.length).getValues();
       for (let i = 0; i < vals.length; i++) {
-        if (String(vals[i][1]).toLowerCase() === email && String(vals[i][2]) === to && String(vals[i][7]) === 'queued') {
+        if (String(vals[i][1]).toLowerCase() === email && String(vals[i][2]) === to
+            && String(vals[i][OUT_CH] || 'mail') === ch && String(vals[i][7]) === 'queued') {
           sh.getRange(i + 2, 1, 1, OUT_HEADER.length).setValues([row]);
           return out({ ok: true, id: id, replaced: true });
         }
@@ -521,10 +530,18 @@ function sendDue() {
       if (String(r[7]) !== 'queued') continue;
       const at = new Date(r[6]).getTime();
       if (isNaN(at) || at > now) continue;
-      if (MailApp.getRemainingDailyQuota() < OUT_MIN_QUOTA) break;   // 할당량이 바닥나기 전에 멈춘다
+      if (String(r[OUT_CH] || 'mail') === 'mail' && MailApp.getRemainingDailyQuota() < OUT_MIN_QUOTA) break;   // 메일 할당량이 바닥나기 전에 멈춘다
       const row = i + 2;
       try {
-        if (!dry) GmailApp.sendEmail(String(r[2]), String(r[4]), String(r[5]));
+        const ch = String(r[OUT_CH] || 'mail');
+        if (!dry) {
+          if (ch === 'sms') {
+            const res = smsSend_(String(r[2]), String(r[5]));
+            if (!res.ok) throw new Error(res.error || '문자 발송 실패');
+          } else {
+            GmailApp.sendEmail(String(r[2]), String(r[4]), String(r[5]));
+          }
+        }
         sh.getRange(row, 8, 1, 3).setValues([['sent', new Date(), dry ? '연습 모드 — 실제로 보내지 않았습니다' : '']]);
         sent++;
       } catch (err) {
@@ -681,4 +698,93 @@ function importProfessorsFromGitHub() {
   if (toAppend.length) sh.getRange(last + 1, 1, toAppend.length, header.length).setValues(toAppend);
   Logger.log('추가 ' + added + '명, 갱신 ' + updated + '명, 총 ' + (last - 1 + added) + '명');
   return { added, updated };
+}
+
+
+/* ==========================================================
+ * 문자 발송 (LMS)
+ * ----------------------------------------------------------
+ * 키는 코드에 적지 않고 스크립트 속성에 둡니다(저장소가 공개이므로).
+ * 편집기 왼쪽 톱니바퀴 → 프로젝트 설정 → 스크립트 속성에서 넣으십시오.
+ *
+ *   SMS_KEY      문자 서비스 API 키
+ *   SMS_USER     문자 서비스 아이디
+ *   SMS_FROM     발신번호 (통신사에 사전등록한 본인 번호)
+ *   SMS_TEST_TO  시험 발송을 받을 번호 (본인 휴대폰)
+ *
+ * 연습 모드(OUTBOX_DRYRUN='yes')에서는 이 아래 함수가 아예 불리지 않습니다.
+ * 그래서 계정이 없어도 대기열이 도는 것까지는 지금 그대로 시험해 볼 수 있습니다.
+ * ========================================================== */
+const SMS_URL = 'https://apis.aligo.in/send/';
+
+function smsProps_() { return PropertiesService.getScriptProperties(); }
+function smsReady_() {
+  const p = smsProps_();
+  return !!(p.getProperty('SMS_KEY') && p.getProperty('SMS_USER') && p.getProperty('SMS_FROM'));
+}
+
+/* 한 통 보낸다. {ok:true} 또는 {ok:false, error:'...'} */
+function smsSend_(to, text) {
+  const p = smsProps_();
+  const key = p.getProperty('SMS_KEY'), user = p.getProperty('SMS_USER'), from = p.getProperty('SMS_FROM');
+  if (!key || !user || !from) return { ok: false, error: '문자 설정이 없습니다 — 스크립트 속성에 SMS_KEY·SMS_USER·SMS_FROM 을 넣으십시오' };
+  const num = String(to).replace(/[^\d]/g, '');
+  if (!/^01[016789]\d{7,8}$/.test(num)) return { ok: false, error: '번호 형식이 아닙니다' };
+  const body = String(text || '').slice(0, 2000);
+  if (!body.trim()) return { ok: false, error: '내용이 비었습니다' };
+  try {
+    const res = UrlFetchApp.fetch(SMS_URL, {
+      method: 'post',
+      payload: { key: key, user_id: user, sender: from, receiver: num, msg: body, msg_type: 'LMS', title: '' },
+      muteHttpExceptions: true,
+    });
+    const txt = res.getContentText();
+    let j = null; try { j = JSON.parse(txt); } catch (e) {}
+    if (!j) return { ok: false, error: '응답을 읽지 못했습니다: ' + txt.slice(0, 200) };
+    // 이 서비스는 result_code 가 1 이상이면 접수된 것입니다
+    if (Number(j.result_code) > 0) return { ok: true };
+    return { ok: false, error: (j.result_code + ' ' + (j.message || '')).slice(0, 200) };
+  } catch (err) {
+    return { ok: false, error: String(err).slice(0, 200) };
+  }
+}
+
+/* ---- 편집기에서 손으로 실행하는 문자 스위치들 ---- */
+
+/* 무엇을 넣어야 하는지, 지금 무엇이 들어 있는지 보여 줍니다. 키 자체는 찍지 않습니다. */
+function smsStatus() {
+  const p = smsProps_();
+  const has = k => p.getProperty(k) ? '들어 있음' : '없음';
+  Logger.log('문자 설정 — SMS_KEY: ' + has('SMS_KEY') + ' / SMS_USER: ' + has('SMS_USER')
+    + ' / SMS_FROM: ' + (p.getProperty('SMS_FROM') || '없음')
+    + ' / SMS_TEST_TO: ' + (p.getProperty('SMS_TEST_TO') || '없음')
+    + ' / 준비됨: ' + (smsReady_() ? '예' : '아니오')
+    + ' / 보내기: ' + (outboxOn_() ? (outDry_() ? '연습 모드' : '켜짐') : '꺼짐'));
+}
+
+/* 본인 번호로 한 통만 보내 봅니다.
+ * 연습 모드면 실제로 보내지 않고 무엇을 보낼지만 적습니다. */
+function smsTest() {
+  const to = smsProps_().getProperty('SMS_TEST_TO');
+  if (!to) { Logger.log('SMS_TEST_TO 에 본인 휴대폰 번호를 먼저 넣으십시오.'); return; }
+  const text = '[시험] 제주대 공과대학 학장 선거 문자 발송 시험입니다. 이 문자가 보이면 설정이 끝난 것입니다.';
+  if (outDry_()) {
+    Logger.log('연습 모드입니다. 실제로 보내지 않았습니다.\n받는 번호: ' + to + '\n내용: ' + text);
+    return;
+  }
+  const r = smsSend_(to, text);
+  Logger.log(r.ok ? ('보냈습니다 → ' + to) : ('보내지 못했습니다 — ' + r.error));
+}
+
+/* 대기열에 시험용 문자 한 건을 1분 뒤로 넣습니다. 트리거가 실제로 집어 가는지 보려는 것입니다. */
+function smsQueueTest() {
+  const to = smsProps_().getProperty('SMS_TEST_TO');
+  if (!to) { Logger.log('SMS_TEST_TO 를 먼저 넣으십시오.'); return; }
+  const email = Session.getEffectiveUser().getEmail().toLowerCase();
+  const sh = outSheet();
+  const at = new Date(Date.now() + 60000);
+  sh.appendRow([Utilities.getUuid().slice(0, 8), email, String(to).replace(/[^\d]/g, ''), 'test/sms',
+    '', '[시험] 대기열을 거쳐 나가는 문자입니다.', at, 'queued', '', '', 'sms']);
+  Logger.log('1분 뒤에 나가도록 넣었습니다. 5분마다 도는 트리거가 집어 갑니다.\n'
+    + '지금 상태 — 보내기: ' + (outboxOn_() ? (outDry_() ? '연습 모드(실제로 안 나감)' : '켜짐') : '꺼짐'));
 }

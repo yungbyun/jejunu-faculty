@@ -21,17 +21,18 @@ const install = (mode) => page.evaluate(m => {
     window.__calls.push({ action, payload });
     if (action === 'outbox') {
       if (m === 'olddeploy') return { error: 'bad action' };
-      return { ok: true, on: m === 'on', quota: 87, rows: window.__queued.slice() };
+      return { ok: true, on: m === 'on', sms: m === 'on', quota: 87, rows: window.__queued.slice() };
     }
     if (action === 'queue') {
       window.__queued.push({ id: 'abc12345', to: payload.to, key: payload.key, subject: payload.subject,
+                             channel: payload.channel || 'mail',
                              sendAt: payload.sendAt, status: 'queued', sentAt: '', error: '' });
       return { ok: true, id: 'abc12345' };
     }
     if (action === 'unqueue') { window.__queued = []; return { ok: true }; }
     return { ok: true };
   };
-  Object.assign(OB, { rows: new Map(), on: false, quota: null, loaded: false, needDeploy: false });
+  Object.assign(OB, { rows: new Map(), on: false, sms: false, quota: null, loaded: false, needDeploy: false });
   location.hash = '#/outreach'; OUT.open = ''; render();
 }, mode);
 
@@ -78,11 +79,27 @@ await page.click('[data-unq]');
 await page.waitForTimeout(900);
 check('취소되면 배지 사라짐', await page.evaluate(() => !document.querySelector('.oc__ob--q') && obCount() === 0));
 
-// 7) 메일이 아닌 채널에서는 예약 줄이 없다
+// 7) 문자도 예약할 수 있다 (핸드폰 번호가 있을 때). 카톡은 보낼 길이 없어 예약 줄이 없다.
 await page.waitForSelector('.oc__ta', { timeout: 10000 });
+await page.evaluate(() => { const p = state.rows.find(x => rKey(x) === OUT.open); setMobile(p, '010-1234-5678'); renderOutreach(); });
+await page.waitForTimeout(400);
 await page.click('.oc__d [data-ch="문자"]');
 await page.waitForTimeout(500);
-check('문자 채널에는 예약 줄 없음', await page.evaluate(() => !document.querySelector('.oc__at')));
+check('문자에도 예약 줄이 있다', await page.evaluate(() => !!document.querySelector('.oc__at')));
+await page.click('.oc__d [data-queue]');
+await page.waitForTimeout(700);
+const smsCall = await page.evaluate(() => (window.__calls.filter(c => c.action === 'queue').pop() || {}).payload || {});
+check('문자는 channel=sms 로 나간다', smsCall.channel === 'sms', JSON.stringify(smsCall.channel));
+check('문자는 번호로 보낸다', smsCall.to === '010-1234-5678', String(smsCall.to));
+check('문자는 제목이 없다', !smsCall.subject);
+check('메일 예약과 따로 잡힌다', await page.evaluate(() => {
+  const p = state.rows.find(x => rKey(x) === OUT.open);
+  return !!obOf(p, '문자') && !obOf(p, '메일');
+}));
+await page.click('.oc__d [data-ch="카톡"]');
+await page.waitForTimeout(400);
+check('카톡에는 예약 줄 없음', await page.evaluate(() => !document.querySelector('.oc__at')));
+await page.evaluate(() => { const p = state.rows.find(x => rKey(x) === OUT.open); setMobile(p, ''); });
 
 // 8) 위쪽 알림줄이 상태를 정확히 말한다.
 //    outboxDryRun() 이 OUTBOX 를 'on' 으로 켜므로 연습 모드를 '켜짐' 이라 하면 안 된다.
