@@ -75,6 +75,33 @@ t('포커스 테두리 없음', await page.evaluate(()=>{
   const b=document.querySelector('.rate--wide .rate__b'); b.focus();
   return getComputedStyle(b).outlineStyle === 'none';
 }));
+t('폰에서 누를 때 회색 네모 없음', await page.evaluate(()=>{
+  const c=getComputedStyle(document.querySelector('.rate--wide .rate__b')).webkitTapHighlightColor || '';
+  return /rgba\(0, 0, 0, 0\)|transparent/.test(c);
+}), await page.evaluate(()=>getComputedStyle(document.querySelector('.rate--wide .rate__b')).webkitTapHighlightColor));
+t('고른 단추에 덧고리 없음', await page.evaluate(()=>
+  getComputedStyle(document.querySelector('.rate--wide .rate__b[aria-pressed="true"]')).boxShadow === 'none'));
+// 학과 카드의 선호도 여섯 개는 어떤 폭에서도 한 줄
+for (const w of [300, 320, 360, 390]) {
+  await page.setViewportSize({ width: w, height: 900 });
+  await page.evaluate(()=>{ location.hash='#/dept/comdol'; render(); });
+  await page.waitForTimeout(350);
+  const r = await page.evaluate(()=>{
+    const bs=[...document.querySelectorAll('.prof .rate')[0].querySelectorAll('.rate__b')];
+    const ys=new Set(bs.map(b=>Math.round(b.getBoundingClientRect().y)));
+    return { n:bs.length, 줄:ys.size, 끝:Math.round(bs[bs.length-1].getBoundingClientRect().right), vw:innerWidth };
+  });
+  t(`카드 선호도 ${w}px 에서 한 줄`, r.n===6 && r.줄===1 && r.끝<=r.vw, `${r.n}개 ${r.줄}줄 끝=${r.끝}/${r.vw}`);
+}
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.waitForTimeout(200);
+
+t('학과 카드의 고리는 그대로', await page.evaluate(()=>{
+  location.hash='#/dept/comdol'; render();
+  const p=state.rows.find(x=>x.dept_id==='comdol'); setRating(rKey(p),'확');
+  const b=document.querySelector('.prof .rate__b[aria-pressed="true"]');
+  return !!b && getComputedStyle(b).boxShadow !== 'none';
+}));
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);

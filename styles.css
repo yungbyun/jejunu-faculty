@@ -37,6 +37,9 @@
 }
 
 *{box-sizing:border-box}
+/* 폰에서 누를 때 생기는 회색 사각형(탭 하이라이트)을 없앤다. 동그란 단추 위에 각진 네모가
+   덧그려져 보기 싫다. 눌린 것은 색으로 알 수 있다. */
+button,a,[role="button"],label,summary{-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:var(--fs-m);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 a{color:inherit;text-decoration:none}
@@ -358,7 +361,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   color:var(--ink-2);font-size:14.5px;font-weight:800}
 .rate--wide .rate__b:hover{background:var(--surface);border-color:var(--rc);color:var(--rc)}
 /* 뒤에 오는 규칙이 이기므로 눌린 모습을 여기서 다시 적어 준다 */
-.rate--wide .rate__b[aria-pressed="true"]{background:var(--rc);border-color:var(--rc);color:#fff}
+.rate--wide .rate__b[aria-pressed="true"]{background:var(--rc);border-color:var(--rc);color:#fff;box-shadow:none}
 .rate--big{position:static;display:inline-flex;box-shadow:none;background:var(--surface-2)}
 .d-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .d-top .d-rank{margin-bottom:0}
@@ -987,11 +990,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .qz-end__n{font-size:44px}
 }
 
-/* 좁은 폰: 선호도 여섯 개(확긍중모부비)가 한 줄에 들어가도록 조금 줄인다.
-   그래도 안 들어가면 .rate 의 flex-wrap 이 받아 준다 — 잘려서 안 보이는 것보다 낫다. */
-@media (max-width:389px){
-  .rate{gap:4px}
-  .rate__b{width:26px;height:26px;font-size:11.5px}
+/* 폰에서 교수 카드의 선호도 여섯 개(확긍중모부비)는 반드시 한 줄에 놓는다.
+   크기를 고정하면 좁은 화면에서 비가 다음 줄로 넘어가므로, 남은 폭을 여섯이 똑같이 나눠 갖게
+   하고(flex:1 1 0) 높이는 aspect-ratio 로 따라가게 한다. */
+@media (max-width:720px){
+  .prof__foot .rate{flex-wrap:nowrap;width:100%;gap:5px}
+  .prof__foot .rate__b{flex:1 1 0;min-width:0;width:auto;height:auto;max-width:32px;aspect-ratio:1;font-size:12px}
 }
 @media (max-width:339px){
   .prof__photo{width:96px;min-height:128px}
