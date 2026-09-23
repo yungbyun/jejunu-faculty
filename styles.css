@@ -438,6 +438,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favc__loc{display:flex;align-items:center;gap:3px;margin-top:1px}
 .favc__loc svg{flex:none}
 .favc .rs{margin-left:auto;flex:none}
+.favw .counter{flex:none;align-self:center;margin:0 2px 0 4px;padding:2px;background:transparent;border:0}
+.favw .counter__b{width:24px;height:24px;font-size:14px}
+.favw .counter__n{min-width:20px;font-size:14px}
 @media (max-width:720px){
   .favsec{padding:14px;margin:4px 0 18px}
   .favsec__list{grid-template-columns:1fr;gap:6px}
