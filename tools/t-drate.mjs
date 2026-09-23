@@ -96,6 +96,38 @@ for (const w of [300, 320, 360, 390]) {
 await page.setViewportSize({ width: 1440, height: 1000 });
 await page.waitForTimeout(200);
 
+// 저장 표시가 줄 전체를 네모로 두르지 않는다 — 고른 동그라미에만 두른다
+await page.evaluate(()=>{
+  const p=state.rows[0];
+  setRating(rKey(p),'중');
+  location.hash=`#/dept/${p.dept_id}/prof/${p.slug}`; render();
+});
+await page.waitForTimeout(600);      // 저장 표시가 저절로 지워지기를 기다린 뒤
+await page.evaluate(()=>document.querySelectorAll('#drawer .rate').forEach(g=>g.dataset.save='saved'));
+await page.waitForTimeout(300);      // 그림자에 전환 효과가 있어 곧바로 읽으면 중간값이 나온다
+const sv = await page.evaluate(()=>({
+  row: getComputedStyle(document.querySelector('.rate--wide')).boxShadow,
+  on:  getComputedStyle(document.querySelector('.rate--wide .rate__b[aria-pressed="true"]')).boxShadow,
+}));
+t('줄 전체에 네모 없음', sv.row === 'none', sv.row);
+t('고른 동그라미에 3px 고리', /3px/.test(sv.on) && !/\/ 0\)/.test(sv.on), sv.on);
+
+// 폰의 학과 카드도 저장 표시를 줄 전체에 두르지 않는다
+await page.setViewportSize({ width: 390, height: 900 });
+await page.evaluate(()=>{ location.hash='#/dept/comdol'; render();
+  const p=state.rows.find(x=>x.dept_id==='comdol'); setRating(rKey(p),'중'); });
+await page.waitForTimeout(700);
+await page.evaluate(()=>document.querySelectorAll('.prof__foot .rate').forEach(g=>g.dataset.save='saved'));
+await page.waitForTimeout(300);
+const cs = await page.evaluate(()=>({
+  row: getComputedStyle(document.querySelector('.prof__foot .rate')).boxShadow,
+  on:  getComputedStyle(document.querySelector('.prof__foot .rate__b[aria-pressed="true"]')).boxShadow,
+}));
+t('폰 카드도 줄 전체에 네모 없음', cs.row === 'none', cs.row);
+t('폰 카드도 동그라미에만 고리', /3px/.test(cs.on) && !/\/ 0\)/.test(cs.on), cs.on);
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.waitForTimeout(200);
+
 t('학과 카드의 고리는 그대로', await page.evaluate(()=>{
   location.hash='#/dept/comdol'; render();
   const p=state.rows.find(x=>x.dept_id==='comdol'); setRating(rKey(p),'확');

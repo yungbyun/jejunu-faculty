@@ -249,6 +249,13 @@ t-episode 가 70 으로 박혀 있어 깨졌습니다.
 `.prof__foot .rate__b` 에 **`flex:1 1 0` + `aspect-ratio:1`** 을 줘 남은 폭을 여섯이 똑같이 나눠
 갖게 했습니다(`max-width:32px`). 300~719px 전 구간에서 한 줄임을 `t-drate` 가 확인합니다.
 
+**선호도를 고를 때 둘레에 그려지던 네모 (2026-09-23).** 포커스가 아니라 **저장 표시**였습니다
+(`markSaving` → `.rate[data-save]{box-shadow:0 0 0 2px …}`). 학과 카드의 PC 모양은 알약이라
+고리가 자연스럽지만, **폰의 카드와 상세의 선호도 줄은 배경이 없는 줄**이라 커다란 네모가 됩니다.
+두 곳 모두 **고른 동그라미 하나에만** 두르도록 바꿨습니다(`.rate--wide[data-save] …`,
+`.prof__foot .rate[data-save] …`). 저장 표시 자체를 없애지는 않았습니다 — 시트에 들어갔는지
+알려 주는 유일한 신호입니다.
+
 **누를 때 생기던 회색 네모 (2026-09-23).** 포커스 테두리가 아니라 폰의
 `-webkit-tap-highlight-color` 였습니다(기본 `rgba(0,0,0,.18)`, **각진 사각형**). `button,a,[role=button],
 label,summary` 에 `transparent` 로 껐습니다. 상세의 고른 단추에서는 `box-shadow` 고리도 뺐습니다

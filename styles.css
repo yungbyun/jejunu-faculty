@@ -685,6 +685,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .rate[data-save="saving"]{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent);animation:savepulse 1s ease-in-out infinite}
 .rate[data-save="saved"]{box-shadow:0 0 0 2px color-mix(in srgb,#1f8a5b 55%,transparent)}
 .rate[data-save="error"]{box-shadow:0 0 0 2px #c0392b}
+/* 상세의 선호도 줄은 배경이 없는 줄이라, 저장 표시를 줄 전체에 두르면 커다란 네모가 된다.
+   고른 동그라미 하나에만 두른다. */
+.rate--wide[data-save]{box-shadow:none;animation:none}
+.rate--wide[data-save="saving"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#2563eb 45%,transparent);animation:savepulse 1s ease-in-out infinite}
+.rate--wide[data-save="saved"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#1f8a5b 55%,transparent)}
+.rate--wide[data-save="error"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px #c0392b}
 @keyframes savepulse{0%,100%{box-shadow:0 0 0 2px color-mix(in srgb,#2563eb 45%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,#2563eb 15%,transparent)}}
 .savebar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:8px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:#fff;background:#374151;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .savebar[hidden]{display:none}
@@ -995,6 +1001,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    하고(flex:1 1 0) 높이는 aspect-ratio 로 따라가게 한다. */
 @media (max-width:720px){
   .prof__foot .rate{flex-wrap:nowrap;width:100%;gap:5px}
+  /* 폰에서는 이 줄에 배경이 없어, 저장 표시를 줄 전체에 두르면 커다란 네모가 된다.
+     상세 화면과 똑같이 고른 동그라미 하나에만 두른다. */
+  .prof__foot .rate[data-save]{box-shadow:none;animation:none}
+  .prof__foot .rate[data-save="saving"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#2563eb 45%,transparent);animation:savepulse 1s ease-in-out infinite}
+  .prof__foot .rate[data-save="saved"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#1f8a5b 55%,transparent)}
+  .prof__foot .rate[data-save="error"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px #c0392b}
   .prof__foot .rate__b{flex:1 1 0;min-width:0;width:auto;height:auto;max-width:32px;aspect-ratio:1;font-size:12px}
 }
 @media (max-width:339px){
