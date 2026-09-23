@@ -19,6 +19,13 @@ const k = await page.evaluate(()=>{
 await page.waitForSelector('.favw',{timeout:10000});
 t('관심 카드 2장', await page.locator('.favw').count()===2);
 t('카드마다 카운터', await page.locator('.favw .counter').count()===2);
+// 자리가 좁아 '공과대학' 은 뗀다 (모두 공과대학이므로). 해양과학대학은 남긴다.
+t('공과대학은 뗀다', await page.evaluate(()=>shortLoc('공과대학 1호관 7219')==='1호관 7219'));
+t('해양과학대학은 남긴다', await page.evaluate(()=>shortLoc('해양과학대학 3호관 5502호')==='해양과학대학 3호관 5502호'));
+t('카드에도 공과대학 없음', await page.evaluate(()=>![...document.querySelectorAll('.favc__loc')].some(e=>e.textContent.includes('공과대학'))),
+  await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].map(e=>e.textContent.trim()).join(' | ')));
+t('호실은 그대로 보인다', await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].some(e=>/\d호관/.test(e.textContent))));
+
 t('처음은 0', await page.evaluate(()=>document.querySelector('.favw .counter__n').textContent)==='0');
 const lay = await page.evaluate(()=>{
   const c=document.querySelector('.favw .counter').getBoundingClientRect();

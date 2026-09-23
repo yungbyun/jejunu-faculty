@@ -1770,7 +1770,7 @@ function favSection() {
             <span class="favc__ph">${p.photo
               ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')">`
               : esc(initial(p.name))}</span>
-            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(loc)}</small>` : ''}</span>
+            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(shortLoc(loc))}</small>` : ''}</span>
             ${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}
             </a>
             ${meetCounter(p)}
@@ -1876,6 +1876,10 @@ function renderDept(d) {
 /* 연구실 칸은 "연구실 이름 (건물 호실)" 형태가 섞여 있다.
  * 이름은 영문명 옆에, 위치만 호실 줄에 넣으려고 둘을 갈라 둔다. */
 const OFFICE_RE = /^\s*(.+?)\s*[（(]\s*(.+?)\s*[）)]\s*$/;
+/* 관심 카드처럼 자리가 좁은 곳에서 '공과대학' 을 뗀다. 모두 공과대학이라 알려 주는 것이 없다.
+ * 해양과학대학처럼 다른 건물은 그대로 둔다 — 그건 알아야 하는 정보다. */
+const shortLoc = v => String(v || '').replace(/^공과대학\s*/, '');
+
 function officeParts(o) {
   const t = String(o || '').trim();
   if (!t) return { lab: '', loc: '' };
