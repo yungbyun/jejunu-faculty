@@ -19,10 +19,11 @@ const k = await page.evaluate(()=>{
 await page.waitForSelector('.favw',{timeout:10000});
 t('관심 카드 2장', await page.locator('.favw').count()===2);
 t('카드마다 카운터', await page.locator('.favw .counter').count()===2);
-// 자리가 좁아 '공과대학' 은 뗀다 (모두 공과대학이므로). 해양과학대학은 남긴다.
-t('공과대학은 뗀다', await page.evaluate(()=>shortLoc('공과대학 1호관 7219')==='1호관 7219'));
-t('해양과학대학은 남긴다', await page.evaluate(()=>shortLoc('해양과학대학 3호관 5502호')==='해양과학대학 3호관 5502호'));
-t('카드에도 공과대학 없음', await page.evaluate(()=>![...document.querySelectorAll('.favc__loc')].some(e=>e.textContent.includes('공과대학'))),
+// 자리가 좁아 건물 이름을 줄여 쓴다 — 공과대학 → 공대, 해양과학대학 → 해대
+t('공과대학 → 공대', await page.evaluate(()=>shortLoc('공과대학 1호관 7219')==='공대 1호관 7219'));
+t('해양과학대학 → 해대', await page.evaluate(()=>shortLoc('해양과학대학 3호관 5502호')==='해대 3호관 5502호'));
+t('연구실 이름만 있으면 그대로', await page.evaluate(()=>shortLoc('MEMS 연구실')==='MEMS 연구실'));
+t('카드에 긴 이름이 안 남음', await page.evaluate(()=>![...document.querySelectorAll('.favc__loc')].some(e=>/공과대학|해양과학대학/.test(e.textContent))),
   await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].map(e=>e.textContent.trim()).join(' | ')));
 t('호실은 그대로 보인다', await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].some(e=>/\d호관/.test(e.textContent))));
 
