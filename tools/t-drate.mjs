@@ -19,9 +19,8 @@ t('건축학과 4명', await page.evaluate(()=>state.rows.filter(p=>p.dept_name=
 const info = await page.evaluate(()=>{ const p=state.rows.find(x=>x.name==='좌정우'); state.ratings.delete(rKey(p)); return {k:rKey(p), h:`#/dept/${p.dept_id}/prof/${p.slug}`}; });
 await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('.rate--wide',{timeout:10000});
-t('선호도 단추 5개', await page.locator('.rate--wide .rate__b').count()===5, String(await page.locator('.rate--wide .rate__b').count()));
-t('비(평가제외)는 없음', await page.evaluate(()=>![...document.querySelectorAll('.rate--wide .rate__b')].some(b=>b.dataset.val==='비')));
-t('확·긍·중·모·부 순서', await page.evaluate(()=>[...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join(''))==='확긍중모부');
+t('선호도 단추 6개', await page.locator('.rate--wide .rate__b').count()===6, String(await page.locator('.rate--wide .rate__b').count()));
+t('확·긍·중·모·부·비 순서', await page.evaluate(()=>[...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join(''))==='확긍중모부비');
 t('글자만 (이름 없음)', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').textContent.trim())==='확');
 t('뜻은 도움말로', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').getAttribute('title'))==='확실');
 
@@ -60,12 +59,22 @@ t('학과 카드에도 반영', await page.evaluate(k=>{
   return c && c.dataset.rating==='확';
 }, info.k));
 
-// 5) 비로 되어 있으면 알려 준다
-await page.evaluate(k=>{ setRating(k,'비'); }, info.k);
+// 5) 비도 상세에서 바로 고를 수 있다
 await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('.rate--wide',{timeout:10000});
-t('비면 안내가 뜬다', await page.evaluate(()=>[...document.querySelectorAll('.d-section .st-note')].some(e=>e.textContent.includes('연구년'))));
-t('비면 아무것도 안 눌림', await page.evaluate(()=>![...document.querySelectorAll('.rate--wide .rate__b')].some(b=>b.getAttribute('aria-pressed')==='true')));
+await page.locator('.rate--wide .rate__b[data-val="비"]').click();
+await page.waitForTimeout(400);
+t('비를 상세에서 고를 수 있다', await page.evaluate(k=>getRatingByKey(k)==='비', info.k));
+t('비가 눌린 상태로 보인다', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b[data-val="비"]').getAttribute('aria-pressed'))==='true');
+
+// 6) 누른 뒤 포커스 테두리가 남지 않는다
+t('누른 단추가 포커스를 놓는다', await page.evaluate(()=>
+  document.activeElement !== document.querySelector('.rate--wide .rate__b[data-val="비"]')),
+  await page.evaluate(()=>document.activeElement.className||document.activeElement.tagName));
+t('포커스 테두리 없음', await page.evaluate(()=>{
+  const b=document.querySelector('.rate--wide .rate__b'); b.focus();
+  return getComputedStyle(b).outlineStyle === 'none';
+}));
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);

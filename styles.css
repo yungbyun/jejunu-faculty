@@ -328,6 +328,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .rate__b{width:26px;height:26px;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--ink-3);font:inherit;font-size:12px;font-weight:700;cursor:pointer;display:grid;place-items:center;transition:all .12s;--rc:var(--ink-2)}
 .rate__b:hover{background:var(--surface-2);color:var(--ink)}
 .rate__b--high{--rc:#38831c}.rate__b--pos{--rc:#0d8a6a}.rate__b--mid{--rc:#0a7ab0}.rate__b--low{--rc:#6b7280}.rate__b--neg{--rc:#c0392b}.rate__b--na{--rc:#7c5cbf}
+/* 고른 것은 색으로 알 수 있으므로 포커스 테두리는 그리지 않는다 */
+.rate__b:focus,.rate__b:focus-visible{outline:none}
 .rate__b[aria-pressed="true"]{background:var(--rc);color:#fff;border-color:var(--rc);box-shadow:0 0 0 2px color-mix(in srgb,var(--rc) 25%,transparent)}
 .prof[data-rating="확"]{border-color:#38831c}.prof[data-rating="긍"]{border-color:#0d8a6a}.prof[data-rating="중"]{border-color:#0a7ab0}.prof[data-rating="모"]{border-color:#9ca3af}.prof[data-rating="부"]{border-color:#c0392b;opacity:.72}
 .prof[data-rating="비"]{border-color:#7c5cbf;border-style:dashed;opacity:.6}
