@@ -438,9 +438,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favc__loc{display:flex;align-items:center;gap:3px;margin-top:1px}
 .favc__loc svg{flex:none}
 .favc .rs{margin-left:auto;flex:none}
-.favw .counter{flex:none;align-self:center;margin:0 2px 0 4px;padding:2px;background:transparent;border:0}
-.favw .counter__b{width:24px;height:24px;font-size:14px}
-.favw .counter__n{min-width:20px;font-size:14px}
+/* 관심 카드는 자리가 좁다 — 숫자 옆에 + 를 위, − 를 아래로 세워 폭을 줄인다.
+   칸 순서는 − · 숫자 · + 이므로 격자에서 자리를 지정해 준다. */
+.favw .counter{flex:none;align-self:center;margin:0 2px 0 4px;padding:0;background:transparent;border:0;
+  display:grid;grid-template-columns:auto 21px;grid-template-rows:auto auto;align-items:center;gap:2px 3px}
+.favw .counter__n{grid-column:1;grid-row:1 / span 2;min-width:18px;font-size:15px}
+.favw .counter__b{width:21px;height:17px;border-radius:5px;font-size:12px;box-shadow:none;border:1px solid var(--line)}
+.favw .counter [data-inc]{grid-column:2;grid-row:1}
+.favw .counter [data-dec]{grid-column:2;grid-row:2}
 @media (max-width:720px){
   .favsec{padding:14px;margin:4px 0 18px}
   .favsec__list{grid-template-columns:1fr;gap:6px}

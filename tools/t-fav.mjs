@@ -20,6 +20,15 @@ await page.waitForSelector('.favw',{timeout:10000});
 t('관심 카드 2장', await page.locator('.favw').count()===2);
 t('카드마다 카운터', await page.locator('.favw .counter').count()===2);
 t('처음은 0', await page.evaluate(()=>document.querySelector('.favw .counter__n').textContent)==='0');
+const lay = await page.evaluate(()=>{
+  const c=document.querySelector('.favw .counter').getBoundingClientRect();
+  const inc=document.querySelector('.favw [data-inc]').getBoundingClientRect();
+  const dec=document.querySelector('.favw [data-dec]').getBoundingClientRect();
+  return { w:Math.round(c.width), incY:Math.round(inc.y), decY:Math.round(dec.y), incX:Math.round(inc.x), decX:Math.round(dec.x) };
+});
+t('+ 가 − 보다 위에', lay.incY < lay.decY, `+ y=${lay.incY} / − y=${lay.decY}`);
+t('+ 와 − 가 같은 열에', Math.abs(lay.incX - lay.decX) <= 1);
+t('폭이 50px 아래', lay.w < 50, `${lay.w}px`);
 
 await page.locator('.favw .counter [data-inc]').first().click();
 await page.waitForTimeout(300);
