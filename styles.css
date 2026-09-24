@@ -813,6 +813,51 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .let-targets .chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .let-segs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 
+/* ---------- 직접 보낸 기록 ---------- */
+.ot-top{margin-bottom:10px}
+.ms-acts{margin-bottom:12px}
+.ms-list{display:flex;flex-direction:column;gap:8px}
+.ms-row{border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);overflow:hidden}
+.ms-row.on{border-color:var(--brand)}
+.ms-row__h{display:grid;grid-template-columns:150px 64px 1fr 60px;align-items:center;gap:10px;width:100%;
+  padding:11px 14px;border:0;background:none;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer;text-align:left}
+.ms-row__h:hover{background:var(--surface-2)}
+.ms-row__d{font-weight:800}
+.ms-row__n{color:var(--ink-3);font-size:12.5px}
+.ms-row__n b{color:var(--brand);font-size:14px}
+.ms-row__m{color:var(--ink-3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-row__x{color:var(--ink-3);font-size:11.5px;text-align:right}
+.ms-edit{border-top:1px solid var(--line);padding:14px}
+.ms-f{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.ms-f label{display:flex;flex-direction:column;gap:4px}
+.ms-f label span{font-size:11.5px;font-weight:700;color:var(--ink-3)}
+.ms-f input{padding:8px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);font:inherit;font-size:13px}
+.ms-f__memo{flex:1 1 220px}
+.ms-f__memo input{width:100%}
+.ms-day{font-size:15px;font-weight:800;color:var(--brand);padding-bottom:8px}
+.ms-del{margin-left:auto;color:#c0392b}
+.ms-del:hover{border-color:#c0392b}
+.ms-lists{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.ms-g{display:grid;grid-template-columns:96px 1fr;align-items:start;gap:10px;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
+.ms-g h3{margin:0;padding-top:4px;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.ms-g h3 .n{color:var(--ink-3);font-weight:500;font-size:12px}
+.ms-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ms-c{padding:5px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);
+  font:inherit;font-weight:600;font-size:13px;color:var(--ink);cursor:pointer;white-space:nowrap;transition:all .12s}
+.ms-c:hover{border-color:var(--rc)}
+/* 누른 이름은 바탕을 그 선호도 색으로 꽉 채운다 — 멀리서도 한눈에 갈린다 */
+.ms-c.on{background:var(--rc);border-color:var(--rc);color:#fff;font-weight:800}
+.ms-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.ms-foot .st-note{margin:0}
+@media (max-width:720px){
+  .ms-row__h{grid-template-columns:1fr 54px;gap:4px 8px}
+  .ms-row__m{grid-column:1 / -1}
+  .ms-row__x{display:none}
+  .ms-g{grid-template-columns:1fr;gap:6px}
+  .ms-del{margin-left:0}
+}
+
 /* ---------- 접촉: 문자 보내기 ---------- */
 .ot-sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:14px 16px;margin-bottom:12px}
 .ot-sec__h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}

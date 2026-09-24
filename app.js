@@ -267,6 +267,7 @@ function route() {
   if (parts[0] === 'stats') return { view: 'stats' };
   if (parts[0] === 'letters') return { view: 'letters' };
   if (parts[0] === 'outreach') return { view: 'outreach' };
+  if (parts[0] === 'manual') return { view: 'manual' };
   if (parts[0] === 'quiz') return { view: 'quiz' };
   return { view: 'home' };
 }
@@ -289,6 +290,9 @@ function render() {
     closeDrawer(false);
   } else if (r.view === 'outreach') {
     renderOutreach();
+    closeDrawer(false);
+  } else if (r.view === 'manual') {
+    renderManual();
     closeDrawer(false);
   } else if (r.view === 'quiz') {
     renderQuiz();
@@ -1166,6 +1170,158 @@ function obNotice() {
   return `<p class="ot-ok">예약 <b>${nq}건</b>${OB.quota != null ? ` · 오늘 남은 발송 한도 ${OB.quota}통` : ''} — 때가 되면 5분 안에 나갑니다.</p>`;
 }
 
+/* ---------- 직접 보낸 기록 ----------
+ * 앱이 보내는 것과는 아무 상관이 없다. 폰으로 손수 문자를 보낸 뒤, 누구에게 보냈는지 날짜별로
+ * 찍어 두는 곳이다. 회차 발송 기록과도 섞지 않는다 — 손으로 보낸 것은 회차와 안 맞을 수 있다.
+ * 저장은 선호도·항시 제외와 같은 길(비공개 시트)이라 폰에서 찍고 PC 에서 봐도 그대로다. */
+const MSEND_KEY = 'jnu-msend';
+let msendMap = null;
+function msends() { if (!msendMap) msendMap = loadObj(MSEND_KEY); return msendMap; }
+function msSave() { saveObj(MSEND_KEY, msends(), SET_MS); }
+/* 최근 날짜가 위로 */
+const msList = () => Object.entries(msends())
+  .map(([id, v]) => ({ id, date: v.date || '', memo: v.memo || '', who: Array.isArray(v.who) ? v.who : [] }))
+  .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id.localeCompare(a.id));
+function msAdd() {
+  const id = String(Date.now()).slice(-9);
+  const d = new Date();
+  msends()[id] = { date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, memo: '', who: [] };
+  msSave();
+  return id;
+}
+function msDel(id) { delete msends()[id]; msSave(); }
+function msToggle(id, k) {
+  const r = msends()[id];
+  if (!r) return false;
+  const w = new Set(r.who || []);
+  w.has(k) ? w.delete(k) : w.add(k);
+  r.who = [...w];
+  msSave();
+  return w.has(k);
+}
+const MS_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+/* 2026-09-25 → 2026-09-25 (금). 날짜에서 뽑으니 틀릴 일이 없다 */
+function msWhen(v) {
+  const d = new Date(String(v || '') + 'T00:00:00');
+  return isNaN(d.getTime()) ? String(v || '') : `${v} (${MS_DAYS[d.getDay()]})`;
+}
+
+let MS_OPEN = '';   // 지금 펼쳐 놓은 기록
+
+function renderManual() {
+  const list = msList();
+  const open = list.find(r => r.id === MS_OPEN);
+
+  $app.innerHTML = `
+    <div class="view">
+      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>직접 보낸 기록</span></div>
+      <div class="hero"><div class="eyebrow">직접 보낸 기록</div>
+        <h1>손으로 보낸 문자</h1>
+        <p>폰으로 직접 보내신 뒤 여기에 찍어 두십시오. 앱이 보내는 것과는 따로 셉니다.</p></div>
+
+      <div class="ms-acts"><button type="button" class="btn btn--go" data-msadd>+ 새 문자 전송 기록</button></div>
+
+      ${list.length ? `<div class="ms-list">${list.map(r => `
+        <div class="ms-row${r.id === MS_OPEN ? ' on' : ''}">
+          <button type="button" class="ms-row__h" data-msopen="${esc(r.id)}" aria-expanded="${r.id === MS_OPEN}">
+            <span class="ms-row__d">${esc(msWhen(r.date))}</span>
+            <span class="ms-row__n"><b>${r.who.length}</b>명</span>
+            <span class="ms-row__m">${esc(r.memo || '')}</span>
+            <span class="ms-row__x">${r.id === MS_OPEN ? '접기' : '펼치기'}</span>
+          </button>
+          ${r.id === MS_OPEN ? msEdit(r) : ''}
+        </div>`).join('')}</div>`
+        : `<div class="empty"><strong>아직 기록이 없습니다</strong>위 단추를 눌러 오늘 보낸 것부터 남겨 보세요.</div>`}
+    </div>`;
+  bindManual();
+}
+
+/* 펼친 기록 한 건 — 날짜·메모와 선호도별 이름 칩 */
+function msEdit(r) {
+  const picked = new Set(r.who);
+  return `<div class="ms-edit">
+    <div class="ms-f">
+      <label><span>보낸 날짜</span><input type="date" data-msdate value="${esc(r.date)}"></label>
+      <span class="ms-day">${esc(msWhen(r.date).replace(r.date, '').trim())}</span>
+      <label class="ms-f__memo"><span>메모</span><input type="text" data-msmemo value="${esc(r.memo)}" placeholder="예) 1회차 문자, 학과장님들 먼저"></label>
+      <button type="button" class="btn ms-del" data-msdel>이 기록 지우기</button>
+    </div>
+    <p class="st-note">이름을 누르면 그날 보낸 것으로 표시됩니다. 다시 누르면 풀립니다.</p>
+    <div class="ms-lists">
+      ${RLABELS().map(g => {
+        const ps = state.rows.filter(p => (getRating(p) || '미지정') === g);
+        if (!ps.length) return '';
+        const n = ps.filter(p => picked.has(rKey(p))).length;
+        return `<div class="ms-g">
+          <h3><i class="sw sw--${rcls(g)}"></i>${esc(g)} <span class="n">${n}/${ps.length}</span></h3>
+          <div class="ms-chips">${ps.map(p => {
+            const k = rKey(p), on = picked.has(k);
+            return `<button type="button" class="ms-c${on ? ' on' : ''}" data-mstoggle="${esc(k)}"
+              style="--rc:${esc(RCOLOR[g] || '#6b7280')}" aria-pressed="${on}"
+              title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}</button>`;
+          }).join('')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="ms-foot">
+      <button type="button" class="btn" data-msall>전원 표시</button>
+      <button type="button" class="btn" data-msnone>모두 풀기</button>
+      <span class="st-note">모두 <b data-mscount>${r.who.length}</b>명 표시됨</span>
+    </div>
+  </div>`;
+}
+
+function bindManual() {
+  const $ = s => $app.querySelector(s);
+  $('[data-msadd]')?.addEventListener('click', () => { MS_OPEN = msAdd(); renderManual(); });
+  $app.querySelectorAll('[data-msopen]').forEach(b => b.addEventListener('click', () => {
+    MS_OPEN = MS_OPEN === b.dataset.msopen ? '' : b.dataset.msopen;
+    renderManual();
+  }));
+  $('[data-msdate]')?.addEventListener('change', e => {
+    const r = msends()[MS_OPEN]; if (!r) return;
+    r.date = e.target.value; msSave(); renderManual();
+  });
+  /* 메모는 쓰는 동안 다시 그리지 않는다 — 커서가 튄다 */
+  const memo = $('[data-msmemo]');
+  memo?.addEventListener('input', () => { const r = msends()[MS_OPEN]; if (r) { r.memo = memo.value; msSave(); } });
+  $('[data-msdel]')?.addEventListener('click', () => {
+    const r = msends()[MS_OPEN]; if (!r) return;
+    if (!confirm(`${msWhen(r.date)} 기록(${(r.who || []).length}명)을 지울까요?`)) return;
+    msDel(MS_OPEN); MS_OPEN = ''; flashStatus('기록을 지웠습니다'); renderManual();
+  });
+  /* 이름 하나를 누르는 일은 잦다. 화면을 통째로 다시 그리지 않고 그 칩만 바꾼다. */
+  $app.querySelectorAll('[data-mstoggle]').forEach(b => b.addEventListener('click', () => {
+    const on = msToggle(MS_OPEN, b.dataset.mstoggle);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+    msRefreshCounts();
+  }));
+  $('[data-msall]')?.addEventListener('click', () => {
+    const r = msends()[MS_OPEN]; if (!r) return;
+    r.who = state.rows.map(rKey); msSave(); renderManual();
+  });
+  $('[data-msnone]')?.addEventListener('click', () => {
+    const r = msends()[MS_OPEN]; if (!r) return;
+    r.who = []; msSave(); renderManual();
+  });
+}
+
+/* 칩만 바꿔 놓고 숫자들을 맞춘다 */
+function msRefreshCounts() {
+  const r = msends()[MS_OPEN]; if (!r) return;
+  const picked = new Set(r.who);
+  const tot = $app.querySelector('[data-mscount]');
+  if (tot) tot.textContent = String(r.who.length);
+  $app.querySelectorAll('.ms-g').forEach(g => {
+    const on = [...g.querySelectorAll('[data-mstoggle]')].filter(b => picked.has(b.dataset.mstoggle)).length;
+    const n = g.querySelector('h3 .n');
+    if (n) n.textContent = `${on}/${g.querySelectorAll('[data-mstoggle]').length}`;
+  });
+  const head = $app.querySelector(`[data-msopen="${CSS.escape(MS_OPEN)}"] .ms-row__n`);
+  if (head) head.innerHTML = `<b>${r.who.length}</b>명`;
+}
+
 /* ---------- 화면: 접촉 (문자 보내기) ----------
  * 예전에는 회차 원고를 사람마다 펼쳐 보며 AI 로 고쳐 쓰는 화면이었다. 지금은 그 반대다 —
  * 본문 하나를 직접 쓰고, 보낼 사람을 골라, 한 번에 예약한다.
@@ -1241,6 +1397,7 @@ function renderOutreach() {
   $app.innerHTML = `
     <div class="view">
       <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
+      <div class="ot-top"><a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a></div>
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>① 문자 쓰기</h2>
@@ -2282,14 +2439,14 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend';
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_EP, SET_EPS];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
-const SET_OBJ = [SET_MC, SET_MB, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2302,6 +2459,7 @@ function settingValue(key) {
   if (key === SET_NS) return [...noSend()];
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
+  if (key === SET_MS) return msends();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
@@ -2316,12 +2474,13 @@ function settingApplyLocal(key, v) {
     if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
+    if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
