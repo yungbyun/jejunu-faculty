@@ -2037,11 +2037,12 @@ const rKey = p => `${p.dept_id}/${p.slug}`;
 const PHOTO_ZOOM = {
   'nuclear/manhee-jeong': 0.7, 'nuclear/taeseok-kim': 0.7, 'nuclear/myeongkyu-lee': 0.7,
   'foodse/lee-hae-won': 0.75,   // 10% 로는 턱이 그대로 잘려 더 줄였습니다
-  'chemeng/joung-sook-hong': 0.7, 'elec/yeong-jun-choi': 0.7, 'telecom/hyeongyong-lim': 0.7,
+  'chemeng/joung-sook-hong': 0.7, 'chemeng/min-chan-kim': 0.7, 'elec/yeong-jun-choi': 0.7, 'telecom/hyeongyong-lim': 0.7,
   'comdol/jae-young-hur': 0.7, 'comdol/sangyeop-lee': 0.7,
   'ce/yung-cheol-byun': 0.7, 'ce/joon-min-gil': 0.7,
   'mse/jongmin-yang': 0.7, 'mse/jin-hwan-ko': 0.7, 'mse/sang-jae-kim': 0.7,
   'archidesign/yi-yong-kyu': 0.7, 'civil/minsu-cha': 0.7,
+  'archieng/ko-dong-woo': 0.7, 'archieng/lee-myungdo': 0.7,
 };
 /* contain 은 원래(cover)의 9/16 크기다. 거기에 얼마를 곱해야 원하는 배율이 되는지 */
 const photoZoom = p => PHOTO_ZOOM[rKey(p)] ? (PHOTO_ZOOM[rKey(p)] * 16 / 9).toFixed(3) : '';
