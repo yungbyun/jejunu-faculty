@@ -157,6 +157,72 @@ check('복사 표시 지우기', await page.evaluate(() => copied().size === 0))
 await page.evaluate(() => { copiedSet = new Set(); localStorage.removeItem('jnu-copied'); });
 
 
+
+// 11) 복사 단추는 토글 — 잘못 눌렀으면 되돌릴 수 있어야 한다
+await page.evaluate(() => { copiedSet = new Set(); localStorage.removeItem('jnu-copied'); renderOutreach(); });
+await page.waitForSelector('[data-copy]', { timeout: 10000 });
+await page.locator('[data-copy]').first().click();
+await page.waitForTimeout(400);
+check('한 번 누르면 복사함', (await page.locator('[data-copy]').first().innerText()).includes('복사함'));
+await page.locator('[data-copy]').first().click();
+await page.waitForTimeout(400);
+check('다시 누르면 복사로 돌아옴', (await page.locator('[data-copy]').first().innerText()).trim() === '복사',
+  (await page.locator('[data-copy]').first().innerText()).trim());
+check('되돌리면 숫자도 줄어든다', await page.evaluate(() => document.querySelector('[data-ncopy]').textContent) === '0');
+check('기록에서도 빠진다', await page.evaluate(() => copied().size === 0));
+
+// 12) 항시 제외 — 넣어 두면 받을 분에 기본으로 안 들어간다
+await page.evaluate(() => { noSendSet = new Set(); localStorage.removeItem('jnu-nosend'); renderOutreach(); });
+await page.waitForSelector('[data-ban]', { timeout: 10000 });
+const nBefore = await page.evaluate(() => outPicked().length);
+const banned = await page.evaluate(() => outPicked()[0].name);
+await page.locator('[data-ban]').first().click();
+await page.waitForTimeout(500);
+check('항시 제외하면 한 명 줄어든다', await page.evaluate(() => outPicked().length) === nBefore - 1,
+  `${nBefore} → ${await page.evaluate(() => outPicked().length)}`);
+check('체크가 꺼지고 잠긴다', await page.evaluate(() => {
+  const i = document.querySelector('.ot-p--ban input');
+  return !!i && !i.checked && i.disabled;
+}));
+check('머리말에 빠진 이유 표시', (await page.evaluate(() =>
+  document.querySelector('[data-nsel]').closest('.st-note').textContent)).includes('항시 제외 1명'));
+check('전체 선택을 눌러도 안 들어온다', await page.evaluate(() => {
+  document.querySelector('[data-allon]').click();
+  return outPicked().length;
+}) === nBefore - 1);
+await page.waitForTimeout(400);
+check('보낼 목록에서도 빠진다', await page.evaluate(w => !outPicked().some(p => p.name === w), banned), banned);
+await page.evaluate(() => { location.hash = '#/'; render(); location.hash = '#/outreach'; render(); });
+await page.waitForSelector('[data-ban]', { timeout: 10000 });
+check('다시 열어도 그대로', await page.evaluate(() => outPicked().length) === nBefore - 1);
+await page.locator('.ot-p--ban [data-ban]').click();
+await page.waitForTimeout(500);
+check('되돌리면 다시 들어온다', await page.evaluate(() => outPicked().length) === nBefore);
+await page.evaluate(() => { noSendSet = new Set(); localStorage.removeItem('jnu-nosend'); });
+
+
+// 13) 비참여(선호도 '비')도 기본으로 빠진다 — 과반 계산에서 빠지는 분들이다
+const nb = await page.evaluate(() => outPicked().length);
+const bname = await page.evaluate(() => { const p = outPicked()[0]; setRating(rKey(p), '비'); renderOutreach(); return p.name; });
+await page.waitForTimeout(500);
+check('비참여는 빠진다', await page.evaluate(() => outPicked().length) === nb - 1, `${nb} → ${await page.evaluate(() => outPicked().length)}`);
+check('행에 비참여라고 적힌다', await page.evaluate(w => {
+  const row = [...document.querySelectorAll('.ot-p')].find(e => e.querySelector('[data-prof]').textContent === w);
+  return !!row && row.querySelector('.ot-p__m').textContent.includes('비참여');
+}, bname), bname);
+check('체크가 잠긴다', await page.evaluate(w => {
+  const row = [...document.querySelectorAll('.ot-p')].find(e => e.querySelector('[data-prof]').textContent === w);
+  return row.querySelector('input').disabled && !row.querySelector('input').checked;
+}, bname));
+check('전체 선택으로도 안 들어온다', await page.evaluate(() => { document.querySelector('[data-allon]').click(); return outPicked().length; }) === nb - 1);
+await page.waitForTimeout(400);
+check('선호도를 바꾸면 다시 들어온다', await page.evaluate(w => {
+  const p = state.rows.find(x => x.name === w);
+  setRating(rKey(p), '중'); renderOutreach();
+  return outPicked().length;
+}, bname) === nb);
+await page.evaluate(w => { const p = state.rows.find(x => x.name === w); setRating(rKey(p), ''); }, bname);
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);

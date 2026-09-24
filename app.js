@@ -1174,6 +1174,29 @@ const OUT = { ep: 1, depts: new Set(), off: new Set(), text: '', at: '' };
 
 /* 카톡은 자동으로 보낼 길이 없어 한 사람씩 손으로 붙여넣어야 한다. 어디까지 했는지만 적어 둔다.
  * 이 기기에만 둔다 — 보냈다는 기록이 아니라 작업 중인 표시일 뿐이다. */
+/* 항시 제외 — 연구년·퇴임 예정 등 아예 보내지 않을 분. 관심 교수와 같은 길로 저장해
+ * 다른 기기에서도 그대로 보인다. 받을 분에서 기본으로 빠진다. */
+const NOSEND_KEY = 'jnu-nosend';
+let noSendSet = null;
+function noSend() {
+  if (!noSendSet) {
+    noSendSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(NOSEND_KEY) || '[]'); if (Array.isArray(v)) noSendSet = new Set(v); } catch {}
+  }
+  return noSendSet;
+}
+const isNoSend = p => noSend().has(rKey(p));
+function noSendSave() {
+  try { const n = noSend(); n.size ? localStorage.setItem(NOSEND_KEY, JSON.stringify([...n])) : localStorage.removeItem(NOSEND_KEY); } catch {}
+  saveSetting(SET_NS, settingValue(SET_NS));
+}
+function noSendToggle(p) {
+  const n = noSend(), k = rKey(p);
+  n.has(k) ? n.delete(k) : n.add(k);
+  noSendSave();
+  return n.has(k);
+}
+
 const COPIED_KEY = 'jnu-copied';
 let copiedSet = null;
 function copied() {
@@ -1193,7 +1216,12 @@ const copiedCount = () => outPicked().filter(p => copied().has(rKey(p))).length;
 /* 지금 화면에 보이는 대상 (학과를 고르지 않았으면 전원) */
 const outTargets = () => state.rows.filter(p => !OUT.depts.size || OUT.depts.has(p.dept_id));
 /* 그중 실제로 나갈 사람 — 번호가 있고 해제하지 않은 사람 */
-const outPicked = () => outTargets().filter(p => mobileOf(p) && !OUT.off.has(rKey(p)));
+/* 아예 못 보내는 이유. 없으면 빈 문자열 — 그때만 고를 수 있다.
+ * 비참여(선호도 '비')는 연구년 등으로 이번 선거에서 빠지는 분이라 과반 계산에서도 빠진다. */
+const outSkip = p => isNoSend(p) ? '항시 제외'
+  : getRating(p) === '비' ? '비참여'
+  : !mobileOf(p) ? '번호 없음' : '';
+const outPicked = () => outTargets().filter(p => !outSkip(p) && !OUT.off.has(rKey(p)));
 /* 사람마다 이름·학과를 넣어 완성한 문장 */
 const outBody = (p, t) => String(t == null ? OUT.text : t)
   .replace(/\{이름\}/g, p.name)
@@ -1205,7 +1233,9 @@ function renderOutreach() {
   obLoad();
   const targets = outTargets();
   const picked = outPicked();
-  const noNum = targets.filter(p => !mobileOf(p));
+  const why = {};
+  targets.forEach(p => { const r = outSkip(p); if (r) why[r] = (why[r] || 0) + 1; });
+  const skipNote = Object.keys(why).map(r => `${r} ${why[r]}명`).join(' · ');
   const first = picked[0];
 
   $app.innerHTML = `
@@ -1238,7 +1268,7 @@ function renderOutreach() {
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>③ 받을 분</h2>
-          <span class="st-note"><b data-nsel>${picked.length}</b>명 선택됨${noNum.length ? ` · 번호 없어 제외 ${noNum.length}명` : ''}
+          <span class="st-note"><b data-nsel>${picked.length}</b>명 선택됨${skipNote ? ` · 빠짐: ${esc(skipNote)}` : ''}
             · 카톡 복사 <b data-ncopy>${copiedCount()}</b>/${picked.length}</span></div>
         <div class="ot-acts">
           <button type="button" class="btn" data-allon>전체 선택</button>
@@ -1246,13 +1276,15 @@ function renderOutreach() {
           ${copied().size ? `<button type="button" class="btn" data-copyclr>복사 표시 지우기</button>` : ''}
         </div>
         ${targets.length ? `<div class="ot-people">${targets.map(p => {
-          const k = rKey(p), num = mobileOf(p), on = num && !OUT.off.has(k);
-          return `<div class="ot-p${num ? '' : ' ot-p--no'}">
-            <label class="ot-p__c"><input type="checkbox" data-pick="${esc(k)}"${on ? ' checked' : ''}${num ? '' : ' disabled'}></label>
+          const k = rKey(p), skip = outSkip(p), no = isNoSend(p);
+          const on = !skip && !OUT.off.has(k);
+          return `<div class="ot-p${skip ? ' ot-p--no' : ''}${no ? ' ot-p--ban' : ''}">
+            <label class="ot-p__c"><input type="checkbox" data-pick="${esc(k)}"${on ? ' checked' : ''}${skip ? ' disabled' : ''}></label>
             <button type="button" class="ot-p__n" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기">${esc(p.name)}</button>
             <span class="ot-p__d">${esc(p.dept_name)}</span>
-            <span class="ot-p__m">${num ? esc(num) : '번호 없음'}</span>
-            <button type="button" class="ot-p__c2${copied().has(k) ? ' on' : ''}" data-copy="${esc(k)}" title="${esc(p.name)} 교수님께 보낼 글을 복사합니다 — 카톡에 붙여넣으십시오">${copied().has(k) ? '✓ 복사함' : '복사'}</button>
+            <span class="ot-p__m">${skip ? esc(skip) : esc(mobileOf(p))}</span>
+            ${skip ? '' : `<button type="button" class="ot-p__c2${copied().has(k) ? ' on' : ''}" data-copy="${esc(k)}" title="${copied().has(k) ? '다시 누르면 복사 표시를 지웁니다' : esc(p.name) + ' 교수님께 보낼 글을 복사합니다 — 카톡에 붙여넣으십시오'}">${copied().has(k) ? '✓ 복사함' : '복사'}</button>`}
+            <button type="button" class="ot-p__ban${no ? ' on' : ''}" data-ban="${esc(k)}" title="${no ? '항시 제외에서 빼기' : '항시 제외에 넣기 — 앞으로 받을 분에 안 들어갑니다'}">${no ? '되돌리기' : '항시 제외'}</button>
           </div>`; }).join('')}</div>` : `<div class="empty"><strong>고른 학과에 교수가 없습니다</strong></div>`}
       </section>
 
@@ -1356,16 +1388,33 @@ function bindOutreach() {
    * 화면을 다시 그리지 않는다. 69명을 훑는 중에 목록이 맨 위로 튀면 못 쓴다. */
   $app.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
     const k = b.dataset.copy, p = state.rows.find(x => rKey(x) === k);
-    if (!p || !OUT.text.trim()) { flashStatus('먼저 보낼 글을 쓰십시오', true); return; }
+    if (!p) return;
+    const bump = () => { const n = $('[data-ncopy]'); if (n) n.textContent = String(copiedCount()); };
+    /* 이미 복사함이면 표시를 되돌린다 — 잘못 눌렀을 때 되돌릴 길이 있어야 한다 */
+    if (copied().has(k)) {
+      copyMark(k, false);
+      b.classList.remove('on');
+      b.textContent = '복사';
+      bump();
+      flashStatus(`${p.name} 교수님 복사 표시를 지웠습니다`);
+      return;
+    }
+    if (!OUT.text.trim()) { flashStatus('먼저 보낼 글을 쓰십시오', true); return; }
     try {
       await navigator.clipboard.writeText(outBody(p));
       copyMark(k, true);
       b.classList.add('on');
       b.textContent = '✓ 복사함';
-      const n = $('[data-ncopy]');
-      if (n) n.textContent = String(copiedCount());
+      bump();
       flashStatus(`${p.name} 교수님께 보낼 글을 복사했습니다 — 카톡에 붙여넣으십시오`);
     } catch (e) { flashStatus('복사하지 못했습니다 — ' + e.message, true); }
+  }));
+  $app.querySelectorAll('[data-ban]').forEach(b => b.addEventListener('click', () => {
+    const p = state.rows.find(x => rKey(x) === b.dataset.ban);
+    if (!p) return;
+    const on = noSendToggle(p);
+    flashStatus(on ? `${p.name} 교수님을 항시 제외에 넣었습니다` : `${p.name} 교수님을 항시 제외에서 뺐습니다`);
+    renderOutreach();
   }));
   $('[data-copyclr]')?.addEventListener('click', () => {
     if (!confirm('복사 표시를 모두 지울까요? 보낸 기록이 아니라 어디까지 복사했는지 표시일 뿐입니다.')) return;
@@ -2222,14 +2271,14 @@ async function syncRatings({ initial = false } = {}) {
 
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
-const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile';
+const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_EP, SET_EPS];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_EP, SET_EPS];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2239,6 +2288,7 @@ function settingValue(key) {
   if (key === SET_QD) return [...quizDepts()].sort();
   if (key === SET_QX) return [...quizEx()].sort();
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
+  if (key === SET_NS) return [...noSend()];
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
   if (key === SET_EP) return eps();
@@ -2252,6 +2302,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_QD) { quiz.depts = new Set(v); localStorage.setItem(QUIZ_DEPTS_KEY, JSON.stringify(v)); }
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
+    if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
@@ -2259,7 +2310,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -2307,7 +2358,7 @@ function applySettings(m) {
     const cur = settingValue(key) || (isObj ? {} : []);
     const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
     const same = isObj ? canon(cur) === canon(v)
-               : key === SET_FAV ? JSON.stringify(cur) === JSON.stringify(v)
+               : (key === SET_FAV || key === SET_NS) ? JSON.stringify(cur) === JSON.stringify(v)
                                  : JSON.stringify(cur) === JSON.stringify([...v].sort());
     if (same) continue;
     settingApplyLocal(key, v); changed.push(key);
