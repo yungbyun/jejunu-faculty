@@ -1221,6 +1221,23 @@ function msWhen(v) {
 }
 
 let MS_OPEN = '';   // 지금 펼쳐 놓은 기록
+/* '전원 표시'·'모두 풀기' 는 한 번에 69명을 바꾼다. 실수로 눌렀을 때 되돌릴 수 있어야 한다.
+ * 직전 상태를 하나만 들고 있는다(이 화면을 벗어나면 지운다 — 그 뒤엔 되돌릴 일도 아니다). */
+let MS_UNDO = null;
+function msSnap(id, what) {
+  const r = msends()[id];
+  if (!r) return;
+  MS_UNDO = { id, what, who: [...(r.who || [])], na: [...(r.na || [])] };
+}
+function msUndo() {
+  if (!MS_UNDO) return false;
+  const r = msends()[MS_UNDO.id];
+  if (!r) { MS_UNDO = null; return false; }
+  r.who = [...MS_UNDO.who]; r.na = [...MS_UNDO.na];
+  msSave();
+  MS_UNDO = null;
+  return true;
+}
 
 function renderManual() {
   const list = msList();
@@ -1281,6 +1298,7 @@ function msEdit(r) {
     <div class="ms-foot">
       <button type="button" class="btn" data-msall>전원 표시</button>
       <button type="button" class="btn" data-msnone>모두 풀기</button>
+      ${MS_UNDO && MS_UNDO.id === r.id ? `<button type="button" class="btn ms-undo" data-msundo>↩ ${esc(MS_UNDO.what)} 되돌리기</button>` : ''}
       <span class="st-note">보냄 <b data-mscount>${r.who.length}</b>명${r.na.length ? ` · 따로 안 보내도 됨 <b data-mscountna>${r.na.length}</b>명` : ''}</span>
     </div>
   </div>`;
@@ -1288,8 +1306,9 @@ function msEdit(r) {
 
 function bindManual() {
   const $ = s => $app.querySelector(s);
-  $('[data-msadd]')?.addEventListener('click', () => { MS_OPEN = msAdd(); renderManual(); });
+  $('[data-msadd]')?.addEventListener('click', () => { MS_UNDO = null; MS_OPEN = msAdd(); renderManual(); });
   $app.querySelectorAll('[data-msopen]').forEach(b => b.addEventListener('click', () => {
+    MS_UNDO = null;
     MS_OPEN = MS_OPEN === b.dataset.msopen ? '' : b.dataset.msopen;
     renderManual();
   }));
@@ -1303,7 +1322,7 @@ function bindManual() {
   $('[data-msdel]')?.addEventListener('click', () => {
     const r = msends()[MS_OPEN]; if (!r) return;
     if (!confirm(`${msWhen(r.date)} 기록(${(r.who || []).length}명)을 지울까요?`)) return;
-    msDel(MS_OPEN); MS_OPEN = ''; flashStatus('기록을 지웠습니다'); renderManual();
+    msDel(MS_OPEN); MS_OPEN = ''; MS_UNDO = null; flashStatus('기록을 지웠습니다'); renderManual();
   });
   /* 이름 하나를 누르는 일은 잦다. 화면을 통째로 다시 그리지 않고 그 칩만 바꾼다. */
   $app.querySelectorAll('[data-mstoggle]').forEach(b => b.addEventListener('click', () => {
@@ -1315,11 +1334,22 @@ function bindManual() {
   }));
   $('[data-msall]')?.addEventListener('click', () => {
     const r = msends()[MS_OPEN]; if (!r) return;
-    r.who = state.rows.filter(p => !(r.na || []).includes(rKey(p))).map(rKey); msSave(); renderManual();
+    msSnap(MS_OPEN, '전원 표시');
+    r.who = state.rows.filter(p => !(r.na || []).includes(rKey(p))).map(rKey);
+    msSave(); renderManual();
+    flashStatus('전원을 보냄으로 표시했습니다 — 아래 되돌리기로 되돌릴 수 있습니다');
   });
   $('[data-msnone]')?.addEventListener('click', () => {
     const r = msends()[MS_OPEN]; if (!r) return;
-    r.who = []; r.na = []; msSave(); renderManual();
+    const n = (r.who || []).length + (r.na || []).length;
+    if (!n) return;
+    msSnap(MS_OPEN, '모두 풀기');
+    r.who = []; r.na = [];
+    msSave(); renderManual();
+    flashStatus(`${n}명 표시를 풀었습니다 — 아래 되돌리기로 되돌릴 수 있습니다`);
+  });
+  $('[data-msundo]')?.addEventListener('click', () => {
+    if (msUndo()) { flashStatus('되돌렸습니다'); renderManual(); }
   });
 }
 

@@ -101,12 +101,38 @@ t('전원 표시가 생략을 건드리지 않음', await page.evaluate(() => {
   const r = Object.values(msends())[0];
   return r.na.length === 1 && r.who.length === state.rows.length - 1;
 }), await page.evaluate(() => JSON.stringify({ who: Object.values(msends())[0].who.length, na: Object.values(msends())[0].na.length })));
+t('전원 표시 뒤 되돌리기가 뜬다', await page.locator('[data-msundo]').count() === 1);
+await page.click('[data-msundo]');
+await page.waitForTimeout(600);
+t('전원 표시를 되돌린다', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.who.length === 0 && r.na.length === 1;
+}), await page.evaluate(() => JSON.stringify({ who: Object.values(msends())[0].who.length, na: Object.values(msends())[0].na.length })));
+t('되돌린 뒤엔 단추가 사라진다', await page.locator('[data-msundo]').count() === 0);
+
+await page.click('[data-msall]');
+await page.waitForTimeout(600);
 await page.click('[data-msnone]');
 await page.waitForTimeout(600);
 t('모두 풀기는 생략도 푼다', await page.evaluate(() => {
   const r = Object.values(msends())[0];
   return r.who.length === 0 && r.na.length === 0;
 }));
+t('모두 풀기 뒤에도 되돌리기가 뜬다', await page.locator('[data-msundo]').count() === 1);
+await page.click('[data-msundo]');
+await page.waitForTimeout(600);
+t('모두 풀기를 되돌린다', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.who.length === state.rows.length - 1 && r.na.length === 1;
+}), await page.evaluate(() => JSON.stringify({ who: Object.values(msends())[0].who.length, na: Object.values(msends())[0].na.length })));
+t('아무것도 없을 때 모두 풀기는 아무 일 안 함', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  r.who = []; r.na = []; msSave(); renderManual();
+  document.querySelector('[data-msnone]').click();
+  return !document.querySelector('[data-msundo]');
+}));
+await page.evaluate(() => { const r = Object.values(msends())[0]; r.who = []; r.na = []; msSave(); MS_UNDO = null; renderManual(); });
+await page.waitForTimeout(400);
 
 // 날짜·메모
 await page.fill('[data-msdate]', '2026-09-25');
