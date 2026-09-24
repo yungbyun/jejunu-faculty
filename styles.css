@@ -848,6 +848,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ms-c:hover{border-color:var(--rc)}
 /* 누른 이름은 바탕을 그 선호도 색으로 꽉 채운다 — 멀리서도 한눈에 갈린다 */
 .ms-c.on{background:var(--rc);border-color:var(--rc);color:#fff;font-weight:800}
+/* 한 번 더 누르면 노랑 — 따로 보내지 않아도 되는 사람. 노랑 위에는 검은 글자라야 읽힌다 */
+.ms-c.na{background:#f5c518;border-color:#e0ad00;color:#3b2f12;font-weight:800}
+.ms-lg{padding:1px 7px;border-radius:999px;font-size:11.5px}
+.ms-lg--on{background:var(--ink);color:var(--bg)}
+.ms-lg--na{background:#f5c518;color:#3b2f12}
 .ms-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .ms-foot .st-note{margin:0}
 @media (max-width:720px){

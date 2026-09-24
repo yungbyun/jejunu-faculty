@@ -1180,24 +1180,38 @@ function msends() { if (!msendMap) msendMap = loadObj(MSEND_KEY); return msendMa
 function msSave() { saveObj(MSEND_KEY, msends(), SET_MS); }
 /* 최근 날짜가 위로 */
 const msList = () => Object.entries(msends())
-  .map(([id, v]) => ({ id, date: v.date || '', memo: v.memo || '', who: Array.isArray(v.who) ? v.who : [] }))
+  .map(([id, v]) => ({ id, date: v.date || '', memo: v.memo || '',
+    who: Array.isArray(v.who) ? v.who : [], na: Array.isArray(v.na) ? v.na : [] }))
   .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id.localeCompare(a.id));
 function msAdd() {
   const id = String(Date.now()).slice(-9);
   const d = new Date();
-  msends()[id] = { date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, memo: '', who: [] };
+  msends()[id] = { date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, memo: '', who: [], na: [] };
   msSave();
   return id;
 }
 function msDel(id) { delete msends()[id]; msSave(); }
+/* 세 번 돌아간다: 아무것도 아님 → 보냄 → 따로 안 보내도 됨 → 아무것도 아님.
+ * 두 번째 상태는 '이미 만나서 얘기했다' 처럼 문자를 굳이 안 보내도 되는 사람을 적어 두는 자리다. */
+const MS_NONE = '', MS_SENT = 'sent', MS_SKIP = 'skip';
+function msStateOf(r, k) {
+  if (!r) return MS_NONE;
+  if ((r.who || []).includes(k)) return MS_SENT;
+  if ((r.na || []).includes(k)) return MS_SKIP;
+  return MS_NONE;
+}
 function msToggle(id, k) {
   const r = msends()[id];
-  if (!r) return false;
-  const w = new Set(r.who || []);
-  w.has(k) ? w.delete(k) : w.add(k);
-  r.who = [...w];
+  if (!r) return MS_NONE;
+  const w = new Set(r.who || []), n = new Set(r.na || []);
+  const cur = msStateOf(r, k);
+  w.delete(k); n.delete(k);
+  const next = cur === MS_NONE ? MS_SENT : cur === MS_SENT ? MS_SKIP : MS_NONE;
+  if (next === MS_SENT) w.add(k);
+  if (next === MS_SKIP) n.add(k);
+  r.who = [...w]; r.na = [...n];
   msSave();
-  return w.has(k);
+  return next;
 }
 const MS_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 /* 2026-09-25 → 2026-09-25 (금). 날짜에서 뽑으니 틀릴 일이 없다 */
@@ -1225,7 +1239,7 @@ function renderManual() {
         <div class="ms-row${r.id === MS_OPEN ? ' on' : ''}">
           <button type="button" class="ms-row__h" data-msopen="${esc(r.id)}" aria-expanded="${r.id === MS_OPEN}">
             <span class="ms-row__d">${esc(msWhen(r.date))}</span>
-            <span class="ms-row__n"><b>${r.who.length}</b>명</span>
+            <span class="ms-row__n"><b>${r.who.length}</b>명${r.na.length ? ` · 생략 ${r.na.length}` : ''}</span>
             <span class="ms-row__m">${esc(r.memo || '')}</span>
             <span class="ms-row__x">${r.id === MS_OPEN ? '접기' : '펼치기'}</span>
           </button>
@@ -1238,7 +1252,7 @@ function renderManual() {
 
 /* 펼친 기록 한 건 — 날짜·메모와 선호도별 이름 칩 */
 function msEdit(r) {
-  const picked = new Set(r.who);
+  const picked = new Set(r.who), skipped = new Set(r.na);
   return `<div class="ms-edit">
     <div class="ms-f">
       <label><span>보낸 날짜</span><input type="date" data-msdate value="${esc(r.date)}"></label>
@@ -1246,19 +1260,20 @@ function msEdit(r) {
       <label class="ms-f__memo"><span>메모</span><input type="text" data-msmemo value="${esc(r.memo)}" placeholder="예) 1회차 문자, 학과장님들 먼저"></label>
       <button type="button" class="btn ms-del" data-msdel>이 기록 지우기</button>
     </div>
-    <p class="st-note">이름을 누르면 그날 보낸 것으로 표시됩니다. 다시 누르면 풀립니다.</p>
+    <p class="st-note">이름을 누를 때마다 <b class="ms-lg ms-lg--on">보냄</b> → <b class="ms-lg ms-lg--na">따로 안 보내도 됨</b> → 해제 순으로 바뀝니다.</p>
     <div class="ms-lists">
       ${RLABELS().map(g => {
         const ps = state.rows.filter(p => (getRating(p) || '미지정') === g);
         if (!ps.length) return '';
         const n = ps.filter(p => picked.has(rKey(p))).length;
+        const nn = ps.filter(p => skipped.has(rKey(p))).length;
         return `<div class="ms-g">
-          <h3><i class="sw sw--${rcls(g)}"></i>${esc(g)} <span class="n">${n}/${ps.length}</span></h3>
+          <h3><i class="sw sw--${rcls(g)}"></i>${esc(g)} <span class="n">${n}/${ps.length}${nn ? ` · 생략 ${nn}` : ''}</span></h3>
           <div class="ms-chips">${ps.map(p => {
-            const k = rKey(p), on = picked.has(k);
-            return `<button type="button" class="ms-c${on ? ' on' : ''}" data-mstoggle="${esc(k)}"
-              style="--rc:${esc(RCOLOR[g] || '#6b7280')}" aria-pressed="${on}"
-              title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}</button>`;
+            const k = rKey(p), st = msStateOf(r, k);
+            return `<button type="button" class="ms-c${st === MS_SENT ? ' on' : st === MS_SKIP ? ' na' : ''}" data-mstoggle="${esc(k)}"
+              style="--rc:${esc(RCOLOR[g] || '#6b7280')}" aria-pressed="${st === MS_SENT}"
+              title="${esc(p.dept_name)} · ${esc(p.rank)} — 누를 때마다 보냄 → 따로 안 보내도 됨 → 해제">${esc(p.name)}</button>`;
           }).join('')}</div>
         </div>`;
       }).join('')}
@@ -1266,7 +1281,7 @@ function msEdit(r) {
     <div class="ms-foot">
       <button type="button" class="btn" data-msall>전원 표시</button>
       <button type="button" class="btn" data-msnone>모두 풀기</button>
-      <span class="st-note">모두 <b data-mscount>${r.who.length}</b>명 표시됨</span>
+      <span class="st-note">보냄 <b data-mscount>${r.who.length}</b>명${r.na.length ? ` · 따로 안 보내도 됨 <b data-mscountna>${r.na.length}</b>명` : ''}</span>
     </div>
   </div>`;
 }
@@ -1292,34 +1307,38 @@ function bindManual() {
   });
   /* 이름 하나를 누르는 일은 잦다. 화면을 통째로 다시 그리지 않고 그 칩만 바꾼다. */
   $app.querySelectorAll('[data-mstoggle]').forEach(b => b.addEventListener('click', () => {
-    const on = msToggle(MS_OPEN, b.dataset.mstoggle);
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', String(on));
+    const st = msToggle(MS_OPEN, b.dataset.mstoggle);
+    b.classList.toggle('on', st === MS_SENT);
+    b.classList.toggle('na', st === MS_SKIP);
+    b.setAttribute('aria-pressed', String(st === MS_SENT));
     msRefreshCounts();
   }));
   $('[data-msall]')?.addEventListener('click', () => {
     const r = msends()[MS_OPEN]; if (!r) return;
-    r.who = state.rows.map(rKey); msSave(); renderManual();
+    r.who = state.rows.filter(p => !(r.na || []).includes(rKey(p))).map(rKey); msSave(); renderManual();
   });
   $('[data-msnone]')?.addEventListener('click', () => {
     const r = msends()[MS_OPEN]; if (!r) return;
-    r.who = []; msSave(); renderManual();
+    r.who = []; r.na = []; msSave(); renderManual();
   });
 }
 
 /* 칩만 바꿔 놓고 숫자들을 맞춘다 */
 function msRefreshCounts() {
   const r = msends()[MS_OPEN]; if (!r) return;
-  const picked = new Set(r.who);
   const tot = $app.querySelector('[data-mscount]');
   if (tot) tot.textContent = String(r.who.length);
+  const totNa = $app.querySelector('[data-mscountna]');
+  if (totNa) totNa.textContent = String((r.na || []).length);
   $app.querySelectorAll('.ms-g').forEach(g => {
-    const on = [...g.querySelectorAll('[data-mstoggle]')].filter(b => picked.has(b.dataset.mstoggle)).length;
+    const bs = [...g.querySelectorAll('[data-mstoggle]')];
+    const on = bs.filter(b => b.classList.contains('on')).length;
+    const na = bs.filter(b => b.classList.contains('na')).length;
     const n = g.querySelector('h3 .n');
-    if (n) n.textContent = `${on}/${g.querySelectorAll('[data-mstoggle]').length}`;
+    if (n) n.textContent = `${on}/${bs.length}${na ? ` · 생략 ${na}` : ''}`;
   });
   const head = $app.querySelector(`[data-msopen="${CSS.escape(MS_OPEN)}"] .ms-row__n`);
-  if (head) head.innerHTML = `<b>${r.who.length}</b>명`;
+  if (head) head.innerHTML = `<b>${r.who.length}</b>명${(r.na || []).length ? ` · 생략 ${(r.na || []).length}` : ''}`;
 }
 
 /* ---------- 화면: 접촉 (문자 보내기) ----------

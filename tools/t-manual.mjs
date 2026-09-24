@@ -59,15 +59,47 @@ t('시트로도 저장', await page.evaluate(() => {
 t('누를 때 화면이 다시 안 그려진다', await page.evaluate(() => document.querySelectorAll('.ms-edit').length === 1));
 await page.locator('[data-mstoggle]').first().click();
 await page.waitForTimeout(300);
-t('다시 누르면 풀린다', await page.evaluate(() => !document.querySelector('[data-mstoggle]').classList.contains('on')));
-
-// 전원 표시 / 모두 풀기
+t('두 번째는 노랑(따로 안 보내도 됨)', await page.evaluate(() => {
+  const el = document.querySelector('[data-mstoggle]');
+  return !el.classList.contains('on') && el.classList.contains('na');
+}));
+t('노랑 바탕에 검은 글자', await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('[data-mstoggle].na'));
+  return cs.backgroundColor === 'rgb(245, 197, 24)' && cs.color !== 'rgb(255, 255, 255)';
+}), await page.evaluate(() => getComputedStyle(document.querySelector('[data-mstoggle].na')).backgroundColor));
+t('보냄에서 빠지고 생략으로 간다', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.who.length === 0 && r.na.length === 1;
+}));
+t('머리말에 생략 인원', (await page.evaluate(() =>
+  document.querySelector('.ms-row__n').textContent)).includes('생략 1'),
+  await page.evaluate(() => document.querySelector('.ms-row__n').textContent));
+await page.locator('[data-mstoggle]').first().click();
+await page.waitForTimeout(300);
+t('세 번째는 해제', await page.evaluate(() => {
+  const el = document.querySelector('[data-mstoggle]');
+  return !el.classList.contains('on') && !el.classList.contains('na');
+}));
+t('두 목록에서 모두 빠진다', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.who.length === 0 && r.na.length === 0;
+}));
+// 전원 표시는 생략으로 둔 사람을 건드리지 않는다
+await page.locator('[data-mstoggle]').first().click();
+await page.locator('[data-mstoggle]').first().click();
+await page.waitForTimeout(400);
 await page.click('[data-msall]');
 await page.waitForTimeout(600);
-t('전원 표시', await page.evaluate(() => Object.values(msends())[0].who.length === state.rows.length));
+t('전원 표시가 생략을 건드리지 않음', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.na.length === 1 && r.who.length === state.rows.length - 1;
+}), await page.evaluate(() => JSON.stringify({ who: Object.values(msends())[0].who.length, na: Object.values(msends())[0].na.length })));
 await page.click('[data-msnone]');
 await page.waitForTimeout(600);
-t('모두 풀기', await page.evaluate(() => Object.values(msends())[0].who.length === 0));
+t('모두 풀기는 생략도 푼다', await page.evaluate(() => {
+  const r = Object.values(msends())[0];
+  return r.who.length === 0 && r.na.length === 0;
+}));
 
 // 날짜·메모
 await page.fill('[data-msdate]', '2026-09-25');
