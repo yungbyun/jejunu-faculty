@@ -223,6 +223,22 @@ check('선호도를 바꾸면 다시 들어온다', await page.evaluate(w => {
 }, bname) === nb);
 await page.evaluate(w => { const p = state.rows.find(x => x.name === w); setRating(rKey(p), ''); }, bname);
 
+
+// 14) 번호를 누르면 클립보드에 담긴다
+await page.evaluate(() => { noSendSet = new Set(); renderOutreach(); });
+await page.waitForSelector('[data-num]', { timeout: 10000 });
+const wantNum = await page.evaluate(() => document.querySelector('[data-num]').dataset.num);
+await page.locator('[data-num]').first().click();
+await page.waitForTimeout(400);
+check('번호가 클립보드에', await page.evaluate(() => navigator.clipboard.readText()) === wantNum, wantNum);
+check('잠깐 복사 표시', (await page.locator('[data-num]').first().innerText()).includes('복사'));
+await page.waitForTimeout(1400);
+check('표시가 번호로 되돌아옴', (await page.locator('[data-num]').first().innerText()).trim() === wantNum);
+check('빠진 사람 번호 자리는 단추가 아님', await page.evaluate(() => {
+  const row = document.querySelector('.ot-p--no');
+  return !row || !row.querySelector('[data-num]');
+}));
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);

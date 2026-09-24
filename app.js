@@ -1282,7 +1282,8 @@ function renderOutreach() {
             <label class="ot-p__c"><input type="checkbox" data-pick="${esc(k)}"${on ? ' checked' : ''}${skip ? ' disabled' : ''}></label>
             <button type="button" class="ot-p__n" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기">${esc(p.name)}</button>
             <span class="ot-p__d">${esc(p.dept_name)}</span>
-            <span class="ot-p__m">${skip ? esc(skip) : esc(mobileOf(p))}</span>
+            ${skip ? `<span class="ot-p__m">${esc(skip)}</span>`
+              : `<button type="button" class="ot-p__m ot-p__m--go" data-num="${esc(mobileOf(p))}" title="번호를 복사합니다">${esc(mobileOf(p))}</button>`}
             ${skip ? '' : `<button type="button" class="ot-p__c2${copied().has(k) ? ' on' : ''}" data-copy="${esc(k)}" title="${copied().has(k) ? '다시 누르면 복사 표시를 지웁니다' : esc(p.name) + ' 교수님께 보낼 글을 복사합니다 — 카톡에 붙여넣으십시오'}">${copied().has(k) ? '✓ 복사함' : '복사'}</button>`}
             <button type="button" class="ot-p__ban${no ? ' on' : ''}" data-ban="${esc(k)}" title="${no ? '항시 제외에서 빼기' : '항시 제외에 넣기 — 앞으로 받을 분에 안 들어갑니다'}">${no ? '되돌리기' : '항시 제외'}</button>
           </div>`; }).join('')}</div>` : `<div class="empty"><strong>고른 학과에 교수가 없습니다</strong></div>`}
@@ -1407,6 +1408,16 @@ function bindOutreach() {
       b.textContent = '✓ 복사함';
       bump();
       flashStatus(`${p.name} 교수님께 보낼 글을 복사했습니다 — 카톡에 붙여넣으십시오`);
+    } catch (e) { flashStatus('복사하지 못했습니다 — ' + e.message, true); }
+  }));
+  /* 번호를 누르면 클립보드에 담는다 — 카톡에서 사람을 찾을 때 번호로 검색하게 된다 */
+  $app.querySelectorAll('[data-num]').forEach(b => b.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(b.dataset.num);
+      const old = b.textContent;
+      b.textContent = '✓ 복사';
+      setTimeout(() => { b.textContent = old; }, 1200);
+      flashStatus(`${b.dataset.num} 을(를) 복사했습니다`);
     } catch (e) { flashStatus('복사하지 못했습니다 — ' + e.message, true); }
   }));
   $app.querySelectorAll('[data-ban]').forEach(b => b.addEventListener('click', () => {
