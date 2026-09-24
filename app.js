@@ -2005,7 +2005,7 @@ function profCard(p, d, showDept = false) {
   const { lab, loc } = officeParts(p.office);
   return `
     <div class="prof" role="button" tabindex="0" data-dept="${esc(p.dept_id)}" data-slug="${esc(p.slug)}" data-rating="${esc(getRating(p))}" data-fav="${isFav(p) ? '1' : ''}" style="--dept-color:${esc(color)}" aria-label="${esc(p.name)} ${esc(p.rank)} 상세 보기">
-      <div class="prof__photo">
+      <div class="prof__photo${photoZoom(p) ? ' prof__photo--z' : ''}"${photoZoom(p) ? ` style="--pz:${photoZoom(p)}"` : ''}>
         <div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>
         ${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="photoErr(this,'remove')">` : ''}
         ${chickBadge(p)}
@@ -2031,6 +2031,20 @@ function profCard(p, d, showDept = false) {
 
 /* ---------- 선호도 ---------- */
 const rKey = p => `${p.dept_id}/${p.slug}`;
+
+/* 사진이 바짝 잘려 입·턱이 안 보이는 분들. 값은 '원래보다 몇 배' — 0.7 이면 30% 작게.
+ * 카드 칸(4:3)과 사진(3:4)의 비가 달라 생기는 일이라, 사람마다 눈으로 보고 정한다. */
+const PHOTO_ZOOM = {
+  'nuclear/manhee-jeong': 0.7, 'nuclear/taeseok-kim': 0.7, 'nuclear/myeongkyu-lee': 0.7,
+  'foodse/lee-hae-won': 0.75,   // 10% 로는 턱이 그대로 잘려 더 줄였습니다
+  'chemeng/joung-sook-hong': 0.7, 'elec/yeong-jun-choi': 0.7, 'telecom/hyeongyong-lim': 0.7,
+  'comdol/jae-young-hur': 0.7, 'comdol/sangyeop-lee': 0.7,
+  'ce/yung-cheol-byun': 0.7, 'ce/joon-min-gil': 0.7,
+  'mse/jongmin-yang': 0.7, 'mse/jin-hwan-ko': 0.7, 'mse/sang-jae-kim': 0.7,
+  'archidesign/yi-yong-kyu': 0.7, 'civil/minsu-cha': 0.7,
+};
+/* contain 은 원래(cover)의 9/16 크기다. 거기에 얼마를 곱해야 원하는 배율이 되는지 */
+const photoZoom = p => PHOTO_ZOOM[rKey(p)] ? (PHOTO_ZOOM[rKey(p)] * 16 / 9).toFixed(3) : '';
 /* 카드에 붙는 작은 표시: 만남 N회 · 메모 있음 */
 const noteBadge = e => e.memo ? `<span class="nb nb--memo" title="${esc(memoPlain(e.memo))}">메모</span>` : '';
 const getRating = p => state.ratings.get(rKey(p)) || '';

@@ -325,6 +325,18 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .newp svg{display:block;width:28px;height:28px}
 .d-photo .newp{right:6px;bottom:6px;width:31px;height:31px}
 .d-photo .newp svg{width:24px;height:24px}
+/* ---------- 바짝 잘린 사진 되돌리기 ----------
+ * 원본은 3:4 인데 카드 칸은 4:3 이라, cover 로 채우면 세로의 56% 만 보인다. 그래서 사람에 따라
+ * 입·턱이 잘린다. contain 으로 바꾸면 사진 전체가 들어오고(= 원래의 56% 크기), 거기에 --pz 를
+ * 곱해 "원래보다 몇 % 작게" 를 맞춘다. 위를 기준으로 키우므로 잘리는 쪽은 어깨다.
+ * 누구를 얼마나 줄일지는 app.js 의 PHOTO_ZOOM 에 적는다. */
+.prof__photo--z img{object-fit:contain;object-position:center top;transform-origin:center top;transform:scale(var(--pz,1))}
+.prof:hover .prof__photo--z img{transform:scale(var(--pz,1))}   /* 애써 맞춘 크기가 흐트러지지 않게 */
+.prof__photo--z{background:var(--surface-2)}
+/* 옆 여백으로 아바타 바탕색이 비친다. 사진이 있으니 덮는다.
+   (사진이 안 열리면 photoErr 가 img 를 지우고, 그때는 글자만 안 보일 뿐 자리는 남는다) */
+.prof__photo--z .avatar{background:var(--surface-2);color:transparent}
+
 /* ---------- 선호도 ---------- */
 .prof{position:relative}
 .rate{position:absolute;top:10px;right:10px;z-index:3;display:flex;gap:3px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.08)}
