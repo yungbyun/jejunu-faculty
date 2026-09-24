@@ -74,6 +74,13 @@ t('보냄에서 빠지고 생략으로 간다', await page.evaluate(() => {
 t('머리말에 생략 인원', (await page.evaluate(() =>
   document.querySelector('.ms-row__n').textContent)).includes('생략 1'),
   await page.evaluate(() => document.querySelector('.ms-row__n').textContent));
+t('머리말 숫자가 한 줄에 들어간다', await page.evaluate(() =>
+  document.querySelector('.ms-row__n').getBoundingClientRect().height <= 24),
+  String(await page.evaluate(() => Math.round(document.querySelector('.ms-row__n').getBoundingClientRect().height))));
+t('선호도 줄 숫자도 한 줄', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.ms-g h3 .n')].find(e => e.textContent.includes('생략'));
+  return !el || el.getBoundingClientRect().height <= 22;
+}));
 await page.locator('[data-mstoggle]').first().click();
 await page.waitForTimeout(300);
 t('세 번째는 해제', await page.evaluate(() => {

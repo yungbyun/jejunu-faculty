@@ -819,11 +819,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ms-list{display:flex;flex-direction:column;gap:8px}
 .ms-row{border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);overflow:hidden}
 .ms-row.on{border-color:var(--brand)}
-.ms-row__h{display:grid;grid-template-columns:150px 64px 1fr 60px;align-items:center;gap:10px;width:100%;
+.ms-row__h{display:grid;grid-template-columns:150px 132px 1fr 60px;align-items:center;gap:10px;width:100%;
   padding:11px 14px;border:0;background:none;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer;text-align:left}
 .ms-row__h:hover{background:var(--surface-2)}
 .ms-row__d{font-weight:800}
-.ms-row__n{color:var(--ink-3);font-size:12.5px}
+.ms-row__n{color:var(--ink-3);font-size:12.5px;white-space:nowrap}
 .ms-row__n b{color:var(--brand);font-size:14px}
 .ms-row__m{color:var(--ink-3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms-row__x{color:var(--ink-3);font-size:11.5px;text-align:right}
@@ -838,10 +838,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ms-del{margin-left:auto;color:#c0392b}
 .ms-del:hover{border-color:#c0392b}
 .ms-lists{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.ms-g{display:grid;grid-template-columns:96px 1fr;align-items:start;gap:10px;background:var(--bg);
+.ms-g{display:grid;grid-template-columns:132px 1fr;align-items:start;gap:10px;background:var(--bg);
   border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
 .ms-g h3{margin:0;padding-top:4px;font-size:13.5px;display:flex;align-items:center;gap:6px}
-.ms-g h3 .n{color:var(--ink-3);font-weight:500;font-size:12px}
+.ms-g h3 .n{color:var(--ink-3);font-weight:500;font-size:12px;white-space:nowrap}
 .ms-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ms-c{padding:5px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);
   font:inherit;font-weight:600;font-size:13px;color:var(--ink);cursor:pointer;white-space:nowrap;transition:all .12s}
@@ -856,7 +856,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ms-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .ms-foot .st-note{margin:0}
 @media (max-width:720px){
-  .ms-row__h{grid-template-columns:1fr 54px;gap:4px 8px}
+  .ms-row__h{grid-template-columns:1fr auto;gap:4px 8px}
   .ms-row__m{grid-column:1 / -1}
   .ms-row__x{display:none}
   .ms-g{grid-template-columns:1fr;gap:6px}
