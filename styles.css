@@ -855,8 +855,6 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ms-lg--na{background:#f5c518;color:#3b2f12}
 .ms-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 .ms-foot .st-note{margin:0}
-.ms-undo{border-color:var(--brand);color:var(--brand);font-weight:700}
-.ms-undo:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
 @media (max-width:720px){
   .ms-row__h{grid-template-columns:1fr auto;gap:4px 8px}
   .ms-row__m{grid-column:1 / -1}
