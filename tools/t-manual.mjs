@@ -41,6 +41,11 @@ await page.waitForTimeout(700);
 t('선호도별로 묶임', await page.locator('.ms-g').count() >= 6, String(await page.locator('.ms-g').count()));
 t('교수 전원이 칩으로', await page.evaluate(() => document.querySelectorAll('[data-mstoggle]').length === state.rows.length),
   String(await page.evaluate(() => document.querySelectorAll('[data-mstoggle]').length)));
+t('이름에 올리면 학과·직급과 순서가 뜬다', await page.evaluate(() => {
+  const el = document.querySelector('[data-mstoggle]');
+  const p = state.rows.find(x => rKey(x) === el.dataset.mstoggle);
+  return el.getAttribute('title') === `${p.dept_name} ${p.rank} - 보냈음 -> 따로 안보냄 -> 해제`;
+}), await page.evaluate(() => document.querySelector('[data-mstoggle]').getAttribute('title')));
 
 // 이름을 누르면 진한 바탕
 await page.locator('[data-mstoggle]').first().click();

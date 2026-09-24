@@ -1273,7 +1273,7 @@ function msEdit(r) {
             const k = rKey(p), st = msStateOf(r, k);
             return `<button type="button" class="ms-c${st === MS_SENT ? ' on' : st === MS_SKIP ? ' na' : ''}" data-mstoggle="${esc(k)}"
               style="--rc:${esc(RCOLOR[g] || '#6b7280')}" aria-pressed="${st === MS_SENT}"
-              title="${esc(p.dept_name)} · ${esc(p.rank)} — 누를 때마다 보냄 → 따로 안 보내도 됨 → 해제">${esc(p.name)}</button>`;
+              title="${esc(p.dept_name)} ${esc(p.rank)} - 보냈음 -> 따로 안보냄 -> 해제">${esc(p.name)}</button>`;
           }).join('')}</div>
         </div>`;
       }).join('')}
