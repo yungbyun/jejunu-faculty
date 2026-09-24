@@ -1172,6 +1172,24 @@ function obNotice() {
  * 원고를 다듬는 일은 원고 탭이 맡는다. */
 const OUT = { ep: 1, depts: new Set(), off: new Set(), text: '', at: '' };
 
+/* 카톡은 자동으로 보낼 길이 없어 한 사람씩 손으로 붙여넣어야 한다. 어디까지 했는지만 적어 둔다.
+ * 이 기기에만 둔다 — 보냈다는 기록이 아니라 작업 중인 표시일 뿐이다. */
+const COPIED_KEY = 'jnu-copied';
+let copiedSet = null;
+function copied() {
+  if (!copiedSet) {
+    copiedSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(COPIED_KEY) || '[]'); if (Array.isArray(v)) copiedSet = new Set(v); } catch {}
+  }
+  return copiedSet;
+}
+function copyMark(k, on) {
+  const c = copied();
+  on ? c.add(k) : c.delete(k);
+  try { c.size ? localStorage.setItem(COPIED_KEY, JSON.stringify([...c])) : localStorage.removeItem(COPIED_KEY); } catch {}
+}
+const copiedCount = () => outPicked().filter(p => copied().has(rKey(p))).length;
+
 /* 지금 화면에 보이는 대상 (학과를 고르지 않았으면 전원) */
 const outTargets = () => state.rows.filter(p => !OUT.depts.size || OUT.depts.has(p.dept_id));
 /* 그중 실제로 나갈 사람 — 번호가 있고 해제하지 않은 사람 */
@@ -1204,7 +1222,8 @@ function renderOutreach() {
           ${epNos().length ? `<span class="ot-load">
             <select data-epsel aria-label="불러올 회차">${epNos().map(n =>
               `<option value="${n}"${n === OUT.ep ? ' selected' : ''}>${n}회차 ${esc((epOf(n) || {}).name || '')}</option>`).join('')}</select>
-            <button type="button" class="btn" data-epload>원고 불러오기</button></span>` : ''}
+            <button type="button" class="btn" data-epload="sms">문자 원고</button>
+            <button type="button" class="btn" data-epload="kakao">카톡 원고</button></span>` : ''}
         </div>
       </section>
 
@@ -1219,10 +1238,12 @@ function renderOutreach() {
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>③ 받을 분</h2>
-          <span class="st-note"><b data-nsel>${picked.length}</b>명 선택됨${noNum.length ? ` · 번호 없어 제외 ${noNum.length}명` : ''}</span></div>
+          <span class="st-note"><b data-nsel>${picked.length}</b>명 선택됨${noNum.length ? ` · 번호 없어 제외 ${noNum.length}명` : ''}
+            · 카톡 복사 <b data-ncopy>${copiedCount()}</b>/${picked.length}</span></div>
         <div class="ot-acts">
           <button type="button" class="btn" data-allon>전체 선택</button>
           <button type="button" class="btn" data-alloff>전체 해제</button>
+          ${copied().size ? `<button type="button" class="btn" data-copyclr>복사 표시 지우기</button>` : ''}
         </div>
         ${targets.length ? `<div class="ot-people">${targets.map(p => {
           const k = rKey(p), num = mobileOf(p), on = num && !OUT.off.has(k);
@@ -1231,6 +1252,7 @@ function renderOutreach() {
             <button type="button" class="ot-p__n" data-prof="${esc(k)}" title="${esc(p.name)} 교수 상세 보기">${esc(p.name)}</button>
             <span class="ot-p__d">${esc(p.dept_name)}</span>
             <span class="ot-p__m">${num ? esc(num) : '번호 없음'}</span>
+            <button type="button" class="ot-p__c2${copied().has(k) ? ' on' : ''}" data-copy="${esc(k)}" title="${esc(p.name)} 교수님께 보낼 글을 복사합니다 — 카톡에 붙여넣으십시오">${copied().has(k) ? '✓ 복사함' : '복사'}</button>
           </div>`; }).join('')}</div>` : `<div class="empty"><strong>고른 학과에 교수가 없습니다</strong></div>`}
       </section>
 
@@ -1299,14 +1321,15 @@ function bindOutreach() {
   ta?.addEventListener('input', () => { OUT.text = ta.value; draw(); });
   $('[data-at]')?.addEventListener('change', e => { OUT.at = e.target.value; });
 
-  $('[data-epload]')?.addEventListener('click', () => {
-    const n = Number($('[data-epsel]').value), ep = epOf(n);
+  $app.querySelectorAll('[data-epload]').forEach(b => b.addEventListener('click', () => {
+    const n = Number($('[data-epsel]').value), ep = epOf(n), kind = b.dataset.epload;
     if (!ep) return;
-    if (OUT.text.trim() && !confirm(`${n}회차 문자 원고를 불러옵니다. 지금 쓰신 내용은 지워집니다.`)) return;
+    const name = kind === 'kakao' ? '카톡' : '문자';
+    if (OUT.text.trim() && !confirm(`${n}회차 ${name} 원고를 불러옵니다. 지금 쓰신 내용은 지워집니다.`)) return;
     OUT.ep = n;
-    OUT.text = ep.sms || ep.body || '';
+    OUT.text = kind === 'kakao' ? (ep.kakao || ep.sms || ep.body || '') : (ep.sms || ep.body || '');
     renderOutreach();
-  });
+  }));
 
   $('[data-dall]')?.addEventListener('click', () => { OUT.depts.clear(); renderOutreach(); });
   $app.querySelectorAll('[data-dept]').forEach(b => b.addEventListener('click', () => {
@@ -1328,6 +1351,28 @@ function bindOutreach() {
     const d = p && state.depts.find(x => x.id === p.dept_id);
     if (p && d) openDrawer(p, d);
   }));
+
+  /* 카톡용 복사 — 그 사람 이름이 들어간 완성된 글을 클립보드에 담는다.
+   * 화면을 다시 그리지 않는다. 69명을 훑는 중에 목록이 맨 위로 튀면 못 쓴다. */
+  $app.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+    const k = b.dataset.copy, p = state.rows.find(x => rKey(x) === k);
+    if (!p || !OUT.text.trim()) { flashStatus('먼저 보낼 글을 쓰십시오', true); return; }
+    try {
+      await navigator.clipboard.writeText(outBody(p));
+      copyMark(k, true);
+      b.classList.add('on');
+      b.textContent = '✓ 복사함';
+      const n = $('[data-ncopy]');
+      if (n) n.textContent = String(copiedCount());
+      flashStatus(`${p.name} 교수님께 보낼 글을 복사했습니다 — 카톡에 붙여넣으십시오`);
+    } catch (e) { flashStatus('복사하지 못했습니다 — ' + e.message, true); }
+  }));
+  $('[data-copyclr]')?.addEventListener('click', () => {
+    if (!confirm('복사 표시를 모두 지울까요? 보낸 기록이 아니라 어디까지 복사했는지 표시일 뿐입니다.')) return;
+    copiedSet = new Set();
+    try { localStorage.removeItem(COPIED_KEY); } catch {}
+    renderOutreach();
+  });
 
   $('[data-send]')?.addEventListener('click', outSend);
 

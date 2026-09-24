@@ -4,7 +4,8 @@
 import { chromium } from 'playwright';
 
 const b = await chromium.launch();
-const page = await (await b.newContext({ viewport: { width: 1440, height: 1100 } })).newPage();
+const page = await (await b.newContext({ viewport: { width: 1440, height: 1100 },
+  permissions: ['clipboard-read', 'clipboard-write'] })).newPage();
 const errs = []; page.on('pageerror', e => errs.push(String(e)));
 await page.goto('http://127.0.0.1:8080/', { waitUntil: 'load' });
 await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
@@ -125,6 +126,36 @@ check('회차 원고를 불러온다', (await page.evaluate(() => OUT.text)).sta
 check('교수별 초안 펼치기 없음', await page.evaluate(() => !document.querySelector('[data-open]')));
 check('AI 다시 쓰기 없음', await page.evaluate(() => !document.querySelector('[data-airun], [data-aidept], [data-aiprof]')));
 check('채널 고르기 없음', await page.evaluate(() => !document.querySelector('[data-ch]')));
+
+// 10) 카톡용 복사 — 자동 발송이 안 되므로 한 사람씩 붙여넣는다
+await page.evaluate(() => {
+  copiedSet = new Set(); localStorage.removeItem('jnu-copied');
+  OUT.text = '{이름} 교수님, 컴퓨터공학과 변영철입니다.';
+  OUT.depts = new Set(['comdol']); OUT.off = new Set();
+  renderOutreach();
+});
+await page.waitForSelector('[data-copy]', { timeout: 10000 });
+check('행마다 복사 단추', await page.locator('[data-copy]').count() > 0, String(await page.locator('[data-copy]').count()));
+check('처음엔 0 복사', await page.evaluate(() => document.querySelector('[data-ncopy]').textContent) === '0');
+const cname = await page.locator('[data-prof]').first().innerText();
+await page.locator('[data-copy]').first().click();
+await page.waitForTimeout(500);
+const clip = await page.evaluate(() => navigator.clipboard.readText());
+check('클립보드에 개인화된 글', clip.startsWith(cname) && !clip.includes('{이름}'), clip);
+check('단추가 복사함으로 바뀜', (await page.locator('[data-copy]').first().innerText()).includes('복사함'));
+check('진행 숫자 올라감', await page.evaluate(() => document.querySelector('[data-ncopy]').textContent) === '1');
+check('이 기기에만 저장', await page.evaluate(() => {
+  try { return JSON.parse(localStorage.getItem('jnu-copied')).length === 1; } catch { return false; }
+}));
+await page.evaluate(() => { location.hash = '#/'; render(); location.hash = '#/outreach'; render(); });
+await page.waitForSelector('[data-copy]', { timeout: 10000 });
+check('화면을 다시 열어도 표시가 남는다', (await page.locator('[data-copy]').first().innerText()).includes('복사함'));
+await page.evaluate(() => { window.confirm = () => true; });
+await page.click('[data-copyclr]');
+await page.waitForTimeout(400);
+check('복사 표시 지우기', await page.evaluate(() => copied().size === 0));
+await page.evaluate(() => { copiedSet = new Set(); localStorage.removeItem('jnu-copied'); });
+
 
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
