@@ -1746,7 +1746,7 @@ function donut(profs) {
           <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%${gap(reach)}</b>
           <span class="pie__kn">${reach}명 · 공략 +${added}명</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
-      <p class="pie__pool">괄호 안은 <b>절반 ${half}명</b>까지 모자라거나 넘는 인원입니다. 더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
+      <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
       </div>
