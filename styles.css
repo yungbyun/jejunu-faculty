@@ -392,6 +392,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 칩 글자색만 따로 둔다(2026-09-20). 배경이 옅은 같은 색이라 원래 색 그대로는 대비가
    3.2~4.0 으로 모자랐다. 색상·채도는 두고 밝기만 옮겨 두 테마 모두 4.6 이상으로 맞췄다.
    선호도 색 자체(막대·테두리·채운 칩)는 그대로이니 여기 값만 고칠 것. */
+/* 공략(선거일까지 꼭 만날 사람) — 관심 교수의 금색과 헷갈리지 않게 주황으로 */
+:root{--push:#b83c0a}   /* 밝은 화면: #c2410c 는 단추 글자 대비가 4.35 로 모자랐다 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--push:#fb923c}}
+:root[data-theme="dark"]{--push:#fb923c}
 :root{--rs-high:#317218;--rs-pos:#0a7359;--rs-mid:#096998;--rs-low:#5f6672;--rs-neg:#b83729;--rs-na:#7351bb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rs-high:#439c21;--rs-pos:#129a74;--rs-mid:#0c90cf;--rs-low:#828997;--rs-neg:#d85f52;--rs-na:#9479cb}}
 :root[data-theme="dark"]{--rs-high:#439c21;--rs-pos:#129a74;--rs-mid:#0c90cf;--rs-low:#828997;--rs-neg:#d85f52;--rs-na:#9479cb}
@@ -546,8 +550,25 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-list h3 .n{color:var(--ink-3);font-weight:500}
 .st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 /* 칩은 이름만 (2026-09-20). 학과·직위는 title 로만 남겨 마우스를 올리면 보인다 */
-.st-list li a{display:inline-block;padding:4px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-weight:600;font-size:13px;white-space:nowrap}
-.st-list li a:hover{border-color:var(--brand)}
+.st-list li a,.st-list li button{display:inline-flex;align-items:center;gap:0;padding:4px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-weight:600;font-size:13px;white-space:nowrap;color:inherit;cursor:pointer}
+.st-list li a:hover,.st-list li button:hover{border-color:var(--brand)}
+/* 공략으로 고른 사람 — 이름 왼쪽에 깃발, 칩 테두리는 안쪽 선으로 굵게 한다
+   (border-width 를 올리면 칩 크기가 흔들려 줄이 밀린다) */
+.st-c.on{border-color:var(--push);box-shadow:inset 0 0 0 1px var(--push)}
+.pushm{display:inline-flex;align-items:center;margin-right:4px;color:var(--push);line-height:0}
+.n--push{color:var(--push);display:inline-flex;align-items:center;gap:2px;margin-left:6px}
+/* 고르기 모드의 단추들 */
+.st-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn--push.on{border-color:var(--push);color:var(--push);background:color-mix(in srgb,var(--push) 10%,transparent)}
+.btn--push:disabled{opacity:.45;cursor:default}
+.btn--push .n{font-weight:800}
+/* 상세 페이지의 공략 단추 */
+.pushbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
+  font-weight:700;cursor:pointer}
+.pushbtn:hover{border-color:var(--push);color:var(--push)}
+.pushbtn.on{border-color:var(--push);color:var(--push);background:color-mix(in srgb,var(--push) 12%,transparent)}
+
 /* 만난 적이 있는 교수 — 이름 오른쪽에 만난 횟수만큼 작은 불. 색은 그 선호도의 대표 색(--lit) */
 .metlit{display:inline-flex;align-items:center;gap:2.5px;margin-left:6px;
   vertical-align:middle;position:relative;top:-1px}

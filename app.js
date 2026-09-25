@@ -1771,6 +1771,19 @@ function tagStats() {
   return { list, minN };
 }
 
+/* 선호도별 목록의 두 가지 모드. 화면을 떠나도 그대로 두면 다시 왔을 때 헷갈리지 않는다 */
+const STP = { pick: false, only: false };
+
+/* 이름 칩 하나. 고르기 모드에서는 링크가 아니라 단추가 되어 눌러도 상세로 가지 않는다 */
+function stChip(p, r) {
+  const met = getMet(p), pu = isPush(p), k = rKey(p);
+  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, RCOLOR[r])}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${pu ? ' · 공략' : ''}`;
+  return STP.pick
+    ? `<li><button type="button" class="st-c${pu ? ' on' : ''}" data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
+    : `<li><a class="st-c${pu ? ' on' : ''}" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
+}
+
 function renderStats() {
   const all = state.rows, rated = all.filter(getRating);
   const c = dist(all);
@@ -1805,11 +1818,23 @@ function renderStats() {
       </section>
 
       <section class="st-sec">
-        <div class="st-head"><h2>선호도별 교수 목록</h2><button class="btn" type="button" id="csvBtn">CSV 내보내기</button></div>
+        <div class="st-head"><h2>선호도별 교수 목록</h2>
+          <div class="st-tools">
+            <button class="btn btn--push${STP.pick ? ' on' : ''}" type="button" id="pushPick" aria-pressed="${STP.pick}">
+              ${STP.pick ? '고르기 끝내기' : '공략 고르기'}</button>
+            <button class="btn btn--push${STP.only ? ' on' : ''}" type="button" id="pushOnly" aria-pressed="${STP.only}"
+              ${pushes().size ? '' : 'disabled'}>공략만 보기 <span class="n">${pushes().size}</span></button>
+            <button class="btn" type="button" id="csvBtn">CSV 내보내기</button>
+          </div></div>
+        ${STP.pick ? `<p class="st-note">이름을 누르면 <b>공략</b>으로 표시됩니다. 다시 누르면 풀립니다 — 상세 페이지로는 가지 않습니다.</p>` : ''}
         <div class="st-lists">
-          ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
-            <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
-              ${ps.length ? `<ul>${ps.map(p => { const met = getMet(p); return `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}">${esc(p.name)}${metDots(met, RCOLOR[r])}</a></li>`; }).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+          ${CONFIG.RATINGS.LABELS.map(r => {
+            const inRow = all.filter(p => getRating(p) === r);
+            const np = inRow.filter(isPush).length;
+            const ps = STP.only ? inRow.filter(isPush) : inRow;
+            return `
+            <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${inRow.length}</span>${np ? `<span class="n n--push">${PUSH_FLAG} ${np}</span>` : ''}</h3>
+              ${ps.length ? `<ul>${ps.map(p => stChip(p, r)).join('')}</ul>` : `<div class="muted st-small">${STP.only ? '공략으로 고른 분이 없습니다' : '없음'}</div>`}
             </div>`; }).join('')}
         </div>
       </section>
@@ -1834,6 +1859,39 @@ function renderStats() {
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   });
   $app.querySelector('#csvBtn')?.addEventListener('click', exportCsv);
+  $app.querySelector('#pushPick')?.addEventListener('click', () => { STP.pick = !STP.pick; renderStats(); });
+  $app.querySelector('#pushOnly')?.addEventListener('click', () => { STP.only = !STP.only; renderStats(); });
+  /* 한 사람씩 고르는 일은 잦다. 화면을 통째로 다시 그리지 않고 누른 칩과 숫자만 고친다. */
+  $app.querySelectorAll('[data-pushkey]').forEach(btn => btn.addEventListener('click', () => {
+    const p = state.rows.find(x => rKey(x) === btn.dataset.pushkey);
+    if (!p) return;
+    const on = pushToggle(p);
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    const mark = btn.querySelector('.pushm');
+    if (on && !mark) btn.insertAdjacentHTML('afterbegin', `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>`);
+    if (!on && mark) mark.remove();
+    pushRefreshCounts();
+  }));
+}
+
+/* 칩만 바꿔 놓고 줄머리와 「공략만 보기」 숫자를 맞춘다 */
+function pushRefreshCounts() {
+  $app.querySelectorAll('.st-list').forEach(box => {
+    const n = box.querySelectorAll('[data-pushkey].on, a.st-c.on').length;
+    const h = box.querySelector('h3');
+    if (!h) return;
+    let tag = h.querySelector('.n--push');
+    if (!n) { if (tag) tag.remove(); return; }
+    if (!tag) { h.insertAdjacentHTML('beforeend', '<span class="n n--push"></span>'); tag = h.querySelector('.n--push'); }
+    tag.innerHTML = `${PUSH_FLAG} ${n}`;
+  });
+  const only = $app.querySelector('#pushOnly');
+  if (only) {
+    const t = pushes().size;
+    only.querySelector('.n').textContent = String(t);
+    only.disabled = !t;
+  }
 }
 
 function exportCsv() {
@@ -2081,6 +2139,30 @@ function favSave() {
   saveSetting(SET_FAV, settingValue(SET_FAV));
 }
 function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : f.add(k); favSave(); return f.has(k); }
+
+/* ---------- 공략 (선거일까지 꼭 만날 사람) ----------
+ * 선호도와도, 관심 교수와도 따로 둔다. 관심은 눈여겨보는 사람, 공략은 반드시 만날 사람이다.
+ * 둘을 한 표시로 합치면 "관심이지만 아직 공략은 아닌 사람" 을 못 가른다.
+ * 저장은 관심·항시 제외와 같은 길(settings 탭의 push 키)이라 기기가 바뀌어도 따라온다.
+ * 서버(Code.gs)는 키 이름을 가리지 않으므로 재배포할 것이 없다. */
+const PUSH_KEY = 'jnu-push';
+let pushSet = null;
+function pushes() {
+  if (!pushSet) {
+    pushSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(PUSH_KEY) || '[]'); if (Array.isArray(v)) pushSet = new Set(v); } catch {}
+  }
+  return pushSet;
+}
+const isPush = p => pushes().has(rKey(p));
+function pushSave() {
+  try { const s = pushes(); s.size ? localStorage.setItem(PUSH_KEY, JSON.stringify([...s])) : localStorage.removeItem(PUSH_KEY); } catch {}
+  saveSetting(SET_PU, settingValue(SET_PU));
+}
+function pushToggle(p) { const s = pushes(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); pushSave(); return s.has(k); }
+/* 공략 표식 — 관심 교수의 체크와 헷갈리지 않도록 깃발이고, 색도 금색이 아닌 주황이다 */
+const PUSH_FLAG = '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">'
+  + '<path d="M6 22V3h12l-3 5 3 5H6" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 
 /* ---------- 메일 보낸 횟수 ----------
  * 관심 교수와 같은 길(settings 탭)로 저장한다. 값이 배열이 아니라 객체라는 점만 다르고,
@@ -2470,13 +2552,14 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
+const SET_PU = 'push';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2487,6 +2570,7 @@ function settingValue(key) {
   if (key === SET_QX) return [...quizEx()].sort();
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
   if (key === SET_NS) return [...noSend()];
+  if (key === SET_PU) return [...pushes()].sort();   // 고른 순서는 뜻이 없다
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
   if (key === SET_MS) return msends();
@@ -2502,6 +2586,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_QX) { quiz.ex = new Set(v); v.length ? localStorage.setItem(QUIZ_EX_KEY, JSON.stringify(v)) : localStorage.removeItem(QUIZ_EX_KEY); }
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
     if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
+    if (key === SET_PU) { pushSet = new Set(v); v.length ? localStorage.setItem(PUSH_KEY, JSON.stringify(v)) : localStorage.removeItem(PUSH_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
@@ -2510,7 +2595,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -3112,6 +3197,12 @@ function openDrawer(p, d) {
         ${meetCounter(p)}
       </div>
 
+      <div class="d-section"><h3>공략</h3>
+        <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
+          ${PUSH_FLAG}<span>${isPush(p) ? '선거일까지 꼭 만날 분' : '공략으로 표시'}</span></button>
+        <p class="st-note">선호도와는 별개입니다. 분석 페이지의 선호도별 목록에 깃발로 함께 보입니다.</p>
+      </div>
+
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
@@ -3133,6 +3224,13 @@ function openDrawer(p, d) {
   bindRates($panel);
   bindNotes($panel);
   bindAix($panel, p, d);
+  $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
+    const btn = e.currentTarget, on = pushToggle(p);
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.querySelector('span').textContent = on ? '선거일까지 꼭 만날 분' : '공략으로 표시';
+    flashStatus(on ? `${p.name} 교수를 공략으로 표시했습니다` : `${p.name} 교수의 공략 표시를 풀었습니다`);
+  });
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
     if (box) box.innerHTML = insightsHtml(p, d, data);
