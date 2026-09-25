@@ -96,13 +96,33 @@ t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / $
 t('불은 이름 오른쪽 끝에', lit.okPos);
 t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
 t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
+const dots = await page.evaluate(()=>{
+  state.ratings.clear(); state.notes.clear();
+  const v=['확','긍','중','모','부'];
+  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%5]); state.notes.set(rKey(p),{met:i%9,memo:''}); });
+  render();
+  const rows = [...document.querySelectorAll('.st-list li a')].map(el=>{
+    const p = state.rows.find(x=>el.getAttribute('href').endsWith(encodeURIComponent(x.slug)));
+    const w = el.querySelector('.metlit');
+    return { met: p?getMet(p):-1, n: w?w.querySelectorAll('b').length:0, num: w&&w.querySelector('em')?w.querySelector('em').textContent:'' };
+  });
+  return {
+    small: rows.some(x=>x.met>0) && rows.filter(x=>x.met>0&&x.met<=5).every(x=>x.n===x.met&&!x.num),
+    capped: rows.filter(x=>x.met>5).every(x=>x.n===5&&x.num===String(x.met)),
+    many: rows.filter(x=>x.met>5).length,
+    size: (()=>{ const b=document.querySelector('.metlit b'); return b?Math.round(b.getBoundingClientRect().width):0; })(),
+  };
+});
+t('만난 횟수만큼 점이 찍힌다', dots.small);
+t('다섯을 넘으면 점 다섯에 숫자', dots.capped && dots.many>0, `${dots.many}명`);
+t('점은 전보다 작다(7px 미만)', dots.size>0 && dots.size<7, `${dots.size}px`);
 const cols = await page.evaluate(()=>{
   const v=['확','긍','중','모','부','비']; state.ratings.clear(); state.notes.clear();
   state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%6]); state.notes.set(rKey(p),{met:1,memo:''}); });
   render();
   const hex = x => '#'+x.match(/\d+/g).slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join('');
   return [...document.querySelectorAll('.st-list')].map(box=>{
-    const r=box.dataset.rslist, lit=box.querySelector('.metlit');
+    const r=box.dataset.rslist, lit=box.querySelector('.metlit b');
     return { r, got: lit?hex(getComputedStyle(lit).backgroundColor):'', want: RCOLOR[r] };
   });
 });

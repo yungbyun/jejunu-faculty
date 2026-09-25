@@ -1809,7 +1809,7 @@ function renderStats() {
         <div class="st-lists">
           ${CONFIG.RATINGS.LABELS.map(r => { const ps = all.filter(p => getRating(p) === r); return `
             <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${ps.length}</span></h3>
-              ${ps.length ? `<ul>${ps.map(p => { const met = getMet(p); return `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}">${esc(p.name)}${met ? `<i class="metlit" style="--lit:${esc(RCOLOR[r] || '#22c55e')}" role="img" aria-label="만난 적 있음 ${met}회"></i>` : ''}</a></li>`; }).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
+              ${ps.length ? `<ul>${ps.map(p => { const met = getMet(p); return `<li><a href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}">${esc(p.name)}${metDots(met, RCOLOR[r])}</a></li>`; }).join('')}</ul>` : `<div class="muted st-small">없음</div>`}
             </div>`; }).join('')}
         </div>
       </section>
@@ -2343,6 +2343,12 @@ const chickBadge = p => isNewProf(p)
 const getNote = key => state.notes.get(key) || { met: 0, memo: '' };
 const getMet = p => getNote(rKey(p)).met || 0;
 const getMemo = p => getNote(rKey(p)).memo || '';
+/* 만난 횟수만큼 작은 점. 여섯 번을 넘으면 칩이 길어지니 점은 다섯까지만 찍고 숫자로 적는다 */
+const MET_DOT_MAX = 5;
+const metDots = (met, color) => !met ? '' :
+  `<i class="metlit" style="--lit:${esc(color || '#22c55e')}" role="img" aria-label="만난 적 있음 ${met}회">`
+  + '<b></b>'.repeat(Math.min(met, MET_DOT_MAX))
+  + (met > MET_DOT_MAX ? `<em>${met}</em>` : '') + '</i>';
 const normMet = v => Math.max(0, Math.min(999, Math.round(Number(v) || 0)));
 const normMemo = v => String(v == null ? '' : v).slice(0, 2000);
 /* 한 교수의 로컬 기록 전체 {rating, met, memo} */
