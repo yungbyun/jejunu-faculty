@@ -99,8 +99,7 @@ main{min-height:60vh;padding:40px 20px 72px}
 .home .hero p{font-size:var(--fs-m)}
 /* 학과 차례 바꾸기 — 손잡이는 줄(<a>) 안에 못 넣으므로(링크 안의 단추는 안 된다)
    줄을 감싸고 형제로 둔다. 줄은 그만큼 왼쪽을 비운다. */
-.dept-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 6px}
-.dept-head .st-note{margin:0}
+.dept-head{display:flex;justify-content:flex-end;margin:0 0 6px}
 .dept-list{border-top:1px solid var(--line)}
 .drow-w{position:relative}
 .dept-list .drow{padding-left:36px}
@@ -314,8 +313,6 @@ a.ins__joined:hover{border-color:var(--dept-color,var(--accent));color:var(--dep
 .foot__status::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink-3);margin-right:6px;vertical-align:1px}
 .foot__status.ok::before{background:#22a06b}
 .foot__status.warn::before{background:#e0a020}
-/* 판·계정 — 상태 점(●)이 붙지 않도록 .foot__status 와 따로 둔다 */
-.foot__ver{font-variant-numeric:tabular-nums}
 .foot__sep{opacity:.5}
 .foot__btn{font:inherit;font-size:inherit;padding:4px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer;transition:all .14s}
 .foot__btn:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}

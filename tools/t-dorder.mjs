@@ -23,7 +23,7 @@ t('학과마다 손잡이가 있다', await page.evaluate(() =>
 t('손잡이는 링크 안에 있지 않다', await page.evaluate(() =>
   ![...document.querySelectorAll('[data-grip]')].some(g => g.closest('a'))));
 t('처음엔 원래대로 단추가 없다', await page.locator('#dordReset').count() === 0);
-t('무엇을 할 수 있는지 적혀 있다', (await page.locator('.dept-head .st-note').innerText()).includes('차례'));
+t('안내 문구는 두지 않는다', await page.locator('.dept-head').count() === 0);
 
 // 끌어서 옮기기 — 붙박이 머리띠에 가리지 않는 줄을 고른다
 const before = await page.evaluate(() => state.depts.map(d => d.id));

@@ -1992,10 +1992,7 @@ function renderHome() {
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
       ${favSection()}
-      <div class="dept-head">
-        <span class="st-note">학과 왼쪽의 <b>⠿</b> 를 끌면 차례를 바꿀 수 있습니다. 바꾼 차례는 모든 화면에 함께 쓰입니다.</span>
-        ${dorderCustom() ? `<button type="button" class="btn" id="dordReset">원래 차례로</button>` : ''}
-      </div>
+      ${dorderCustom() ? `<div class="dept-head"><button type="button" class="btn" id="dordReset">원래 차례로</button></div>` : ''}
       <div class="dept-list">
         ${state.depts.map(d => `
           <div class="drow-w" data-did="${esc(d.id)}">
@@ -2908,14 +2905,6 @@ function markSaving(key, st) {
 
 /* 하단 상태줄: 저장 중 / 저장됨 / 미저장 N건 */
 let $saveBar = null;
-/* 바닥글의 판·계정. 기기마다 다른 것이 보이면 여기부터 맞춰 본다 —
-   판이 다르면 새로고침, 계정이 다르면 같은 계정으로 로그인해야 자료가 같아진다. */
-function updateFoot() {
-  const el = document.getElementById('footVer');
-  if (!el) return;
-  const who = state.session ? state.session.email : '시트에 연결 안 됨 — 이 기기에만 저장됩니다';
-  el.textContent = `판 ${APP_V || '(모름)'} · ${who}`;
-}
 
 /* 무엇이 막혔는지 이름으로 — 「미저장 1건」 만으로는 무엇을 잃는지 알 수 없다 */
 function dirtyNames() {
@@ -2958,7 +2947,6 @@ function dropSave() {
 
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
-  updateFoot();
   const saving = sync.queue.size + sync.busyS.size, dirty = sync.dirty.size + sync.dirtyS.size;
   if (sync.authNeeded && !sync.authHidden) {
     if ($saveBar.dataset.mode !== 'auth') {
@@ -3021,7 +3009,6 @@ async function checkVersion() {
 
 /* 버전 감시는 로그인·시트 연동과 무관하게 항상 돈다 */
 function startVersionWatch() {
-  updateFoot();
   checkVersion();
   setInterval(checkVersion, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });

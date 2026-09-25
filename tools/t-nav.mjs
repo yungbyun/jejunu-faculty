@@ -27,18 +27,6 @@ for (const [w,h,tag] of [[1440,1000,'PC'],[390,844,'폰']]) {
     t('PC 메뉴는 다섯 개', navSeen.length===5, navSeen.join(' '));
     t('PC 접촉에는 군더더기 없음', !tabSeen);
   }
-  /* 바닥글의 판·계정 — 두 기기가 다르게 보일 때 여기부터 맞춰 본다 */
-  t('바닥글에 판이 보인다', /판 \S+/.test(await page.evaluate(()=>document.getElementById('footVer').textContent)),
-    await page.evaluate(()=>document.getElementById('footVer').textContent));
-  t('로그인 안 했으면 그렇다고 적힌다',
-    (await page.evaluate(()=>document.getElementById('footVer').textContent)).includes('이 기기에만'),
-    await page.evaluate(()=>document.getElementById('footVer').textContent));
-  t('로그인하면 계정이 보인다', (await page.evaluate(()=>{
-    state.session = { email: 'a@b.com' }; updateFoot();
-    return document.getElementById('footVer').textContent;
-  })).includes('a@b.com'));
-  t('상태 점이 붙지 않는다', await page.evaluate(()=>
-    getComputedStyle(document.getElementById('footVer'), '::before').content === 'none'));
   await page.close();
 }
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
