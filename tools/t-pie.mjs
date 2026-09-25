@@ -182,6 +182,10 @@ t('%도 합집합 기준', (await page.locator('.pie__k--push b').innerText()).s
 t('겹치는 사람이 실제로 있다', T.dup > 0, `${T.dup}명`);
 t('더해진 인원은 합집합 빼기 확+긍', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`공략 +${T.union - T.base}명`),
   await page.locator('.pie__k--push .pie__kn').innerText());
+t('공략 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
+  await page.locator('.pie__k--push .pie__kn').innerText());
+t('모수는 옆 카드에 그대로 있다', (await page.locator('.pie__k--pos .pie__kn').innerText()).includes('/'),
+  await page.locator('.pie__k--pos .pie__kn').innerText());
 t('도움말이 겹침을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('두 번 세지 않았습니다'),
   await page.getAttribute('.pie__k--push', 'title'));
 t('비참여는 더하지 않는다', await page.evaluate(() => {
@@ -197,7 +201,7 @@ const T2 = await truth();
 t('전원을 공략으로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 모수 전체가 된다', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.total}명 / ${T2.total}명`),
+t('그때는 모수 전체가 된다', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.total}명 ·`),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
   await page.locator('.pie__k--pos .pie__kn').innerText());

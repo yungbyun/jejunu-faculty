@@ -296,6 +296,8 @@ a.ins__joined:hover{border-color:var(--dept-color,var(--accent));color:var(--dep
 .foot__status::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink-3);margin-right:6px;vertical-align:1px}
 .foot__status.ok::before{background:#22a06b}
 .foot__status.warn::before{background:#e0a020}
+/* 판·계정 — 상태 점(●)이 붙지 않도록 .foot__status 와 따로 둔다 */
+.foot__ver{font-variant-numeric:tabular-nums}
 .foot__sep{opacity:.5}
 .foot__btn{font:inherit;font-size:inherit;padding:4px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer;transition:all .14s}
 .foot__btn:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}

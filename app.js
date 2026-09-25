@@ -1743,7 +1743,7 @@ function donut(profs) {
           <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명 · 절반 ${half}명</span></div>
         ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puDup ? ` — 공략 ${puDup}명은 이미 확·긍이라 두 번 세지 않았습니다` : ''}${puNa ? ` — 비참여 ${puNa}명은 모수에서 빠진 분이라 더하지 않았습니다` : ''}">
           <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명 / ${total}명 · 공략 +${added}명</span></div>` : ''}
+          <span class="pie__kn">${reach}명 · 공략 +${added}명</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">괄호 안은 <b>절반 ${half}명</b>까지 모자라거나 넘는 인원입니다. 더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
@@ -2767,8 +2767,18 @@ function markSaving(key, st) {
 
 /* 하단 상태줄: 저장 중 / 저장됨 / 미저장 N건 */
 let $saveBar = null;
+/* 바닥글의 판·계정. 기기마다 다른 것이 보이면 여기부터 맞춰 본다 —
+   판이 다르면 새로고침, 계정이 다르면 같은 계정으로 로그인해야 자료가 같아진다. */
+function updateFoot() {
+  const el = document.getElementById('footVer');
+  if (!el) return;
+  const who = state.session ? state.session.email : '시트에 연결 안 됨 — 이 기기에만 저장됩니다';
+  el.textContent = `판 ${APP_V || '(모름)'} · ${who}`;
+}
+
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
+  updateFoot();
   const saving = sync.queue.size + sync.busyS.size, dirty = sync.dirty.size + sync.dirtyS.size;
   if (sync.authNeeded && !sync.authHidden) {
     if ($saveBar.dataset.mode !== 'auth') {
@@ -2816,6 +2826,7 @@ async function checkVersion() {
 
 /* 버전 감시는 로그인·시트 연동과 무관하게 항상 돈다 */
 function startVersionWatch() {
+  updateFoot();
   checkVersion();
   setInterval(checkVersion, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
