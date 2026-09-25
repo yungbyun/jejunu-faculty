@@ -1378,8 +1378,13 @@ function copyMark(k, on) {
 }
 const copiedCount = () => outPicked().filter(p => copied().has(rKey(p))).length;
 
+/* 비참여(선호도 '비')는 연구년 등으로 이번 선거에서 빠지는 분이라 ③ 받을 분에 아예 안 띄운다.
+   잠근 채로 보여 주기만 하면 명단만 길어지고 눈에 걸린다 (2026-09-25). */
+const outOut = p => getRating(p) === '비';
 /* 지금 화면에 보이는 대상 (학과를 고르지 않았으면 전원) */
-const outTargets = () => state.rows.filter(p => !OUT.depts.size || OUT.depts.has(p.dept_id));
+const outTargets = () => state.rows.filter(p => !outOut(p) && (!OUT.depts.size || OUT.depts.has(p.dept_id)));
+/* 학과를 골랐을 때 그 학과에서 빠진 비참여 인원 — 숫자가 안 맞는 이유를 적어 주려고 센다 */
+const outOutCount = () => state.rows.filter(p => outOut(p) && (!OUT.depts.size || OUT.depts.has(p.dept_id))).length;
 /* 그중 실제로 나갈 사람 — 번호가 있고 해제하지 않은 사람 */
 /* 아예 못 보내는 이유. 없으면 빈 문자열 — 그때만 고를 수 있다.
  * 비참여(선호도 '비')는 연구년 등으로 이번 선거에서 빠지는 분이라 과반 계산에서도 빠진다. */
@@ -1400,7 +1405,9 @@ function renderOutreach() {
   const picked = outPicked();
   const why = {};
   targets.forEach(p => { const r = outSkip(p); if (r) why[r] = (why[r] || 0) + 1; });
-  const skipNote = Object.keys(why).map(r => `${r} ${why[r]}명`).join(' · ');
+  const outN = outOutCount();
+  const skipNote = Object.keys(why).map(r => `${r} ${why[r]}명`)
+    .concat(outN ? [`비참여 ${outN}명(목록에서 제외)`] : []).join(' · ');
   const first = picked[0];
 
   $app.innerHTML = `

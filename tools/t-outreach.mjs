@@ -201,19 +201,18 @@ check('되돌리면 다시 들어온다', await page.evaluate(() => outPicked().
 await page.evaluate(() => { noSendSet = new Set(); localStorage.removeItem('jnu-nosend'); });
 
 
-// 13) 비참여(선호도 '비')도 기본으로 빠진다 — 과반 계산에서 빠지는 분들이다
+// 13) 비참여(선호도 '비')는 ③ 받을 분에서 아예 빠진다 (2026-09-25)
 const nb = await page.evaluate(() => outPicked().length);
+const nrow = await page.evaluate(() => document.querySelectorAll('.ot-p').length);
 const bname = await page.evaluate(() => { const p = outPicked()[0]; setRating(rKey(p), '비'); renderOutreach(); return p.name; });
 await page.waitForTimeout(500);
 check('비참여는 빠진다', await page.evaluate(() => outPicked().length) === nb - 1, `${nb} → ${await page.evaluate(() => outPicked().length)}`);
-check('행에 비참여라고 적힌다', await page.evaluate(w => {
-  const row = [...document.querySelectorAll('.ot-p')].find(e => e.querySelector('[data-prof]').textContent === w);
-  return !!row && row.querySelector('.ot-p__m').textContent.includes('비참여');
-}, bname), bname);
-check('체크가 잠긴다', await page.evaluate(w => {
-  const row = [...document.querySelectorAll('.ot-p')].find(e => e.querySelector('[data-prof]').textContent === w);
-  return row.querySelector('input').disabled && !row.querySelector('input').checked;
-}, bname));
+check('줄 자체가 목록에 없다', await page.evaluate(w =>
+  ![...document.querySelectorAll('.ot-p')].some(e => e.querySelector('[data-prof]').textContent === w), bname), bname);
+check('목록이 한 줄 줄어든다', await page.evaluate(() => document.querySelectorAll('.ot-p').length) === nrow - 1,
+  `${nrow} → ${await page.evaluate(() => document.querySelectorAll('.ot-p').length)}`);
+check('머리말에 몇 명이 빠졌는지 적힌다', (await page.evaluate(() =>
+  [...document.querySelectorAll('.ot-sec__h .st-note')].map(e => e.textContent).join(' '))).includes('비참여 1명'));
 check('전체 선택으로도 안 들어온다', await page.evaluate(() => { document.querySelector('[data-allon]').click(); return outPicked().length; }) === nb - 1);
 await page.waitForTimeout(400);
 check('선호도를 바꾸면 다시 들어온다', await page.evaluate(w => {
@@ -221,6 +220,8 @@ check('선호도를 바꾸면 다시 들어온다', await page.evaluate(w => {
   setRating(rKey(p), '중'); renderOutreach();
   return outPicked().length;
 }, bname) === nb);
+check('줄도 돌아온다', await page.evaluate(w =>
+  [...document.querySelectorAll('.ot-p')].some(e => e.querySelector('[data-prof]').textContent === w), bname));
 await page.evaluate(w => { const p = state.rows.find(x => x.name === w); setRating(rKey(p), ''); }, bname);
 
 
