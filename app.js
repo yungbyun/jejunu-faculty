@@ -2021,7 +2021,7 @@ function profCard(p, d, showDept = false) {
         ${loc || p.phone || mobileOf(p) ? `<div class="prof__office">
           ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
-          ${mobileOf(p) ? `<a class="po__tel po__mob" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.6h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(mobileOf(p))}</a>` : ''}
+          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.6h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(mobileOf(p))}</a><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
         </div>
@@ -2769,12 +2769,22 @@ function persistSession() { try { localStorage.setItem(AUTH_KEY, JSON.stringify(
 function bindCards() {
   const open = b => { location.hash = `#/dept/${encodeURIComponent(b.dataset.dept)}/prof/${encodeURIComponent(b.dataset.slug)}`; };
   $app.querySelectorAll('.prof').forEach(b => {
-    b.addEventListener('click', e => { if (e.target.closest('.rate, .fav, .counter, .po__tel')) return; open(b); });
-    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .fav, .counter, .po__tel')) { e.preventDefault(); open(b); } });
+    b.addEventListener('click', e => { if (e.target.closest('.rate, .fav, .counter, .po__tel, .po__cp')) return; open(b); });
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.rate, .fav, .counter, .po__tel, .po__cp')) { e.preventDefault(); open(b); } });
   });
   bindRates($app);
   bindFavs($app);
   bindNotes($app);
+  /* 번호 옆 복사 아이콘. 카드가 열리지 않도록 이벤트를 여기서 막는다. */
+  $app.querySelectorAll('[data-copynum]').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation(); e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(b.dataset.copynum);
+      b.classList.add('ok');
+      setTimeout(() => b.classList.remove('ok'), 1200);
+      flashStatus(`${b.dataset.copynum} 을(를) 복사했습니다`);
+    } catch (err) { flashStatus('복사하지 못했습니다 — ' + err.message, true); }
+  }));
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
 

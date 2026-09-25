@@ -12,7 +12,8 @@ const leaked = pub.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g) || [];
 check('공개 data/professors.json 에 휴대폰 없음', leaked.length === 0, `${leaked.length}건`);
 
 const b = await chromium.launch();
-const page = await (await b.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
+const page = await (await b.newContext({ viewport: { width: 1440, height: 1000 },
+  permissions: ['clipboard-read', 'clipboard-write'] })).newPage();
 await page.goto('http://127.0.0.1:8080/', { waitUntil: 'load' });
 await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
 await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
@@ -47,6 +48,21 @@ check('연구실 전화 다음에 온다', await page.evaluate(() => {
   return kids.indexOf('po__tel') < kids.findIndex(c => c.includes('po__mob'));
 }));
 check('tel: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'tel:01012345678'));
+
+// 2-1) 번호 오른쪽의 복사 아이콘
+check('번호 옆에 복사 아이콘', await page.evaluate(() => !!document.querySelector('.po__cp')));
+check('번호와 아이콘이 한 줄에', await page.evaluate(() => {
+  const n = document.querySelector('.po__mob').getBoundingClientRect();
+  const c = document.querySelector('.po__cp').getBoundingClientRect();
+  return Math.abs((n.top + n.bottom) / 2 - (c.top + c.bottom) / 2) < 4 && c.left >= n.right - 2;
+}));
+const hashBefore = await page.evaluate(() => location.hash);
+await page.locator('[data-copynum]').first().click();
+await page.waitForTimeout(400);
+check('누르면 번호가 복사된다', await page.evaluate(() => navigator.clipboard.readText()) === '010-1234-5678');
+check('카드가 열리지는 않는다', await page.evaluate(() => location.hash) === hashBefore,
+  await page.evaluate(() => location.hash));
+check('복사한 뒤 확인 표시', await page.evaluate(() => document.querySelector('.po__cp').classList.contains('ok')));
 
 // 3) 상세 드로어에는 더 이상 핸드폰 칸이 없다 (학과 카드에서 보이므로 뺐다)
 await page.evaluate(x => {
