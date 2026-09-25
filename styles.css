@@ -499,6 +499,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__k--high b{color:var(--rs-high)}
 .pie__k--pos b{color:var(--rs-pos)}
 .pie__k--goal b{color:var(--brand)}
+/* % 옆의 (-3명) — 절반까지 모자라거나 넘는 인원. 카드를 따로 두는 대신 여기에 붙였다 */
+.pie__kg{font-style:normal;font-size:15px;font-weight:700;margin-left:3px;letter-spacing:-.2px}
+.pie__kg--short{color:var(--ink-2)}   /* ink-3 은 밝은 화면에서 대비 3.06 — 읽어야 할 숫자다 */
+.pie__kg--over{color:var(--rs-high)}
+.pie__pool{margin:0;text-align:center;font-size:12px;font-weight:600;color:var(--ink-2);max-width:440px}
+.pie__pool b{color:var(--ink-2)}
 .pie__k--push b{color:var(--push)}
 .pie__k--push{border-color:color-mix(in srgb,var(--push) 30%,var(--line))}
 .pie__k--over b{color:var(--rs-high)}

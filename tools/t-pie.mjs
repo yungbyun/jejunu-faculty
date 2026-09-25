@@ -71,11 +71,26 @@ const maj = await page.evaluate(()=>{
   render();
   const ks=[...document.querySelectorAll('.pie__k')].map(k=>k.innerText.split(String.fromCharCode(10)).join(' '));
   const u=document.querySelector('.pie__u').textContent;
-  return { ks, u, n: state.rows.length };
+  return { ks, u, n: state.rows.length, pool: document.querySelector('.pie__pool').textContent,
+           goal: !!document.querySelector('.pie__k--goal, .pie__k--over') };
 });
 t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
-t('기준선은 모수의 절반(올림)', maj.ks[1].includes(`${Math.ceil((maj.n-3)/2)-30}명`), maj.ks[1]);
-t('아직 안 매긴 사람도 같이 적는다', maj.ks[1].includes('미지정'), maj.ks[1]);
+/* 「절반까지」 카드는 2026-09-25 에 없앴다 — 모자란 인원은 % 옆 괄호로 간다 */
+t('절반까지 카드는 없다', !maj.goal);
+t('모자란 인원이 % 옆 괄호에', maj.ks[0].includes(`(-${Math.ceil((maj.n-3)/2)-30}명)`), maj.ks[0]);
+t('절반이 몇 명인지 카드에 적힌다', maj.ks[0].includes(`절반 ${Math.ceil((maj.n-3)/2)}명`), maj.ks[0]);
+t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
+
+const over = await page.evaluate(()=>{
+  state.ratings.clear();
+  state.rows.forEach(p=>state.ratings.set(rKey(p),'확'));   // 전원 확 — 절반을 크게 넘는다
+  render();
+  const half = Math.ceil(state.rows.length/2);
+  return { k: document.querySelector('.pie__k--pos').innerText.split(String.fromCharCode(10)).join(' '),
+           want: state.rows.length - half };
+});
+t('절반을 넘으면 +N명', over.k.includes(`(+${over.want}명)`), over.k);
+t('그때는 100%', over.k.includes('100%'), over.k);
 
 // 6) 만난 적이 있으면 이름 칩 안에 초록 불
 const lit = await page.evaluate(()=>{
@@ -162,7 +177,7 @@ t('공략이 있으면 카드가 생긴다', await page.locator('.pie__k--push')
 t('겹침을 뺀 합집합과 같다', await page.evaluate(() =>
   document.querySelector('.pie__k--push .pie__kn').textContent.split('명')[0]) === String(T.union),
   `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 집합 ${T.union}`);
-t('%도 합집합 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
+t('%도 합집합 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
 t('겹치는 사람이 실제로 있다', T.dup > 0, `${T.dup}명`);
 t('더해진 인원은 합집합 빼기 확+긍', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`공략 +${T.union - T.base}명`),
@@ -184,7 +199,7 @@ t('전원을 공략으로 해도 100% 이하', await page.evaluate(() =>
   await page.locator('.pie__k--push b').innerText());
 t('그때는 모수 전체가 된다', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.total}명 / ${T2.total}명`),
   await page.locator('.pie__k--push .pie__kn').innerText());
-t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()) === `${T2.base}명 / ${T2.total}명`,
+t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
   await page.locator('.pie__k--pos .pie__kn').innerText());
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); });
 

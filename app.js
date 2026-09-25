@@ -1696,6 +1696,14 @@ function donut(profs) {
   const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
+  /* 절반까지 몇 명인지를 따로 카드로 두지 않고 % 옆에 붙인다 (2026-09-25).
+   * 모자라면 -N명, 넘으면 +N명, 딱 맞으면 ±0명. 둘 다 '절반' 기준이다. */
+  const gap = n => {
+    const d = n - half;
+    const cls = d < 0 ? 'pie__kg--short' : 'pie__kg--over';
+    const txt = d === 0 ? '±0명' : d < 0 ? `-${-d}명` : `+${d}명`;
+    return `<em class="pie__kg ${cls}" title="절반 ${half}명 기준">(${txt})</em>`;
+  };
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
   const R = 72, W = 24, CX = 100, CY = 112;
@@ -1731,16 +1739,13 @@ function donut(profs) {
         <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
       <div class="pie__kpi">
-        <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
+        <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
+          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명 · 절반 ${half}명</span></div>
         ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puDup ? ` — 공략 ${puDup}명은 이미 확·긍이라 두 번 세지 않았습니다` : ''}${puNa ? ` — 비참여 ${puNa}명은 모수에서 빠진 분이라 더하지 않았습니다` : ''}">
-          <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%</b>
+          <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%${gap(reach)}</b>
           <span class="pie__kn">${reach}명 / ${total}명 · 공략 +${added}명</span></div>` : ''}
-        ${need > 0
-          ? `<div class="pie__k pie__k--goal"><span class="pie__kl">절반까지</span><b>${need}명</b><span class="pie__kn">${pool}</span></div>`
-          : need === 0
-          ? `<div class="pie__k pie__k--over"><span class="pie__kl">절반 딱 맞음</span><b>${base}명</b><span class="pie__kn">절반 ${half}명 기준</span></div>`
-          : `<div class="pie__k pie__k--over"><span class="pie__kl">절반 넘음</span><b>+${-need}명</b><span class="pie__kn">절반 ${half}명 기준</span></div>`}
       </div>
+      <p class="pie__pool">괄호 안은 <b>절반 ${half}명</b>까지 모자라거나 넘는 인원입니다. 더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
       </div>
