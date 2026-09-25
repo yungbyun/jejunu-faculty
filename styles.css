@@ -398,6 +398,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 :root{--push:#b83c0a}   /* 밝은 화면: #c2410c 는 단추 글자 대비가 4.35 로 모자랐다 */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--push:#fb923c}}
 :root[data-theme="dark"]{--push:#fb923c}
+/* 확실 — 이름 바탕을 채우는 색. 흰 글자가 얹히므로 충분히 진해야 한다
+   (밝은 #2d6b16 은 흰 글자 6.51, 어두운 #2f7d1a 는 5.16).
+   단추 글자·테두리는 --sure-ink 로 따로 둔다 — 어두운 화면에서 칠하는 색을 그대로 쓰면 4.29 로 모자란다. */
+:root{--sure:#2d6b16;--sure-ink:#317218}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sure:#2f7d1a;--sure-ink:#4db02a}}
+:root[data-theme="dark"]{--sure:#2f7d1a;--sure-ink:#4db02a}
 :root{--rs-high:#317218;--rs-pos:#0a7359;--rs-mid:#096998;--rs-low:#5f6672;--rs-neg:#b83729;--rs-na:#7351bb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rs-high:#439c21;--rs-pos:#129a74;--rs-mid:#0c90cf;--rs-low:#828997;--rs-neg:#d85f52;--rs-na:#9479cb}}
 :root[data-theme="dark"]{--rs-high:#439c21;--rs-pos:#129a74;--rs-mid:#0c90cf;--rs-low:#828997;--rs-neg:#d85f52;--rs-na:#9479cb}
@@ -566,6 +572,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 공략으로 고른 사람 — 이름 왼쪽에 깃발, 칩 테두리는 안쪽 선으로 굵게 한다
    (border-width 를 올리면 칩 크기가 흔들려 줄이 밀린다) */
 .st-c.on{border-color:var(--push);box-shadow:inset 0 0 0 1px var(--push)}
+/* 확실 — 이름 바탕을 진한 색으로 채운다. 안쪽 것들은 모두 흰색으로 뒤집는다 */
+.st-c.sure{background:var(--sure);border-color:var(--sure);color:#fff}
+.st-c.sure:hover{border-color:var(--sure);filter:brightness(1.12)}
+.st-c.sure .pushm{color:#fff}
+.st-c.sure .metlit b{box-shadow:none}
+/* 확실이면서 공략일 때 — 진한 바탕에 주황 테는 잘 안 보인다. 깃발 하나로 충분하다 */
+.st-c.sure.on{border-color:var(--sure);box-shadow:none}
 .pushm{display:inline-flex;align-items:center;margin-right:4px;color:var(--push);line-height:0}
 .n--push{color:var(--push);display:inline-flex;align-items:center;gap:2px;margin-left:6px}
 /* 고르기 모드의 단추들 */
@@ -574,6 +587,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .btn--push:disabled{opacity:.45;cursor:default}
 .btn--push .n{font-weight:800}
 /* 상세 페이지의 공략 단추 */
+.d-marks{display:flex;gap:8px;flex-wrap:wrap}
+.surebtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
+  font-weight:700;cursor:pointer}
+.surebtn:hover{border-color:var(--sure-ink);color:var(--sure-ink)}
+.surebtn.on{border-color:var(--sure-ink);color:var(--sure-ink);background:color-mix(in srgb,var(--sure-ink) 12%,transparent)}
 .pushbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}

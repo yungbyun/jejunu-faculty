@@ -1805,12 +1805,13 @@ const STP = { pick: false, only: false };
 
 /* 이름 칩 하나. 고르기 모드에서는 링크가 아니라 단추가 되어 눌러도 상세로 가지 않는다 */
 function stChip(p, r) {
-  const met = getMet(p), pu = isPush(p), k = rKey(p);
-  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, RCOLOR[r])}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${pu ? ' · 공략' : ''}`;
+  const met = getMet(p), pu = isPush(p), su = isSure(p), k = rKey(p);
+  const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}`;
+  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, su ? '#ffffff' : RCOLOR[r])}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${su ? ' · 확실' : ''}${pu ? ' · 공략' : ''}`;
   return STP.pick
-    ? `<li><button type="button" class="st-c${pu ? ' on' : ''}" data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
-    : `<li><a class="st-c${pu ? ' on' : ''}" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
+    ? `<li><button type="button" class="${cls}" data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
+    : `<li><a class="${cls}" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
 }
 
 function renderStats() {
@@ -2189,7 +2190,29 @@ function pushSave() {
   saveSetting(SET_PU, settingValue(SET_PU));
 }
 function pushToggle(p) { const s = pushes(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); pushSave(); return s.has(k); }
+
+/* ---------- 확실 (지금 이 시점에 확실한 사람) ----------
+ * 선호도 '확' 과는 다른 것이다. 선호도는 내가 매긴 평가이고, 이것은 만나 보고 굳어진 결론이다.
+ * 공략과 나란히 쓰는 표시라 저장하는 길도 같다(settings 탭의 sure 키). */
+const SURE_KEY = 'jnu-sure';
+let sureSet = null;
+function sures() {
+  if (!sureSet) {
+    sureSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(SURE_KEY) || '[]'); if (Array.isArray(v)) sureSet = new Set(v); } catch {}
+  }
+  return sureSet;
+}
+const isSure = p => sures().has(rKey(p));
+function sureSave() {
+  try { const s = sures(); s.size ? localStorage.setItem(SURE_KEY, JSON.stringify([...s])) : localStorage.removeItem(SURE_KEY); } catch {}
+  saveSetting(SET_SU, settingValue(SET_SU));
+}
+function sureToggle(p) { const s = sures(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); sureSave(); return s.has(k); }
 /* 공략 표식 — 관심 교수의 체크와 헷갈리지 않도록 깃발이고, 색도 금색이 아닌 주황이다 */
+/* 확실 표식 — 굳어졌다는 뜻이라 체크 */
+const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
+  + '<path d="M4 12.5l5.5 5.5L20 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PUSH_FLAG = '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">'
   + '<path d="M6 22V3h12l-3 5 3 5H6" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 
@@ -2581,14 +2604,14 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
-const SET_PU = 'push';
+const SET_PU = 'push', SET_SU = 'sure';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2600,6 +2623,7 @@ function settingValue(key) {
   if (key === SET_FAV) return [...favs()];   // 정렬하지 않는다: 고른 순서를 그대로 쓴다
   if (key === SET_NS) return [...noSend()];
   if (key === SET_PU) return [...pushes()].sort();   // 고른 순서는 뜻이 없다
+  if (key === SET_SU) return [...sures()].sort();
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
   if (key === SET_MS) return msends();
@@ -2616,6 +2640,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_FAV) { favSet = new Set(v); v.length ? localStorage.setItem(FAV_KEY, JSON.stringify(v)) : localStorage.removeItem(FAV_KEY); }
     if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
     if (key === SET_PU) { pushSet = new Set(v); v.length ? localStorage.setItem(PUSH_KEY, JSON.stringify(v)) : localStorage.removeItem(PUSH_KEY); }
+    if (key === SET_SU) { sureSet = new Set(v); v.length ? localStorage.setItem(SURE_KEY, JSON.stringify(v)) : localStorage.removeItem(SURE_KEY); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
@@ -2624,7 +2649,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -3237,10 +3262,16 @@ function openDrawer(p, d) {
         ${meetCounter(p)}
       </div>
 
-      <div class="d-section"><h3>공략</h3>
-        <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
-          ${PUSH_FLAG}<span>공략으로 표시</span></button>   <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
-        <p class="st-note">선호도와는 별개입니다. 분석 페이지의 선호도별 목록에 깃발로 함께 보입니다.</p>
+      <div class="d-section"><h3>표시</h3>
+        <div class="d-marks">
+          <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
+          <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}">
+            ${SURE_MARK}<span>확실</span></button>
+          <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
+            ${PUSH_FLAG}<span>공략</span></button>
+        </div>
+        <p class="st-note">선호도와는 별개입니다. 분석 페이지의 선호도별 목록에서 <b>확실</b>은 이름 바탕이
+          진한 색으로, <b>공략</b>은 깃발로 보입니다.</p>
       </div>
 
       <div class="d-section"><h3>메모</h3>
@@ -3264,6 +3295,12 @@ function openDrawer(p, d) {
   bindRates($panel);
   bindNotes($panel);
   bindAix($panel, p, d);
+  $panel.querySelector('[data-surebtn]')?.addEventListener('click', e => {
+    const btn = e.currentTarget, on = sureToggle(p);
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    flashStatus(on ? `${p.name} 교수를 확실로 표시했습니다` : `${p.name} 교수의 확실 표시를 풀었습니다`);
+  });
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = pushToggle(p);
     btn.classList.toggle('on', on);

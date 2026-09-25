@@ -12,6 +12,7 @@ const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
 
 const reset = () => page.evaluate(() => {
   pushSet = new Set(); localStorage.removeItem('jnu-push');
+  sureSet = new Set(); localStorage.removeItem('jnu-sure');
   favSet = new Set(); localStorage.removeItem('jnu-fav');
   state.ratings.clear(); state.notes.clear();
   const v = ['확', '긍', '중', '모', '부', '비'];
@@ -99,26 +100,83 @@ await page.evaluate(() => {
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 });
 await page.waitForSelector('[data-pushbtn]', { timeout: 10000 });
-t('상세에 공략 단추', (await page.locator('[data-pushbtn] span').innerText()).includes('공략으로 표시'));
+t('상세에 공략 단추', (await page.locator('[data-pushbtn] span').innerText()).trim() === '공략',
+  await page.locator('[data-pushbtn] span').innerText());
 await page.click('[data-pushbtn]');
 await page.waitForTimeout(400);
 t('상세에서 켜진다', await page.evaluate(() => pushes().size === 1 &&
   document.querySelector('[data-pushbtn]').getAttribute('aria-pressed') === 'true'));
-t('글자는 켜나 끄나 같다', (await page.locator('[data-pushbtn] span').innerText()).trim() === '공략으로 표시',
+t('글자는 켜나 끄나 같다', (await page.locator('[data-pushbtn] span').innerText()).trim() === '공략',
   await page.locator('[data-pushbtn] span').innerText());
 await page.click('[data-pushbtn]');
 await page.waitForTimeout(400);
 t('상세에서 풀린다', await page.evaluate(() => pushes().size === 0));
 
+// 5-2) 확실 — 선호도 '확' 과는 다른, 지금 이 시점의 결론
+t('상세에 확실 단추가 공략 앞에', await page.evaluate(() => {
+  const marks = document.querySelector('.d-marks');
+  const b = [...marks.querySelectorAll('button')];
+  return b.length === 2 && b[0].hasAttribute('data-surebtn') && b[1].hasAttribute('data-pushbtn');
+}));
+t('단추 글자는 확실·공략', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '확실,공략',
+  await page.evaluate(() => [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()));
+await page.click('[data-surebtn]');
+await page.waitForTimeout(400);
+t('확실이 켜진다', await page.evaluate(() => sures().size === 1 &&
+  document.querySelector('[data-surebtn]').getAttribute('aria-pressed') === 'true'));
+t('확실 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '확실');
+t('공략과는 따로 간다', await page.evaluate(() => sures().size === 1 && pushes().size === 0));
+t('선호도도 건드리지 않는다', await page.evaluate(() => {
+  const before = getRating(state.rows[0]);
+  sureToggle(state.rows[0]); sureToggle(state.rows[0]);   // 켰다 껐다
+  return getRating(state.rows[0]) === before && isSure(state.rows[0]);
+}));
+
+// 분석 목록에서 이름 바탕이 진한 색으로 찬다
+await page.evaluate(() => { setRating(rKey(state.rows[0]), '중'); location.hash = '#/stats'; render(); });
+await page.waitForSelector('.st-c.sure', { timeout: 10000 });
+await page.mouse.move(0, 0);
+await page.waitForTimeout(300);
+t('확실인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
+t('바탕이 진한 색으로 찬다', await page.evaluate(() => {
+  const el = document.querySelector('.st-c.sure');
+  const want = getComputedStyle(document.documentElement).getPropertyValue('--sure').trim();
+  const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
+  return hex(getComputedStyle(el).backgroundColor) === want && getComputedStyle(el).color === 'rgb(255, 255, 255)';
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.sure')).backgroundColor));
+t('확실이 아니면 바탕이 비어 있다', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('sure'));
+  return !!el && getComputedStyle(el).color !== 'rgb(255, 255, 255)';
+}));
+/* 확실이면서 공략일 때 — 진한 바탕에 주황 테는 안 보이므로 깃발만 남긴다 */
+t('확실+공략이면 깃발이 흰색', await page.evaluate(() => {
+  const p = state.rows[0];
+  pushes().add(rKey(p)); pushSave(); render();
+  const el = document.querySelector('.st-c.sure.on');
+  return !!el && getComputedStyle(el.querySelector('.pushm')).color === 'rgb(255, 255, 255)';
+}));
+await page.evaluate(() => {
+  sureSet = new Set(); localStorage.removeItem('jnu-sure');
+  pushSet = new Set(); localStorage.removeItem('jnu-push');
+  setRating(rKey(state.rows[0]), '');
+});
+
 // 6) 시트로도 저장된다
 t('settings 의 push 키로 등록', await page.evaluate(() => SET_KEYS.includes('push') && SET_LABEL['push'] === '공략'));
+t('settings 의 sure 키로도 등록', await page.evaluate(() => SET_KEYS.includes('sure') && SET_LABEL['sure'] === '확실'));
 t('받은 값을 이 기기에 적용', await page.evaluate(() => {
   const k = rKey(state.rows[3]);
   settingApplyLocal('push', [k]);
   return isPush(state.rows[3]) && JSON.parse(localStorage.getItem('jnu-push') || '[]')[0] === k;
 }));
 
-await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); });
+t('확실도 시트에서 내려받는다', await page.evaluate(() => {
+  const k = rKey(state.rows[5]);
+  settingApplyLocal('sure', [k]);
+  return isSure(state.rows[5]) && JSON.parse(localStorage.getItem('jnu-sure') || '[]')[0] === k;
+}));
+await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);
