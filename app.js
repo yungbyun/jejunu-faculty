@@ -3228,7 +3228,7 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>공략</h3>
         <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
-          ${PUSH_FLAG}<span>${isPush(p) ? '선거일까지 꼭 만날 분' : '공략으로 표시'}</span></button>
+          ${PUSH_FLAG}<span>공략으로 표시</span></button>   <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
         <p class="st-note">선호도와는 별개입니다. 분석 페이지의 선호도별 목록에 깃발로 함께 보입니다.</p>
       </div>
 
@@ -3257,7 +3257,6 @@ function openDrawer(p, d) {
     const btn = e.currentTarget, on = pushToggle(p);
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
-    btn.querySelector('span').textContent = on ? '선거일까지 꼭 만날 분' : '공략으로 표시';
     flashStatus(on ? `${p.name} 교수를 공략으로 표시했습니다` : `${p.name} 교수의 공략 표시를 풀었습니다`);
   });
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {

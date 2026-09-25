@@ -104,7 +104,8 @@ await page.click('[data-pushbtn]');
 await page.waitForTimeout(400);
 t('상세에서 켜진다', await page.evaluate(() => pushes().size === 1 &&
   document.querySelector('[data-pushbtn]').getAttribute('aria-pressed') === 'true'));
-t('글자가 바뀐다', (await page.locator('[data-pushbtn] span').innerText()).includes('꼭 만날'));
+t('글자는 켜나 끄나 같다', (await page.locator('[data-pushbtn] span').innerText()).trim() === '공략으로 표시',
+  await page.locator('[data-pushbtn] span').innerText());
 await page.click('[data-pushbtn]');
 await page.waitForTimeout(400);
 t('상세에서 풀린다', await page.evaluate(() => pushes().size === 0));
