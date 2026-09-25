@@ -763,6 +763,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .savebar--busy{background:#2563eb}.savebar--ok{background:#1f8a5b}.savebar--warn{background:#c0392b}
 .savebar__btn{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
 .savebar__btn:hover{background:rgba(255,255,255,.3)}
+.savebar__btn:disabled{opacity:.6;cursor:default}
+.savebar__btn--x{border-color:rgba(255,255,255,.35);background:none}
+/* 무엇이 막혔는지 — 줄이 길어지므로 폰에서는 접어 준다 */
+.savebar small{font-size:11.5px;font-weight:600;opacity:.85;margin-left:5px}
+@media (max-width:520px){
+  .savebar{white-space:normal;flex-wrap:wrap;justify-content:center;border-radius:14px;text-align:center}
+}
 .savebar--auth{white-space:normal;text-align:center;flex-wrap:wrap;justify-content:center;border-radius:16px;padding:10px 14px}
 
 /* ---------- 만남 횟수 · 메모 ---------- */

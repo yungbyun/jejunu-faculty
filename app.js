@@ -2529,7 +2529,7 @@ function saveRatingsCache() {
  * 그리고 화면이 보이는 동안 SYNC_SEC 마다 시트를 다시 읽어 다른 기기에서 바꾼 값을 반영합니다.
  * 저장이 진행 중이거나 실패한 항목(pending/dirty)은 서버 값으로 덮어쓰지 않고 다시 올립니다.
  * 저장 단위는 교수 1명의 일부 필드({rating}, {met}, {memo} 또는 그 조합)입니다. */
-const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, timer: null, last: 0, savedAt: 0, pendS: new Map(), busyS: new Set(), dirtyS: new Map() };
+const sync = { pending: new Map(), dirty: new Map(), queue: new Map(), running: false, runAt: 0, timer: null, last: 0, savedAt: 0, pendS: new Map(), busyS: new Set(), dirtyS: new Map() };
 const dirtyKey = () => 'jnu-ratings-dirty:' + (state.session ? state.session.email : 'local');
 function loadDirty() {
   try {
@@ -2563,9 +2563,10 @@ function startSyncLoop() {
 
 async function syncRatings({ initial = false } = {}) {
   if (!CONFIG.RATINGS.API_URL || !state.session) return;
-  if (sync.running) return;
+  /* 멈춘 요청이 남아 있으면 풀어 준다 — 안 그러면 다시는 동기화가 돌지 않는다 */
+  if (sync.running && Date.now() - sync.runAt < API_TIMEOUT + 10000) return;
   if (!initial && Date.now() - sync.last < 5000) return; // 연속 호출 방지
-  sync.running = true;
+  sync.running = true; sync.runAt = Date.now();
   try {
     // 1) 저장에 실패했던 항목 먼저 다시 올림
     for (const [k, v] of [...sync.dirtyS]) { if (await pushSetting(k, v)) { sync.dirtyS.delete(k); saveSetDirty(); } }
@@ -2801,6 +2802,45 @@ function updateFoot() {
   el.textContent = `판 ${APP_V || '(모름)'} · ${who}`;
 }
 
+/* 무엇이 막혔는지 이름으로 — 「미저장 1건」 만으로는 무엇을 잃는지 알 수 없다 */
+function dirtyNames() {
+  const n = [...new Set([...sync.dirtyS.keys()].map(k => SET_LABEL[k] || '회차 원고'))];
+  if (sync.dirty.size) n.unshift('선호도·메모');
+  return n.join(' · ');
+}
+/* 404 처럼 사람이 알아볼 수 없는 말은 풀어서 적는다 */
+function syncHint(msg) {
+  const m = String(msg || '');
+  if (/404/.test(m)) return ' — 시트 주소를 못 찾았습니다. Apps Script 배포 주소가 바뀌었는지 확인하십시오';
+  if (/401|403/.test(m)) return ' — 로그인을 한 번 다시 해 주십시오';
+  if (/응답 없음/.test(m)) return ' — 연결이 느리거나 끊겼습니다';
+  return '';
+}
+async function retrySave(e) {
+  const b = e.currentTarget;
+  b.disabled = true; b.textContent = '다시 저장 중…';
+  sync.last = 0;
+  if (sync.running && Date.now() - sync.runAt > 15000) sync.running = false;   // 멈춰 있던 것 풀기
+  await syncRatings();
+  const left = sync.dirty.size + sync.dirtyS.size;
+  delete $saveBar.dataset.sig;
+  updateSaveBar();
+  flashStatus(left ? `아직 ${left}건이 남았습니다 — ${sync.lastError || '연결 실패'}${syncHint(sync.lastError)}`
+                   : '시트에 저장했습니다', !!left);
+}
+/* 아무리 해도 안 올라가는 것이 하나 있으면 빨간 줄이 영영 남는다. 버릴 수 있게 해 둔다. */
+function dropSave() {
+  if (!confirm(`아직 시트에 못 올린 ${dirtyNames()}을(를) 버릴까요?
+
+`
+    + '이 기기의 값은 그대로 있지만, 다음 동기화 때 시트에 있는 예전 값으로 되돌아갈 수 있습니다.')) return;
+  sync.dirtyS.clear(); saveSetDirty();
+  sync.dirty.clear(); saveDirty();
+  delete $saveBar.dataset.sig;
+  updateSaveBar();
+  flashStatus('못 올린 것을 버렸습니다');
+}
+
 function updateSaveBar() {
   if (!$saveBar) { $saveBar = document.createElement('div'); $saveBar.className = 'savebar'; $saveBar.hidden = true; document.body.appendChild($saveBar); }
   updateFoot();
@@ -2816,8 +2856,23 @@ function updateSaveBar() {
     return;
   }
   delete $saveBar.dataset.mode;
+  if (!dirty || saving) delete $saveBar.dataset.sig;
   if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = `시트에 저장 중… (${saving}건)`; $saveBar.hidden = false; }
-  else if (dirty) { $saveBar.className = 'savebar savebar--warn'; $saveBar.innerHTML = `미저장 ${dirty}건 — ${esc(sync.lastError || '연결 실패')} <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`; $saveBar.hidden = false; $saveBar.querySelector('#retrySave').addEventListener('click', () => { sync.last = 0; syncRatings(); }); }
+  else if (dirty) {
+    /* 같은 내용이면 다시 만들지 않는다 — innerHTML 을 갈아 끼우면 누르는 순간 단추가 사라져
+       클릭이 먹히지 않는다. 이 화면은 저장할 때마다 자주 불린다. */
+    const sig = `${dirty}|${sync.lastError || ''}|${dirtyNames()}`;
+    if ($saveBar.dataset.sig !== sig) {
+      $saveBar.dataset.sig = sig;
+      $saveBar.className = 'savebar savebar--warn';
+      $saveBar.innerHTML = `미저장 ${dirty}건<small>${esc(dirtyNames())}</small> — ${esc(sync.lastError || '연결 실패')}`
+        + ` <button type="button" class="savebar__btn" id="retrySave">지금 다시 저장</button>`
+        + ` <button type="button" class="savebar__btn savebar__btn--x" id="dropSave" title="다시 올리기를 그만둡니다">버리기</button>`;
+      $saveBar.querySelector('#retrySave').addEventListener('click', retrySave);
+      $saveBar.querySelector('#dropSave').addEventListener('click', dropSave);
+    }
+    $saveBar.hidden = false;
+  }
   else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
   else $saveBar.hidden = true;
 }
@@ -2890,10 +2945,20 @@ function refreshRatingUI(key, val) {
 }
 
 /* Apps Script 호출 */
+/* 시트 요청에 시간 제한을 둔다. 없으면 한 번 멈춘 요청이 sync.running 을 영영 붙잡아
+   그 뒤로는 「지금 다시 저장」을 눌러도 아무 일도 일어나지 않는다. */
+const API_TIMEOUT = 20000;
 async function apiPost(payload) {
-  const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify(payload), redirect: 'follow', keepalive: payload.action === 'set' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), API_TIMEOUT);
+  try {
+    const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify(payload),
+      redirect: 'follow', keepalive: payload.action === 'set', signal: ac.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    throw e.name === 'AbortError' ? new Error(`응답 없음(${API_TIMEOUT / 1000}초)`) : e;
+  } finally { clearTimeout(t); }
 }
 async function ratingsApi(action, payload) {
   const token = await authToken();
