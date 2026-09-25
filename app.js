@@ -201,6 +201,7 @@ function apply(rawRows, source) {
   state.rawRows = rawRows;
   state.rows = normalize(rawRows);
   state.depts = buildDepts(state.rows);
+  dorderApply();   // 내가 바꾼 차례가 있으면 그대로 세운다
   state.source = source;
   setStatus(source);
   render();
@@ -1991,8 +1992,19 @@ function renderHome() {
       </div>
       ${state.source === 'error' ? `<div class="empty"><strong>데이터를 불러오지 못했습니다</strong>Google 시트 공개 설정과 네트워크 연결을 확인해 주세요.</div>` : ''}
       ${favSection()}
+      <div class="dept-head">
+        <span class="st-note">학과 왼쪽의 <b>⠿</b> 를 끌면 차례를 바꿀 수 있습니다. 바꾼 차례는 모든 화면에 함께 쓰입니다.</span>
+        ${dorderCustom() ? `<button type="button" class="btn" id="dordReset">원래 차례로</button>` : ''}
+      </div>
       <div class="dept-list">
         ${state.depts.map(d => `
+          <div class="drow-w" data-did="${esc(d.id)}">
+            <span class="drow__grip" role="button" tabindex="0" data-grip="${esc(d.id)}"
+              aria-label="${esc(d.name)} 차례 옮기기 — 끌거나 위아래 화살표를 누르십시오" title="끌어서 차례 바꾸기">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><g fill="currentColor">
+              <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/>
+              <circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
+              </g></svg></span>
           <a class="drow" href="#/dept/${encodeURIComponent(d.id)}" style="--dept-color:${esc(d.color)}">
             <div class="drow__num">${d.profs.length}<small>명</small></div>
             <div class="drow__main">
@@ -2006,11 +2018,12 @@ function renderHome() {
               ${d.profs.length > 7 ? `<i class="av av--more">+${d.profs.length - 7}</i>` : ''}
             </div>
             <span class="drow__arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-          </a>`).join('')}
+          </a></div>`).join('')}
       </div>
     </div>`;
 
   bindNotes($app);        // 관심 카드의 만남 카운터
+  bindDeptDrag();
   $app.querySelectorAll('.favx').forEach(b => b.addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     const p = state.rows.find(x => rKey(x) === b.dataset.key);
@@ -2019,6 +2032,76 @@ function renderHome() {
     renderHome();           // 명단·학과별 표시를 한 번에 다시 그린다
     flashStatus(`${p.name} 교수를 관심에서 해제했습니다`);
   }));
+}
+
+/* 학과 차례 바꾸기 — 손잡이를 끌면 그 줄이 따라오고, 놓으면 그 자리로 굳는다.
+   포인터 이벤트라 마우스와 손가락이 같은 길을 쓴다. 손잡이에 touch-action:none 을 주어
+   끄는 동안 화면이 같이 밀리지 않게 했다. */
+function bindDeptDrag() {
+  const list = $app.querySelector('.dept-list');
+  if (!list) return;
+
+  const commit = () => {
+    const ids = [...list.querySelectorAll('.drow-w')].map(e => e.dataset.did);
+    dorderSave(ids);
+    flashStatus('학과 차례를 바꿨습니다');
+  };
+
+  list.querySelectorAll('[data-grip]').forEach(grip => {
+    grip.addEventListener('pointerdown', e => {
+      if (e.button != null && e.button !== 0) return;
+      const row = grip.closest('.drow-w');
+      if (!row) return;
+      e.preventDefault();
+      /* setPointerCapture 를 쓰면 안 된다 — 줄을 DOM 에서 옮기는 순간 손잡이가 지워졌다 다시
+         꽂히면서 잡기가 풀려, 그 뒤로는 움직임도 놓기도 안 온다. 그래서 창에 건다. */
+      row.classList.add('drow-w--drag');
+      list.classList.add('dept-list--drag');
+      let moved = false;
+
+      const move = ev => {
+        moved = true;
+        const y = ev.clientY;
+        /* 끌고 있는 줄을 뺀 나머지 중, 가운데보다 위로 올라온 첫 줄 앞에 끼운다 */
+        const after = [...list.querySelectorAll('.drow-w:not(.drow-w--drag)')]
+          .find(el => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2; });
+        after ? list.insertBefore(row, after) : list.appendChild(row);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        row.classList.remove('drow-w--drag');
+        list.classList.remove('dept-list--drag');
+        if (moved) commit();
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
+
+    /* 손으로 끌기 어려운 분을 위해 — 손잡이에 초점을 두고 위아래 화살표 */
+    grip.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      const row = grip.closest('.drow-w');
+      const rows = [...list.querySelectorAll('.drow-w')];
+      const i = rows.indexOf(row), j = i + d;
+      if (j < 0 || j >= rows.length) return;
+      d < 0 ? list.insertBefore(row, rows[j]) : list.insertBefore(rows[j], row);
+      commit();
+      renderHome();
+      $app.querySelector(`[data-grip="${CSS.escape(grip.dataset.grip)}"]`)?.focus();
+    });
+  });
+
+  $app.querySelector('#dordReset')?.addEventListener('click', () => {
+    if (!confirm('학과 차례를 원래대로 되돌릴까요?')) return;
+    dorderSave([]);
+    apply(state.rawRows, state.source);   // 자료에 적힌 원래 차례로 다시 세운다
+    flashStatus('학과 차례를 원래대로 되돌렸습니다');
+  });
 }
 
 function matches(p, q) {
@@ -2209,6 +2292,36 @@ function sureSave() {
   saveSetting(SET_SU, settingValue(SET_SU));
 }
 function sureToggle(p) { const s = sures(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); sureSave(); return s.has(k); }
+
+/* ---------- 학과 순서 ----------
+ * 첫 화면에서 손잡이를 끌어 바꾼 차례. 값은 학과 id 의 배열이고 **순서 자체가 뜻**이라
+ * 관심 교수처럼 정렬하지 않는다. 명단에 없는 학과(새로 생겼거나 이름이 바뀐 것)는 원래 자리에 남는다. */
+const DORDER_KEY = 'jnu-deptorder';
+let dorderList = null;
+function dorder() {
+  if (!dorderList) {
+    dorderList = [];
+    try { const v = JSON.parse(localStorage.getItem(DORDER_KEY) || '[]'); if (Array.isArray(v)) dorderList = v.map(String); } catch {}
+  }
+  return dorderList;
+}
+/* state.depts 를 저장된 차례대로 세운다. 모르는 학과는 원래 차례를 지키며 뒤에 붙는다. */
+function dorderApply() {
+  const ord = dorder();
+  if (!ord.length || !state.depts.length) return;
+  const at = new Map(ord.map((id, i) => [id, i]));
+  state.depts = state.depts
+    .map((d, i) => [d, at.has(d.id) ? at.get(d.id) : ord.length + i])
+    .sort((a, b) => a[1] - b[1])
+    .map(x => x[0]);
+}
+function dorderSave(ids) {
+  dorderList = ids.map(String);
+  try { dorderList.length ? localStorage.setItem(DORDER_KEY, JSON.stringify(dorderList)) : localStorage.removeItem(DORDER_KEY); } catch {}
+  saveSetting(SET_DO, settingValue(SET_DO));
+  dorderApply();
+}
+const dorderCustom = () => dorder().length > 0;
 /* 공략 표식 — 관심 교수의 체크와 헷갈리지 않도록 깃발이고, 색도 금색이 아닌 주황이다 */
 /* 확실 표식 — 굳어졌다는 뜻이라 체크 */
 const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
@@ -2605,14 +2718,14 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
-const SET_PU = 'push', SET_SU = 'sure';
+const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_DO]: '학과 순서', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2625,6 +2738,7 @@ function settingValue(key) {
   if (key === SET_NS) return [...noSend()];
   if (key === SET_PU) return [...pushes()].sort();   // 고른 순서는 뜻이 없다
   if (key === SET_SU) return [...sures()].sort();
+  if (key === SET_DO) return [...dorder()];   // 정렬하지 않는다: 차례가 곧 값이다
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
   if (key === SET_MS) return msends();
@@ -2642,6 +2756,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
     if (key === SET_PU) { pushSet = new Set(v); v.length ? localStorage.setItem(PUSH_KEY, JSON.stringify(v)) : localStorage.removeItem(PUSH_KEY); }
     if (key === SET_SU) { sureSet = new Set(v); v.length ? localStorage.setItem(SURE_KEY, JSON.stringify(v)) : localStorage.removeItem(SURE_KEY); }
+    if (key === SET_DO) { dorderList = v.map(String); v.length ? localStorage.setItem(DORDER_KEY, JSON.stringify(v)) : localStorage.removeItem(DORDER_KEY); dorderApply(); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
@@ -2650,7 +2765,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -2698,7 +2813,7 @@ function applySettings(m) {
     const cur = settingValue(key) || (isObj ? {} : []);
     const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
     const same = isObj ? canon(cur) === canon(v)
-               : (key === SET_FAV || key === SET_NS) ? JSON.stringify(cur) === JSON.stringify(v)
+               : (key === SET_FAV || key === SET_NS || key === SET_DO) ? JSON.stringify(cur) === JSON.stringify(v)
                                  : JSON.stringify(cur) === JSON.stringify([...v].sort());
     if (same) continue;
     settingApplyLocal(key, v); changed.push(key);
