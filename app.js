@@ -1679,6 +1679,20 @@ function donut(profs) {
    * 숫자가 절반이어서 기준을 절반에 두고, 말도 절반이라고 쓴다.
    * 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다. 부(부정)는 세지
    * 않는다 — 돌려세우는 것은 다른 일이다. */
+  /* 확+긍에 공략을 더한 값. 공략은 선호도와 겹칠 수 있으므로 인원을 그냥 더하면 두 번 센다.
+   * 열쇠로 집합을 만들어 합집합의 크기를 세고, 늘어난 사람만 따로 보여 준다.
+   * 비(평가제외)는 모수(total)에서 빠진 사람이라 공략이어도 더하지 않는다 —
+   * 더하면 분자만 늘어 100% 를 넘을 수 있다. */
+  const inBase = p => { const r = getRating(p); return r === '확' || r === '긍'; };
+  const puAdd = profs.filter(p => isPush(p) && !inBase(p) && getRating(p) !== '비');
+  const puNa = profs.filter(p => isPush(p) && getRating(p) === '비').length;
+  const added = new Set(puAdd.map(rKey)).size;
+  const reach = base + added;
+  const puDup = profs.filter(p => isPush(p) && inBase(p)).length;
+  /* 어디서 더해졌는지 한눈에 — 숫자를 못 믿겠을 때 마우스를 올려 확인하시라고 */
+  const puWhy = ['중', '모', '부', '미지정']
+    .map(r => [r, puAdd.filter(p => (getRating(p) || '미지정') === r).length])
+    .filter(x => x[1]).map(([r, n]) => `${r} ${n}`).join(' · ');
   const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
@@ -1709,7 +1723,7 @@ function donut(profs) {
   return `
     <div class="pie">
       <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 공략까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
@@ -1718,6 +1732,9 @@ function donut(profs) {
       </svg>
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span><b>${pct(base)}%</b><span class="pie__kn">${base}명 / ${total}명</span></div>
+        ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puDup ? ` — 공략 ${puDup}명은 이미 확·긍이라 두 번 세지 않았습니다` : ''}${puNa ? ` — 비참여 ${puNa}명은 모수에서 빠진 분이라 더하지 않았습니다` : ''}">
+          <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%</b>
+          <span class="pie__kn">${reach}명 / ${total}명 · 공략 +${added}명</span></div>` : ''}
         ${need > 0
           ? `<div class="pie__k pie__k--goal"><span class="pie__kl">절반까지</span><b>${need}명</b><span class="pie__kn">${pool}</span></div>`
           : need === 0
