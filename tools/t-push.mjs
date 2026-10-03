@@ -112,6 +112,37 @@ await page.click('[data-pushbtn]');
 await page.waitForTimeout(400);
 t('상세에서 풀린다', await page.evaluate(() => pushes().size === 0));
 
+/* 눌렀는지 안 눌렀는지 눈으로 갈려야 한다. 마우스를 올린 모습이 켜진 모습과 같으면
+   누른 자리에 커서가 그대로 있는 동안 토글이 된 티가 나지 않는다 (2026-10-04) */
+const look = async sel => {
+  const read = () => page.evaluate(s => {
+    const el = document.querySelector(s), cs = getComputedStyle(el);
+    return { bg: cs.backgroundColor, fg: cs.color, bd: cs.borderTopColor };
+  }, sel);
+  await page.mouse.move(0, 0); await page.waitForTimeout(200);
+  const off = await read();
+  await page.locator(sel).hover(); await page.waitForTimeout(200);
+  const offHover = await read();
+  await page.locator(sel).click(); await page.waitForTimeout(300);
+  const onHover = await read();          // 누른 자리에 커서가 그대로
+  await page.mouse.move(0, 0); await page.waitForTimeout(200);
+  const on = await read();
+  await page.locator(sel).click(); await page.waitForTimeout(300);
+  return { off, offHover, on, onHover };
+};
+const clear = c => c.replace(/\s/g, '');
+for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushbtn]']]) {
+  const L = await look(sel);
+  t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg) && L.on.fg === 'rgb(255, 255, 255)',
+    `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
+  t(`${name}: 마우스만 올린 것과 켜진 것이 다르다`, clear(L.offHover.bg) !== clear(L.on.bg),
+    `${L.offHover.bg} vs ${L.on.bg}`);
+  t(`${name}: 커서를 둔 채로도 켜진 티가 난다`, clear(L.onHover.bg) !== clear(L.offHover.bg),
+    `${L.offHover.bg} vs ${L.onHover.bg}`);
+  t(`${name}: 두 번 누르면 꺼진 모습으로 돌아온다`, await page.evaluate(s =>
+    !document.querySelector(s).classList.contains('on'), sel));
+}
+
 // 5-2) 확실 — 선호도 '확' 과는 다른, 지금 이 시점의 결론
 t('상세에 확실 단추가 공략 앞에', await page.evaluate(() => {
   const marks = document.querySelector('.d-marks');

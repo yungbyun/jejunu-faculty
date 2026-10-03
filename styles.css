@@ -410,9 +410,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    3.2~4.0 으로 모자랐다. 색상·채도는 두고 밝기만 옮겨 두 테마 모두 4.6 이상으로 맞췄다.
    선호도 색 자체(막대·테두리·채운 칩)는 그대로이니 여기 값만 고칠 것. */
 /* 공략(선거일까지 꼭 만날 사람) — 관심 교수의 금색과 헷갈리지 않게 주황으로 */
-:root{--push:#b83c0a}   /* 밝은 화면: #c2410c 는 단추 글자 대비가 4.35 로 모자랐다 */
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--push:#fb923c}}
-:root[data-theme="dark"]{--push:#fb923c}
+:root{--push:#b83c0a;--push-fill:#b83c0a}   /* 밝은 화면: #c2410c 는 단추 글자 대비가 4.35 로 모자랐다 */
+/* --push-fill 은 바탕을 채울 때 쓴다. 어두운 화면의 --push(#fb923c)는 흰 글자 대비가 2.26 이라 못 쓴다 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--push:#fb923c;--push-fill:#c2410c}}
+:root[data-theme="dark"]{--push:#fb923c;--push-fill:#c2410c}
 /* 확실 — 이름 바탕을 채우는 색. 흰 글자가 얹히므로 충분히 진해야 한다
    (밝은 #2d6b16 은 흰 글자 6.51, 어두운 #2f7d1a 는 5.16).
    단추 글자·테두리는 --sure-ink 로 따로 둔다 — 어두운 화면에서 칠하는 색을 그대로 쓰면 4.29 로 모자란다. */
@@ -606,13 +607,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .surebtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}
-.surebtn:hover{border-color:var(--sure-ink);color:var(--sure-ink)}
-.surebtn.on{border-color:var(--sure-ink);color:var(--sure-ink);background:color-mix(in srgb,var(--sure-ink) 12%,transparent)}
+/* 마우스를 올렸을 때는 테두리만 물들인다 — 글자색까지 바꾸면 켜진 모습과 똑같아 보여
+   누른 자리에 커서가 있는 동안 토글이 된 티가 나지 않았다 (2026-10-04) */
+.surebtn:hover{border-color:var(--sure-ink)}
+/* 켜짐은 색으로 꽉 채우고 흰 글자 — 분석 목록의 확실 칩과 같은 꼴이라 뜻이 바로 통한다 */
+.surebtn.on{background:var(--sure);border-color:var(--sure);color:#fff}
 .pushbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}
-.pushbtn:hover{border-color:var(--push);color:var(--push)}
-.pushbtn.on{border-color:var(--push);color:var(--push);background:color-mix(in srgb,var(--push) 12%,transparent)}
+.pushbtn:hover{border-color:var(--push)}
+.pushbtn.on{background:var(--push-fill);border-color:var(--push-fill);color:#fff}
+.surebtn.on:hover,.pushbtn.on:hover{filter:brightness(1.12)}
 
 /* 만난 적이 있는 교수 — 이름 오른쪽에 만난 횟수만큼 작은 불. 색은 그 선호도의 대표 색(--lit) */
 .metlit{display:inline-flex;align-items:center;gap:2.5px;margin-left:6px;
