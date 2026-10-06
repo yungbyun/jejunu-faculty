@@ -417,6 +417,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 확실 — 이름 바탕을 채우는 색. 흰 글자가 얹히므로 충분히 진해야 한다
    (밝은 #2d6b16 은 흰 글자 6.51, 어두운 #2f7d1a 는 5.16).
    단추 글자·테두리는 --sure-ink 로 따로 둔다 — 어두운 화면에서 칠하는 색을 그대로 쓰면 4.29 로 모자란다. */
+/* VIP — 색이 아니라 '두 줄 테두리' 로 나타낸다(바탕은 확실, 깃발은 공략이 이미 쓴다).
+   --vip 는 테와 글자, --vip-fill 은 단추를 채울 때. 어두운 화면의 --vip(#e3b341)는
+   흰 글자 대비가 1.95 라 채우는 데 못 쓴다. */
+:root{--vip:#8a6300;--vip-fill:#8a6300}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--vip:#e3b341}}
+:root[data-theme="dark"]{--vip:#e3b341}
 :root{--sure:#2d6b16;--sure-ink:#317218}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sure:#2f7d1a;--sure-ink:#4db02a}}
 :root[data-theme="dark"]{--sure:#2f7d1a;--sure-ink:#4db02a}
@@ -581,7 +587,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-list{display:grid;grid-template-columns:92px 1fr;align-items:start;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
 .st-list h3{margin:0;padding-top:4px;font-size:13.5px;display:flex;align-items:center;gap:6px}
 .st-list h3 .n{color:var(--ink-3);font-weight:500}
-.st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:9px}   /* VIP 의 바깥 고리(3.5px)가 옆 칩에 닿지 않게 6→9 */
 /* 칩은 이름만 (2026-09-20). 학과·직위는 title 로만 남겨 마우스를 올리면 보인다 */
 .st-list li a,.st-list li button{display:inline-flex;align-items:center;gap:0;padding:4px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-weight:600;font-size:13px;white-space:nowrap;color:inherit;cursor:pointer}
 .st-list li a:hover,.st-list li button:hover{border-color:var(--brand)}
@@ -595,6 +601,15 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-c.sure .metlit b{box-shadow:none}
 /* 확실이면서 공략일 때 — 진한 바탕에 주황 테는 잘 안 보인다. 깃발 하나로 충분하다 */
 .st-c.sure.on{border-color:var(--sure);box-shadow:none}
+/* VIP — 이름 테두리를 두 줄로. 칩이 본래 가진 테를 안쪽 줄로 쓰되 색을 --vip 로 맞추고
+   (옅은 회색 그대로 두면 한 줄로만 보인다), 바깥 줄은 그림자로 그린다. 가운데 틈은 칩이 놓인
+   바탕색(--surface)으로 메워야 두 줄로 갈린다. 그림자는 자리를 차지하지 않아 칩 크기가 안 흔들린다.
+   확실(채움)·공략(깃발)과 겹쳐 달 수 있다. 공략의 안쪽 주황 선은 VIP 일 때 그리지 않는다 —
+   금색 두 줄에 주황까지 겹치면 어지럽고, 공략은 깃발로 이미 보인다. */
+.st-c.vip,.st-c.on.vip,.st-c.sure.vip,.st-c.sure.on.vip{
+  border-color:var(--vip);
+  box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--vip)}
+.st-c.vip:hover{border-color:var(--vip)}
 .pushm{display:inline-flex;align-items:center;margin-right:4px;color:var(--push);line-height:0}
 .n--push{color:var(--push);display:inline-flex;align-items:center;gap:2px;margin-left:6px}
 /* 고르기 모드의 단추들 */
@@ -616,6 +631,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}
 .pushbtn:hover{border-color:var(--push)}
+.vipbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
+  font-weight:700;cursor:pointer}
+.vipbtn:hover{border-color:var(--vip)}
+.vipbtn.on{background:var(--vip-fill);border-color:var(--vip-fill);color:#fff}
+.vipbtn.on:hover{filter:brightness(1.12)}
 .pushbtn.on{background:var(--push-fill);border-color:var(--push-fill);color:#fff}
 .surebtn.on:hover,.pushbtn.on:hover{filter:brightness(1.12)}
 

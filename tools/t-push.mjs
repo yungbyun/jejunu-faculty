@@ -13,6 +13,7 @@ const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
 const reset = () => page.evaluate(() => {
   pushSet = new Set(); localStorage.removeItem('jnu-push');
   sureSet = new Set(); localStorage.removeItem('jnu-sure');
+  vipSet = new Set(); localStorage.removeItem('jnu-vip');
   favSet = new Set(); localStorage.removeItem('jnu-fav');
   state.ratings.clear(); state.notes.clear();
   const v = ['확', '긍', '중', '모', '부', '비'];
@@ -131,7 +132,7 @@ const look = async sel => {
   return { off, offHover, on, onHover };
 };
 const clear = c => c.replace(/\s/g, '');
-for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushbtn]']]) {
+for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushbtn]'], ['VIP', '[data-vipbtn]']]) {
   const L = await look(sel);
   t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg) && L.on.fg === 'rgb(255, 255, 255)',
     `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
@@ -144,13 +145,13 @@ for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushb
 }
 
 // 5-2) 확실 — 선호도 '확' 과는 다른, 지금 이 시점의 결론
-t('상세에 확실 단추가 공략 앞에', await page.evaluate(() => {
-  const marks = document.querySelector('.d-marks');
-  const b = [...marks.querySelectorAll('button')];
-  return b.length === 2 && b[0].hasAttribute('data-surebtn') && b[1].hasAttribute('data-pushbtn');
+t('단추 차례는 확실·공략·VIP', await page.evaluate(() => {
+  const b = [...document.querySelectorAll('.d-marks button')];
+  return b.length === 3 && b[0].hasAttribute('data-surebtn') &&
+    b[1].hasAttribute('data-pushbtn') && b[2].hasAttribute('data-vipbtn');
 }));
-t('단추 글자는 확실·공략', await page.evaluate(() =>
-  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '확실,공략',
+t('단추 글자는 확실·공략·VIP', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '확실,공략,VIP',
   await page.evaluate(() => [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()));
 await page.click('[data-surebtn]');
 await page.waitForTimeout(400);
@@ -193,9 +194,65 @@ await page.evaluate(() => {
   setRating(rKey(state.rows[0]), '');
 });
 
+// 5-3) VIP — 분석 목록에서 이름 테두리를 두 줄로
+t('상세에 VIP 단추가 셋째로', await page.evaluate(() => {
+  const b = [...document.querySelectorAll('.d-marks button')];
+  return b.length === 3 && b[2].hasAttribute('data-vipbtn') && b[2].querySelector('span').textContent.trim() === 'VIP';
+}));
+await page.evaluate(() => {
+  vipSet = new Set(); pushSet = new Set(); sureSet = new Set();
+  const p = state.rows[0];
+  setRating(rKey(p), '중'); vips().add(rKey(p)); vipSave();
+  location.hash = '#/stats'; render();
+});
+await page.waitForSelector('.st-c.vip', { timeout: 10000 });
+await page.mouse.move(0, 0);
+await page.waitForTimeout(300);
+t('VIP 인 칩에만 vip', await page.evaluate(() => document.querySelectorAll('.st-c.vip').length === vips().size));
+const ring = await page.evaluate(() => {
+  const el = document.querySelector('.st-c.vip'), cs = getComputedStyle(el);
+  const hex = x => { const m = x.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : x; };
+  const want = cs.getPropertyValue('--vip').trim();
+  /* 바깥 줄은 그림자로 그린다. 두 줄로 보이려면 가운데 틈(바탕색)이 사이에 있어야 한다 */
+  const sh = cs.boxShadow;
+  const parts = sh.split(/,(?![^(]*\))/).map(x => x.trim());
+  return { border: hex(cs.borderTopColor), want, parts, n: parts.length, inset: /inset/.test(sh) };
+});
+t('안쪽 줄이 VIP 색', ring.border === ring.want, `${ring.border} / ${ring.want}`);
+t('바깥 줄이 따로 하나 더', ring.n === 2 && !ring.inset, `${ring.n}겹 ${ring.parts.join(' | ')}`);
+t('두 줄 사이에 틈이 있다', await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.st-c.vip'));
+  const gap = cs.boxShadow.split(/,(?![^(]*\))/)[0];
+  const panel = getComputedStyle(document.querySelector('.st-list')).backgroundColor;
+  return gap.includes(panel.replace(/\s/g, '')) || gap.includes(panel);
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip')).boxShadow));
+/* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 */
+t('확실·공략과 겹쳐 달아도 두 줄이 남는다', await page.evaluate(() => {
+  const p = state.rows[0];
+  pushes().add(rKey(p)); sures().add(rKey(p)); render();
+  const el = document.querySelector('.st-c.vip');
+  const cs = getComputedStyle(el);
+  const hex = x => { const m = x.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : x; };
+  return el.classList.contains('sure') && el.classList.contains('on') &&
+    hex(cs.borderTopColor) === cs.getPropertyValue('--vip').trim() &&
+    cs.boxShadow !== 'none' && !/inset/.test(cs.boxShadow);
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip')).boxShadow));
+t('VIP 가 아니면 두 줄이 아니다', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('vip'));
+  return !!el && getComputedStyle(el).boxShadow === 'none';
+}));
+t('도움말에 VIP 라고 적힌다', await page.evaluate(() =>
+  (document.querySelector('.st-c.vip').getAttribute('title') || '').includes('VIP')));
+await page.evaluate(() => {
+  vipSet = new Set(); pushSet = new Set(); sureSet = new Set();
+  ['jnu-vip', 'jnu-push', 'jnu-sure'].forEach(k => localStorage.removeItem(k));
+  setRating(rKey(state.rows[0]), '');
+});
+
 // 6) 시트로도 저장된다
 t('settings 의 push 키로 등록', await page.evaluate(() => SET_KEYS.includes('push') && SET_LABEL['push'] === '공략'));
 t('settings 의 sure 키로도 등록', await page.evaluate(() => SET_KEYS.includes('sure') && SET_LABEL['sure'] === '확실'));
+t('settings 의 vip 키로도 등록', await page.evaluate(() => SET_KEYS.includes('vip') && SET_LABEL['vip'] === 'VIP'));
 t('받은 값을 이 기기에 적용', await page.evaluate(() => {
   const k = rKey(state.rows[3]);
   settingApplyLocal('push', [k]);
@@ -207,7 +264,12 @@ t('확실도 시트에서 내려받는다', await page.evaluate(() => {
   settingApplyLocal('sure', [k]);
   return isSure(state.rows[5]) && JSON.parse(localStorage.getItem('jnu-sure') || '[]')[0] === k;
 }));
-await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
+t('VIP 도 시트에서 내려받는다', await page.evaluate(() => {
+  const k = rKey(state.rows[7]);
+  settingApplyLocal('vip', [k]);
+  return isVip(state.rows[7]) && JSON.parse(localStorage.getItem('jnu-vip') || '[]')[0] === k;
+}));
+await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); sureSet = new Set(); localStorage.removeItem('jnu-sure'); vipSet = new Set(); localStorage.removeItem('jnu-vip'); });
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);
