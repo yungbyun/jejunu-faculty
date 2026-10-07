@@ -64,38 +64,52 @@ check('카드가 열리지는 않는다', await page.evaluate(() => location.has
   await page.evaluate(() => location.hash));
 check('복사한 뒤 확인 표시', await page.evaluate(() => document.querySelector('.po__cp').classList.contains('ok')));
 
-/* 3) 상세 화면의 연락처 칸.
-   2026-09-22 에 뺐다가 2026-10-07 에 되살렸다 — 상세만 열어 두고도 전화를 걸 수 있어야 한다. */
+/* 3) 상세 화면의 번호 줄 — 영문 이름 바로 아래, 같은 글꼴·색으로 (2026-10-07).
+   따로 칸을 두었다가(같은 날) 영문 이름 아래로 옮겼다. */
 await page.evaluate(x => {
   const p = state.rows.find(y => rKey(y) === x);
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 }, k);
-await page.waitForSelector('.d-contact', { timeout: 10000 });
+await page.waitForSelector('.d-phones', { timeout: 10000 });
+check('연락처 칸을 따로 두지 않는다', await page.evaluate(() =>
+  ![...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '연락처')));
+check('영문 이름 바로 다음 줄', await page.evaluate(() =>
+  document.querySelector('.d-en').nextElementSibling === document.querySelector('.d-phones')));
+check('글꼴·크기·색이 영문 이름과 같다', await page.evaluate(() => {
+  const a = getComputedStyle(document.querySelector('.d-en'));
+  const b = getComputedStyle(document.querySelector('.d-ct__n'));
+  return a.fontFamily === b.fontFamily && a.fontSize === b.fontSize && a.color === b.color;
+}), await page.evaluate(() => {
+  const a = getComputedStyle(document.querySelector('.d-en')), b = getComputedStyle(document.querySelector('.d-ct__n'));
+  return `${a.fontSize}/${a.color} vs ${b.fontSize}/${b.color}`;
+}));
 const ct = await page.evaluate(() => [...document.querySelectorAll('.d-ct')].map(e => ({
-  l: e.querySelector('.d-ct__l').textContent.trim(),
   n: e.querySelector('.d-ct__n').textContent.trim(),
   href: e.querySelector('.d-ct__n').getAttribute('href'),
   cp: !!e.querySelector('[data-copynum]'),
 })));
-check('연락처 칸이 있다', await page.evaluate(() =>
-  [...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '연락처')));
-check('연구실 전화가 먼저', ct[0] && ct[0].l === '연구실', JSON.stringify(ct[0] || null));
-check('핸드폰이 그 다음', ct[1] && ct[1].l === '핸드폰' && ct[1].n === '010-1234-5678', JSON.stringify(ct[1] || null));
+check('연구실 전화가 먼저, 핸드폰이 다음', ct.length === 2 && ct[1].n === '010-1234-5678',
+  ct.map(x => x.n).join(' | '));
+check('한 줄에 나란히', await page.evaluate(() => {
+  const a = document.querySelectorAll('.d-ct');
+  const r0 = a[0].getBoundingClientRect(), r1 = a[1].getBoundingClientRect();
+  return Math.abs((r0.top + r0.bottom) / 2 - (r1.top + r1.bottom) / 2) < 4;
+}));
 check('둘 다 tel: 링크', ct.length === 2 && ct.every(x => /^tel:[\d+]+$/.test(x.href)), ct.map(x => x.href).join(' '));
 check('둘 다 복사 아이콘', ct.length === 2 && ct.every(x => x.cp));
 /* 상세에서 복사 아이콘을 눌러도 화면이 닫히거나 넘어가면 안 된다 */
 const dHash = await page.evaluate(() => location.hash);
-await page.locator('.d-ct [data-copynum]').last().click();
+await page.locator('.d-ct__c').last().click();
 await page.waitForTimeout(400);
 check('상세에서도 복사된다', await page.evaluate(() => navigator.clipboard.readText()) === '010-1234-5678');
 check('상세가 닫히지 않는다', await page.evaluate(() => location.hash) === dHash &&
   await page.evaluate(() => !document.querySelector('.drawer').hidden));
-check('번호가 하나도 없으면 칸도 없다', await page.evaluate(() => {
+check('번호가 하나도 없으면 줄도 없다', await page.evaluate(() => {
   const q = state.rows.find(y => !mobileOf(y));
   if (!q) return true;
   const keep = q.phone; q.phone = '';
   location.hash = `#/dept/${q.dept_id}/prof/${q.slug}`; render();
-  const none = !document.querySelector('.d-contact');
+  const none = !document.querySelector('.d-phones');
   q.phone = keep;
   return none;
 }));

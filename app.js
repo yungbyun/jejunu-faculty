@@ -3427,21 +3427,26 @@ function redrawAix(box, p, d) {
   box.innerHTML = aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined);
 }
 
-/* 상세 화면의 번호 한 줄. 번호를 누르면 전화가 걸리고, 옆 아이콘을 누르면 복사된다.
+/* 상세 화면의 번호 줄 — 영문 이름 바로 아래에, 같은 글꼴·색(.d-en)으로 둔다.
+   번호를 누르면 전화가 걸리고, 옆 아이콘을 누르면 복사된다.
    핸드폰은 비공개 시트에만 있는 값이라 공개 파일에는 절대 들어가지 않는다. */
-function dPhone(label, num, who, mob) {
+const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
+  + '<rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>'
+  + '<path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+function dPhone(label, num, who) {
   const tel = String(num).replace(/[^\d+]/g, '');
-  return `<div class="d-ct">
-    <span class="d-ct__l">${esc(label)}</span>
-    <a class="d-ct__n" href="tel:${esc(tel)}" aria-label="${esc(who)} ${esc(label)} ${esc(num)}">${esc(num)}</a>
-    <button type="button" class="po__cp" data-copynum="${esc(num)}" title="번호 복사"
-      aria-label="${esc(who)} ${esc(label)} 번호 복사"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-      <path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg></button>
-  </div>`;
+  return `<span class="d-ct">`
+    + `<a class="d-ct__n" href="tel:${esc(tel)}" aria-label="${esc(who)} ${esc(label)} ${esc(num)}">${esc(num)}</a>`
+    + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
+    + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
 }
-
+/* 둘 다 없으면 줄 자체를 그리지 않는다 */
+function dPhones(p) {
+  const a = [];
+  if (p.phone) a.push(dPhone('연구실', p.phone, p.name));
+  if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name));
+  return a.length ? `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>` : '';
+}
 /* ---------- 상세 드로어 ---------- */
 function openDrawer(p, d) {
   const links = [
@@ -3462,16 +3467,11 @@ function openDrawer(p, d) {
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span></div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
+          ${dPhones(p)}
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         </div>
       </div>
 
-      ${p.phone || mobileOf(p) ? `<div class="d-section"><h3>연락처</h3>
-        <div class="d-contact">
-          ${p.phone ? dPhone('연구실', p.phone, p.name) : ''}
-          ${mobileOf(p) ? dPhone('핸드폰', mobileOf(p), p.name, true) : ''}
-        </div>
-      </div>` : ''}
 
       <div class="d-section"><h3>선호도</h3>
         ${rateWide(p)}
