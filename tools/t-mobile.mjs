@@ -64,15 +64,43 @@ check('카드가 열리지는 않는다', await page.evaluate(() => location.has
   await page.evaluate(() => location.hash));
 check('복사한 뒤 확인 표시', await page.evaluate(() => document.querySelector('.po__cp').classList.contains('ok')));
 
-// 3) 상세 드로어에는 더 이상 핸드폰 칸이 없다 (학과 카드에서 보이므로 뺐다)
+/* 3) 상세 화면의 연락처 칸.
+   2026-09-22 에 뺐다가 2026-10-07 에 되살렸다 — 상세만 열어 두고도 전화를 걸 수 있어야 한다. */
 await page.evaluate(x => {
   const p = state.rows.find(y => rKey(y) === x);
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 }, k);
-await page.waitForSelector('.d-name', { timeout: 10000 });
-check('드로어에 핸드폰 칸 없음', await page.evaluate(() => !document.querySelector('.d-mob')));
-check('드로어에 핸드폰 제목도 없음', await page.evaluate(() =>
-  ![...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '핸드폰')));
+await page.waitForSelector('.d-contact', { timeout: 10000 });
+const ct = await page.evaluate(() => [...document.querySelectorAll('.d-ct')].map(e => ({
+  l: e.querySelector('.d-ct__l').textContent.trim(),
+  n: e.querySelector('.d-ct__n').textContent.trim(),
+  href: e.querySelector('.d-ct__n').getAttribute('href'),
+  cp: !!e.querySelector('[data-copynum]'),
+})));
+check('연락처 칸이 있다', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '연락처')));
+check('연구실 전화가 먼저', ct[0] && ct[0].l === '연구실', JSON.stringify(ct[0] || null));
+check('핸드폰이 그 다음', ct[1] && ct[1].l === '핸드폰' && ct[1].n === '010-1234-5678', JSON.stringify(ct[1] || null));
+check('둘 다 tel: 링크', ct.length === 2 && ct.every(x => /^tel:[\d+]+$/.test(x.href)), ct.map(x => x.href).join(' '));
+check('둘 다 복사 아이콘', ct.length === 2 && ct.every(x => x.cp));
+/* 상세에서 복사 아이콘을 눌러도 화면이 닫히거나 넘어가면 안 된다 */
+const dHash = await page.evaluate(() => location.hash);
+await page.locator('.d-ct [data-copynum]').last().click();
+await page.waitForTimeout(400);
+check('상세에서도 복사된다', await page.evaluate(() => navigator.clipboard.readText()) === '010-1234-5678');
+check('상세가 닫히지 않는다', await page.evaluate(() => location.hash) === dHash &&
+  await page.evaluate(() => !document.querySelector('.drawer').hidden));
+check('번호가 하나도 없으면 칸도 없다', await page.evaluate(() => {
+  const q = state.rows.find(y => !mobileOf(y));
+  if (!q) return true;
+  const keep = q.phone; q.phone = '';
+  location.hash = `#/dept/${q.dept_id}/prof/${q.slug}`; render();
+  const none = !document.querySelector('.d-contact');
+  q.phone = keep;
+  return none;
+}));
+/* 공개 파일에 번호가 새지 않았는지 다시 — 상세에 다시 넣은 뒤라 꼭 본다 */
+check('상세에 넣어도 공개 파일은 그대로', (pub.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g) || []).length === 0);
 
 // 4) 한 번에 가져오기
 const imp = await page.evaluate(() => {

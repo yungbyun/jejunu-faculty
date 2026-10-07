@@ -619,6 +619,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .btn--push .n{font-weight:800}
 /* 상세 페이지의 공략 단추 */
 .d-marks{display:flex;gap:8px;flex-wrap:wrap}
+/* 상세 화면의 연락처 — 한 줄에 「이름표 · 번호 · 복사」 */
+.d-contact{display:flex;flex-direction:column;gap:6px}
+.d-ct{display:flex;align-items:center;gap:10px}
+.d-ct__l{flex:none;min-width:52px;font-size:12px;font-weight:700;color:var(--ink-3)}
+.d-ct__n{font-size:15px;font-weight:700;color:var(--brand);text-decoration:none;
+  letter-spacing:.2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.d-ct__n:hover,.d-ct__n:focus-visible{text-decoration:underline}
+.d-ct .po__cp{margin-left:-2px}
 .surebtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}
