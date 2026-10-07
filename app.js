@@ -3491,8 +3491,7 @@ function openDrawer(p, d) {
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
             ${VIP_MARK}<span>VIP</span></button>
         </div>
-        <p class="st-note">선호도와는 별개입니다. 분석 페이지의 선호도별 목록에서 <b>확실</b>은 이름 바탕이
-          진한 색으로, <b>공략</b>은 깃발로, <b>VIP</b>는 두 줄 테두리로 보입니다.</p>
+        <p class="st-note"><b>확실</b>은 이름 바탕이 진한 색으로, <b>공략</b>은 깃발로, <b>VIP</b>는 두 줄 테두리</p>
       </div>
 
       <div class="d-section"><h3>메모</h3>
