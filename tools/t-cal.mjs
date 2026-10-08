@@ -144,7 +144,7 @@ await page.evaluate(() => {
 await page.waitForSelector('[data-mtnew]', { timeout: 10000 });
 t('점심·저녁·기타 세 갈래', await page.evaluate(() =>
   [...document.querySelectorAll('[data-mtnew]')].map(b => b.dataset.mtnew + ':' + b.textContent.trim()).join()) ===
-  'lunch:점심,dinner:저녁,:기타',
+  'lunch:점심,dinner:저녁,other:기타',
   await page.evaluate(() => [...document.querySelectorAll('[data-mtnew]')].map(b => b.textContent.trim()).join()));
 const n0 = await page.evaluate(() => mtList().length);
 await page.click('[data-mtnew="lunch"]');
@@ -160,12 +160,13 @@ t('점심은 12:00', await page.evaluate(() => meets()[CAL.open].time) === '12:0
 t('줄머리에 「점심 12:00」', (await page.locator('.cal-r.on .cal-r__t').innerText()).includes('점심 12:00'),
   await page.locator('.cal-r.on .cal-r__t').innerText());
 t('약속이 하나 늘었다', await page.evaluate(() => mtList().length) === n0 + 1);
-t('저녁은 18:00, 기타는 미정', await page.evaluate(() => {
+t('저녁은 18:00, 기타는 14:00', await page.evaluate(() => {
   const a = mtAdd(mtToday(), rKey(state.rows[3]), 'dinner');
-  const c = mtAdd(mtToday(), rKey(state.rows[3]), '');
+  const c = mtAdd(mtToday(), rKey(state.rows[3]), 'other');
   return a !== c && meets()[a].time === '18:00' && meets()[a].kind === 'dinner' &&
-    meets()[c].time === '' && meets()[c].kind === '';
+    meets()[c].time === '14:00' && meets()[c].kind === 'other';
 }));
+t('기타는 줄머리에 시각만', await page.evaluate(() => mtKindName('other') === ''));
 /* 같은 밀리초에 두 번 잡아도 앞 약속이 덮어써지면 안 된다 */
 t('연달아 잡아도 id 가 겹치지 않는다', await page.evaluate(() => {
   const before = mtList().length;
@@ -193,17 +194,62 @@ await page.evaluate(() => {
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 });
 await page.waitForSelector('[data-mtnew]', { timeout: 10000 });
-await page.click('[data-mtnew=""]');
+await page.click('[data-mtnew="other"]');
 await page.waitForTimeout(700);
 
-// 지우기 — 센 것은 돌려놓는다
+/* 줄에서 바로 고치고 지우기 — 펼쳐 들어갈 것 없이 (2026-10-08) */
 await page.evaluate(() => {
-  const id = CAL.open;
-  mtWho(id, rKey(state.rows[3]));            // 넣었다 빼서 깨끗이
-  mtWho(id, rKey(state.rows[3]));
+  meetMap = {}; state.notes.clear();
+  const t = mtToday(), r = state.rows;
+  meets()['b1'] = { date: t, time: '12:00', kind: 'lunch', place: '', memo: '', who: [rKey(r[0])], done: '', counted: [] };
+  meets()['b2'] = { date: t, time: '14:00', kind: 'other', place: '', memo: '', who: [rKey(r[1])], done: 'met', counted: [rKey(r[1])] };
+  setMet(rKey(r[1]), 1);
+  CAL.day = t; CAL.ym = mtMonth(t); CAL.open = ''; renderCal();
+});
+await page.waitForSelector('[data-mtrmv]', { timeout: 10000 });
+t('줄마다 수정·지우기 단추', await page.evaluate(() =>
+  [...document.querySelectorAll('.cal-r')].every(r => r.querySelector('[data-mtedit]') && r.querySelector('[data-mtrmv]'))));
+t('단추가 머리줄 안에 있다', await page.evaluate(() =>
+  !!document.querySelector('.cal-r__h [data-mtedit]') && !!document.querySelector('.cal-r__h [data-mtrmv]')));
+/* 단추 안에 단추를 넣으면 안 된다 — 머리줄은 묶음이어야 한다 */
+t('단추를 단추 안에 넣지 않았다', await page.evaluate(() =>
+  ![...document.querySelectorAll('.cal-r__a')].some(b => b.parentElement.tagName === 'BUTTON')));
+t('상태 배지는 그대로', await page.evaluate(() => document.querySelectorAll('.cal-r__s').length === 2));
+await page.locator('[data-mtedit]').first().click();
+await page.waitForTimeout(500);
+t('수정을 누르면 그 자리에서 펼쳐진다', await page.evaluate(() => !!document.querySelector('.cal-r.on .cal-e')));
+t('펼친 뒤에는 접기로 바뀐다', (await page.locator('.cal-r.on [data-mtedit]').innerText()).trim() === '접기',
+  await page.locator('.cal-r.on [data-mtedit]').innerText());
+await page.locator('.cal-r.on [data-mtedit]').click();
+await page.waitForTimeout(400);
+t('다시 누르면 접힌다', await page.locator('.cal-r.on').count() === 0);
+/* 지우기는 반드시 먼저 물어보고, 만난 횟수를 올려 둔 것은 돌려놓는다 */
+await page.evaluate(() => { window.__ASK = ''; window.confirm = m => { window.__ASK = m; return false; }; });
+await page.locator('[data-mtrmv]').first().click();
+await page.waitForTimeout(400);
+t('지우기 전에 물어본다', (await page.evaluate(() => window.__ASK)).includes('지울까요'),
+  await page.evaluate(() => window.__ASK));
+t('아니라고 하면 그대로 둔다', await page.evaluate(() => mtList().length) === 2);
+t('물어볼 때 누구와의 약속인지 밝힌다', await page.evaluate(() =>
+  window.__ASK.includes(state.rows[0].name)), await page.evaluate(() => window.__ASK));
+const metB = await page.evaluate(() => getNote(rKey(state.rows[1])).met || 0);
+await page.evaluate(() => { window.confirm = () => true; });
+await page.locator('.cal-r').nth(1).locator('[data-mtrmv]').click();
+await page.waitForTimeout(600);
+t('지우면 줄이 사라진다', await page.locator('.cal-r').count() === 1 &&
+  await page.evaluate(() => mtList().length) === 1);
+t('지우면 센 만난 횟수도 돌려놓는다', await page.evaluate(() => getNote(rKey(state.rows[1])).met || 0) === metB - 1,
+  `${metB} → ${await page.evaluate(() => getNote(rKey(state.rows[1])).met || 0)}`);
+
+// 펼친 칸 안의 「이 약속 지우기」 — 센 것은 돌려놓는다
+await page.evaluate(() => {
+  meetMap = {}; state.notes.clear();
+  const id = mtAdd(mtToday(), rKey(state.rows[3]), 'lunch');
   mtDone(id, 'met');
+  CAL.open = id; CAL.day = mtToday(); CAL.ym = mtMonth(mtToday());
   renderCal();
 });
+await page.waitForSelector('[data-mtdel]', { timeout: 10000 });
 await page.waitForTimeout(500);
 const metA = await page.evaluate(() => getNote(rKey(state.rows[3])).met || 0);
 await page.evaluate(() => { window.confirm = () => true; });

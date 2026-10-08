@@ -3486,7 +3486,11 @@ const mtSoon = (n = 4) => { const t = mtToday(); return mtList().filter(m => m.d
 
 /* 약속 시간 갈래. 점심·저녁은 시각이 뻔하므로 미리 넣어 두고, 기타는 미정으로 둔다.
    시각을 손으로 고치면 갈래는 지운다 — 18:00 인데 '점심' 이라고 적혀 있으면 안 된다. */
-const MT_KIND = { lunch: { name: '점심', time: '12:00' }, dinner: { name: '저녁', time: '18:00' } };
+const MT_KIND = {
+  lunch:  { name: '점심', time: '12:00' },
+  dinner: { name: '저녁', time: '18:00' },
+  other:  { name: '',     time: '14:00' },   // 이름을 비워 두면 줄머리에 시각만 나온다
+};
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
 /* 시각만으로 id 를 지으면 같은 밀리초에 두 번 부를 때 겹쳐 앞 약속이 덮어써진다.
    단추를 연달아 누르면 실제로 그렇게 된다. 겹치지 않을 때까지 다시 짓는다. */
@@ -3547,7 +3551,7 @@ function mtWhen(day, time) {
 const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean);
 
 /* ---------- 달력 화면 ---------- */
-const CAL = { ym: '', day: '', open: '', q: '' };
+const CAL = { ym: '', day: '', open: '', q: '', scroll: false };
 
 /* 그 달의 칸들. 앞뒤를 빈 칸으로 채워 일요일부터 시작하는 격자를 만든다 */
 function mtCells(ym) {
@@ -3623,6 +3627,12 @@ function renderCal() {
       </section>
     </div>`;
   bindCal();
+  /* 상세에서 약속을 잡고 넘어왔을 때 — 달력 아래에 펼쳐진 그 약속이 바로 보이게 한다 */
+  if (CAL.scroll) {
+    CAL.scroll = false;
+    const el = $app.querySelector('.cal-r.on');
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
 }
 
 const MT_DONE = { '': '예정', met: '만남', no: '못 만남' };
@@ -3630,12 +3640,15 @@ function mtRow(m) {
   const open = m.id === CAL.open;
   const names = mtNames(m);
   return `<div class="cal-r${open ? ' on' : ''}${m.done ? ' cal-r--' + m.done : ''}">
-    <button type="button" class="cal-r__h" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
-      <span class="cal-r__t">${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
-      <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
-      <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
-      <span class="cal-r__x">${open ? '접기' : '펼치기'}</span>
-    </button>
+    <div class="cal-r__h">
+      <button type="button" class="cal-r__m" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
+        <span class="cal-r__t">${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
+        <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
+        <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
+      </button>
+      <button type="button" class="cal-r__a" data-mtedit="${esc(m.id)}">${open ? '접기' : '수정'}</button>
+      <button type="button" class="cal-r__a cal-r__a--x" data-mtrmv="${esc(m.id)}">지우기</button>
+    </div>
     ${open ? mtEdit(m) : ''}
   </div>`;
 }
@@ -3689,6 +3702,19 @@ function bindCal() {
     CAL.day = b.dataset.day; CAL.ym = mtMonth(b.dataset.day); CAL.open = b.dataset.mtgo; renderCal();
   }));
   $('[data-mtadd]')?.addEventListener('click', () => { CAL.open = mtAdd(CAL.day); CAL.q = ''; renderCal(); });
+  /* 줄에서 바로 고치고 지운다 — 펼쳐서 찾아 들어갈 것 없이 */
+  $app.querySelectorAll('[data-mtedit]').forEach(b => b.addEventListener('click', () => {
+    CAL.open = CAL.open === b.dataset.mtedit ? '' : b.dataset.mtedit; CAL.q = ''; renderCal();
+  }));
+  $app.querySelectorAll('[data-mtrmv]').forEach(b => b.addEventListener('click', () => {
+    const m = meets()[b.dataset.mtrmv]; if (!m) return;
+    const who = mtNames(mtList().find(x => x.id === b.dataset.mtrmv) || { who: [] });
+    if (!confirm(`${mtWhen(m.date, m.time)}${who.length ? ' ' + who.join(', ') : ''} 약속을 지울까요?`)) return;
+    mtDel(b.dataset.mtrmv);
+    if (CAL.open === b.dataset.mtrmv) CAL.open = '';
+    flashStatus('약속을 지웠습니다');
+    renderCal();
+  }));
   $app.querySelectorAll('[data-mtopen]').forEach(b => b.addEventListener('click', () => {
     CAL.open = CAL.open === b.dataset.mtopen ? '' : b.dataset.mtopen; CAL.q = ''; renderCal();
   }));
@@ -3806,9 +3832,10 @@ function openDrawer(p, d) {
         <div class="d-appt">
           <button type="button" class="btn" data-mtnew="lunch">점심</button>
           <button type="button" class="btn" data-mtnew="dinner">저녁</button>
-          <button type="button" class="btn" data-mtnew="">기타</button>
+          <button type="button" class="btn" data-mtnew="other">기타</button>
         </div>
-        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다. 날짜·장소는 거기서 고치시면 됩니다.</p>
+        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 · 기타 2시.
+          날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
       </div>
 
       <div class="d-section"><h3>표시</h3>
@@ -3848,9 +3875,9 @@ function openDrawer(p, d) {
   $panel.querySelectorAll('[data-mtnew]').forEach(b => b.addEventListener('click', () => {
     const kind = b.dataset.mtnew;
     CAL.open = mtAdd(mtToday(), rKey(p), kind);
-    CAL.day = mtToday(); CAL.ym = mtMonth(mtToday()); CAL.q = '';
+    CAL.day = mtToday(); CAL.ym = mtMonth(mtToday()); CAL.q = ''; CAL.scroll = true;
     location.hash = '#/cal';
-    flashStatus(`${p.name} 교수님과 오늘 ${mtKindName(kind) || '약속'}으로 잡았습니다`);
+    flashStatus(`${p.name} 교수님과 오늘 ${mtKindName(kind) || '약속'} ${(MT_KIND[kind] || {}).time || ''} 로 잡았습니다 — 날짜·시각은 여기서 바꾸시면 됩니다`);
   }));
   bindNotes($panel);
   bindAix($panel, p, d);
