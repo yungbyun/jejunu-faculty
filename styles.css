@@ -1350,7 +1350,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-d.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .cal-del{margin-left:auto;color:var(--rs-neg);border-color:color-mix(in srgb,var(--rs-neg) 35%,var(--line-2))}
 
-.d-met{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.d-appt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 @media (max-width:520px){
   .cal-grid{gap:3px}

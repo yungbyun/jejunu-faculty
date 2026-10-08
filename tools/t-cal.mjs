@@ -142,15 +142,59 @@ await page.evaluate(() => {
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 });
 await page.waitForSelector('[data-mtnew]', { timeout: 10000 });
+t('점심·저녁·기타 세 갈래', await page.evaluate(() =>
+  [...document.querySelectorAll('[data-mtnew]')].map(b => b.dataset.mtnew + ':' + b.textContent.trim()).join()) ===
+  'lunch:점심,dinner:저녁,:기타',
+  await page.evaluate(() => [...document.querySelectorAll('[data-mtnew]')].map(b => b.textContent.trim()).join()));
 const n0 = await page.evaluate(() => mtList().length);
-await page.click('[data-mtnew]');
+await page.click('[data-mtnew="lunch"]');
 await page.waitForTimeout(700);
 t('상세에서 약속을 잡으면 달력으로 간다', await page.evaluate(() => location.hash) === '#/cal');
-t('그 교수가 이미 들어가 있다', await page.evaluate(() => {
+t('그 교수가 저절로 들어가 있다', await page.evaluate(() => {
   const m = meets()[CAL.open];
   return !!m && m.who.length === 1 && m.who[0] === rKey(state.rows[3]);
 }));
+t('오늘 날짜로 잡힌다', await page.evaluate(() => meets()[CAL.open].date === mtToday()));
+t('점심은 12:00', await page.evaluate(() => meets()[CAL.open].time) === '12:00',
+  await page.evaluate(() => meets()[CAL.open].time));
+t('줄머리에 「점심 12:00」', (await page.locator('.cal-r.on .cal-r__t').innerText()).includes('점심 12:00'),
+  await page.locator('.cal-r.on .cal-r__t').innerText());
 t('약속이 하나 늘었다', await page.evaluate(() => mtList().length) === n0 + 1);
+t('저녁은 18:00, 기타는 미정', await page.evaluate(() => {
+  const a = mtAdd(mtToday(), rKey(state.rows[3]), 'dinner');
+  const c = mtAdd(mtToday(), rKey(state.rows[3]), '');
+  return a !== c && meets()[a].time === '18:00' && meets()[a].kind === 'dinner' &&
+    meets()[c].time === '' && meets()[c].kind === '';
+}));
+/* 같은 밀리초에 두 번 잡아도 앞 약속이 덮어써지면 안 된다 */
+t('연달아 잡아도 id 가 겹치지 않는다', await page.evaluate(() => {
+  const before = mtList().length;
+  const ids = new Set();
+  for (let i = 0; i < 12; i++) ids.add(mtAdd(mtToday(), rKey(state.rows[3]), 'lunch'));
+  return ids.size === 12 && mtList().length === before + 12;
+}), await page.evaluate(() => mtList().length));
+t('시각을 손으로 고치면 끼니 이름이 사라진다', await page.evaluate(async () => {
+  const id = mtAdd(mtToday(), rKey(state.rows[3]), 'lunch');
+  CAL.open = id; CAL.day = mtToday(); renderCal();
+  const el = document.querySelector('[data-mttime]');
+  el.value = '19:30'; el.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 300));
+  return meets()[id].time === '19:30' && meets()[id].kind === '';
+}));
+t('캘린더 제목에도 끼니가 붙는다', await page.evaluate(() => {
+  meetMap = {};
+  const id = mtAdd(mtToday(), rKey(state.rows[3]), 'dinner');
+  return icsText().includes('(저녁)');
+}));
+await page.evaluate(() => { meetMap = {}; CAL.open = ''; renderCal(); });
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const p = state.rows[3];
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+});
+await page.waitForSelector('[data-mtnew]', { timeout: 10000 });
+await page.click('[data-mtnew=""]');
+await page.waitForTimeout(700);
 
 // 지우기 — 센 것은 돌려놓는다
 await page.evaluate(() => {
