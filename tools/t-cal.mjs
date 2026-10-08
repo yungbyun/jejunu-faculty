@@ -59,6 +59,20 @@ t('아직 사람이 없다', (await page.locator('.cal-who__p').innerText()).inc
 t('그날 목록에 한 줄', await page.locator('.cal-r').count() === 1);
 t('격자에 점이 찍힌다', await page.evaluate(() => !!document.querySelector('.cal-c.on .cal-c__d i')));
 
+/* 날짜는 2026.10.08 꼴로 보여 준다 — 브라우저가 칸 안에 그리는 10/08/26 은 숨긴다 (2026-10-08) */
+t('날짜 글이 점으로 이어진다', await page.evaluate(() => fmtDate('2026-10-13')) === '2026.10.13',
+  await page.evaluate(() => fmtDate('2026-10-13')));
+t('요일까지 붙여도 같은 꼴', (await page.evaluate(() => mtWhen('2026-10-13', '15:00'))) === '2026.10.13 (화) 15:00',
+  await page.evaluate(() => mtWhen('2026-10-13', '15:00')));
+t('그날 머리글도 같은 꼴', /^\d{4}\.\d{2}\.\d{2} \(.\)$/.test(await page.locator('.cal-head--day h2').innerText()),
+  await page.locator('.cal-head--day h2').innerText());
+t('고르는 칸 옆에 우리 글씨', await page.evaluate(() => {
+  const w = document.querySelector('.dpick');
+  return !!w && !!w.querySelector('input[type=date]') && /^\d{4}\.\d{2}\.\d{2}/.test(w.querySelector('.dpick__t').textContent);
+}), await page.evaluate(() => (document.querySelector('.dpick__t') || {}).textContent));
+t('고르는 칸은 그대로 date 라 값은 ISO', await page.evaluate(() =>
+  document.querySelector('[data-mtdate]').type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(document.querySelector('[data-mtdate]').value)));
+
 // 사람 더하기 — 이름으로 찾아서
 const who = await page.evaluate(() => state.rows[0].name);
 await page.fill('[data-mtq]', who);
@@ -71,6 +85,36 @@ t('누르면 만날 분에 들어간다', await page.evaluate(() => {
   return m.who.length === 1 && m.who[0] === rKey(state.rows.find(p => p.name === document.querySelector('.cal-who__p .cal-chip').textContent.replace('×', '')));
 }), await page.evaluate(() => JSON.stringify(Object.values(meets())[0].who)));
 t('머리줄에 이름이 보인다', (await page.locator('.cal-r__w').first().innerText()).includes(who), who);
+
+/* 한글은 조합하며 들어온다. 한 글자마다 화면을 다시 그리면 칸이 통째로 바뀌어
+   자모가 흩어진다(ㄱ ㅣ ㄹ). 찾는 칸은 절대 갈아 끼우지 않아야 한다. (2026-10-08) */
+t('한글을 쳐도 찾는 칸이 그대로 있다', await page.evaluate(async () => {
+  const i = document.querySelector('[data-mtq]');
+  window.__N = i;
+  i.focus();
+  i.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+  for (const v of ['ㄱ', '기', '길', '길ㅈ', '길주', '길준']) {
+    i.value = v; i.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 30));
+  }
+  const live = document.querySelector('[data-mtq]');
+  return live === window.__N && live.value === '길준' && document.activeElement === live;
+}));
+t('조합 중에도 후보가 따라온다', await page.evaluate(() =>
+  [...document.querySelectorAll('[data-mthits] .cal-chip')].some(b => b.textContent.includes('길준민'))),
+  await page.evaluate(() => [...document.querySelectorAll('[data-mthits] .cal-chip')].map(b => b.textContent.trim()).join(' / ')));
+t('후보를 눌러도 칸이 살아 있다', await page.evaluate(() => {
+  document.querySelector('[data-mthits] .cal-chip').click();
+  const live = document.querySelector('[data-mtq]');
+  return live === window.__N && live.value === '길준';   // 찾던 글자도 그대로
+}));
+await page.evaluate(() => {
+  const m = meets()[CAL.open];
+  m.who = m.who.slice(0, 1); mtSave();   // 여기서 더한 분만 도로 뺀다
+  CAL.q = ''; document.querySelector('[data-mtq]').value = '';
+  mtRefreshWho();
+});
+await page.waitForTimeout(300);
 
 // 시각·장소·메모
 await page.fill('[data-mttime]', '15:00');

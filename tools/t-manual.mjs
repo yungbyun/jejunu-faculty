@@ -105,6 +105,13 @@ await page.fill('[data-msdate]', '2026-09-25');
 await page.waitForTimeout(600);
 t('날짜를 바꾸면 요일도 바뀐다', (await page.evaluate(() => document.querySelector('.ms-day').textContent)).includes('금'),
   await page.evaluate(() => document.querySelector('.ms-day').textContent));
+t('날짜를 점으로 보여 준다', (await page.locator('.ms-row__d').first().innerText()).includes('2026.09.25'),
+  await page.locator('.ms-row__d').first().innerText());
+t('고르는 칸은 그대로 ISO', await page.evaluate(() =>
+  document.querySelector('[data-msdate]').value) === '2026-09-25');
+t('칸 옆에 우리 글씨', await page.evaluate(() =>
+  /^\d{4}\.\d{2}\.\d{2}$/.test((document.querySelector('.dpick__t') || {}).textContent || '')),
+  await page.evaluate(() => (document.querySelector('.dpick__t') || {}).textContent));
 await page.fill('[data-msmemo]', '1회차 문자');
 await page.waitForTimeout(500);
 t('메모 저장', await page.evaluate(() => Object.values(msends())[0].memo === '1회차 문자'));
@@ -115,7 +122,7 @@ await page.waitForTimeout(600);
 await page.fill('[data-msdate]', '2026-10-01');
 await page.waitForTimeout(600);
 t('기록 두 건', await page.locator('.ms-row').count() === 2);
-t('최근 날짜가 위', (await page.locator('.ms-row__d').first().innerText()).includes('2026-10-01'),
+t('최근 날짜가 위', (await page.locator('.ms-row__d').first().innerText()).includes('2026.10.01'),
   await page.locator('.ms-row__d').first().innerText());
 
 // 회차 발송 기록과 섞이지 않는다

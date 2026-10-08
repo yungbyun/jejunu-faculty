@@ -1224,10 +1224,20 @@ function msToggle(id, k) {
   return next;
 }
 const MS_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+/* 보여 줄 때는 2026.10.13 꼴을 쓴다. 저장과 날짜 칸(input type=date)은 그대로 YYYY-MM-DD 다 —
+   그 칸은 ISO 꼴만 받는다. 브라우저가 칸 안에 그리는 10/13/26 은 우리가 못 바꾸므로,
+   칸은 달력 아이콘만 남기고 글씨는 우리가 옆에 적는다(dpick). */
+const fmtDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v).replace(/-/g, '.') : String(v || '');
+const dayName = v => { const d = new Date(String(v || '') + 'T00:00:00'); return isNaN(d.getTime()) ? '' : MS_DAYS[d.getDay()]; };
+/* 날짜 고르는 칸 — 글씨는 우리가, 달력은 브라우저가 */
+function dpick(attr, v, label, extra) {
+  return `<span class="dpick"><b class="dpick__t">${esc(fmtDate(v))}${extra ? ' ' + esc(extra) : ''}</b>`
+    + `<input type="date" ${attr} value="${esc(v)}" aria-label="${esc(label)}"></span>`;
+}
 /* 2026-09-25 → 2026-09-25 (금). 날짜에서 뽑으니 틀릴 일이 없다 */
 function msWhen(v) {
   const d = new Date(String(v || '') + 'T00:00:00');
-  return isNaN(d.getTime()) ? String(v || '') : `${v} (${MS_DAYS[d.getDay()]})`;
+  return isNaN(d.getTime()) ? String(v || '') : `${fmtDate(v)} (${MS_DAYS[d.getDay()]})`;
 }
 
 let MS_OPEN = '';   // 지금 펼쳐 놓은 기록
@@ -1265,7 +1275,7 @@ function msEdit(r) {
   const picked = new Set(r.who), skipped = new Set(r.na);
   return `<div class="ms-edit">
     <div class="ms-f">
-      <label><span>보낸 날짜</span><input type="date" data-msdate value="${esc(r.date)}"></label>
+      <label><span>보낸 날짜</span>${dpick('data-msdate', r.date, '보낸 날짜 고르기')}</label>
       <span class="ms-day">${esc(msWhen(r.date).replace(r.date, '').trim())}</span>
       <label class="ms-f__memo"><span>메모</span><input type="text" data-msmemo value="${esc(r.memo)}" placeholder="예) 1회차 문자, 학과장님들 먼저"></label>
       <button type="button" class="btn ms-del" data-msdel>이 기록 지우기</button>
@@ -3546,7 +3556,7 @@ const MT_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 function mtWhen(day, time) {
   const d = new Date(String(day || '') + 'T00:00:00');
   const w = isNaN(d.getTime()) ? '' : ` (${MT_DAYS[d.getDay()]})`;
-  return `${day || ''}${w}${time ? ' ' + time : ''}`;
+  return `${fmtDate(day)}${w}${time ? ' ' + time : ''}`;
 }
 const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean);
 
@@ -3653,14 +3663,48 @@ function mtRow(m) {
   </div>`;
 }
 
-function mtEdit(m) {
-  const picked = new Set(m.who);
+/* 만날 분 — 고른 사람과 찾은 사람을 따로 그린다.
+   한 글자 칠 때마다 화면을 통째로 다시 그리면 **한글 조합이 끊겨 자모가 흩어진다**(ㅎ ㅏ ㄴ).
+   그래서 찾는 칸은 건드리지 않고 이 두 덩이만 갈아 끼운다. */
+function mtPickedHtml(m) {
+  const a = m.who.map(k => {
+    const p = state.rows.find(x => rKey(x) === k);
+    return p ? `<button type="button" class="cal-chip on" data-mtwho="${esc(k)}" title="${esc(p.dept_name)} · ${esc(p.rank)} — 빼기">${esc(p.name)}<i>×</i></button>` : '';
+  }).join('');
+  return a || '<span class="st-note">아직 없습니다</span>';
+}
+function mtHitsHtml(m) {
   const q = CAL.q.trim().toLowerCase();
-  const hits = q ? state.rows.filter(p => !picked.has(rKey(p)) &&
-    (p.name.toLowerCase().includes(q) || p.dept_name.toLowerCase().includes(q))).slice(0, 12) : [];
+  if (!q) return '';
+  const picked = new Set(m.who);
+  const hits = state.rows.filter(p => !picked.has(rKey(p)) &&
+    (p.name.toLowerCase().includes(q) || p.dept_name.toLowerCase().includes(q))).slice(0, 12);
+  if (!hits.length) return '<p class="st-note">찾는 분이 없습니다</p>';
+  return hits.map(p =>
+    `<button type="button" class="cal-chip" data-mtwho="${esc(rKey(p))}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}<small>${esc(p.dept_name)}</small></button>`).join('');
+}
+/* 칩만 갈아 끼우고 머리줄 이름도 맞춘다 — 찾는 칸은 손대지 않는다 */
+function mtRefreshWho() {
+  const m = mtList().find(x => x.id === CAL.open);
+  if (!m) return;
+  const pb = $app.querySelector('[data-mtpicked]'), hb = $app.querySelector('[data-mthits]');
+  if (pb) pb.innerHTML = mtPickedHtml(m);
+  if (hb) hb.innerHTML = mtHitsHtml(m);
+  const head = $app.querySelector('.cal-r.on .cal-r__w');
+  if (head) head.textContent = mtNames(m).join(', ') || '사람 없음';
+  bindWho();
+}
+function bindWho() {
+  $app.querySelectorAll('[data-mtwho]').forEach(b => b.addEventListener('click', () => {
+    mtWho(CAL.open, b.dataset.mtwho);
+    mtRefreshWho();
+  }));
+}
+
+function mtEdit(m) {
   return `<div class="cal-e">
     <div class="cal-f">
-      <label><span>날짜</span><input type="date" data-mtdate value="${esc(m.date)}"></label>
+      <label><span>날짜</span>${dpick('data-mtdate', m.date, '날짜 고르기', dayName(m.date) ? `(${dayName(m.date)})` : '')}</label>
       <label><span>시각</span><input type="time" data-mttime value="${esc(m.time)}"></label>
       <label class="cal-f__w"><span>장소</span><input type="text" data-mtplace value="${esc(m.place)}" placeholder="예) 공과대학 3호관 C422호"></label>
     </div>
@@ -3668,14 +3712,9 @@ function mtEdit(m) {
 
     <div class="cal-who">
       <span class="cal-who__l">만날 분</span>
-      <div class="cal-who__p">${[...picked].map(k => {
-        const p = state.rows.find(x => rKey(x) === k);
-        return p ? `<button type="button" class="cal-chip on" data-mtwho="${esc(k)}" title="${esc(p.dept_name)} · ${esc(p.rank)} — 빼기">${esc(p.name)}<i>×</i></button>` : '';
-      }).join('') || '<span class="st-note">아직 없습니다</span>'}</div>
+      <div class="cal-who__p" data-mtpicked>${mtPickedHtml(m)}</div>
       <input type="search" class="cal-q" data-mtq value="${esc(CAL.q)}" placeholder="이름이나 학과로 찾아 더하기">
-      ${hits.length ? `<div class="cal-who__h">${hits.map(p =>
-        `<button type="button" class="cal-chip" data-mtwho="${esc(rKey(p))}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}<small>${esc(p.dept_name)}</small></button>`).join('')}</div>` : ''}
-      ${q && !hits.length ? `<p class="st-note">찾는 분이 없습니다</p>` : ''}
+      <div class="cal-who__h" data-mthits>${mtHitsHtml(m)}</div>
     </div>
 
     <div class="cal-foot">
@@ -3732,15 +3771,10 @@ function bindCal() {
   const place = $('[data-mtplace]'), memo = $('[data-mtmemo]');
   place?.addEventListener('input', () => mtSet(CAL.open, { place: place.value }));
   memo?.addEventListener('input', () => mtSet(CAL.open, { memo: memo.value }));
+  /* 한글이 조합되는 중에 화면을 다시 그리면 자모가 흩어진다. 찾은 사람 칸만 갈아 끼운다. */
   const q = $('[data-mtq]');
-  q?.addEventListener('input', () => {
-    CAL.q = q.value; renderCal();
-    const el = $app.querySelector('[data-mtq]');
-    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-  });
-  $app.querySelectorAll('[data-mtwho]').forEach(b => b.addEventListener('click', () => {
-    mtWho(CAL.open, b.dataset.mtwho); renderCal();
-  }));
+  q?.addEventListener('input', () => { CAL.q = q.value; mtRefreshWho(); });
+  bindWho();
   $app.querySelectorAll('[data-mtdone]').forEach(b => b.addEventListener('click', () => {
     mtDone(CAL.open, b.dataset.mtdone);
     flashStatus(b.dataset.mtdone === 'met' ? '만남으로 적고 만난 횟수를 올렸습니다' : '약속 상태를 바꿨습니다');
