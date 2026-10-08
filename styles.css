@@ -1263,3 +1263,99 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @media (max-width:339px){
   .prof__photo{width:96px;min-height:128px}
 }
+
+/* ---------- 약속 달력 ----------
+   위는 한 달 격자, 날짜를 누르면 그날 약속이 아래에 펼쳐진다. */
+.cal-soon{margin-bottom:14px}
+.cal-soon h2,.cal-head h2{font-size:15px;margin:0}
+.cal-soon__l{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cal-s{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 12px;border-radius:12px;
+  border:1px solid var(--line);background:var(--surface);font:inherit;text-align:left;cursor:pointer}
+.cal-s:hover{border-color:var(--brand)}
+.cal-s__d{font-size:12px;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+.cal-s__w{font-size:13.5px;font-weight:700}
+.cal-s__p{font-size:11.5px;color:var(--ink-3)}
+
+.cal-sec{margin-bottom:16px}
+.cal-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.cal-head h2{min-width:120px}
+.cal-head--day h2{min-width:0;flex:1}
+.cal-nav{padding:4px 12px;font-size:16px;line-height:1}
+
+/* 폭을 묶어 두지 않으면 PC 에서 칸이 175px 까지 커져 달력처럼 안 보인다 */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:520px}
+.cal-dow{text-align:center;font-size:11.5px;font-weight:700;color:var(--ink-3);padding:4px 0}
+.cal-dow--sun{color:var(--rs-neg)}
+.cal-c{position:relative;aspect-ratio:1/.82;min-height:40px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface);font:inherit;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;padding:2px}
+.cal-c--pad{border:0;background:none;cursor:default}
+.cal-c:hover{border-color:var(--brand)}
+.cal-c__n{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.cal-c.sun .cal-c__n{color:var(--rs-neg)}
+.cal-c.today{border-color:var(--brand)}
+.cal-c.today .cal-c__n{color:var(--brand)}
+.cal-c.on{background:var(--brand);border-color:var(--brand)}
+.cal-c.on .cal-c__n,.cal-c.on.sun .cal-c__n{color:var(--bg)}
+.cal-c__d{display:flex;align-items:center;gap:2px;line-height:0}
+.cal-c__d i{width:5px;height:5px;border-radius:50%;background:var(--rs-high)}
+.cal-c__d b{font-size:9.5px;font-weight:800;color:var(--ink-3);line-height:1}
+.cal-c.on .cal-c__d i{background:var(--bg)}
+.cal-c.on .cal-c__d b{color:var(--bg)}
+
+.cal-list{display:flex;flex-direction:column;gap:8px}
+.cal-r{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.cal-r.on{border-color:var(--brand)}
+.cal-r--met{border-left:4px solid var(--sure)}
+.cal-r--no{border-left:4px solid var(--rs-neg)}
+.cal-r__h{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;background:none;
+  font:inherit;text-align:left;cursor:pointer}
+.cal-r__h:hover{background:var(--surface-2)}
+.cal-r__t{flex:none;min-width:62px;font-size:12.5px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.cal-r__w{flex:1;min-width:0;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-r__s{flex:none;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.cal-r__s--plan{color:var(--ink-2);background:var(--surface-2)}
+.cal-r__s--met{color:#fff;background:var(--sure)}
+.cal-r__s--no{color:#fff;background:var(--rs-neg)}
+.cal-r__x{flex:none;font-size:11.5px;color:var(--ink-2)}
+
+.cal-e{padding:0 12px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.cal-f{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.cal-e label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.cal-f__w{flex:1;min-width:180px}
+.cal-e input{padding:7px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);
+  color:var(--ink);font:inherit;font-size:13px}
+.cal-f__memo{margin-top:-2px}
+
+.cal-who{display:flex;flex-direction:column;gap:6px}
+.cal-who__l{font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.cal-who__p,.cal-who__h{display:flex;gap:6px;flex-wrap:wrap}
+.cal-who__h{padding-top:2px}
+.cal-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--line);font:inherit;font-weight:600;font-size:13px;
+  color:inherit;cursor:pointer;white-space:nowrap}
+.cal-chip:hover{border-color:var(--brand)}
+.cal-chip small{font-size:11px;font-weight:500;color:var(--ink-2)}
+.cal-chip.on{background:var(--brand);border-color:var(--brand);color:var(--bg)}
+.cal-chip.on small{color:var(--bg);opacity:.8}
+.cal-chip.on i{font-style:normal;opacity:.8;font-weight:800}
+.cal-q{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);
+  color:var(--ink);font:inherit;font-size:13px}
+
+.cal-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cal-done{display:flex;gap:6px}
+.cal-d{padding:5px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);
+  color:var(--ink-2);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.cal-d:hover{border-color:var(--brand)}
+.cal-d.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.cal-del{margin-left:auto;color:var(--rs-neg);border-color:color-mix(in srgb,var(--rs-neg) 35%,var(--line-2))}
+
+.d-met{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+@media (max-width:520px){
+  .cal-grid{gap:3px}
+  .cal-c{min-height:36px}
+  .cal-r__t{min-width:52px}
+  .cal-r__x{display:none}
+  .cal-del{margin-left:0}
+}

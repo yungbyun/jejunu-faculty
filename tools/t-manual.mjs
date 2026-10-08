@@ -13,8 +13,8 @@ const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
 // 접촉 맨 위 링크로 들어간다
 await page.evaluate(() => { msendMap = {}; localStorage.removeItem('jnu-msend'); location.hash = '#/outreach'; render(); });
 await page.waitForSelector('.ot-top a', { timeout: 10000 });
-t('접촉 맨 위에 링크', (await page.locator('.ot-top a').innerText()).includes('손으로 보낸'));
-await page.click('.ot-top a');
+t('접촉 맨 위에 링크', (await page.locator('.ot-top a[href="#/manual"]').innerText()).includes('손으로 보낸'));
+await page.click('.ot-top a[href="#/manual"]');
 await page.waitForTimeout(600);
 t('직접 기록 화면으로', await page.evaluate(() => location.hash) === '#/manual', await page.evaluate(() => location.hash));
 t('처음엔 기록 없음', await page.locator('.ms-row').count() === 0);

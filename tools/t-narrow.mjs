@@ -5,7 +5,7 @@
 import { chromium } from 'playwright';
 const b = await chromium.launch();
 const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
-const VIEWS = ['#/', '#/stats', '#/outreach', '#/manual', '#/letters', '#/dept/comdol'];
+const VIEWS = ['#/', '#/stats', '#/outreach', '#/manual', '#/cal', '#/letters', '#/dept/comdol'];
 
 for (const w of [320, 390]) {
   const ctx = await b.newContext({ viewport: { width: w, height: 900 } });

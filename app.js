@@ -269,6 +269,7 @@ function route() {
   if (parts[0] === 'letters') return { view: 'letters' };
   if (parts[0] === 'outreach') return { view: 'outreach' };
   if (parts[0] === 'manual') return { view: 'manual' };
+  if (parts[0] === 'cal') return { view: 'cal' };
   if (parts[0] === 'quiz') return { view: 'quiz' };
   return { view: 'home' };
 }
@@ -294,6 +295,9 @@ function render() {
     closeDrawer(false);
   } else if (r.view === 'manual') {
     renderManual();
+    closeDrawer(false);
+  } else if (r.view === 'cal') {
+    renderCal();
     closeDrawer(false);
   } else if (r.view === 'quiz') {
     renderQuiz();
@@ -1175,6 +1179,11 @@ function obNotice() {
  * 앱이 보내는 것과는 아무 상관이 없다. 폰으로 손수 문자를 보낸 뒤, 누구에게 보냈는지 날짜별로
  * 찍어 두는 곳이다. 회차 발송 기록과도 섞지 않는다 — 손으로 보낸 것은 회차와 안 맞을 수 있다.
  * 저장은 선호도·항시 제외와 같은 길(비공개 시트)이라 폰에서 찍고 PC 에서 봐도 그대로다. */
+/* 약속 달력의 저장 자리. 쓰는 곳은 저 아래 '약속 달력' 칸이지만, 선언은 여기 있어야 한다 —
+   SET_LOCAL_KEY 가 모듈을 읽는 동안 MEET_KEY 를 쓰기 때문이다(뒤에 두면 초기화 전 접근 오류). */
+const MEET_KEY = 'jnu-meets';
+let meetMap = null;
+
 const MSEND_KEY = 'jnu-msend';
 let msendMap = null;
 function msends() { if (!msendMap) msendMap = loadObj(MSEND_KEY); return msendMap; }
@@ -1414,7 +1423,8 @@ function renderOutreach() {
   $app.innerHTML = `
     <div class="view">
       <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
-      <div class="ot-top"><a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a></div>
+      <div class="ot-top"><a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a>
+        <a class="chip" href="#/cal">약속 달력 →</a></div>
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>① 문자 쓰기</h2>
@@ -2739,13 +2749,14 @@ async function syncRatings({ initial = false } = {}) {
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
 const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip';
+const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO, SET_VI];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO, SET_VI, SET_ME];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
-const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_DO]: '학과 순서', [SET_VI]: 'VIP', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_DO]: '학과 순서', [SET_VI]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2763,6 +2774,7 @@ function settingValue(key) {
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
   if (key === SET_MS) return msends();
+  if (key === SET_ME) return meets();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
@@ -2782,12 +2794,13 @@ function settingApplyLocal(key, v) {
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
+    if (key === SET_ME) { meetMap = v; Object.keys(v).length ? localStorage.setItem(MEET_KEY, JSON.stringify(v)) : localStorage.removeItem(MEET_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_ME]: MEET_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -3447,6 +3460,295 @@ function dPhones(p) {
   if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name));
   return a.length ? `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>` : '';
 }
+/* ---------- 약속 달력 ----------
+ * 교수를 언제 만나기로 했는지 적어 두는 곳. 직접 보낸 기록과 같은 길(비공개 시트의 meets 키)로
+ * 저장하므로 장소·시각 같은 사적인 내용이 공개 저장소에 들어가지 않는다.
+ *   meets {"<id>": {date, time, place, memo, who:[열쇠], done:''|'met'|'no', counted:[열쇠]}}
+ * done 을 '만남' 으로 바꾸면 그 교수들의 만난 횟수가 1씩 오른다. 두 번 세지 않도록
+ * 이미 센 사람을 counted 에 적어 두고, 되돌리면 그만큼 도로 내린다. */
+/* MEET_KEY·meetMap 은 SET_LOCAL_KEY 보다 먼저 있어야 한다 — 저 위 '직접 보낸 기록' 옆에 두었다 */
+function meets() { if (!meetMap) meetMap = loadObj(MEET_KEY); return meetMap; }
+function mtSave() { saveObj(MEET_KEY, meets(), SET_ME); }
+
+const mtArr = v => Array.isArray(v) ? v : [];
+const mtList = () => Object.entries(meets())
+  .map(([id, v]) => ({
+    id, date: v.date || '', time: v.time || '', place: v.place || '', memo: v.memo || '',
+    who: mtArr(v.who), done: v.done || '', counted: mtArr(v.counted),
+  }))
+  .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || a.id.localeCompare(b.id));
+
+const mtToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const mtMonth = s => String(s || '').slice(0, 7);
+const mtOf = day => mtList().filter(m => m.date === day);
+/* 오늘부터 앞으로 */
+const mtSoon = (n = 4) => { const t = mtToday(); return mtList().filter(m => m.date >= t).slice(0, n); };
+
+function mtAdd(day, who) {
+  const id = String(Date.now()).slice(-9);
+  meets()[id] = { date: day || mtToday(), time: '', place: '', memo: '', who: who ? [who] : [], done: '', counted: [] };
+  mtSave();
+  return id;
+}
+function mtDel(id) {
+  const m = meets()[id];
+  if (m) mtArr(m.counted).forEach(k => setMet(k, Math.max(0, (getNote(k).met || 0) - 1)));   // 센 것은 돌려놓는다
+  delete meets()[id];
+  mtSave();
+}
+function mtSet(id, f) { const m = meets()[id]; if (!m) return; Object.assign(m, f); mtSave(); }
+function mtWho(id, k) {
+  const m = meets()[id]; if (!m) return false;
+  const w = new Set(mtArr(m.who));
+  if (w.has(k)) { w.delete(k); mtUncount(m, k); } else w.add(k);
+  m.who = [...w];
+  mtSave();
+  return w.has(k);
+}
+function mtUncount(m, k) {
+  const c = new Set(mtArr(m.counted));
+  if (!c.has(k)) return;
+  c.delete(k); m.counted = [...c];
+  setMet(k, Math.max(0, (getNote(k).met || 0) - 1));
+}
+/* 만남으로 바꾸면 아직 안 센 사람만 올리고, 되돌리면 센 사람만 내린다 */
+function mtDone(id, v) {
+  const m = meets()[id]; if (!m) return;
+  m.done = v;
+  if (v === 'met') {
+    const c = new Set(mtArr(m.counted));
+    mtArr(m.who).forEach(k => { if (!c.has(k)) { setMet(k, (getNote(k).met || 0) + 1); c.add(k); } });
+    m.counted = [...c];
+  } else {
+    mtArr(m.counted).slice().forEach(k => mtUncount(m, k));
+  }
+  mtSave();
+}
+
+const MT_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function mtWhen(day, time) {
+  const d = new Date(String(day || '') + 'T00:00:00');
+  const w = isNaN(d.getTime()) ? '' : ` (${MT_DAYS[d.getDay()]})`;
+  return `${day || ''}${w}${time ? ' ' + time : ''}`;
+}
+const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean);
+
+/* ---------- 달력 화면 ---------- */
+const CAL = { ym: '', day: '', open: '', q: '' };
+
+/* 그 달의 칸들. 앞뒤를 빈 칸으로 채워 일요일부터 시작하는 격자를 만든다 */
+function mtCells(ym) {
+  const [y, mo] = ym.split('-').map(Number);
+  const first = new Date(y, mo - 1, 1), last = new Date(y, mo, 0).getDate();
+  const out = [];
+  for (let i = 0; i < first.getDay(); i++) out.push(null);
+  for (let d = 1; d <= last; d++) out.push(`${y}-${pad2(mo)}-${pad2(d)}`);
+  return out;
+}
+function mtShift(ym, n) {
+  const [y, mo] = ym.split('-').map(Number);
+  const d = new Date(y, mo - 1 + n, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+function renderCal() {
+  if (!CAL.ym) CAL.ym = mtMonth(mtToday());
+  if (!CAL.day) CAL.day = mtToday();
+  const today = mtToday();
+  const cells = mtCells(CAL.ym);
+  const byDay = {};
+  mtList().forEach(m => { (byDay[m.date] = byDay[m.date] || []).push(m); });
+  const soon = mtSoon();
+  const dayList = mtOf(CAL.day);
+  const [cy, cm] = CAL.ym.split('-');
+
+  $app.innerHTML = `
+    <div class="view">
+      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>약속 달력</span></div>
+      <div class="hero"><div class="eyebrow">약속 달력</div>
+        <h1>만나기로 한 날</h1>
+        <p>날짜를 누르면 그날 약속이 아래에 나옵니다. 만나고 오셔서 <b>만남</b>으로 바꾸시면 그분의 만난 횟수가 1 오릅니다.</p></div>
+
+      ${soon.length ? `<section class="cal-soon">
+        <h2>다가오는 약속</h2>
+        <div class="cal-soon__l">${soon.map(m => `
+          <button type="button" class="cal-s" data-mtgo="${esc(m.id)}" data-day="${esc(m.date)}">
+            <span class="cal-s__d">${esc(mtWhen(m.date, m.time))}</span>
+            <span class="cal-s__w">${esc(mtNames(m).join(', ') || '사람 없음')}</span>
+            ${m.place ? `<span class="cal-s__p">${esc(m.place)}</span>` : ''}
+          </button>`).join('')}</div>
+      </section>` : ''}
+
+      <section class="cal-sec">
+        <div class="cal-head">
+          <button type="button" class="btn cal-nav" data-mtprev aria-label="지난달">‹</button>
+          <h2>${esc(cy)}년 ${esc(String(Number(cm)))}월</h2>
+          <button type="button" class="btn cal-nav" data-mtnext aria-label="다음달">›</button>
+          <button type="button" class="btn" data-mttoday>오늘</button>
+          <button type="button" class="btn" data-mtics${mtList().length ? '' : ' disabled'}>캘린더로 내보내기</button>
+        </div>
+        <div class="cal-grid" role="grid">
+          ${MT_DAYS.map((d, i) => `<div class="cal-dow${i === 0 ? ' cal-dow--sun' : ''}">${d}</div>`).join('')}
+          ${cells.map(day => {
+            if (!day) return `<div class="cal-c cal-c--pad"></div>`;
+            const n = (byDay[day] || []).length;
+            const dow = new Date(day + 'T00:00:00').getDay();
+            return `<button type="button" class="cal-c${day === CAL.day ? ' on' : ''}${day === today ? ' today' : ''}${dow === 0 ? ' sun' : ''}"
+              data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${day === CAL.day ? ' aria-current="date"' : ''}>
+              <span class="cal-c__n">${Number(day.slice(8))}</span>
+              ${n ? `<span class="cal-c__d">${'<i></i>'.repeat(Math.min(n, 3))}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
+            </button>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <section class="cal-sec">
+        <div class="cal-head cal-head--day"><h2>${esc(mtWhen(CAL.day))}</h2>
+          <button type="button" class="btn btn--go" data-mtadd>+ 새 약속</button></div>
+        ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
+          : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
+      </section>
+    </div>`;
+  bindCal();
+}
+
+const MT_DONE = { '': '예정', met: '만남', no: '못 만남' };
+function mtRow(m) {
+  const open = m.id === CAL.open;
+  const names = mtNames(m);
+  return `<div class="cal-r${open ? ' on' : ''}${m.done ? ' cal-r--' + m.done : ''}">
+    <button type="button" class="cal-r__h" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
+      <span class="cal-r__t">${esc(m.time || '시각 미정')}</span>
+      <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
+      <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
+      <span class="cal-r__x">${open ? '접기' : '펼치기'}</span>
+    </button>
+    ${open ? mtEdit(m) : ''}
+  </div>`;
+}
+
+function mtEdit(m) {
+  const picked = new Set(m.who);
+  const q = CAL.q.trim().toLowerCase();
+  const hits = q ? state.rows.filter(p => !picked.has(rKey(p)) &&
+    (p.name.toLowerCase().includes(q) || p.dept_name.toLowerCase().includes(q))).slice(0, 12) : [];
+  return `<div class="cal-e">
+    <div class="cal-f">
+      <label><span>날짜</span><input type="date" data-mtdate value="${esc(m.date)}"></label>
+      <label><span>시각</span><input type="time" data-mttime value="${esc(m.time)}"></label>
+      <label class="cal-f__w"><span>장소</span><input type="text" data-mtplace value="${esc(m.place)}" placeholder="예) 공과대학 3호관 C422호"></label>
+    </div>
+    <label class="cal-f__w cal-f__memo"><span>메모</span><input type="text" data-mtmemo value="${esc(m.memo)}" placeholder="무엇을 말씀드릴지"></label>
+
+    <div class="cal-who">
+      <span class="cal-who__l">만날 분</span>
+      <div class="cal-who__p">${[...picked].map(k => {
+        const p = state.rows.find(x => rKey(x) === k);
+        return p ? `<button type="button" class="cal-chip on" data-mtwho="${esc(k)}" title="${esc(p.dept_name)} · ${esc(p.rank)} — 빼기">${esc(p.name)}<i>×</i></button>` : '';
+      }).join('') || '<span class="st-note">아직 없습니다</span>'}</div>
+      <input type="search" class="cal-q" data-mtq value="${esc(CAL.q)}" placeholder="이름이나 학과로 찾아 더하기">
+      ${hits.length ? `<div class="cal-who__h">${hits.map(p =>
+        `<button type="button" class="cal-chip" data-mtwho="${esc(rKey(p))}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}<small>${esc(p.dept_name)}</small></button>`).join('')}</div>` : ''}
+      ${q && !hits.length ? `<p class="st-note">찾는 분이 없습니다</p>` : ''}
+    </div>
+
+    <div class="cal-foot">
+      <div class="cal-done" role="group" aria-label="약속 상태">
+        ${Object.keys(MT_DONE).map(v => `<button type="button" class="cal-d${m.done === v ? ' on' : ''}" data-mtdone="${esc(v)}" aria-pressed="${m.done === v}">${esc(MT_DONE[v])}</button>`).join('')}
+      </div>
+      <button type="button" class="btn cal-del" data-mtdel>이 약속 지우기</button>
+    </div>
+    <p class="st-note">${m.counted.length ? `만난 횟수를 ${m.counted.length}분께 올려 두었습니다 — 예정이나 못 만남으로 되돌리면 도로 내립니다.`
+      : '만남으로 바꾸면 여기 적힌 분들의 만난 횟수가 1씩 오릅니다.'}</p>
+  </div>`;
+}
+
+function bindCal() {
+  const $ = s => $app.querySelector(s);
+  $('[data-mtprev]')?.addEventListener('click', () => { CAL.ym = mtShift(CAL.ym, -1); renderCal(); });
+  $('[data-mtnext]')?.addEventListener('click', () => { CAL.ym = mtShift(CAL.ym, 1); renderCal(); });
+  $('[data-mttoday]')?.addEventListener('click', () => { CAL.ym = mtMonth(mtToday()); CAL.day = mtToday(); renderCal(); });
+  $('[data-mtics]')?.addEventListener('click', exportIcs);
+  $app.querySelectorAll('[data-mtday]').forEach(b => b.addEventListener('click', () => {
+    CAL.day = b.dataset.mtday; CAL.open = ''; renderCal();
+  }));
+  $app.querySelectorAll('[data-mtgo]').forEach(b => b.addEventListener('click', () => {
+    CAL.day = b.dataset.day; CAL.ym = mtMonth(b.dataset.day); CAL.open = b.dataset.mtgo; renderCal();
+  }));
+  $('[data-mtadd]')?.addEventListener('click', () => { CAL.open = mtAdd(CAL.day); CAL.q = ''; renderCal(); });
+  $app.querySelectorAll('[data-mtopen]').forEach(b => b.addEventListener('click', () => {
+    CAL.open = CAL.open === b.dataset.mtopen ? '' : b.dataset.mtopen; CAL.q = ''; renderCal();
+  }));
+  $('[data-mtdate]')?.addEventListener('change', e => {
+    mtSet(CAL.open, { date: e.target.value });
+    CAL.day = e.target.value; CAL.ym = mtMonth(e.target.value); renderCal();
+  });
+  $('[data-mttime]')?.addEventListener('change', e => { mtSet(CAL.open, { time: e.target.value }); renderCal(); });
+  /* 글자를 쓰는 동안에는 다시 그리지 않는다 — 커서가 튄다 */
+  const place = $('[data-mtplace]'), memo = $('[data-mtmemo]');
+  place?.addEventListener('input', () => mtSet(CAL.open, { place: place.value }));
+  memo?.addEventListener('input', () => mtSet(CAL.open, { memo: memo.value }));
+  const q = $('[data-mtq]');
+  q?.addEventListener('input', () => {
+    CAL.q = q.value; renderCal();
+    const el = $app.querySelector('[data-mtq]');
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  });
+  $app.querySelectorAll('[data-mtwho]').forEach(b => b.addEventListener('click', () => {
+    mtWho(CAL.open, b.dataset.mtwho); renderCal();
+  }));
+  $app.querySelectorAll('[data-mtdone]').forEach(b => b.addEventListener('click', () => {
+    mtDone(CAL.open, b.dataset.mtdone);
+    flashStatus(b.dataset.mtdone === 'met' ? '만남으로 적고 만난 횟수를 올렸습니다' : '약속 상태를 바꿨습니다');
+    renderCal();
+  }));
+  $('[data-mtdel]')?.addEventListener('click', () => {
+    const m = meets()[CAL.open]; if (!m) return;
+    if (!confirm(`${mtWhen(m.date, m.time)} 약속을 지울까요?`)) return;
+    mtDel(CAL.open); CAL.open = ''; flashStatus('약속을 지웠습니다'); renderCal();
+  });
+}
+
+/* ---------- 캘린더로 내보내기 ----------
+ * 앱은 알림을 못 울린다(켜 두어야만 돈다). .ics 로 내보내 폰 캘린더에 넣으면 알림은 그쪽이 해 준다.
+ * 시각이 없으면 하루 종일 일정으로 적는다. */
+function icsEsc(v) { return String(v || '').replace(/([,;\\])/g, '\\$1').replace(/\r?\n/g, '\\n'); }
+function icsText() {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//jejunu-faculty//meet//KO', 'CALSCALE:GREGORIAN'];
+  mtList().forEach(m => {
+    if (!m.date) return;
+    const d = m.date.replace(/-/g, '');
+    const names = mtNames(m);
+    L.push('BEGIN:VEVENT', `UID:jnu-meet-${m.id}@jejunu-faculty`, `DTSTAMP:${stamp}`);
+    if (m.time) {
+      const t = m.time.replace(':', '') + '00';
+      const [hh, mm] = m.time.split(':').map(Number);
+      const end = `${pad2((hh + 1) % 24)}${pad2(mm)}00`;
+      L.push(`DTSTART:${d}T${t}`, `DTEND:${d}T${end}`);
+    } else {
+      const nx = new Date(m.date + 'T00:00:00'); nx.setDate(nx.getDate() + 1);
+      L.push(`DTSTART;VALUE=DATE:${d}`,
+        `DTEND;VALUE=DATE:${nx.getFullYear()}${pad2(nx.getMonth() + 1)}${pad2(nx.getDate())}`);
+    }
+    L.push(`SUMMARY:${icsEsc(names.length ? names.join(', ') + ' 교수 미팅' : '미팅')}`);
+    if (m.place) L.push(`LOCATION:${icsEsc(m.place)}`);
+    if (m.memo) L.push(`DESCRIPTION:${icsEsc(m.memo)}`);
+    L.push('END:VEVENT');
+  });
+  L.push('END:VCALENDAR');
+  return L.join('\r\n');
+}
+function exportIcs() {
+  const blob = new Blob(['﻿' + icsText()], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `약속-${mtToday()}.ics`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  flashStatus('캘린더 파일을 내려받았습니다 — 열면 폰 캘린더에 들어갑니다');
+}
+
 /* ---------- 상세 드로어 ---------- */
 function openDrawer(p, d) {
   const links = [
@@ -3478,7 +3780,8 @@ function openDrawer(p, d) {
       </div>
 
       <div class="d-section"><h3>만난 횟수</h3>
-        ${meetCounter(p)}
+        <div class="d-met">${meetCounter(p)}
+          <button type="button" class="btn" data-mtnew>약속 잡기 →</button></div>
       </div>
 
       <div class="d-section"><h3>표시</h3>
@@ -3514,6 +3817,12 @@ function openDrawer(p, d) {
     </div>`;
   bindRates($panel);
   bindCopyNums($panel);
+  /* 그 자리에서 오늘 날짜로 약속을 하나 만들고 달력으로 간다 — 날짜는 거기서 고치면 된다 */
+  $panel.querySelector('[data-mtnew]')?.addEventListener('click', () => {
+    CAL.open = mtAdd(mtToday(), rKey(p));
+    CAL.day = mtToday(); CAL.ym = mtMonth(mtToday()); CAL.q = '';
+    location.hash = '#/cal';
+  });
   bindNotes($panel);
   bindAix($panel, p, d);
   $panel.querySelector('[data-vipbtn]')?.addEventListener('click', e => {
