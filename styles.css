@@ -1266,6 +1266,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 
 /* ---------- 약속 달력 ----------
    위는 한 달 격자, 날짜를 누르면 그날 약속이 아래에 펼쳐진다. */
+/* 제목 줄만 남긴 머리 — h1·설명을 뺐으므로 아래 여백을 줄인다 */
+.hero--thin{margin-bottom:10px}
 .cal-soon{margin-bottom:14px}
 .cal-soon h2,.cal-head h2{font-size:15px;margin:0}
 .cal-soon__l{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}

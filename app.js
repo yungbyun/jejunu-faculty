@@ -1179,7 +1179,7 @@ function obNotice() {
  * 앱이 보내는 것과는 아무 상관이 없다. 폰으로 손수 문자를 보낸 뒤, 누구에게 보냈는지 날짜별로
  * 찍어 두는 곳이다. 회차 발송 기록과도 섞지 않는다 — 손으로 보낸 것은 회차와 안 맞을 수 있다.
  * 저장은 선호도·항시 제외와 같은 길(비공개 시트)이라 폰에서 찍고 PC 에서 봐도 그대로다. */
-/* 약속 달력의 저장 자리. 쓰는 곳은 저 아래 '약속 달력' 칸이지만, 선언은 여기 있어야 한다 —
+/* 식사 약속의 저장 자리. 쓰는 곳은 저 아래 '식사 약속' 칸이지만, 선언은 여기 있어야 한다 —
    SET_LOCAL_KEY 가 모듈을 읽는 동안 MEET_KEY 를 쓰기 때문이다(뒤에 두면 초기화 전 접근 오류). */
 const MEET_KEY = 'jnu-meets';
 let meetMap = null;
@@ -1434,7 +1434,7 @@ function renderOutreach() {
     <div class="view">
       <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
       <div class="ot-top"><a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a>
-        <a class="chip" href="#/cal">약속 달력 →</a></div>
+        <a class="chip" href="#/cal">식사 약속 →</a></div>
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>① 문자 쓰기</h2>
@@ -3470,7 +3470,7 @@ function dPhones(p) {
   if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name));
   return a.length ? `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>` : '';
 }
-/* ---------- 약속 달력 ----------
+/* ---------- 식사 약속 ----------
  * 교수를 언제 만나기로 했는지 적어 두는 곳. 직접 보낸 기록과 같은 길(비공개 시트의 meets 키)로
  * 저장하므로 장소·시각 같은 사적인 내용이 공개 저장소에 들어가지 않는다.
  *   meets {"<id>": {date, time, place, memo, who:[열쇠], done:''|'met'|'no', counted:[열쇠]}}
@@ -3560,7 +3560,7 @@ function mtWhen(day, time) {
 }
 const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean);
 
-/* ---------- 달력 화면 ---------- */
+/* ---------- 식사 약속 화면 ---------- */
 const CAL = { ym: '', day: '', open: '', q: '', scroll: false };
 
 /* 그 달의 칸들. 앞뒤를 빈 칸으로 채워 일요일부터 시작하는 격자를 만든다 */
@@ -3591,10 +3591,8 @@ function renderCal() {
 
   $app.innerHTML = `
     <div class="view">
-      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>약속 달력</span></div>
-      <div class="hero"><div class="eyebrow">약속 달력</div>
-        <h1>만나기로 한 날</h1>
-        <p>날짜를 누르면 그날 약속이 아래에 나옵니다. 만나고 오셔서 <b>만남</b>으로 바꾸시면 그분의 만난 횟수가 1 오릅니다.</p></div>
+      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>식사 약속</span></div>
+      <div class="hero hero--thin"><div class="eyebrow">식사 약속</div></div>
 
       ${soon.length ? `<section class="cal-soon">
         <h2>다가오는 약속</h2>

@@ -1,4 +1,4 @@
-/* 약속 달력 — 달을 넘기고, 날짜를 고르고, 약속을 잡고, 만남으로 바꾸면 만난 횟수가 오르는지.
+/* 식사 약속 — 달을 넘기고, 날짜를 고르고, 약속을 잡고, 만남으로 바꾸면 만난 횟수가 오르는지.
    로컬 서버(127.0.0.1:8080)가 떠 있어야 한다. */
 import { chromium } from 'playwright';
 const b = await chromium.launch();
@@ -20,13 +20,18 @@ const reset = () => page.evaluate(() => {
 // 접촉에서 들어간다
 await page.evaluate(() => { location.hash = '#/outreach'; render(); });
 await page.waitForSelector('.ot-top a[href="#/cal"]', { timeout: 10000 });
-t('접촉 맨 위에 달력 링크', (await page.locator('.ot-top a[href="#/cal"]').innerText()).includes('약속'));
+t('접촉 맨 위에 식사 약속 링크', (await page.locator('.ot-top a[href="#/cal"]').innerText()).includes('식사 약속'),
+  await page.locator('.ot-top a[href="#/cal"]').innerText());
 await page.click('.ot-top a[href="#/cal"]');
 await page.waitForTimeout(600);
 t('달력 화면으로', await page.evaluate(() => location.hash) === '#/cal', await page.evaluate(() => location.hash));
 
 await reset();
 await page.waitForSelector('.cal-grid', { timeout: 10000 });
+t('길잡이에 식사 약속', (await page.locator('.crumbs').innerText()).includes('식사 약속'));
+/* 머리글과 설명은 2026-10-08 에 뺐다 — 길잡이만으로 어디인지 안다 */
+t('큰 제목과 설명은 두지 않는다', await page.evaluate(() =>
+  !document.querySelector('.view h1') && !document.querySelector('.hero p')));
 t('처음엔 약속이 없다', await page.locator('.cal-r').count() === 0);
 t('다가오는 약속 칸도 없다', await page.locator('.cal-soon').count() === 0);
 t('오늘이 골라져 있다', await page.evaluate(() => CAL.day === mtToday() && !!document.querySelector('.cal-c.on.today')));
