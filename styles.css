@@ -1411,7 +1411,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .sp__r{flex:none;font-size:12px;font-weight:600;color:var(--ink-2);white-space:nowrap}
 /* 메모에서 굵게 한 말만. 길면 줄여 쓰지 않고 줄을 바꿔 다 보여 준다 —
    무엇을 적어 두었는지가 간단히 보기의 쓸모라서 잘라 내면 안 된다. */
-.sp__b{font-size:12px;font-weight:600;color:var(--dept-color,var(--brand));
+.sp__b{font-size:12px;font-weight:600;color:var(--ink);
   white-space:normal;overflow-wrap:anywhere;line-height:1.45}
 .sp__v{flex:none;min-width:30px;text-align:right;padding-top:1px}
 .sp__v .rs{font-size:12px;font-weight:800;padding:2px 9px}

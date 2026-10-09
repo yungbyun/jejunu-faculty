@@ -133,6 +133,10 @@ const wrap = await page.evaluate(() => {
 });
 t('긴 것은 여러 줄이 된다', wrap.lines >= 2, `${wrap.lines}줄 / ${wrap.white}`);
 t('옆으로 잘리지 않는다', !wrap.clipped);
+/* 학과 색으로 물들이지 않는다 — 본문 글자색 그대로 (2026-10-09) */
+t('글자색은 본문과 같다', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('.sp__b')).color === getComputedStyle(document.querySelector('.sp__n')).color),
+  await page.evaluate(() => getComputedStyle(document.querySelector('.sp__b')).color));
 t('말줄임으로 감추지 않는다', wrap.white !== 'nowrap', wrap.white);
 t('끝까지 다 보인다', wrap.full);
 t('줄이 늘어도 선호도 칩은 위에 붙는다', await page.evaluate(() => {
