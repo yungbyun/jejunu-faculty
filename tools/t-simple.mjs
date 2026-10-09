@@ -23,6 +23,10 @@ const DEPT = await page.evaluate(() => {
   state.notes.set(rKey(d.profs[0]), { met: 0, memo: '지난주 **연구년 복귀** 직후 뵘. **학부 증원**에 관심.' });
   state.notes.set(rKey(d.profs[1]), { met: 0, memo: '통화만 했음. 굵게 한 말이 없다.' });
   state.notes.set(rKey(d.profs[2]), { met: 0, memo: '**같은 말**을 두 번 **같은 말** 굵게.' });
+  /* 한 줄에 안 들어가는 긴 것 — 잘라 내지 말고 줄을 바꿔 다 보여야 한다 */
+  state.notes.set(rKey(d.profs[3]), { met: 0, memo: '**연구년 복귀 직후라 학내 사정을 잘 모르심**, '
+    + '**학부 정원 증원 문제**, **실습실 공간 재배치**, **대학원생 장학금 확대**, '
+    + '**산학협력 과제 행정 간소화**까지 길게 말씀하심.' });
   location.hash = `#/dept/${d.id}`; render();
   return d.id;
 });
@@ -115,6 +119,29 @@ t('줄바꿈이 끼어도 한 줄로 편다', await page.evaluate(() => {
   const br = String.fromCharCode(10);
   return JSON.stringify(memoBold('**두' + br + '줄에  걸친 말**'));
 }));
+/* 길면 잘라 내지 말고 줄을 바꾼다 — 무엇을 적어 두었는지가 간단히 보기의 쓸모다 (2026-10-09) */
+const wrap = await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[3].slug)));
+  const b = el.querySelector('.sp__b'), cs = getComputedStyle(b);
+  return {
+    white: cs.whiteSpace,
+    lines: Math.round(b.getBoundingClientRect().height / parseFloat(cs.lineHeight)),
+    clipped: b.scrollWidth > b.clientWidth + 1,
+    full: b.textContent.includes('산학협력 과제 행정 간소화'),
+  };
+});
+t('긴 것은 여러 줄이 된다', wrap.lines >= 2, `${wrap.lines}줄 / ${wrap.white}`);
+t('옆으로 잘리지 않는다', !wrap.clipped);
+t('말줄임으로 감추지 않는다', wrap.white !== 'nowrap', wrap.white);
+t('끝까지 다 보인다', wrap.full);
+t('줄이 늘어도 선호도 칩은 위에 붙는다', await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[3].slug)));
+  const r = el.getBoundingClientRect(), v = el.querySelector('.sp__v').getBoundingClientRect();
+  return v.top - r.top < r.height / 2;
+}));
+
 t('도움말에도 함께 적힌다', (await page.evaluate(() => {
   const d = state.depts.find(x => x.id === route().dept);
   const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[0].slug)));

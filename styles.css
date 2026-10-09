@@ -1399,7 +1399,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 /* 메모 줄이 있는 칸과 없는 칸이 섞이므로 한 줄끼리 높이를 맞춘다 */
 .simple-list li{display:flex}
-.sp{flex:1;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+.sp{flex:1;display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border:1px solid var(--line);
   border-radius:10px;background:var(--surface);text-decoration:none;color:inherit}
 .sp:hover{border-color:var(--dept-color,var(--brand));background:var(--surface-2)}
 .sp:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent)}
@@ -1409,10 +1409,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sp__n .newp{width:17px;height:17px;font-size:13px;position:static;transform:none;box-shadow:none;flex:none}
 .sp__r{flex:none;font-size:12px;font-weight:600;color:var(--ink-2);white-space:nowrap}
-/* 메모에서 굵게 한 말만 — 길면 줄여 쓰고 마우스를 올리면 다 보인다 */
+/* 메모에서 굵게 한 말만. 길면 줄여 쓰지 않고 줄을 바꿔 다 보여 준다 —
+   무엇을 적어 두었는지가 간단히 보기의 쓸모라서 잘라 내면 안 된다. */
 .sp__b{font-size:12px;font-weight:600;color:var(--dept-color,var(--brand));
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sp__v{flex:none;min-width:30px;text-align:right}
+  white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+.sp__v{flex:none;min-width:30px;text-align:right;padding-top:1px}
 .sp__v .rs{font-size:12px;font-weight:800;padding:2px 9px}
 @media (max-width:520px){
   .simple-list{grid-template-columns:1fr}
