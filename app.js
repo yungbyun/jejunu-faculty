@@ -2156,10 +2156,13 @@ function simpleToggle() {
 /* 한 줄: 이름 · 직위 · 고른 선호도. 안 고른 사람은 칸을 비워 둔다 */
 function simpleRow(p, d) {
   const r = getRating(p);
+  const b = memoBold(getMemo(p)).join(', ');
   return `<li><a class="sp" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}"
-    title="${esc(p.name)} ${esc(p.rank)}${r ? ' · ' + esc(CONFIG.RATINGS.NAMES[r] || r) : ''}">
-    <span class="sp__n">${esc(p.name)}${chickBadge(p)}</span>
-    <span class="sp__r">${esc(p.rank)}</span>
+    title="${esc(p.name)} ${esc(p.rank)}${r ? ' · ' + esc(CONFIG.RATINGS.NAMES[r] || r) : ''}${b ? ' · ' + esc(b) : ''}">
+    <span class="sp__t">
+      <span class="sp__h"><span class="sp__n">${esc(p.name)}${chickBadge(p)}</span><span class="sp__r">${esc(p.rank)}</span></span>
+      ${b ? `<span class="sp__b">${esc(b)}</span>` : ''}
+    </span>
     <span class="sp__v">${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}</span>
   </a></li>`;
 }
@@ -2611,6 +2614,17 @@ const MEMO_MARKS = [
   { mk: '__', tag: 'u', name: '밑줄', key: 'u', cmd: 'underline' },
   { mk: '*',  tag: 'i', name: '기울임', key: 'i', cmd: 'italic' },
 ];
+/* 메모에서 **굵게** 한 조각만 뽑는다. 간단히 보기에서 이름 아래에 적는다.
+   같은 말을 여러 번 굵게 했으면 한 번만 센다. 줄바꿈은 빈칸으로 편다. */
+function memoBold(v) {
+  const out = [];
+  String(v || '').replace(/\*\*([\s\S]+?)\*\*/g, (_, t) => {
+    const x = t.replace(/\s+/g, ' ').trim();
+    if (x && !out.includes(x)) out.push(x);
+    return '';
+  });
+  return out;
+}
 const memoHtml = s => esc(String(s || ''))
   .replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>')
   .replace(/__([\s\S]+?)__/g, '<u>$1</u>')

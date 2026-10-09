@@ -18,6 +18,11 @@ const DEPT = await page.evaluate(() => {
   const v = ['확', '긍', '중', '모', '부', '비'];
   d.profs.forEach((p, i) => setRating(rKey(p), v[i % 6]));
   setRating(rKey(d.profs[d.profs.length - 1]), '');       // 한 명은 일부러 안 고른 채로 둔다
+  state.notes.clear();
+  /* 메모에 굵게 한 말이 간단히 보기에 나와야 한다 */
+  state.notes.set(rKey(d.profs[0]), { met: 0, memo: '지난주 **연구년 복귀** 직후 뵘. **학부 증원**에 관심.' });
+  state.notes.set(rKey(d.profs[1]), { met: 0, memo: '통화만 했음. 굵게 한 말이 없다.' });
+  state.notes.set(rKey(d.profs[2]), { met: 0, memo: '**같은 말**을 두 번 **같은 말** 굵게.' });
   location.hash = `#/dept/${d.id}`; render();
   return d.id;
 });
@@ -74,6 +79,52 @@ t('선호도 칩 색이 그 선호도 색', await page.evaluate(() => {
   if (!el) return true;
   const hex = x => { const m = x.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : x; };
   return hex(getComputedStyle(el).color) === getComputedStyle(document.documentElement).getPropertyValue('--rs-high').trim();
+}));
+
+/* 메모에서 굵게 한 말만 이름 아래에, 콤마로 이어 적는다 (2026-10-09) */
+t('굵게 한 말이 이름 아래에', await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[0].slug)));
+  return (el.querySelector('.sp__b') || {}).textContent;
+}) === '연구년 복귀, 학부 증원', await page.evaluate(() => (document.querySelector('.sp__b') || {}).textContent));
+t('이름 줄 바로 아래', await page.evaluate(() => {
+  const e = document.querySelector('.sp__b');
+  return e.previousElementSibling.classList.contains('sp__h') && e.parentElement.classList.contains('sp__t');
+}));
+t('굵게 한 말이 없으면 줄도 없다', await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[1].slug)));
+  return !el.querySelector('.sp__b');
+}));
+t('같은 말을 두 번 굵게 해도 한 번만', await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[2].slug)));
+  return (el.querySelector('.sp__b') || {}).textContent === '같은 말';
+}), await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[2].slug)));
+  return (el.querySelector('.sp__b') || {}).textContent;
+}));
+t('밑줄·기울임은 뽑지 않는다', await page.evaluate(() =>
+  JSON.stringify(memoBold('__밑줄__ *기울임* **굵게**'))) === '["굵게"]',
+  await page.evaluate(() => JSON.stringify(memoBold('__밑줄__ *기울임* **굵게**'))));
+t('줄바꿈이 끼어도 한 줄로 편다', await page.evaluate(() => {
+  const br = String.fromCharCode(10);
+  return JSON.stringify(memoBold('**두' + br + '줄에  걸친 말**'));
+}) === '["두 줄에 걸친 말"]', await page.evaluate(() => {
+  const br = String.fromCharCode(10);
+  return JSON.stringify(memoBold('**두' + br + '줄에  걸친 말**'));
+}));
+t('도움말에도 함께 적힌다', (await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  const el = [...document.querySelectorAll('.sp')].find(e => e.getAttribute('href').endsWith(encodeURIComponent(d.profs[0].slug)));
+  return el.getAttribute('title');
+})).includes('연구년 복귀, 학부 증원'));
+t('카드로 보기에는 안 나온다', await page.evaluate(() => {
+  simpleToggle(); renderDept(state.depts.find(x => x.id === route().dept));
+  const none = !document.querySelector('.sp__b');
+  simpleToggle(); renderDept(state.depts.find(x => x.id === route().dept));
+  return none;
 }));
 
 // 눌러서 상세로
