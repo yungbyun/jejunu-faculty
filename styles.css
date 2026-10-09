@@ -1444,5 +1444,5 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @keyframes ptrspin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.ptr--go svg{animation:none}}
 /* 확·긍과 겹치는 공략은 두 번 세지 않는다 — 폰에는 말풍선이 없으니 숫자 옆에 적어 둔다 */
-.pie__kd{font-style:normal;color:var(--ink-3);opacity:.9}
+.pie__kd{font-style:normal;color:var(--ink-3);opacity:.9;white-space:nowrap}
 .pie__kd::before{content:'· '}

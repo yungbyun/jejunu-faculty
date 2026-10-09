@@ -144,7 +144,7 @@ const cols = await page.evaluate(()=>{
 t('불 색이 그 선호도 대표색', cols.length===6 && cols.every(c=>c.got===c.want),
   cols.map(c=>`${c.r} ${c.got}${c.got===c.want?'':'≠'+c.want}`).join(' '));
 
-// 7) 확+긍에 공략을 더한 값 — 겹치는 사람을 두 번 세지 않아야 한다
+// 7) 확+긍에 공략을 더한 값 — 더하는 사람은 중·모 안의 공략뿐 (2026-10-09)
 const setup = (pushEvery) => page.evaluate(n => {
   pushSet = new Set(); localStorage.removeItem('jnu-push');
   state.ratings.clear(); state.notes.clear();
@@ -159,10 +159,12 @@ const setup = (pushEvery) => page.evaluate(n => {
 const truth = () => page.evaluate(() => {
   const inPool = p => getRating(p) !== '비';
   const base = new Set(state.rows.filter(p => ['확','긍'].includes(getRating(p))).map(rKey));
-  const pu = new Set(state.rows.filter(p => isPush(p) && inPool(p)).map(rKey));
+  const pu = new Set(state.rows.filter(p => isPush(p) && ['중','모'].includes(getRating(p))).map(rKey));
   const total = state.rows.filter(inPool).length;
-  const union = new Set([...base, ...pu]);
-  return { total, base: base.size, union: union.size, dup: [...pu].filter(k=>base.has(k)).length,
+  const union = new Set([...base, ...pu]);          // 중·모 공략은 확·긍과 겹칠 수 없다
+  return { total, base: base.size, add: pu.size, union: union.size,
+           dup: state.rows.filter(p => isPush(p) && ['확','긍'].includes(getRating(p))).length,
+           out: state.rows.filter(p => isPush(p) && !['중','모'].includes(getRating(p))).length,
            pct: Math.round(union.size/total*100) };
 });
 
@@ -174,35 +176,53 @@ await setup(5);
 await page.waitForTimeout(500);
 const T = await truth();
 t('공략이 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
-t('겹침을 뺀 합집합과 같다', await page.evaluate(() =>
-  document.querySelector('.pie__k--push .pie__kn').textContent.split('명')[0]) === String(T.union),
-  `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 집합 ${T.union}`);
-t('%도 합집합 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
+t('확+긍에 중·모 공략만 더한 값', await page.evaluate(() =>
+  document.querySelector('.pie__k--push .pie__kn').textContent.split('명')[0]) === String(T.base + T.add),
+  `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 셈 ${T.base}+${T.add}`);
+t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('겹치는 사람이 실제로 있다', T.dup > 0, `${T.dup}명`);
-t('더해진 인원은 합집합 빼기 확+긍', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`공략 +${T.union - T.base}명`),
+t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`중·모 공략 +${T.add}명`),
+  await page.locator('.pie__k--push .pie__kn').innerText());
+t('안 더한 공략이 실제로 있다', T.out > 0, `${T.out}명`);
+t('안 더한 인원도 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`나머지 ${T.out}명 뺌`),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('공략 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('모수는 옆 카드에 그대로 있다', (await page.locator('.pie__k--pos .pie__kn').innerText()).includes('/'),
   await page.locator('.pie__k--pos .pie__kn').innerText());
-t('도움말이 겹침을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('두 번 세지 않았습니다'),
+t('도움말이 중·모 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중·모인 공략'),
   await page.getAttribute('.pie__k--push', 'title'));
-t('비참여는 더하지 않는다', await page.evaluate(() => {
-  const na = state.rows.filter(p => isPush(p) && getRating(p) === '비').length;
+t('도움말이 안 더한 까닭도 밝힌다', await page.evaluate(() => {
   const txt = document.querySelector('.pie__k--push').title;
-  return na === 0 || txt.includes(`비참여 ${na}명`);
-}));
+  const n = r => state.rows.filter(p => isPush(p) && (getRating(p)||'미지정') === r).length;
+  const want = [['부', n('부')], ['비참여', n('비')], ['미지정', n('미지정')]].filter(x => x[1]);
+  return want.every(([r, c]) => txt.includes(`${r} ${c}명`));
+}), await page.getAttribute('.pie__k--push', 'title'));
 
-// 모두 공략으로 몰아도 100% 를 넘지 않아야 한다
+// 부·비·미지정만 공략으로 몰면 한 명도 안 더해진다
+await page.evaluate(() => {
+  pushSet = new Set();
+  state.rows.filter(p => !['중','모'].includes(getRating(p))).forEach(p => pushes().add(rKey(p)));
+  pushSave(); renderStats();
+});
+await page.waitForTimeout(300);
+const T1 = await truth();
+t('중·모가 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명'),
+  await page.locator('.pie__k--push .pie__kn').innerText());
+t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
+  `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
+t('부도 공략이지만 안 더한다', T1.out > 0 && T1.add === 0, JSON.stringify(T1));
+
+// 모두 공략으로 몰아도 확+긍+중·모를 넘지 않는다
 await page.evaluate(() => { state.rows.forEach(p => pushes().add(rKey(p))); pushSave(); renderStats(); });
 await page.waitForTimeout(500);
 const T2 = await truth();
 t('전원을 공략으로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 모수 전체가 된다', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.total}명 ·`),
-  await page.locator('.pie__k--push .pie__kn').innerText());
+t('그때는 확+긍+중·모 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명 ·`),
+  `${await page.locator('.pie__k--push .pie__kn').innerText()} / ${T2.base}+${T2.add}`);
+t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
 t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
   await page.locator('.pie__k--pos .pie__kn').innerText());
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); });
