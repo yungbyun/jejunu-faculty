@@ -1443,3 +1443,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ptr--go svg{animation:ptrspin .8s linear infinite}
 @keyframes ptrspin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.ptr--go svg{animation:none}}
+
+/* 비참여는 겨룸에서 빠진 분이라, 분석 화면에서는 색을 빼고 옅은 회색으로 둔다 (2026-10-09).
+   옅은 바탕에 흰 숫자는 안 읽히므로 이 조각만 글자를 어둡게 둔다. */
+.stats .sbar__seg--na{background:#ced3db;color:#39404c}
+.stats .sw--na{background:#ced3db;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.stats .rs--na{color:var(--ink-2);background:color-mix(in srgb,var(--ink-3) 18%,transparent)}

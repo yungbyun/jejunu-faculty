@@ -181,7 +181,7 @@ t('확+긍에 중·모 공략만 더한 값', await page.evaluate(() =>
   `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`중·모 공략 +${T.add}명`),
+t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`+${T.add}명(중·모 공략)`),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('안 더한 공략이 실제로 있다', T.out > 0, `${T.out}명`);
 t('줄에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await page.locator('.pie__k--push .pie__kn').innerText()),
@@ -207,7 +207,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중·모가 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명'),
+t('중·모가 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중·모 공략)'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
@@ -220,7 +220,7 @@ const T2 = await truth();
 t('전원을 공략으로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 확+긍+중·모 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명 ·`),
+t('그때는 확+긍+중·모 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명+`),
   `${await page.locator('.pie__k--push .pie__kn').innerText()} / ${T2.base}+${T2.add}`);
 t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
 t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
@@ -234,7 +234,7 @@ await page.evaluate(() => {
   pushSave(); renderStats();
 });
 t('확·긍만 공략이면 더해지는 사람이 없다',
-  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('공략 +0명'),
+  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중·모 공략)'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
@@ -245,11 +245,53 @@ t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
 }), await page.getAttribute('.pie__k--push', 'title'));
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
 
+/* 두 줄의 생김새 — 꼬리말을 괄호로 묶는다 (2026-10-09) */
+await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });
+t('확+긍 줄은 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(
+  (await page.locator('.pie__k--pos .pie__kn').innerText()).trim()),
+  await page.locator('.pie__k--pos .pie__kn').innerText());
+t('공략 줄은 「N명+K명(중·모 공략)」', /^\d+명\+\d+명\(중·모 공략\)$/.test(
+  (await page.locator('.pie__k--push .pie__kn').innerText()).trim()),
+  await page.locator('.pie__k--push .pie__kn').innerText());
+await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
+
 /* 카드 이름은 「+공략」 한 마디로 (2026-10-09) */
 await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });
 t('공략 카드 이름', await page.evaluate(() =>
   (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+공략',
   await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
+
+/* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
+t('비 막대가 보라가 아니다', await page.evaluate(() => {
+  const [r, g, b] = (getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor.match(/\d+/g) || []).map(Number);
+  return !(b > r + 20 && b > g + 20);
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor));
+t('비 막대가 옅은 회색', await page.evaluate(() => {
+  const [r, g, b] = (getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor.match(/\d+/g) || []).map(Number);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  return max - min <= 20 && min >= 170;      // 색기 없이, 밝게
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor));
+t('모(회색)보다 옅다', await page.evaluate(() => {
+  const g = s => (getComputedStyle(document.querySelector(s)).backgroundColor.match(/\d+/g) || []).map(Number)[0];
+  return g('.sbar__seg--na') > g('.sbar__seg--low') + 40;
+}), await page.evaluate(() => [...document.querySelectorAll('.sbar__seg--na,.sbar__seg--low')].slice(0,2)
+  .map(e => getComputedStyle(e).backgroundColor).join(' / ')));
+t('옅은 바탕이라 숫자는 어둡게', await page.evaluate(() => {
+  const d = document.createElement('canvas'); d.width = d.height = 1;
+  const x = d.getContext('2d');
+  const px = c => { x.fillStyle = '#fff'; x.fillRect(0,0,1,1); x.fillStyle = c; x.fillRect(0,0,1,1);
+    return [...x.getImageData(0,0,1,1).data].slice(0,3); };
+  const L = ([r,g,b]) => { const f = v => { v /= 255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); };
+    return .2126*f(r) + .7152*f(g) + .0722*f(b); };
+  const cs = getComputedStyle(document.querySelector('.sbar__seg--na'));
+  const a = L(px(cs.color)), b = L(px(cs.backgroundColor));
+  return (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 4.5;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.sbar__seg--na')).color));
+t('범례 네모도 같은 회색', await page.evaluate(() => {
+  const a = getComputedStyle(document.querySelector('.stats .sw--na')).backgroundColor;
+  const b = getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor;
+  return a === b;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.stats .sw--na')).backgroundColor));
 
 /* 맨 위 뜻풀이 — 한 글자는 빼고 뜻만, '비'는 「비참여」 (2026-10-09) */
 t('뜻만 적는다', await page.evaluate(() => [...document.querySelectorAll('.legend--names .legend__i')]

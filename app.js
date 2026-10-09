@@ -1764,10 +1764,10 @@ function donut(profs) {
       </svg>
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
-          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명 · 절반 ${half}명</span></div>
+          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span></div>
         ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중·모인 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 공략: ${puOut}` : ''}">
           <span class="pie__kl">+공략</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명 · 중·모 공략 +${added}명</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          <span class="pie__kn">${reach}명+${added}명(중·모 공략)</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
