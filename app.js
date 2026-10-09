@@ -2578,9 +2578,13 @@ function bindNotes(root) {
       scheduleMemo(t.dataset.key, memoRead(t));
       const st = box && box.querySelector('.memo__st');
       if (st) st.textContent = '입력 중…';
+      memoMarkSync();
     };
     t.addEventListener('input', typed);
-    t.addEventListener('blur', () => commitMemo(t.dataset.key, memoRead(t)));
+    t.addEventListener('blur', () => { commitMemo(t.dataset.key, memoRead(t)); memoMarkSync(); });
+    t.addEventListener('focus', memoMarkSync);
+    t.addEventListener('keyup', memoMarkSync);
+    t.addEventListener('mouseup', memoMarkSync);
     /* 붙여넣기는 글자만 받는다 — 남의 서식이 딸려 들어오면 읽을 수 없는 메모가 된다 */
     t.addEventListener('paste', ev => {
       ev.preventDefault();
@@ -2592,6 +2596,7 @@ function bindNotes(root) {
       try { document.execCommand('styleWithCSS', false, false); } catch {}
       document.execCommand(cmd, false, null);
       typed();
+      memoMarkSync();
     };
     t.addEventListener('keydown', ev => {
       if (!(ev.ctrlKey || ev.metaKey)) return;
@@ -2615,6 +2620,21 @@ function notesCacheKey() { return 'jnu-notes:' + (state.session ? state.session.
  * 시트의 memo 열과 CSV 는 평문이라야 사람이 읽을 수 있다. 그래서 **굵게** __밑줄__ *기울임*
  * 처럼 표시만 해 두고, 보여 줄 때만 꾸민다. 저장 형식은 그대로이므로 서버는 손댈 것이 없다.
  * ** 를 먼저 처리해야 * 와 섞이지 않는다. */
+/* 커서가 선 자리의 꾸밈(굵게·밑줄·기울임)을 아래 단추에 그대로 비춘다 (2026-10-09).
+ * `selectionchange` 는 창에 하나만 걸어 둔다 — 메모마다 걸면 상세를 여닫을 때마다 쌓인다. */
+function memoMarkSync() {
+  const a = document.activeElement;
+  const live = a && a.classList && a.classList.contains('memo') && a.isContentEditable;
+  document.querySelectorAll('.memo-box .memo__b').forEach(b => {
+    const mine = live && b.closest('.memo-box').contains(a);
+    let on = false;
+    if (mine) { try { on = document.queryCommandState(b.dataset.cmd); } catch {} }
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+document.addEventListener('selectionchange', memoMarkSync);
+
 const MEMO_MARKS = [
   { mk: '**', tag: 'b', name: '굵게', key: 'b', cmd: 'bold' },
   { mk: '__', tag: 'u', name: '밑줄', key: 'u', cmd: 'underline' },
@@ -3947,7 +3967,7 @@ function openDrawer(p, d) {
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           <div class="memo__bar">
-            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
+            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
           </div>
           <div class="memo__st" aria-live="polite"></div>
         </div>

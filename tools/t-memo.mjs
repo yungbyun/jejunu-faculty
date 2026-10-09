@@ -135,6 +135,67 @@ await page.waitForSelector('.memo[contenteditable]',{timeout:10000});
 const html = await page.evaluate(()=>document.querySelector('.memo').innerHTML);
 t('다시 열어도 굵게 그대로', html.includes('<b>강창남 교수</b>'), html);
 
+/* 커서가 선 자리의 꾸밈을 아래 단추가 실시간으로 비춘다 (2026-10-09) */
+await page.evaluate(() => {
+  const p = state.rows[1];
+  state.notes.set(rKey(p), { memo: '보통 글 **굵은 글** __밑줄 글__ *기운 글* 끝' });
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+});
+await page.waitForSelector('.memo__b', { timeout: 10000 });
+/* 글 안에 커서를 꽂는다 — 마우스 좌표가 아니라 Range 로 정확히 */
+const caretAt = w => page.evaluate(word => {
+  const m = document.querySelector('.memo');
+  const tw = document.createTreeWalker(m, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = tw.nextNode())) {
+    const i = n.nodeValue.indexOf(word);
+    if (i < 0) continue;
+    const r = document.createRange();
+    r.setStart(n, i + 1); r.collapse(true);
+    m.focus();
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    return n.parentNode.nodeName;
+  }
+  return '(못 찾음)';
+}, w);
+const marks = () => page.evaluate(() => [...document.querySelectorAll('.memo__b')]
+  .map(b => `${b.dataset.cmd}:${b.getAttribute('aria-pressed')}:${b.classList.contains('on') ? 'on' : 'off'}`).join(' '));
+
+t('처음엔 셋 다 꺼져 있다', (await marks()) === 'bold:false:off underline:false:off italic:false:off', await marks());
+await caretAt('보통');
+t('보통 글에서는 그대로 꺼짐', (await marks()) === 'bold:false:off underline:false:off italic:false:off', await marks());
+await caretAt('굵은');
+t('굵은 글 안이면 굵게만 켜짐', (await marks()) === 'bold:true:on underline:false:off italic:false:off', await marks());
+await caretAt('밑줄');
+t('밑줄 글 안이면 밑줄만 켜짐', (await marks()) === 'bold:false:off underline:true:on italic:false:off', await marks());
+await caretAt('기운');
+t('기운 글 안이면 기울임만 켜짐', (await marks()) === 'bold:false:off underline:false:off italic:true:on', await marks());
+await caretAt('보통');
+t('도로 보통 글로 오면 다 꺼짐', (await marks()) === 'bold:false:off underline:false:off italic:false:off', await marks());
+
+/* 단추를 눌러 켠 직후에도 바로 비춰야 한다 — execCommand 는 selectionchange 를 안 울릴 때가 있다 */
+await page.click('.memo__b--b');
+t('단추를 누르면 곧바로 켜진다', (await marks()).startsWith('bold:true:on'), await marks());
+await page.click('.memo__b--b');
+t('다시 누르면 곧바로 꺼진다', (await marks()).startsWith('bold:false:off'), await marks());
+
+/* 글상자 밖으로 나가면 모두 끈다 — 남의 자리 꾸밈을 보여 주면 안 된다 */
+await page.evaluate(() => document.querySelector('.memo').blur());
+await page.waitForTimeout(80);
+t('글상자를 나가면 다 꺼진다', (await marks()) === 'bold:false:off underline:false:off italic:false:off', await marks());
+
+t('켜진 단추는 눈에도 띈다', await page.evaluate(async () => {
+  const m = document.querySelector('.memo');
+  const tw = document.createTreeWalker(m, NodeFilter.SHOW_TEXT);
+  let n; while ((n = tw.nextNode())) if (n.nodeValue.includes('굵은')) break;
+  const r = document.createRange(); r.setStart(n, 1); r.collapse(true);
+  m.focus(); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  await new Promise(x => setTimeout(x, 60));
+  const on = document.querySelector('.memo__b.on'), off = document.querySelector('.memo__b:not(.on)');
+  return getComputedStyle(on).backgroundColor !== getComputedStyle(off).backgroundColor;
+}));
+await page.evaluate(() => closeDrawer());
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);
