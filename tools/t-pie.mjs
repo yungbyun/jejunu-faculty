@@ -184,7 +184,7 @@ t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()).star
 t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`중·모 공략 +${T.add}명`),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('안 더한 공략이 실제로 있다', T.out > 0, `${T.out}명`);
-t('안 더한 인원도 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`나머지 ${T.out}명 뺌`),
+t('줄에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await page.locator('.pie__k--push .pie__kn').innerText()),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('공략 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
   await page.locator('.pie__k--push .pie__kn').innerText());
@@ -239,13 +239,11 @@ t('확·긍만 공략이면 더해지는 사람이 없다',
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--pos b').innerText()));
-t('겹친 인원을 뺐다고 적는다', await page.evaluate(() => {
-  const e = document.querySelector('.pie__kd');
+t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
   const n = state.rows.filter(p => isPush(p) && ['확','긍'].includes(getRating(p))).length;
-  return !!e && e.textContent.includes(String(n));
-}), await page.evaluate(() => (document.querySelector('.pie__kd') || {}).textContent));
+  return document.querySelector('.pie__k--push').title.includes(`확·긍(이미 셈) ${n}명`);
+}), await page.getAttribute('.pie__k--push', 'title'));
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
-t('겹치는 사람이 없으면 그 말도 없다', await page.locator('.pie__kd').count() === 0);
 
 /* 카드 이름은 「+공략」 한 마디로 (2026-10-09) */
 await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });

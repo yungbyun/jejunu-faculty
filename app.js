@@ -1713,7 +1713,6 @@ function donut(profs) {
   /* 왜 안 더했는지도 적어 둔다 — 숫자를 못 믿겠을 때 눌러(마우스를 올려) 확인하시라고 */
   const puCnt = r => profs.filter(p => isPush(p) && (getRating(p) || '미지정') === r).length;
   const puDup = puCnt('확') + puCnt('긍');
-  const puSkip = profs.filter(isPush).length - added;
   const puWhy = PU_IN.map(r => [r, puAdd.filter(p => getRating(p) === r).length])
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}`).join(' · ');
   const puOut = [['확·긍(이미 셈)', puDup], ['부', puCnt('부')], ['비참여', puCnt('비')], ['미지정', puCnt('미지정')]]
@@ -1768,7 +1767,7 @@ function donut(profs) {
           <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명 · 절반 ${half}명</span></div>
         ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중·모인 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 공략: ${puOut}` : ''}">
           <span class="pie__kl">+공략</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명 · 중·모 공략 +${added}명${puSkip ? ` <em class="pie__kd">나머지 ${puSkip}명 뺌</em>` : ''}</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          <span class="pie__kn">${reach}명 · 중·모 공략 +${added}명</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
