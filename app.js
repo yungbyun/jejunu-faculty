@@ -3901,7 +3901,7 @@ function openDrawer(p, d) {
     </div>
     <div class="d-body">
       <div class="d-profile">
-        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}${chickBadge(p)}</div>
+        <div class="d-photo"><div class="avatar" aria-hidden="true">${esc(initial(p.name))}</div>${p.photo ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" alt="${esc(p.name)} 사진" onerror="photoErr(this,'remove')">` : ''}${chickBadge(p)}${favBtn(p)}</div>
         <div>
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span></div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
@@ -3962,6 +3962,7 @@ function openDrawer(p, d) {
       ${links.length ? `<div class="d-section"><h3>바로가기</h3><div class="d-links">${links.map(l => `<a class="lnk ${l.primary ? 'primary' : ''}" href="${esc(l.href)}" ${l.href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(l.label)} ↗</a>`).join('')}</div></div>` : ''}
     </div>`;
   bindRates($panel);
+  bindFavs($panel);
   bindCopyNums($panel);
   /* 그 자리에서 오늘 날짜·이 교수로 약속을 만들고 달력으로 간다 — 날짜는 거기서 고치면 된다 */
   $panel.querySelectorAll('[data-mtnew]').forEach(b => b.addEventListener('click', () => {

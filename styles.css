@@ -1451,3 +1451,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .stats .sbar__seg--na{background:#ced3db;color:#39404c}
 .stats .sw--na{background:#ced3db;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
 .stats .rs--na{color:var(--ink-2);background:color-mix(in srgb,var(--ink-3) 18%,transparent)}
+
+/* 상세의 사진에도 관심 교수 체크 — 카드의 것보다 조금 작게 (2026-10-09).
+   폰에서는 카드의 체크를 본문으로 흘려보내지만(작은 얼굴을 가려서), 상세 사진은 넉넉해
+   그대로 왼쪽 위에 얹는다. 그래서 position 을 여기서 되살려야 한다. */
+.d-photo .fav{position:absolute;top:6px;left:6px;width:24px;height:24px;margin:0;order:0}
+.d-photo .fav svg{width:13px;height:13px}
+@media (max-width:620px){.d-photo .fav{top:5px;left:5px;width:23px;height:23px}}

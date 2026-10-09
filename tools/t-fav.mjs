@@ -111,6 +111,38 @@ t('0 밑으로는 안 내려감', await page.evaluate(()=>{ const k2=rKey(state.
 t('카운터를 눌러도 화면 안 바뀜', await page.evaluate(()=>location.hash)==='#/', await page.evaluate(()=>location.hash));
 t('옆 교수는 그대로', await page.evaluate(()=>getNote(rKey(state.rows[1])).met===0));
 
+/* 상세 사진 왼쪽 위에도 관심 교수 체크 — 카드의 것보다 조금 작게 (2026-10-09) */
+await page.evaluate(() => { const p = state.rows[2]; favs().delete(rKey(p));
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
+await page.waitForSelector('.d-photo .fav', { timeout: 10000 });
+t('상세 사진에 체크가 있다', await page.locator('.d-photo .fav').count() === 1);
+t('사진 왼쪽 위에 얹힌다', await page.evaluate(() => {
+  const f = document.querySelector('.d-photo .fav').getBoundingClientRect();
+  const ph = document.querySelector('.d-photo').getBoundingClientRect();
+  return getComputedStyle(document.querySelector('.d-photo .fav')).position === 'absolute'
+    && f.left - ph.left < 12 && f.top - ph.top < 12 && f.right <= ph.right + 1;
+}), await page.evaluate(() => {
+  const f = document.querySelector('.d-photo .fav').getBoundingClientRect();
+  const ph = document.querySelector('.d-photo').getBoundingClientRect();
+  return `왼쪽 ${Math.round(f.left - ph.left)} · 위 ${Math.round(f.top - ph.top)}`;
+}));
+t('카드의 것보다 작다', await page.evaluate(() => {
+  const d = document.querySelector('.d-photo .fav').getBoundingClientRect().width;
+  return d > 0 && d <= 26;
+}), await page.evaluate(() => String(Math.round(document.querySelector('.d-photo .fav').getBoundingClientRect().width))));
+t('동그랗다', await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.d-photo .fav'));
+  return cs.borderRadius === '50%' && cs.width === cs.height;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.d-photo .fav')).borderRadius));
+t('처음엔 꺼져 있다', await page.getAttribute('.d-photo .fav', 'aria-pressed') === 'false');
+await page.click('.d-photo .fav');
+t('누르면 관심 교수가 된다', await page.evaluate(() => isFav(state.rows[2])));
+t('단추도 켜진 꼴', await page.getAttribute('.d-photo .fav', 'aria-pressed') === 'true');
+await page.click('.d-photo .fav');
+t('다시 누르면 풀린다', await page.evaluate(() => !isFav(state.rows[2])));
+await page.evaluate(() => { closeDrawer(); location.hash = '#/'; render(); });
+await page.waitForSelector('.favw', { timeout: 10000 });
+
 // 다른 화면과 같은 값
 await page.evaluate(()=>{ const p=state.rows[0]; location.hash=`#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
 await page.waitForSelector('#drawer .counter',{timeout:10000});
