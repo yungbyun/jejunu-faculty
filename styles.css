@@ -162,6 +162,11 @@ main{min-height:60vh;padding:40px 20px 72px}
 .dept-hero h1{font-size:var(--fs-xl);font-weight:800;letter-spacing:-.5px;margin:0}
 .dept-hero .sub{color:var(--ink-3);font-size:var(--fs-s);margin-top:4px}
 .dept-hero .sub a{color:var(--ink-2);border-bottom:1px solid var(--line-2)}
+/* 글줄 안의 단추 — 옆 링크와 같은 꼴로 보이게 한다. 폰에서 거르개 줄까지 안 내려가도 된다 */
+.sublink{border:0;border-bottom:1px solid var(--line-2);background:none;padding:0;
+  font:inherit;color:var(--ink-2);cursor:pointer}
+.sublink:hover{color:var(--dept-color,var(--brand));border-bottom-color:currentColor}
+.sublink[aria-pressed="true"]{color:var(--dept-color,var(--brand));font-weight:700}
 .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink-2);transition:all .15s}
 .chip:hover{border-color:var(--line-2);color:var(--ink)}
@@ -1390,7 +1395,6 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 
 /* ---------- 간단 표시 ----------
    사진을 접고 이름·직위·고른 선호도만. 넓으면 여러 칸으로 벌려 한눈에 들어오게 한다. */
-.chip--simple[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .simple-list{list-style:none;margin:0;padding:0;display:grid;gap:4px;
   grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 .sp{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);

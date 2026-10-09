@@ -24,13 +24,30 @@ const DEPT = await page.evaluate(() => {
 await page.waitForSelector('[data-simple]', { timeout: 10000 });
 
 t('처음엔 카드로 보인다', await page.locator('.prof-grid').count() === 1 && await page.locator('.simple-list').count() === 0);
-t('간단히 단추가 있다', (await page.locator('[data-simple]').innerText()).trim() === '간단히');
+/* 거르개 줄의 칩이 아니라 학과 홈페이지 옆 링크로 둔다 — 폰에서 손이 덜 간다 (2026-10-09) */
+t('학과 홈페이지 바로 옆에 있다', await page.evaluate(() => {
+  const sub = document.querySelector('.dept-hero .sub');
+  const b = sub && sub.querySelector('[data-simple]');
+  if (!b) return false;
+  const home = sub.querySelector('a[target="_blank"]');
+  return home ? b.previousElementSibling === home : true;   // 홈페이지가 없는 학과면 그냥 줄 안에 있으면 된다
+}), await page.evaluate(() => (document.querySelector('.dept-hero .sub') || {}).innerText));
+t('거르개 줄에는 두지 않는다', await page.evaluate(() => !document.querySelector('.filters [data-simple]')));
+t('링크처럼 보인다', await page.evaluate(() => {
+  const b = document.querySelector('[data-simple]'), a = document.querySelector('.dept-hero .sub a');
+  const cb = getComputedStyle(b), ca = a ? getComputedStyle(a) : cb;
+  return cb.fontSize === ca.fontSize && cb.backgroundColor === 'rgba(0, 0, 0, 0)' && cb.borderTopWidth === '0px';
+}), await page.evaluate(() => getComputedStyle(document.querySelector('[data-simple]')).backgroundColor));
+t('꺼져 있을 땐 「간단히 보기」', (await page.locator('[data-simple]').innerText()).trim() === '간단히 보기',
+  await page.locator('[data-simple]').innerText());
 t('처음엔 꺼져 있다', await page.evaluate(() => document.querySelector('[data-simple]').getAttribute('aria-pressed')) === 'false');
 
 await page.click('[data-simple]');
 await page.waitForSelector('.simple-list', { timeout: 10000 });
 t('켜면 목록으로 바뀐다', await page.locator('.prof-grid').count() === 0 && await page.locator('.simple-list').count() === 1);
 t('단추가 켜진 모양', await page.evaluate(() => document.querySelector('[data-simple]').getAttribute('aria-pressed')) === 'true');
+t('켜져 있을 땐 「카드로 보기」', (await page.locator('[data-simple]').innerText()).trim() === '카드로 보기',
+  await page.locator('[data-simple]').innerText());
 t('사진이 없다', await page.evaluate(() => !document.querySelector('.simple-list img')));
 t('그 학과 전원이 한 줄씩', await page.evaluate(id =>
   document.querySelectorAll('.sp').length === state.depts.find(x => x.id === id).profs.length, DEPT),

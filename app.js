@@ -2175,7 +2175,9 @@ function renderDept(d) {
         <div>
           <div class="eyebrow">${esc(d.en || 'Department')}</div>
           <h1>${esc(d.name)}</h1>
-          <div class="sub">전임교원 ${d.profs.length}명${d.url ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a>` : ''}</div>
+          <div class="sub">전임교원 ${d.profs.length}명${d.url ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a>` : ''}
+            · <button type="button" class="sublink" data-simple aria-pressed="${isSimple()}"
+              title="${isSimple() ? '사진이 있는 카드로 봅니다' : '사진을 접고 이름·직위·선호도만 봅니다'}">${isSimple() ? '카드로 보기' : '간단히 보기'}</button></div>
         </div>
         <div class="filters-wrap">
           <div class="filters" role="group" aria-label="직위 필터">
@@ -2184,7 +2186,6 @@ function renderDept(d) {
           <div class="filters filters--rate" role="group" aria-label="선호도 필터">
             ${rf.map(r => `<button class="chip chip--rate" type="button" data-rating="${esc(r)}" data-val="${esc(r)}" aria-pressed="${state.ratingFilter === r}">${esc(r)}<span class="n">${countRating(d, r)}</span></button>`).join('')}
             <button class="chip chip--fav" type="button" data-favfilter aria-pressed="${state.favOnly}" title="관심 교수만 보기">${FAV_SVG}관심<span class="n">${favCount(d)}</span></button>
-            <button class="chip chip--simple" type="button" data-simple aria-pressed="${isSimple()}" title="사진을 접고 이름·직위·선호도만 봅니다">간단히</button>
           </div>
         </div>
       </div>
@@ -2195,7 +2196,7 @@ function renderDept(d) {
   $app.querySelectorAll('.chip[data-rank]').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
   $app.querySelectorAll('.chip[data-rating]').forEach(b => b.addEventListener('click', () => { state.ratingFilter = b.dataset.rating; renderDept(d); }));
   $app.querySelector('.chip[data-favfilter]')?.addEventListener('click', () => { state.favOnly = !state.favOnly; renderDept(d); });
-  $app.querySelector('.chip[data-simple]')?.addEventListener('click', () => { simpleToggle(); renderDept(d); });
+  $app.querySelector('[data-simple]')?.addEventListener('click', () => { simpleToggle(); renderDept(d); });
   bindCards();
 }
 
