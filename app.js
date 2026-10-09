@@ -34,7 +34,7 @@ const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
     // 선호도 값과 뜻. 비(평가제외)는 연구년 등으로 이번 평가에서 빠지는 경우
     LABELS: ['확', '긍', '중', '모', '부', '비'],
-    NAMES: { '확': '확실', '긍': '긍정', '중': '보통', '모': '모름', '부': '부정', '비': '연구년 등으로 제외' },
+    NAMES: { '확': '확실', '긍': '긍정', '중': '보통', '모': '모름', '부': '부정', '비': '비참여' },
     // 예전에 저장된 값(상/하)은 자동으로 새 값으로 읽음
     LEGACY: { '상': '확', '하': '모' },
     // 다른 기기에서 바꾼 선호도를 다시 읽는 주기(초). 화면이 보일 때만 동작
@@ -1763,8 +1763,8 @@ function donut(profs) {
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
           <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명 · 절반 ${half}명</span></div>
         ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puDup ? ` — 공략 ${puDup}명은 이미 확·긍이라 두 번 세지 않았습니다` : ''}${puNa ? ` — 비참여 ${puNa}명은 모수에서 빠진 분이라 더하지 않았습니다` : ''}">
-          <span class="pie__kl">확+긍+공략</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명 · 공략 +${added}명</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          <span class="pie__kl">+공략</span><b>${pct(reach)}%${gap(reach)}</b>
+          <span class="pie__kn">${reach}명 · 공략 +${added}명${puDup ? ` <em class="pie__kd">겹친 ${puDup}명 뺌</em>` : ''}</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
@@ -1837,7 +1837,6 @@ function stChip(p, r) {
 
 function renderStats() {
   const all = state.rows, rated = all.filter(getRating);
-  const c = dist(all);
   const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
   const maxProfs = Math.max(1, ...state.depts.map(d => d.profs.length));   // 가장 큰 학과를 100% 로
   const legend = `<div class="legend" aria-label="범례">${RLABELS().map(r => `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(r)}</span>`).join('')}</div>`;
@@ -1846,10 +1845,10 @@ function renderStats() {
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
       <div class="hero">
-        <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r => {
-          const txt = r === '비' ? `연구년 등으로 ${c[r]}명 제외` : CONFIG.RATINGS.NAMES[r];   // '비'만 실제 인원을 함께
-          return `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i><b>${esc(r)}</b> ${esc(txt)}</span>`;
-        }).join('')}</div></div>
+        <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r =>
+          /* 한 글자(확·긍…)는 빼고 뜻만 적는다 — 색칠한 네모가 이미 그 자리를 말해 준다 (2026-10-09) */
+          `<span class="legend__i"><i class="sw sw--${rcls(r)}"></i>${esc(CONFIG.RATINGS.NAMES[r] || r)}</span>`
+        ).join('')}</div></div>
 
       ${!rated.length ? `<div class="empty"><strong>아직 선택한 선호도가 없습니다</strong>학과 화면에서 교수 카드의 ${CONFIG.RATINGS.LABELS.join('·')} 칩을 눌러 보세요. <a href="#/">학과 목록으로 →</a></div>` : ''}
 
@@ -1858,7 +1857,7 @@ function renderStats() {
       </section>
 
       <section class="st-sec">
-        <div class="st-head"><h2>학과별 분포</h2><span class="muted st-small">막대의 구간을 누르면 해당 학과가 그 선호도 필터로 열립니다</span>${legend}</div>
+        <div class="st-head"><h2>학과별 분포</h2>${legend}</div>
         <div class="st-rows">
           ${state.depts.map(d => `
             <div class="st-row" style="--dept-color:${esc(d.color)}">
@@ -1872,7 +1871,7 @@ function renderStats() {
         <div class="st-head"><h2>선호도별 교수 목록</h2>
           <div class="st-tools">
             <button class="btn btn--push${STP.pick ? ' on' : ''}" type="button" id="pushPick" aria-pressed="${STP.pick}">
-              ${STP.pick ? '고르기 끝내기' : '공략 고르기'}</button>
+              ${STP.pick ? '설정 끝내기' : '공략 설정'}</button>
             <button class="btn btn--push${STP.only ? ' on' : ''}" type="button" id="pushOnly" aria-pressed="${STP.only}"
               ${pushes().size ? '' : 'disabled'}>공략만 보기 <span class="n">${pushes().size}</span></button>
             <button class="btn" type="button" id="csvBtn">CSV 내보내기</button>
@@ -1983,18 +1982,21 @@ function favSection() {
           const d = state.depts.find(x => x.id === p.dept_id);
           const r = getRating(p);
           const { loc } = officeParts(p.office);
+          const bold = memoBold(getMemo(p)).join(', ');
           return `<div class="favw" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+            <div class="favw__r">
             <a class="favc" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">
             <span class="favc__ph">${p.photo
               ? `<img src="${esc(p.photo)}" data-alt="${esc(p.photo_alt)}" data-initial="${esc(initial(p.name))}" alt="" loading="lazy" onerror="photoErr(this,'initial')">`
               : esc(initial(p.name))}</span>
-            <span class="favc__t"><b>${esc(p.name)}</b><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(shortLoc(loc))}</small>` : ''}</span>
-            ${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}
+            <span class="favc__t"><span class="favc__nm"><b>${esc(p.name)}</b>${r ? `<i class="rs rs--${rcls(r)} rs--mini">${esc(r)}</i>` : ''}</span><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(shortLoc(loc))}</small>` : ''}</span>
             </a>
             ${meetCounter(p)}
             <button type="button" class="favx" data-key="${esc(rKey(p))}" title="관심 해제" aria-label="${esc(p.name)} 관심 교수 해제">
               <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
+            </div>
+            ${bold ? `<div class="favc__m">${esc(bold)}</div>` : ''}
           </div>`;
         }).join('')}
       </div>
@@ -2178,8 +2180,7 @@ function renderDept(d) {
         <div>
           <div class="eyebrow">${esc(d.en || 'Department')}</div>
           <h1>${esc(d.name)}</h1>
-          <div class="sub">전임교원 ${d.profs.length}명${d.url ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a>` : ''}
-            · <button type="button" class="sublink" data-simple aria-pressed="${isSimple()}"
+          <div class="sub">${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a> · ` : ''}<button type="button" class="sublink" data-simple aria-pressed="${isSimple()}"
               title="${isSimple() ? '사진이 있는 카드로 봅니다' : '사진을 접고 이름·직위·선호도만 봅니다'}">${isSimple() ? '카드로 보기' : '간단히 보기'}</button></div>
         </div>
         <div class="filters-wrap">
@@ -4180,8 +4181,91 @@ function showGate() {
   }).catch(() => gateMessage('Google 로그인 스크립트를 불러오지 못했습니다. 네트워크를 확인해 주세요.', true));
 }
 
+/* ---------- 당겨서 새로고침 ----------
+ * 홈 화면에 얹어 쓰면(apple-mobile-web-app-capable) 사파리 주소창이 없어
+ * 당겨서 새로고침도 함께 사라진다. 그래서 손수 만든다. (2026-10-09)
+ * 맨 위에서 아래로 끌 때만 깨어나고, 가로로 밀거나 상세가 열려 있으면 쉰다. */
+const PTR_TRIG = 70, PTR_MAX = 108;
+const ptr = { y0: 0, x0: 0, live: false, on: false, d: 0, busy: false, el: null };
+
+function ptrDraw(d, ready) {
+  if (!ptr.el) return;
+  ptr.el.style.setProperty('--ptr-y', (d - 44).toFixed(1) + 'px');
+  ptr.el.style.setProperty('--ptr-o', Math.min(1, d / 40).toFixed(2));
+  ptr.el.style.setProperty('--ptr-s', (0.6 + Math.min(1, d / PTR_TRIG) * 0.4).toFixed(2));
+  ptr.el.classList.toggle('ptr--ready', !!ready);
+}
+
+function ptrReset() {
+  ptr.live = ptr.on = false; ptr.d = 0;
+  if (!ptr.el) return;
+  ptr.el.classList.add('ptr--back');
+  ptrDraw(0, false);
+  setTimeout(() => ptr.el && ptr.el.classList.remove('ptr--back'), 220);
+}
+
+/* 미저장이 있으면 먼저 올려 보내고 나서 새로 받는다 — 새로고침에 손글씨를 잃지 않도록 */
+async function ptrGo() {
+  ptr.busy = true;
+  ptr.el.classList.add('ptr--go');
+  ptrDraw(PTR_TRIG, true);
+  try { flushMemo(); } catch {}
+  if (sync.dirty.size || sync.queue.size || sync.pending.size) {
+    try { await syncRatings(); } catch {}
+  }
+  hardReload();
+}
+
+function initPullRefresh() {
+  if (!('ontouchstart' in window)) return;
+  const el = document.createElement('div');
+  el.className = 'ptr'; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"'
+    + ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path class="ptr__a" d="M12 4v13M6.5 11.5L12 17l5.5-5.5"/>'
+    + '<path class="ptr__s" d="M12 4a8 8 0 1 1-5.66 2.34"/></svg>';
+  document.body.appendChild(el);
+  ptr.el = el;
+  const top = () => (document.scrollingElement || document.documentElement).scrollTop;
+
+  document.addEventListener('touchstart', e => {
+    if (ptr.busy || e.touches.length !== 1) { ptr.live = false; return; }
+    if ($drawer && !$drawer.hidden) { ptr.live = false; return; }   // 상세가 열려 있으면 쉰다
+    if (top() > 0) { ptr.live = false; return; }
+    /* 끌어 옮기는 손잡이(학과 차례)에서 시작하면 쉰다 — 맨 윗줄을 내리끌다 새로고침되면 큰일이다 */
+    const t0 = e.target;
+    if (t0 && t0.closest && t0.closest('[data-grip],.counter,input,textarea,[contenteditable="true"]')) { ptr.live = false; return; }
+    ptr.y0 = e.touches[0].clientY; ptr.x0 = e.touches[0].clientX;
+    ptr.live = true; ptr.on = false; ptr.d = 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!ptr.live || ptr.busy || e.touches.length !== 1) return;
+    const dy = e.touches[0].clientY - ptr.y0, dx = Math.abs(e.touches[0].clientX - ptr.x0);
+    if (!ptr.on) {
+      if (dy < 0 || dx > 14) { ptr.live = false; return; }   // 위로 올리거나 옆으로 밀면 손 뗀다
+      if (dy < 10) return;
+      if (dx > dy || top() > 0) { ptr.live = false; return; }
+      ptr.on = true;
+    }
+    ptr.d = Math.min(PTR_MAX, dy * 0.5);                      // 끌수록 뻑뻑하게
+    if (e.cancelable) e.preventDefault();                     // 사파리의 고무줄을 막는다
+    ptrDraw(ptr.d, ptr.d >= PTR_TRIG);
+  }, { passive: false });
+
+  const end = () => {
+    if (!ptr.live || ptr.busy) { ptr.live = false; return; }
+    const go = ptr.on && ptr.d >= PTR_TRIG;
+    ptr.live = ptr.on = false;
+    go ? ptrGo() : ptrReset();
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+}
+
 /* ---------- 시작 ---------- */
 startVersionWatch();
+initPullRefresh();
 window.addEventListener('hashchange', () => { state.rankFilter = '전체'; state.favOnly = false; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
 if (!authEnabled()) {
   enterApp(null);

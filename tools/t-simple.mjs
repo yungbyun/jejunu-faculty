@@ -41,6 +41,10 @@ t('학과 홈페이지 바로 옆에 있다', await page.evaluate(() => {
   const home = sub.querySelector('a[target="_blank"]');
   return home ? b.previousElementSibling === home : true;   // 홈페이지가 없는 학과면 그냥 줄 안에 있으면 된다
 }), await page.evaluate(() => (document.querySelector('.dept-hero .sub') || {}).innerText));
+/* 학과 이름 밑 「전임교원 N명」은 지운다 (2026-10-09) */
+t('전임교원 인원수는 없다', await page.evaluate(() =>
+  !/전임교원/.test(document.querySelector('.dept-hero').textContent)),
+  await page.evaluate(() => (document.querySelector('.dept-hero .sub') || {}).innerText));
 t('거르개 줄에는 두지 않는다', await page.evaluate(() => !document.querySelector('.filters [data-simple]')));
 t('링크처럼 보인다', await page.evaluate(() => {
   const b = document.querySelector('[data-simple]'), a = document.querySelector('.dept-hero .sub a');

@@ -27,6 +27,53 @@ t('카드에 긴 이름이 안 남음', await page.evaluate(()=>![...document.qu
   await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].map(e=>e.textContent.trim()).join(' | ')));
 t('호실은 그대로 보인다', await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')].some(e=>/\d호관/.test(e.textContent))));
 
+/* 선호도 칩은 이름 바로 오른쪽에 — 오른쪽 끝에 두면 폰에서 호실이 잘린다 (2026-10-09) */
+await page.evaluate(()=>{ state.rows.slice(0,2).forEach((p,i)=>state.ratings.set(rKey(p), ['확','긍'][i])); render(); });
+await page.waitForSelector('.favc__nm .rs',{timeout:10000});
+t('칩이 이름 칸 안에 있다', await page.evaluate(()=>{
+  const nm=document.querySelector('.favc__nm'), c=nm&&nm.querySelector('.rs');
+  return !!c && c.previousElementSibling === nm.querySelector('b');
+}));
+t('칩이 이름보다 작다', await page.evaluate(()=>{
+  const b=document.querySelector('.favc__nm b'), c=document.querySelector('.favc__nm .rs');
+  return parseFloat(getComputedStyle(c).fontSize) < parseFloat(getComputedStyle(b).fontSize);
+}), await page.evaluate(()=>getComputedStyle(document.querySelector('.favc__nm .rs')).fontSize));
+t('오른쪽 끝으로 밀지 않는다', await page.evaluate(()=>{
+  const nm=document.querySelector('.favc__nm'), c=nm.querySelector('.rs'), b=nm.querySelector('b');
+  return c.getBoundingClientRect().left - b.getBoundingClientRect().right < 12;
+}));
+t('호실이 안 잘린다', await page.evaluate(()=>[...document.querySelectorAll('.favc__loc')]
+  .every(e=>e.scrollWidth <= e.clientWidth+1)));
+
+/* 메모에서 굵게 한 말만 카드 밑에 줄 하나로 (2026-10-09) */
+await page.evaluate(()=>{
+  const k0=rKey(state.rows[0]), k1=rKey(state.rows[1]);
+  state.notes.set(k0,{memo:'**학과장 출신** 통화함' + String.fromCharCode(10) + '**실험실 공간**이 관심사'});
+  state.notes.set(k1,{memo:'굵게 한 데가 없는 메모'});
+  render();
+});
+await page.waitForSelector('.favc__m',{timeout:10000});
+t('굵게 한 말만, 콤마로', await page.evaluate(()=>document.querySelector('.favw .favc__m').textContent)==='학과장 출신, 실험실 공간',
+  await page.evaluate(()=>document.querySelector('.favw .favc__m').textContent));
+t('굵은 데가 없으면 줄도 없다', await page.locator('.favc__m').count()===1,
+  String(await page.locator('.favc__m').count()));
+t('가로줄로 갈라 둔다', await page.evaluate(()=>{
+  const m=document.querySelector('.favc__m'), cs=getComputedStyle(m);
+  return parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle === 'solid';
+}), await page.evaluate(()=>getComputedStyle(document.querySelector('.favc__m')).borderTopWidth));
+t('윗줄 아래에 있다', await page.evaluate(()=>{
+  const w=document.querySelector('.favw'), m=w.querySelector('.favc__m'), r=w.querySelector('.favw__r');
+  return m.getBoundingClientRect().top >= r.getBoundingClientRect().bottom - 1;
+}));
+t('길면 잘리지 않고 줄을 바꾼다', await page.evaluate(()=>{
+  const m=document.querySelector('.favc__m');
+  m.textContent='아주 긴 말 '.repeat(12);
+  const fits = m.scrollWidth <= m.clientWidth+1 && m.getBoundingClientRect().height > 20;
+  render(); return fits;
+}));
+await page.evaluate(()=>{ state.notes.clear(); state.ratings.clear(); render(); });
+await page.waitForSelector('.favw',{timeout:10000});
+
 t('처음은 0', await page.evaluate(()=>document.querySelector('.favw .counter__n').textContent)==='0');
 const lay = await page.evaluate(()=>{
   const c=document.querySelector('.favw .counter').getBoundingClientRect();

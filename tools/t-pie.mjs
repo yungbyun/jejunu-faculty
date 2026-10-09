@@ -207,6 +207,53 @@ t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').in
   await page.locator('.pie__k--pos .pie__kn').innerText());
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); });
 
+/* 확·긍과 겹친 공략은 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
+await page.evaluate(() => {
+  pushSet = new Set();
+  state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => pushes().add(rKey(p)));
+  pushSave(); renderStats();
+});
+t('확·긍만 공략이면 더해지는 사람이 없다',
+  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('공략 +0명'),
+  await page.locator('.pie__k--push .pie__kn').innerText());
+t('확+긍 숫자도 그대로',
+  (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
+  (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--pos b').innerText()));
+t('겹친 인원을 뺐다고 적는다', await page.evaluate(() => {
+  const e = document.querySelector('.pie__kd');
+  const n = state.rows.filter(p => isPush(p) && ['확','긍'].includes(getRating(p))).length;
+  return !!e && e.textContent.includes(String(n));
+}), await page.evaluate(() => (document.querySelector('.pie__kd') || {}).textContent));
+await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
+t('겹치는 사람이 없으면 그 말도 없다', await page.locator('.pie__kd').count() === 0);
+
+/* 카드 이름은 「+공략」 한 마디로 (2026-10-09) */
+await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });
+t('공략 카드 이름', await page.evaluate(() =>
+  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+공략',
+  await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
+
+/* 맨 위 뜻풀이 — 한 글자는 빼고 뜻만, '비'는 「비참여」 (2026-10-09) */
+t('뜻만 적는다', await page.evaluate(() => [...document.querySelectorAll('.legend--names .legend__i')]
+  .map(e => e.textContent.trim()).join('|')) === '확실|긍정|보통|모름|부정|비참여',
+  await page.evaluate(() => [...document.querySelectorAll('.legend--names .legend__i')].map(e => e.textContent.trim()).join('|')));
+t('한 글자를 앞에 달지 않는다', await page.evaluate(() =>
+  !document.querySelector('.legend--names b')));
+t('인원수를 적지 않는다', await page.evaluate(() =>
+  !/\d/.test(document.querySelector('.legend--names').textContent)));
+
+/* 지운 안내 문구와 단추 이름 (2026-10-09) */
+t('학과별 분포에 설명 줄이 없다', await page.evaluate(() => {
+  const h = [...document.querySelectorAll('.st-head')].find(x => /학과별 분포/.test(x.textContent));
+  return !!h && !/마대의 구간/.test(h.textContent);
+}));
+t('단추는 「공략 설정」', (await page.locator('#pushPick').innerText()).trim() === '공략 설정',
+  await page.locator('#pushPick').innerText());
+await page.click('#pushPick');
+t('켜지면 「설정 끝내기」', (await page.locator('#pushPick').innerText()).trim() === '설정 끝내기',
+  await page.locator('#pushPick').innerText());
+await page.click('#pushPick');
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);
