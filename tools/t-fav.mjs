@@ -57,6 +57,17 @@ t('굵게 한 말만, 콤마로', await page.evaluate(()=>document.querySelector
   await page.evaluate(()=>document.querySelector('.favw .favc__m').textContent));
 t('굵은 데가 없으면 줄도 없다', await page.locator('.favc__m').count()===1,
   String(await page.locator('.favc__m').count()));
+t('X 단추가 메모 높이까지 내려온다', await page.evaluate(() => {
+  const w = document.querySelector('.favw'), x = w.querySelector('.favx');
+  return Math.abs(x.getBoundingClientRect().height - w.getBoundingClientRect().height) <= 3;
+}), await page.evaluate(() => {
+  const w = document.querySelector('.favw');
+  return `카드 ${Math.round(w.getBoundingClientRect().height)} / X ${Math.round(w.querySelector('.favx').getBoundingClientRect().height)}`;
+}));
+t('메모에 바탕색을 깔지 않는다', await page.evaluate(() => {
+  const bg = getComputedStyle(document.querySelector('.favc__m')).backgroundColor;
+  return bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent';
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.favc__m')).backgroundColor));
 t('가로줄로 갈라 둔다', await page.evaluate(()=>{
   const m=document.querySelector('.favc__m'), cs=getComputedStyle(m);
   return parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle === 'solid';

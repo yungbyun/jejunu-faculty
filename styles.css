@@ -479,7 +479,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favsec__head h2 svg{color:#e0a10c}
 .favsec__head h2 b{font-size:17px;color:#a1740a}
 .favsec__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
-.favw{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
+.favw{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
+/* 왼쪽 묶음(윗줄 + 메모)과 X 단추 두 칸으로 나눈다 — X 가 메모 높이까지 내려온다 */
+.favw__b{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 .favw__r{display:flex;align-items:stretch}
 .favw:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
 .favc{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;padding:7px 10px}
@@ -499,7 +501,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 이름 바로 오른쪽에 둔다 — 폰에서 칩이 오른쪽 끝을 차지하면 호실이 잘린다 (2026-10-09) */
 .favc .rs--mini{flex:none;margin-left:0;font-size:10.5px;padding:0 6px;line-height:1.55;transform:translateY(-1px)}
 /* 강조한 것은 카드 밑에 줄 하나로, 가로줄로 갈라 붙여 둔다 */
-.favc__m{border-top:1px solid var(--line);padding:4px 10px 5px 12px;font-size:11.5px;line-height:1.45;color:var(--ink-2);background:color-mix(in srgb,var(--surface-2) 55%,transparent);overflow-wrap:anywhere;word-break:keep-all}
+.favc__m{border-top:1px solid var(--line);padding:4px 10px 5px 12px;font-size:11.5px;line-height:1.45;color:var(--ink-2);overflow-wrap:anywhere;word-break:keep-all}
 /* 관심 카드는 자리가 좁다 — 숫자 옆에 + 를 위, − 를 아래로 세워 폭을 줄인다.
    칸 순서는 − · 숫자 · + 이므로 격자에서 자리를 지정해 준다. */
 .favw__r .counter{flex:none;align-self:center;margin:0 2px 0 4px;padding:0;background:transparent;border:0;
