@@ -2636,19 +2636,28 @@ const memoPlain = s => String(s || '')
   .replace(/\*([^*\n]+?)\*/g, '$1');
 const memoFancy = s => /\*\*|__|\*/.test(String(s || ''));
 
-/* 편집기 안(꾸며진 DOM)을 저장용 평문으로 바꾼다 */
-function memoFromDom(node) {
-  if (node.nodeType === 3) return node.nodeValue.replace(/\u00a0/g, ' ');
-  if (node.nodeName === 'BR') return '\n';
-  let inner = '';
-  node.childNodes.forEach(c => { inner += memoFromDom(c); });
-  const t = node.nodeName;
-  if (!inner.trim()) return inner;                       // 빈 껍데기는 표시를 붙이지 않는다
-  if (t === 'B' || t === 'STRONG') return '**' + inner + '**';
-  if (t === 'U') return '__' + inner + '__';
-  if (t === 'I' || t === 'EM') return '*' + inner + '*';
-  if (t === 'DIV' || t === 'P') return inner + '\n';
-  return inner;
+/* 편집기 안(꾸며진 DOM)을 저장용 평문으로 바꾼다.
+ * 줄 하나를 묶음(div)이 끝낼 때 '뒤에 줄바꿈을 붙이는' 식으로 하면 안 된다 —
+ * 브라우저는 첫 줄을 묶음으로 감싸지 않아서(가<div>나</div>) 그 줄이 닫히지 않고 「가나」로 붙는다.
+ * 그래서 묶음을 만나면 앞에 줄바꿈을 넣는다(이미 줄바꿈으로 끝났으면 넣지 않는다).
+ * 이러면 빈 줄(<div><br></div>)도 제 몫을 하고, 겹친 묶음에서 빈 줄이 늘지도 않는다. */
+const MEMO_MK = { B: '**', STRONG: '**', U: '__', I: '*', EM: '*' };
+function memoFromDom(root) {
+  let out = '';
+  const walk = n => {
+    if (n.nodeType === 3) { out += n.nodeValue.replace(/\u00a0/g, ' '); return; }
+    if (n.nodeName === 'BR') { out += '\n'; return; }
+    if (n.nodeType !== 1) return;
+    const t = n.nodeName;
+    if ((t === 'DIV' || t === 'P') && out && !out.endsWith('\n')) out += '\n';   // 앞 줄을 닫는다
+    const at = out.length;
+    n.childNodes.forEach(walk);
+    const mk = MEMO_MK[t];
+    const inner = out.slice(at);
+    if (mk && inner.trim()) out = out.slice(0, at) + mk + inner + mk;   // 빈 껍데기에는 표시를 안 붙인다
+  };
+  root.childNodes.forEach(walk);
+  return out;
 }
 const memoRead = el => memoFromDom(el).replace(/\n+$/, '');
 
@@ -3871,6 +3880,7 @@ function exportIcs() {
 }
 
 /* ---------- 상세 드로어 ---------- */
+let drawerBack = null;   // 상세를 열기 전에 보던 자리
 function openDrawer(p, d) {
   const links = [
     p.homepage && { href: p.homepage, label: '홈페이지', primary: true },
@@ -3983,6 +3993,8 @@ function openDrawer(p, d) {
     const sbox = $panel.querySelector(`.d-summary[data-slug="${CSS.escape(p.slug)}"]`);
     if (sbox) sbox.innerHTML = summaryHtml(p, d);
   });
+  /* body 를 overflow:hidden 으로 접으면 보던 자리가 0 으로 날아간다. 적어 두었다 닫을 때 되돌린다. */
+  drawerBack = { y: window.scrollY, dept: d.id };
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
   $panel.querySelector('[data-close]').focus();
@@ -3993,10 +4005,23 @@ function closeDrawer(navigate = true) {
   flushMemo(); // 쓰다 만 메모를 바로 저장
   $drawer.hidden = true;
   document.body.style.overflow = '';
-  if (navigate) {
-    const r = route();
-    if (r.view === 'dept') history.replaceState(null, '', `#/dept/${encodeURIComponent(r.dept)}`);
+  const r = route();
+  if (navigate && r.view === 'dept') {
+    history.replaceState(null, '', `#/dept/${encodeURIComponent(r.dept)}`);
+    /* replaceState 는 hashchange 를 울리지 않는다 → 뒤에 있던 학과 화면이 옛 내용 그대로 남는다.
+       상세에서 메모·만난 횟수·표시를 고치고 닫으면 그게 안 보이므로 여기서 다시 그린다. */
+    const d = state.depts.find(x => x.id === r.dept);
+    if (d) renderDept(d);
   }
+  /* 열기 전에 보던 자리로. 되돌아온 학과가 같을 때만이고, scroll-behavior:smooth 를 잠깐 꺼서
+     출렁이지 않게 한다. */
+  if (drawerBack && r.view === 'dept' && r.dept === drawerBack.dept) {
+    const html = document.documentElement, keep = html.style.scrollBehavior;
+    html.style.scrollBehavior = 'auto';
+    window.scrollTo(0, drawerBack.y);
+    html.style.scrollBehavior = keep;
+  }
+  drawerBack = null;
 }
 $drawer.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeDrawer(true); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(true); });

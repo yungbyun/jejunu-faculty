@@ -30,6 +30,59 @@ t('줄바꿈도 살린다', await page.evaluate(()=>{
 t('빈 껍데기에는 표시를 안 붙임', await page.evaluate(()=>{
   const d=document.createElement('div'); d.innerHTML='가<b></b>나'; return memoRead(d)==='가나';
 }));
+/* 엔터를 치면 브라우저가 만드는 꼴은 제각각이다. 첫 줄은 묶음으로 감싸지 않는 것이 함정이라
+   「가<div>나</div>」가 '가나' 로 붙어 줄바꿈이 통째로 사라졌다 (2026-10-09에 고침). */
+const shapes = await page.evaluate(() => {
+  const br = String.fromCharCode(10);
+  const read = h => { const d = document.createElement('div'); d.innerHTML = h; return memoRead(d); };
+  return [
+    ['엔터 한 번(첫 줄은 맨몸)', '가<div>나</div>', '가' + br + '나'],
+    ['엔터 두 번(빈 줄)', '가<div><br></div><div>나</div>', '가' + br + br + '나'],
+    ['둘 다 묶음', '<div>가</div><div>나</div>', '가' + br + '나'],
+    ['묶음 사이 빈 줄', '<div>가</div><div><br></div><div>나</div>', '가' + br + br + '나'],
+    ['br 만 쓰는 브라우저', '가<br>나', '가' + br + '나'],
+    ['br 두 번', '가<br><br>나', '가' + br + br + '나'],
+    ['겹친 묶음(붙여넣기)', '<div><div>가</div></div>', '가'],
+    ['묶음 안의 굵게', '<div><b>굵게</b></div><div>다음</div>', '**굵게**' + br + '다음'],
+    ['끝의 빈 줄은 버린다', '가<div><br></div>', '가'],
+    ['빈 줄 둘', '<div>한</div><div><br></div><div><br></div><div>셋</div>', '한' + br + br + br + '셋'],
+  ].map(([name, html, want]) => ({ name, got: read(html), want }));
+});
+shapes.forEach(x => t(`줄바꿈 — ${x.name}`, x.got === x.want, `${JSON.stringify(x.got)} / ${JSON.stringify(x.want)}`));
+
+/* 실제로 쳐 보고, 닫았다 다시 열어도 그대로인지 */
+await page.evaluate(() => {
+  state.notes.clear();
+  const p = state.rows[0];
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+});
+await page.waitForSelector('.memo', { timeout: 10000 });
+await page.click('.memo');
+await page.keyboard.type('첫 줄');
+await page.keyboard.press('Enter');
+await page.keyboard.type('둘째 줄');
+await page.keyboard.press('Enter');
+await page.keyboard.press('Enter');
+await page.keyboard.type('넷째 줄');
+await page.waitForTimeout(1200);
+t('친 그대로 저장된다', await page.evaluate(() => {
+  const br = String.fromCharCode(10);
+  return getNote(rKey(state.rows[0])).memo === '첫 줄' + br + '둘째 줄' + br + br + '넷째 줄';
+}), await page.evaluate(() => JSON.stringify(getNote(rKey(state.rows[0])).memo)));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(700);
+await page.evaluate(() => { const p = state.rows[0]; location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
+await page.waitForSelector('.memo', { timeout: 10000 });
+await page.waitForTimeout(400);
+t('다시 열어도 줄이 그대로', await page.evaluate(() => {
+  const br = String.fromCharCode(10);
+  return memoRead(document.querySelector('.memo')) === '첫 줄' + br + '둘째 줄' + br + br + '넷째 줄';
+}), await page.evaluate(() => JSON.stringify(document.querySelector('.memo').innerHTML)));
+t('화면에도 네 줄로 보인다', await page.evaluate(() => {
+  const m = document.querySelector('.memo');
+  return Math.round(m.scrollHeight / parseFloat(getComputedStyle(m).lineHeight)) >= 4;
+}));
+await page.evaluate(() => { state.notes.clear(); });
 t('되돌리면 같은 글', await page.evaluate(()=>{
   const src='오고 출신, **강창남 교수** 후배.\n__연구실 AX__ 에 *관심*';
   const d=document.createElement('div'); d.innerHTML=memoHtml(src); return memoRead(d)===src;
