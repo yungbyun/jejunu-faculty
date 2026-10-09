@@ -2139,6 +2139,31 @@ function renderSearch(q) {
 }
 
 /* ---------- 화면: 학과 교수 목록 ---------- */
+/* 간단 표시 — 사진을 접고 이름·직위·고른 선호도만 보여 준다.
+   사람에 대한 결정이 아니라 '지금 어떻게 볼지' 라서 시트에 올리지 않고 이 기기에만 둔다
+   (카톡 복사 표시와 같은 사정). */
+const SIMPLE_KEY = 'jnu-simple';
+let simpleOn = null;
+function isSimple() {
+  if (simpleOn === null) { try { simpleOn = localStorage.getItem(SIMPLE_KEY) === '1'; } catch { simpleOn = false; } }
+  return simpleOn;
+}
+function simpleToggle() {
+  simpleOn = !isSimple();
+  try { simpleOn ? localStorage.setItem(SIMPLE_KEY, '1') : localStorage.removeItem(SIMPLE_KEY); } catch {}
+  return simpleOn;
+}
+/* 한 줄: 이름 · 직위 · 고른 선호도. 안 고른 사람은 칸을 비워 둔다 */
+function simpleRow(p, d) {
+  const r = getRating(p);
+  return `<li><a class="sp" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}"
+    title="${esc(p.name)} ${esc(p.rank)}${r ? ' · ' + esc(CONFIG.RATINGS.NAMES[r] || r) : ''}">
+    <span class="sp__n">${esc(p.name)}${chickBadge(p)}</span>
+    <span class="sp__r">${esc(p.rank)}</span>
+    <span class="sp__v">${r ? `<i class="rs rs--${rcls(r)}">${esc(r)}</i>` : ''}</span>
+  </a></li>`;
+}
+
 function renderDept(d) {
   const ranks = ['전체', ...Object.keys(RANK_ORDER).filter(r => d.profs.some(p => p.rank === r))];
   const list = d.profs.filter(p => (state.rankFilter === '전체' || p.rank === state.rankFilter) && matchRating(p) && (!state.favOnly || isFav(p)));
@@ -2159,14 +2184,18 @@ function renderDept(d) {
           <div class="filters filters--rate" role="group" aria-label="선호도 필터">
             ${rf.map(r => `<button class="chip chip--rate" type="button" data-rating="${esc(r)}" data-val="${esc(r)}" aria-pressed="${state.ratingFilter === r}">${esc(r)}<span class="n">${countRating(d, r)}</span></button>`).join('')}
             <button class="chip chip--fav" type="button" data-favfilter aria-pressed="${state.favOnly}" title="관심 교수만 보기">${FAV_SVG}관심<span class="n">${favCount(d)}</span></button>
+            <button class="chip chip--simple" type="button" data-simple aria-pressed="${isSimple()}" title="사진을 접고 이름·직위·선호도만 봅니다">간단히</button>
           </div>
         </div>
       </div>
-      ${list.length ? `<div class="prof-grid">${list.map(p => profCard(p, d)).join('')}</div>` : `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong></div>`}
+      ${!list.length ? `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong></div>`
+        : isSimple() ? `<ul class="simple-list">${list.map(p => simpleRow(p, d)).join('')}</ul>`
+        : `<div class="prof-grid">${list.map(p => profCard(p, d)).join('')}</div>`}
     </div>`;
   $app.querySelectorAll('.chip[data-rank]').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
   $app.querySelectorAll('.chip[data-rating]').forEach(b => b.addEventListener('click', () => { state.ratingFilter = b.dataset.rating; renderDept(d); }));
   $app.querySelector('.chip[data-favfilter]')?.addEventListener('click', () => { state.favOnly = !state.favOnly; renderDept(d); });
+  $app.querySelector('.chip[data-simple]')?.addEventListener('click', () => { simpleToggle(); renderDept(d); });
   bindCards();
 }
 

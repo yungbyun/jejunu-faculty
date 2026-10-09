@@ -23,6 +23,7 @@ for (const w of [320, 390]) {
       if (i % 7 === 0) sures().add(rKey(p));
     });
     mobileMap = {}; const m = mobiles(); state.rows.forEach(p => { m[rKey(p)] = '010-1234-5678'; });
+    simpleOn = false; localStorage.removeItem('jnu-simple');
   });
   for (const v of VIEWS) {
     await page.evaluate(h => { location.hash = h; render(); }, v);
