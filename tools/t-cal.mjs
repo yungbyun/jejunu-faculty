@@ -33,7 +33,9 @@ t('길잡이에 식사 약속', (await page.locator('.crumbs').innerText()).incl
 t('큰 제목과 설명은 두지 않는다', await page.evaluate(() =>
   !document.querySelector('.view h1') && !document.querySelector('.hero p')));
 t('처음엔 약속이 없다', await page.locator('.cal-r').count() === 0);
-t('다가오는 약속 칸도 없다', await page.locator('.cal-soon').count() === 0);
+/* 「다가오는 약속」 칸은 2026-10-12 에 뺐다 — 달력과 그날 목록만 남긴다 */
+t('다가오는 약속 칸은 없다', await page.evaluate(() =>
+  !document.querySelector('.cal-soon') && !/다가오는/.test(document.body.textContent)));
 t('오늘이 골라져 있다', await page.evaluate(() => CAL.day === mtToday() && !!document.querySelector('.cal-c.on.today')));
 t('요일 머리글이 일곱', await page.locator('.cal-dow').count() === 7);
 t('그 달의 날 수만큼 칸', await page.evaluate(() => {
@@ -398,6 +400,7 @@ await page.evaluate(() => {
   mtAdd(day(1), rKey(state.rows[0]), 'lunch');
   mtAdd(day(1), rKey(state.rows[1]), 'dinner');
   mtAdd(day(1), rKey(state.rows[2]), 'other');
+  mtAdd(day(1), rKey(state.rows[4]), '');        // 시각 미정 — 시계 아이콘
   mtAdd(day(3), rKey(state.rows[3]), 'dinner');
   CAL.day = day(1); CAL.ym = mtMonth(day(1)); CAL.open = '';
   location.hash = '#/cal'; render();
@@ -411,15 +414,15 @@ const lum = () => page.evaluate(() => {
   const pick = k => { const i = document.querySelector(`.cal-c:not(.on) .cal-c__d i.cal-dot--${k}`)
       || document.querySelector(`.cal-c__d i.cal-dot--${k}`);
     return i ? L(getComputedStyle(i).backgroundColor) : null; };
-  return { lunch: pick('lunch'), dinner: pick('dinner'), etc: pick('etc') };
+  return { lunch: pick('day'), dinner: pick('night'), etc: pick('none') };
 });
 const Lm = await lum();
 t('갈래마다 점 색이 다르다', await page.evaluate(() => {
   const c = k => { const i = document.querySelector(`.cal-c__d i.cal-dot--${k}`); return i && getComputedStyle(i).backgroundColor; };
-  const a = c('lunch'), b2 = c('dinner'), e = c('etc');
+  const a = c('day'), b2 = c('night'), e = c('none');
   return a && b2 && e && a !== b2 && b2 !== e && a !== e;
 }), JSON.stringify(Lm));
-t('점심 점이 저녁 점보다 밝다', Lm.lunch !== null && Lm.dinner !== null && Lm.lunch > Lm.dinner + .1,
+t('낮 점이 밤 점보다 밝다', Lm.lunch !== null && Lm.dinner !== null && Lm.lunch > Lm.dinner + .1,
   `점심 ${(Lm.lunch || 0).toFixed(3)} · 저녁 ${(Lm.dinner || 0).toFixed(3)}`);
 t('고른 날에도 갈래가 갈린다', await page.evaluate(() => {
   const on = document.querySelectorAll('.cal-c.on .cal-c__d i');
@@ -446,20 +449,51 @@ t('줄마다 시각 앞에 아이콘', await page.evaluate(() =>
     const i = e.querySelector('.mt-i');
     return !!i && i === e.firstElementChild && i.querySelector('svg');
   })));
-t('점심·저녁 아이콘이 갈린다', await page.evaluate(() => {
+t('낮·밤·미정 아이콘이 갈린다', await page.evaluate(() => {
   const k = [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className);
-  return k.some(c => c.includes('mt-i--lunch')) && k.some(c => c.includes('mt-i--dinner')) && k.some(c => c.includes('mt-i--etc'));
+  return k.some(c => c.includes('mt-i--day')) && k.some(c => c.includes('mt-i--night')) && k.some(c => c.includes('mt-i--none'));
 }), await page.evaluate(() => [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className).join(' | ')));
 t('아이콘 색이 달력의 점과 같다', await page.evaluate(() => {
-  const dot = document.querySelector('.cal-c:not(.on) .cal-c__d i.cal-dot--dinner')
-    || document.querySelector('.cal-c__d i.cal-dot--dinner');
-  const ico = document.querySelector('.cal-r__t .mt-i--dinner');
+  const dot = document.querySelector('.cal-c:not(.on) .cal-c__d i.cal-dot--night')
+    || document.querySelector('.cal-c__d i.cal-dot--night');
+  const ico = document.querySelector('.cal-r__t .mt-i--night');
   return !!dot && !!ico && getComputedStyle(dot).backgroundColor === getComputedStyle(ico).color;
 }));
 t('아이콘이 글자를 밀어내지 않는다', await page.evaluate(() => {
   const e = document.querySelector('.cal-r__t');
   return e.scrollWidth <= e.clientWidth + 1;
 }));
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
+/* 해·달은 갈래가 아니라 **몇 시냐**로 정한다 (2026-10-12) */
+t('여섯 시부터 열여덟 시 앞까지가 낮', await page.evaluate(() =>
+  ['06:00', '12:00', '14:00', '17:59'].every(t2 => mtSlot({ time: t2 }) === 'day')));
+t('열여덟 시부터는 밤', await page.evaluate(() =>
+  ['18:00', '18:30', '19:40', '23:00', '05:30'].every(t2 => mtSlot({ time: t2 }) === 'night')));
+t('시각이 없으면 갈래의 시각을 본다', await page.evaluate(() =>
+  mtSlot({ time: '', kind: 'lunch' }) === 'day' && mtSlot({ time: '', kind: 'dinner' }) === 'night'));
+t('둘 다 없으면 시계', await page.evaluate(() => mtSlot({ time: '', kind: '' }) === 'none'));
+/* 갈래 없이 손으로 넣은 시각도 해·달로 갈린다 */
+await page.evaluate(() => {
+  meetMap = {}; const d = mtToday();
+  mtSet(mtAdd(d, rKey(state.rows[0]), ''), { time: '14:00' });
+  mtSet(mtAdd(d, rKey(state.rows[1]), ''), { time: '19:40' });
+  mtAdd(d, rKey(state.rows[2]), '');
+  CAL.day = d; CAL.ym = mtMonth(d); CAL.open = ''; renderCal();
+});
+await page.waitForSelector('.cal-r__t .mt-i', { timeout: 10000 });
+t('14:00 은 해, 19:40 은 달, 미정은 시계', await page.evaluate(() => {
+  const m = {};
+  document.querySelectorAll('.cal-r__t').forEach(e => {
+    m[e.textContent.trim().split(/\s+/)[0]] = e.querySelector('.mt-i').className.replace('mt-i mt-i--', '');
+  });
+  return m['14:00'] === 'day' && m['19:40'] === 'night' && m['시각'] === 'none';
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-r__t')]
+  .map(e => e.querySelector('.mt-i').className.replace('mt-i mt-i--', '') + ':' + e.textContent.trim().split(/\s+/)[0]).join(' ')));
+t('달력 점도 같은 규칙', await page.evaluate(() => {
+  const k = [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => i.className.replace('cal-dot--', ''));
+  return k.includes('day') && k.includes('night');
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => i.className).join(' ')));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* 새 약속을 잡을 때 점심·저녁·직접 중에서 고른다 (2026-10-12) */
@@ -472,7 +506,7 @@ t('단추에 시각이 적혀 있다', await page.evaluate(() => {
   return g('lunch').includes('12:00') && g('dinner').includes('18:30');
 }), await page.evaluate(() => [...document.querySelectorAll('[data-mtadd]')].map(b => b.textContent.trim()).join(' | ')));
 t('단추에도 해·달 아이콘', await page.evaluate(() =>
-  !!document.querySelector('[data-mtadd="lunch"] .mt-i--lunch') && !!document.querySelector('[data-mtadd="dinner"] .mt-i--dinner')));
+  !!document.querySelector('[data-mtadd="lunch"] .mt-i--day') && !!document.querySelector('[data-mtadd="dinner"] .mt-i--night')));
 t('날짜 제목과 다른 줄에 있다', await page.evaluate(() => {
   const h = document.querySelector('.cal-head--day h2').getBoundingClientRect();
   const b = document.querySelector('[data-mtadd="lunch"]').getBoundingClientRect();

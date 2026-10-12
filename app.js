@@ -3639,8 +3639,6 @@ const mtList = () => Object.entries(meets())
 const mtToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
 const mtMonth = s => String(s || '').slice(0, 7);
 const mtOf = day => mtList().filter(m => m.date === day);
-/* 오늘부터 앞으로 */
-const mtSoon = (n = 4) => { const t = mtToday(); return mtList().filter(m => m.date >= t).slice(0, n); };
 
 /* 약속 시간 갈래. 점심·저녁은 시각이 뻔하므로 미리 넣어 두고, 기타는 미정으로 둔다.
    시각을 손으로 고치면 갈래는 지운다 — 18:00 인데 '점심' 이라고 적혀 있으면 안 된다. */
@@ -3650,18 +3648,29 @@ const MT_KIND = {
   other:  { name: '',     time: '14:00' },   // 이름을 비워 두면 줄머리에 시각만 나온다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
-/* 점심·저녁을 한눈에 — 해와 달. 갈래가 없으면 시계. */
+/* 낮이면 해, 밤이면 달, 시각을 안 정했으면 시계.
+ * 점심·저녁이라는 갈래가 아니라 **몇 시냐**로 가른다 — 14시 커피도 해, 19시 40분도 달이다.
+ * 여섯 시부터 열여덟 시 앞까지를 낮으로 본다. */
 const MT_ICON = {
-  lunch: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="currentColor"/>'
+  day: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="currentColor"/>'
     + '<g stroke="currentColor" stroke-width="2" stroke-linecap="round">'
     + '<path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></g></svg>',
-  dinner: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  night: '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<path d="M20 14.2A8.3 8.3 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z" fill="currentColor"/></svg>',
-  '': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/>'
+  none: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/>'
     + '<path d="M12 7.4V12l3 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
 };
-const mtKindCls = k => (k === 'lunch' || k === 'dinner') ? k : 'etc';
-const mtIcon = k => `<i class="mt-i mt-i--${mtKindCls(k)}" aria-hidden="true">${MT_ICON[k === 'lunch' || k === 'dinner' ? k : '']}</i>`;
+const MT_DAY0 = 6, MT_DAY1 = 18;
+/* 약속 하나가 낮인지 밤인지. 시각이 먼저고, 없으면 갈래에 적힌 시각을 본다. */
+function mtSlot(m) {
+  const t = String((m && m.time) || '');
+  const h = /^(\d{1,2}):/.test(t) ? Number(t.slice(0, 2)) : null;
+  if (h !== null) return (h >= MT_DAY0 && h < MT_DAY1) ? 'day' : 'night';
+  const K = MT_KIND[(m && m.kind) || ''];
+  if (K && K.time) return Number(K.time.slice(0, 2)) < MT_DAY1 ? 'day' : 'night';
+  return 'none';
+}
+const mtIcon = slot => `<i class="mt-i mt-i--${slot}" aria-hidden="true">${MT_ICON[slot] || MT_ICON.none}</i>`;
 /* 시각만으로 id 를 지으면 같은 밀리초에 두 번 부를 때 겹쳐 앞 약속이 덮어써진다.
    단추를 연달아 누르면 실제로 그렇게 된다. 겹치지 않을 때까지 다시 짓는다. */
 function mtNewId() {
@@ -3763,7 +3772,6 @@ function renderCal() {
   const cells = mtCells(CAL.ym);
   const byDay = {};
   mtList().forEach(m => { (byDay[m.date] = byDay[m.date] || []).push(m); });
-  const soon = mtSoon();
   const dayList = mtOf(CAL.day);
   const [cy, cm] = CAL.ym.split('-');
 
@@ -3771,16 +3779,6 @@ function renderCal() {
     <div class="view">
       <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>식사 약속</span></div>
       <div class="hero hero--thin"><div class="eyebrow">식사 약속</div></div>
-
-      ${soon.length ? `<section class="cal-soon">
-        <h2>다가오는 약속</h2>
-        <div class="cal-soon__l">${soon.map(m => `
-          <button type="button" class="cal-s" data-mtgo="${esc(m.id)}" data-day="${esc(m.date)}">
-            <span class="cal-s__d">${esc(mtWhen(m.date, m.time))}</span>
-            <span class="cal-s__w">${esc(mtNames(m).join(', ') || '사람 없음')}</span>
-            ${m.place ? `<span class="cal-s__p">${esc(m.place)}</span>` : ''}
-          </button>`).join('')}</div>
-      </section>` : ''}
 
       <section class="cal-sec">
         <div class="cal-head">
@@ -3800,7 +3798,7 @@ function renderCal() {
               data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${day === CAL.day ? ' aria-current="date"' : ''}>
               <span class="cal-c__n">${Number(day.slice(8))}</span>
               ${n ? `<span class="cal-c__d">${(byDay[day] || []).slice(0, 3)
-                  .map(x => `<i class="cal-dot--${mtKindCls(x.kind)}"></i>`).join('')}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
+                  .map(x => `<i class="cal-dot--${mtSlot(x)}"></i>`).join('')}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
             </button>`;
           }).join('')}
         </div>
@@ -3810,9 +3808,9 @@ function renderCal() {
         <div class="cal-head cal-head--day"><h2>${esc(mtWhen(CAL.day))}</h2>
           <div class="cal-new" role="group" aria-label="새 약속 잡기">
             <span class="cal-new__l">새 약속</span>
-            <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('lunch')}점심 12:00</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('dinner')}저녁 18:30</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="">${mtIcon('')}직접</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('day')}점심 12:00</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('night')}저녁 18:30</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="">${mtIcon('none')}직접</button>
           </div></div>
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
@@ -3834,7 +3832,7 @@ function mtRow(m) {
   return `<div class="cal-r${open ? ' on' : ''}${m.done ? ' cal-r--' + m.done : ''}">
     <div class="cal-r__h">
       <button type="button" class="cal-r__m" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
-        <span class="cal-r__t">${mtIcon(m.kind)}${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
+        <span class="cal-r__t">${mtIcon(mtSlot(m))}${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
         <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
         <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
       </button>
@@ -3939,9 +3937,6 @@ function bindCal() {
   $('[data-mtics]')?.addEventListener('click', exportIcs);
   $app.querySelectorAll('[data-mtday]').forEach(b => b.addEventListener('click', () => {
     CAL.day = b.dataset.mtday; CAL.open = ''; renderCal();
-  }));
-  $app.querySelectorAll('[data-mtgo]').forEach(b => b.addEventListener('click', () => {
-    CAL.day = b.dataset.day; CAL.ym = mtMonth(b.dataset.day); CAL.open = b.dataset.mtgo; renderCal();
   }));
   $app.querySelectorAll('[data-mtadd]').forEach(b => b.addEventListener('click', () => {
     const kind = b.dataset.mtadd;
