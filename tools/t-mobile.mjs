@@ -119,14 +119,16 @@ await page.waitForTimeout(400);
 check('상세에서도 복사된다', await page.evaluate(() => navigator.clipboard.readText()) === '010-1234-5678');
 check('상세가 닫히지 않는다', await page.evaluate(() => location.hash) === dHash &&
   await page.evaluate(() => !document.querySelector('.drawer').hidden));
-check('번호가 하나도 없으면 줄도 없다', await page.evaluate(() => {
+/* 번호가 하나도 없어도 줄은 남긴다 — 거기에 「핸드폰 등록」 단추가 있다 (2026-10-12) */
+check('번호가 없으면 등록 단추만', await page.evaluate(() => {
   const q = state.rows.find(y => !mobileOf(y));
   if (!q) return true;
   const keep = q.phone; q.phone = '';
   location.hash = `#/dept/${q.dept_id}/prof/${q.slug}`; render();
-  const none = !document.querySelector('.d-phones');
+  const box = document.querySelector('.d-phones');
+  const ok = !!box && !!box.querySelector('[data-mobed]') && !box.querySelector('.d-ct__n');
   q.phone = keep;
-  return none;
+  return ok;
 }));
 /* 공개 파일에 번호가 새지 않았는지 다시 — 상세에 다시 넣은 뒤라 꼭 본다 */
 check('상세에 넣어도 공개 파일은 그대로', (pub.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g) || []).length === 0);
@@ -188,6 +190,75 @@ await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'
 
 check('settings 키로 등록됨', await page.evaluate(() =>
   setKeys().includes('mobile') && SET_OBJ.includes('mobile')));
+
+/* 번호를 폰에서 바로 등록·수정 — 수화기 옆 연필 (2026-10-12) */
+const who = await page.evaluate(() => {
+  mobileMap = {}; localStorage.removeItem('jnu-mobile');
+  const p = state.rows[2];
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+  return p.name;
+});
+await page.waitForSelector('.d-phones', { timeout: 10000 });
+check('번호가 없으면 「핸드폰 등록」', await page.evaluate(() => {
+  const b = document.querySelector('[data-mobed]');
+  return !!b && b.textContent.includes('핸드폰 등록');
+}), await page.evaluate(() => document.querySelector('.d-phones').innerText.replace(/\n/g, ' | ')));
+await page.click('[data-mobed]');
+await page.waitForSelector('[data-mobin]', { timeout: 5000 });
+check('숫자 자판이 뜨는 칸', await page.evaluate(() => {
+  const i = document.querySelector('[data-mobin]');
+  return i.type === 'tel' && i.getAttribute('inputmode') === 'numeric';
+}));
+check('칸에 커서가 가 있다', await page.evaluate(() => document.activeElement === document.querySelector('[data-mobin]')));
+
+/* 자릿수가 안 맞으면 저장하지 않는다 */
+await page.fill('[data-mobin]', '12345');
+await page.click('[data-mobok]');
+await page.waitForTimeout(200);
+check('짧은 번호는 안 받는다', await page.evaluate(() => !!document.querySelector('[data-mobin]')));
+check('왜 안 되는지 알려 준다', (await page.evaluate(() => document.querySelector('.foot__status').textContent)).includes('자리'),
+  await page.evaluate(() => document.querySelector('.foot__status').textContent));
+
+/* 제대로 넣으면 저장되고 바로 문자 링크가 된다 */
+await page.fill('[data-mobin]', '01087651234');
+await page.press('[data-mobin]', 'Enter');
+await page.waitForTimeout(250);
+check('엔터로도 저장된다', await page.evaluate(() => mobileOf(state.rows[2])) === '010-8765-1234',
+  await page.evaluate(() => mobileOf(state.rows[2])));
+check('저장하면 바로 문자 링크', await page.evaluate(() => {
+  const a = document.querySelector('.d-ct__n[href^="sms:"]');
+  return !!a && a.getAttribute('href') === 'sms:01087651234';
+}));
+check('시트에도 올라간다', await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('jnu-mobile'))[rKey(state.rows[2])] === '010-8765-1234'));
+check('수화기 옆에 연필', await page.evaluate(() => {
+  const box = [...document.querySelectorAll('.d-ct')].pop();
+  const kids = [...box.children].map(e => e.tagName + (e.dataset.mobed !== undefined ? ':pen' : ''));
+  return kids.some(k => k.endsWith(':pen'));
+}), await page.evaluate(() => [...[...document.querySelectorAll('.d-ct')].pop().children].map(e => e.tagName).join(' ')));
+
+/* 취소하면 그대로 둔다 */
+await page.click('[data-mobed]');
+await page.fill('[data-mobin]', '01000000000');
+await page.click('[data-mobno]');
+await page.waitForTimeout(200);
+check('취소하면 안 바뀐다', await page.evaluate(() => mobileOf(state.rows[2])) === '010-8765-1234');
+
+/* 카드의 연필 — 상세를 열며 바로 고치게 한다 */
+await page.evaluate(() => { closeDrawer(false); const p = state.rows[2]; location.hash = `#/dept/${p.dept_id}`; render(); });
+await page.waitForSelector('[data-mobgo]', { timeout: 10000 });
+await page.locator('[data-mobgo]').first().click();
+await page.waitForTimeout(500);
+check('카드 연필이 상세를 연다', await page.evaluate(() => !document.getElementById('drawer').hidden));
+check('열자마자 고칠 수 있다', await page.evaluate(() => !!document.querySelector('[data-mobin]')));
+
+/* 비우면 지운다 */
+await page.fill('[data-mobin]', '');
+await page.click('[data-mobok]');
+await page.waitForTimeout(250);
+check('비우면 번호가 지워진다', await page.evaluate(() => mobileOf(state.rows[2])) === '');
+check('지우면 다시 등록 단추', await page.evaluate(() => !!document.querySelector('[data-mobed]')));
+await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); closeDrawer(false); });
 
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }

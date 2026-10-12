@@ -2248,7 +2248,7 @@ function profCard(p, d, showDept = false) {
         ${loc || p.phone || mobileOf(p) ? `<div class="prof__office">
           ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
-          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="sms:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="문자 쓰기" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))} — 문자 쓰기">${SMS_SVG}${esc(mobileOf(p))}</a><a class="po__cp" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="전화 걸기" aria-label="${esc(p.name)} 전화 걸기">${TEL_SVG}</a><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
+          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="sms:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="문자 쓰기" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))} — 문자 쓰기">${SMS_SVG}${esc(mobileOf(p))}</a><a class="po__cp" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="전화 걸기" aria-label="${esc(p.name)} 전화 걸기">${TEL_SVG}</a><button type="button" class="po__cp" data-mobgo="${esc(rKey(p))}" title="번호 고치기" aria-label="${esc(p.name)} 핸드폰 번호 고치기">${PEN_SVG}</button><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
         </div>
@@ -3218,6 +3218,15 @@ function persistSession() { try { localStorage.setItem(AUTH_KEY, JSON.stringify(
 
 /* 번호 옆 복사 아이콘. 카드가 열리지 않도록 이벤트를 여기서 막는다.
    카드(목록)와 상세 화면이 같이 쓴다. */
+/* 카드의 연필 — 그 교수 상세를 열면서 번호 칸을 바로 펼친다 */
+function bindMobGo(root) {
+  root.querySelectorAll('[data-mobgo]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); e.preventDefault();
+    const p = state.rows.find(x => rKey(x) === b.dataset.mobgo); if (!p) return;
+    mobEditKey = b.dataset.mobgo;
+    location.hash = `#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}`;
+  }));
+}
 function bindCopyNums(root) {
   root.querySelectorAll('[data-copynum]').forEach(b => b.addEventListener('click', async e => {
     e.stopPropagation(); e.preventDefault();
@@ -3240,6 +3249,7 @@ function bindCards() {
   bindFavs($app);
   bindNotes($app);
   bindCopyNums($app);
+  bindMobGo($app);
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
 
@@ -3536,6 +3546,11 @@ const SMS_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="tr
   + '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.8 9.8 0 0 1-2.6-.35L4 21l1.4-3.9A8.1 8.1 0 0 1 3 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 const TEL_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>';
+const PEN_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
+  + '<path d="M4 20h4l10-10-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>'
+  + '<path d="M14.5 5.5l4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+/* 지금 번호를 고치고 있는 사람. 카드의 연필로 들어오면 상세가 열리면서 바로 고칠 수 있다. */
+let mobEditKey = '';
 const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>'
   + '<path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -3546,16 +3561,62 @@ function dPhone(label, num, who, sms) {
     + `<a class="d-ct__n" href="${sms ? 'sms' : 'tel'}:${esc(tel)}"`
     + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)}${sms ? ' — 문자 쓰기' : ' — 전화 걸기'}"`
     + ` title="${sms ? '문자 쓰기' : '전화 걸기'}">${sms ? SMS_SVG : ''}${esc(num)}</a>`
-    + (sms ? `<a class="d-ct__c" href="tel:${esc(tel)}" title="전화 걸기" aria-label="${esc(who)} ${esc(label)} 전화 걸기">${TEL_SVG}</a>` : '')
+    + (sms ? `<a class="d-ct__c" href="tel:${esc(tel)}" title="전화 걸기" aria-label="${esc(who)} ${esc(label)} 전화 걸기">${TEL_SVG}</a>`
+      + `<button type="button" class="d-ct__c" data-mobed title="번호 고치기" aria-label="${esc(who)} 핸드폰 번호 고치기">${PEN_SVG}</button>` : '')
     + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
     + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
 }
-/* 둘 다 없으면 줄 자체를 그리지 않는다 */
+/* 핸드폰은 없으면 등록, 있으면 고칠 수 있다 — 폰에서 바로 적어 넣으시라고. */
+function dMobEdit(p) {
+  const cur = mobileOf(p);
+  return `<span class="d-ct d-ct--ed">`
+    + `<input type="tel" inputmode="numeric" class="d-ct__i" data-mobin value="${esc(cur)}"`
+    + ` placeholder="010-0000-0000" aria-label="${esc(p.name)} 핸드폰 번호">`
+    + `<button type="button" class="d-ct__b" data-mobok>저장</button>`
+    + `<button type="button" class="d-ct__b d-ct__b--x" data-mobno>취소</button></span>`;
+}
+function dMobile(p) {
+  if (mobEditKey === rKey(p)) return dMobEdit(p);
+  const num = mobileOf(p);
+  if (!num) return `<button type="button" class="d-ct__add" data-mobed`
+    + ` aria-label="${esc(p.name)} 핸드폰 번호 등록">${PEN_SVG}핸드폰 등록</button>`;
+  return dPhone('핸드폰', num, p.name, true);
+}
+/* 연구실 번호도 핸드폰도 없고 등록 단추도 없을 때만 줄을 비운다 */
 function dPhones(p) {
   const a = [];
   if (p.phone) a.push(dPhone('연구실', p.phone, p.name));
-  if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name, true));
-  return a.length ? `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>` : '';
+  a.push(dMobile(p));
+  return `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>`;
+}
+/* 번호 줄만 갈아 끼운다 — 메모를 쓰던 중에 상세를 통째로 다시 그리면 커서가 날아간다 */
+function refreshPhones(p) {
+  const box = $panel.querySelector('.d-phones');
+  if (!box) return;
+  box.outerHTML = dPhones(p);
+  bindCopyNums($panel);
+  bindMobEdit(p);
+}
+function bindMobEdit(p) {
+  $panel.querySelector('[data-mobed]')?.addEventListener('click', () => {
+    mobEditKey = rKey(p); refreshPhones(p);
+    const i = $panel.querySelector('[data-mobin]'); if (i) { i.focus(); i.select(); }
+  });
+  $panel.querySelector('[data-mobno]')?.addEventListener('click', () => { mobEditKey = ''; refreshPhones(p); });
+  const inp = $panel.querySelector('[data-mobin]');
+  const save = () => {
+    const v = inp.value.trim();
+    if (v && !fmtMobile(v)) { flashStatus('번호가 열한 자리(또는 열 자리)가 아닙니다', true); inp.focus(); return; }
+    const f = setMobile(p, v);
+    mobEditKey = '';
+    refreshPhones(p);
+    flashStatus(f ? `${p.name} 교수 핸드폰을 ${f} 로 적었습니다` : `${p.name} 교수 핸드폰 번호를 지웠습니다`);
+  };
+  $panel.querySelector('[data-mobok]')?.addEventListener('click', save);
+  inp?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); mobEditKey = ''; refreshPhones(p); }
+  });
 }
 /* ---------- 식사 약속 ----------
  * 교수를 언제 만나기로 했는지 적어 두는 곳. 직접 보낸 기록과 같은 길(비공개 시트의 meets 키)로
@@ -4037,6 +4098,7 @@ function openDrawer(p, d) {
   bindRates($panel);
   bindFavs($panel);
   bindCopyNums($panel);
+  bindMobEdit(p);
   /* 그 자리에서 오늘 날짜·이 교수로 약속을 만들고 달력으로 간다 — 날짜는 거기서 고치면 된다 */
   $panel.querySelectorAll('[data-mtnew]').forEach(b => b.addEventListener('click', () => {
     const kind = b.dataset.mtnew;

@@ -1475,3 +1475,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-chip--add:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
 /* 핸드폰 번호 앞의 말풍선 — 누르면 문자로 간다는 뜻 */
 .d-ct__n svg{width:12px;height:12px;margin-right:4px;vertical-align:-1px;opacity:.85}
+
+/* 핸드폰 번호 등록·고치기 (2026-10-12) */
+.d-ct__add{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+  border:1px dashed var(--line-2);background:none;color:var(--ink-3);font:inherit;font-size:inherit;cursor:pointer}
+.d-ct__add:hover{border-color:var(--brand);color:var(--brand)}
+/* 고치는 동안에는 한 줄을 다 쓴다 — 저장·취소가 아래로 떨어지지 않게 */
+.d-ct--ed{display:flex;align-items:center;gap:8px;margin-top:6px}
+.d-ct__i{flex:1 1 auto;min-width:0;max-width:230px;padding:4px 10px;border-radius:8px;border:1px solid var(--line-2);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:inherit}
+.d-ct__i:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
+.d-ct__b{flex:none;white-space:nowrap;padding:5px 14px;border-radius:999px;border:1px solid var(--brand);background:var(--brand);
+  color:#fff;font:inherit;font-size:inherit;font-weight:700;cursor:pointer}
+.d-ct__b--x{background:none;color:var(--ink-3);border-color:var(--line-2);font-weight:500}
+.d-ct__b--x:hover{color:var(--ink);border-color:var(--line)}
