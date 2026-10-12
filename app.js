@@ -3650,6 +3650,18 @@ const MT_KIND = {
   other:  { name: '',     time: '14:00' },   // 이름을 비워 두면 줄머리에 시각만 나온다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
+/* 점심·저녁을 한눈에 — 해와 달. 갈래가 없으면 시계. */
+const MT_ICON = {
+  lunch: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="currentColor"/>'
+    + '<g stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+    + '<path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></g></svg>',
+  dinner: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M20 14.2A8.3 8.3 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z" fill="currentColor"/></svg>',
+  '': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/>'
+    + '<path d="M12 7.4V12l3 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+};
+const mtKindCls = k => (k === 'lunch' || k === 'dinner') ? k : 'etc';
+const mtIcon = k => `<i class="mt-i mt-i--${mtKindCls(k)}" aria-hidden="true">${MT_ICON[k === 'lunch' || k === 'dinner' ? k : '']}</i>`;
 /* 시각만으로 id 를 지으면 같은 밀리초에 두 번 부를 때 겹쳐 앞 약속이 덮어써진다.
    단추를 연달아 누르면 실제로 그렇게 된다. 겹치지 않을 때까지 다시 짓는다. */
 function mtNewId() {
@@ -3787,7 +3799,8 @@ function renderCal() {
             return `<button type="button" class="cal-c${day === CAL.day ? ' on' : ''}${day === today ? ' today' : ''}${dow === 0 ? ' sun' : ''}"
               data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${day === CAL.day ? ' aria-current="date"' : ''}>
               <span class="cal-c__n">${Number(day.slice(8))}</span>
-              ${n ? `<span class="cal-c__d">${'<i></i>'.repeat(Math.min(n, 3))}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
+              ${n ? `<span class="cal-c__d">${(byDay[day] || []).slice(0, 3)
+                  .map(x => `<i class="cal-dot--${mtKindCls(x.kind)}"></i>`).join('')}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
             </button>`;
           }).join('')}
         </div>
@@ -3816,7 +3829,7 @@ function mtRow(m) {
   return `<div class="cal-r${open ? ' on' : ''}${m.done ? ' cal-r--' + m.done : ''}">
     <div class="cal-r__h">
       <button type="button" class="cal-r__m" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
-        <span class="cal-r__t">${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
+        <span class="cal-r__t">${mtIcon(m.kind)}${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
         <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
         <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
       </button>

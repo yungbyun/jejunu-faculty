@@ -389,6 +389,79 @@ t('guests 도 meets 에 담긴다', await page.evaluate(() => {
 }));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.q = ''; });
 
+/* 점심은 밝게, 저녁은 어둡게 — 달력의 점과 목록의 아이콘 (2026-10-12) */
+await page.evaluate(() => {
+  meetMap = {};
+  const t0 = mtToday(), d = new Date(t0 + 'T00:00:00');
+  const day = n => { const x = new Date(d); x.setDate(x.getDate() + n);
+    return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
+  mtAdd(day(1), rKey(state.rows[0]), 'lunch');
+  mtAdd(day(1), rKey(state.rows[1]), 'dinner');
+  mtAdd(day(1), rKey(state.rows[2]), 'other');
+  mtAdd(day(3), rKey(state.rows[3]), 'dinner');
+  CAL.day = day(1); CAL.ym = mtMonth(day(1)); CAL.open = '';
+  location.hash = '#/cal'; render();
+});
+await page.waitForSelector('.cal-c__d i', { timeout: 10000 });
+/* 화면에 찍힌 색을 그대로 읽어 밝기를 잰다 */
+const lum = () => page.evaluate(() => {
+  const L = c => { const [r, g, b] = (c.match(/\d+/g) || []).map(Number);
+    const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+    return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const pick = k => { const i = document.querySelector(`.cal-c:not(.on) .cal-c__d i.cal-dot--${k}`)
+      || document.querySelector(`.cal-c__d i.cal-dot--${k}`);
+    return i ? L(getComputedStyle(i).backgroundColor) : null; };
+  return { lunch: pick('lunch'), dinner: pick('dinner'), etc: pick('etc') };
+});
+const Lm = await lum();
+t('갈래마다 점 색이 다르다', await page.evaluate(() => {
+  const c = k => { const i = document.querySelector(`.cal-c__d i.cal-dot--${k}`); return i && getComputedStyle(i).backgroundColor; };
+  const a = c('lunch'), b2 = c('dinner'), e = c('etc');
+  return a && b2 && e && a !== b2 && b2 !== e && a !== e;
+}), JSON.stringify(Lm));
+t('점심 점이 저녁 점보다 밝다', Lm.lunch !== null && Lm.dinner !== null && Lm.lunch > Lm.dinner + .1,
+  `점심 ${(Lm.lunch || 0).toFixed(3)} · 저녁 ${(Lm.dinner || 0).toFixed(3)}`);
+t('고른 날에도 갈래가 갈린다', await page.evaluate(() => {
+  const on = document.querySelectorAll('.cal-c.on .cal-c__d i');
+  if (on.length < 2) return false;
+  const s = new Set([...on].map(i => getComputedStyle(i).backgroundColor));
+  return s.size >= 2;
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => getComputedStyle(i).backgroundColor).join(' ')));
+t('고른 날 점이 바탕과 갈린다', await page.evaluate(() => {
+  const d = document.createElement('canvas'); d.width = d.height = 1; const x = d.getContext('2d');
+  const px = c => { x.fillStyle = '#fff'; x.fillRect(0, 0, 1, 1); x.fillStyle = c; x.fillRect(0, 0, 1, 1);
+    return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+  const L = ([r, g, b]) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+    return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const cell = getComputedStyle(document.querySelector('.cal-c.on')).backgroundColor;
+  return [...document.querySelectorAll('.cal-c.on .cal-c__d i')].every(i => {
+    const a = L(px(getComputedStyle(i).backgroundColor)), b2 = L(px(cell));
+    return (Math.max(a, b2) + .05) / (Math.min(a, b2) + .05) >= 3;
+  });
+}));
+
+/* 목록 — 시각 앞의 아이콘 */
+t('줄마다 시각 앞에 아이콘', await page.evaluate(() =>
+  [...document.querySelectorAll('.cal-r__t')].every(e => {
+    const i = e.querySelector('.mt-i');
+    return !!i && i === e.firstElementChild && i.querySelector('svg');
+  })));
+t('점심·저녁 아이콘이 갈린다', await page.evaluate(() => {
+  const k = [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className);
+  return k.some(c => c.includes('mt-i--lunch')) && k.some(c => c.includes('mt-i--dinner')) && k.some(c => c.includes('mt-i--etc'));
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className).join(' | ')));
+t('아이콘 색이 달력의 점과 같다', await page.evaluate(() => {
+  const dot = document.querySelector('.cal-c:not(.on) .cal-c__d i.cal-dot--dinner')
+    || document.querySelector('.cal-c__d i.cal-dot--dinner');
+  const ico = document.querySelector('.cal-r__t .mt-i--dinner');
+  return !!dot && !!ico && getComputedStyle(dot).backgroundColor === getComputedStyle(ico).color;
+}));
+t('아이콘이 글자를 밀어내지 않는다', await page.evaluate(() => {
+  const e = document.querySelector('.cal-r__t');
+  return e.scrollWidth <= e.clientWidth + 1;
+}));
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);
