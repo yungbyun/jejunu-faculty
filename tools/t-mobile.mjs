@@ -47,7 +47,17 @@ check('연구실 전화 다음에 온다', await page.evaluate(() => {
   const kids = [...box.children].map(e => e.className);
   return kids.indexOf('po__tel') < kids.findIndex(c => c.includes('po__mob'));
 }));
-check('tel: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'tel:01012345678'));
+/* 핸드폰을 누르면 바로 문자 쓰기로 간다. 전화는 옆의 수화기로 건다. (2026-10-12) */
+check('핸드폰은 sms: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'sms:01012345678'),
+  await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href')));
+check('옆에 전화 걸기 단추', await page.evaluate(() => {
+  const a = document.querySelector('.po__mobw a.po__cp');
+  return !!a && a.getAttribute('href') === 'tel:01012345678';
+}));
+check('연구실 번호는 그대로 tel:', await page.evaluate(() => {
+  const a = document.querySelector('.prof__office a.po__tel:not(.po__mob)');
+  return !a || /^tel:/.test(a.getAttribute('href'));
+}));
 
 // 2-1) 번호 오른쪽의 복사 아이콘
 check('번호 옆에 복사 아이콘', await page.evaluate(() => !!document.querySelector('.po__cp')));
@@ -62,7 +72,7 @@ await page.waitForTimeout(400);
 check('누르면 번호가 복사된다', await page.evaluate(() => navigator.clipboard.readText()) === '010-1234-5678');
 check('카드가 열리지는 않는다', await page.evaluate(() => location.hash) === hashBefore,
   await page.evaluate(() => location.hash));
-check('복사한 뒤 확인 표시', await page.evaluate(() => document.querySelector('.po__cp').classList.contains('ok')));
+check('복사한 뒤 확인 표시', await page.evaluate(() => document.querySelector('.po__cp[data-copynum]').classList.contains('ok')));
 
 /* 3) 상세 화면의 번호 줄 — 영문 이름 바로 아래, 같은 글꼴·색으로 (2026-10-07).
    따로 칸을 두었다가(같은 날) 영문 이름 아래로 옮겼다. */
@@ -95,7 +105,12 @@ check('한 줄에 나란히', await page.evaluate(() => {
   const r0 = a[0].getBoundingClientRect(), r1 = a[1].getBoundingClientRect();
   return Math.abs((r0.top + r0.bottom) / 2 - (r1.top + r1.bottom) / 2) < 4;
 }));
-check('둘 다 tel: 링크', ct.length === 2 && ct.every(x => /^tel:[\d+]+$/.test(x.href)), ct.map(x => x.href).join(' '));
+check('연구실은 tel:, 핸드폰은 sms:', ct.length === 2 && /^tel:[\d+]+$/.test(ct[0].href) && /^sms:[\d+]+$/.test(ct[1].href),
+  ct.map(x => x.href).join(' '));
+check('상세에도 전화 걸기 단추', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct')][1].querySelector('a.d-ct__c');
+  return !!a && /^tel:/.test(a.getAttribute('href'));
+}));
 check('둘 다 복사 아이콘', ct.length === 2 && ct.every(x => x.cp));
 /* 상세에서 복사 아이콘을 눌러도 화면이 닫히거나 넘어가면 안 된다 */
 const dHash = await page.evaluate(() => location.hash);

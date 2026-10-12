@@ -1463,3 +1463,15 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .d-photo .fav{position:absolute;top:6px;left:6px;width:24px;height:24px;margin:0;order:0}
 .d-photo .fav svg{width:13px;height:13px}
 @media (max-width:620px){.d-photo .fav{top:5px;left:5px;width:23px;height:23px}}
+
+/* 만날 분 — 줄머리에 '추가' 단추, 명단 밖의 분은 다른 칩으로 (2026-10-12) */
+.cal-who__hd{display:flex;align-items:center;gap:12px}
+/* 폰에서는 .btn 이 한 줄을 다 차지하도록 되어 있다 — 이 단추만 작게 되돌린다 */
+.cal-who__add{display:inline-flex;width:auto;flex:none;margin-left:auto;padding:7px 15px;font-size:13.5px;border-radius:999px}
+/* 명단 밖의 분 — 교수 칩(.on)과 색을 달리해 한눈에 갈린다 */
+.cal-chip.cal-chip--g{background:#7c5cbf;border-color:#7c5cbf;color:#fff}
+.cal-chip.cal-chip--g i{opacity:.85}
+.cal-chip--add{border-style:dashed;border-color:var(--brand);color:var(--brand);font-weight:700}
+.cal-chip--add:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
+/* 핸드폰 번호 앞의 말풍선 — 누르면 문자로 간다는 뜻 */
+.d-ct__n svg{width:12px;height:12px;margin-right:4px;vertical-align:-1px;opacity:.85}

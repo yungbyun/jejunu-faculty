@@ -316,6 +316,79 @@ t('받은 값을 이 기기에 적용', await page.evaluate(() => {
 }));
 
 await page.evaluate(() => { meetMap = {}; localStorage.removeItem('jnu-meets'); state.notes.clear(); });
+/* 만날 분 더하기 — 명단에 있는 교수와, 명단 밖의 분(교직원·외부 인사) (2026-10-12) */
+await page.evaluate(() => {
+  meetMap = {}; mtSave();
+  location.hash = '#/cal'; render();
+});
+await page.waitForSelector('[data-mtadd]', { timeout: 10000 });
+await page.click('[data-mtadd]');
+await page.waitForSelector('[data-mtmore]', { timeout: 10000 });
+
+t('「+ 만날 분 추가」 단추가 있다', (await page.locator('[data-mtmore]').innerText()).includes('만날 분 추가'));
+t('단추는 이름표와 한 줄에', await page.evaluate(() => {
+  const l = document.querySelector('.cal-who__l').getBoundingClientRect();
+  const b = document.querySelector('[data-mtmore]').getBoundingClientRect();
+  return Math.abs((l.top + l.bottom) / 2 - (b.top + b.bottom) / 2) < 10 && b.width < 300;
+}), await page.evaluate(() => Math.round(document.querySelector('[data-mtmore]').getBoundingClientRect().width) + 'px'));
+await page.click('[data-mtmore]');
+t('누르면 찾는 칸으로 간다', await page.evaluate(() => document.activeElement === document.querySelector('[data-mtq]')));
+
+/* 1) 명단에 있는 교수 */
+const nm = await page.evaluate(() => state.rows[3].name);
+await page.fill('[data-mtq]', nm);
+await page.waitForTimeout(200);
+t('명단에서 찾아진다', await page.evaluate(() => !!document.querySelector('[data-mthits] [data-mtwho]')));
+await page.locator('[data-mthits] [data-mtwho]').first().click();
+await page.waitForTimeout(150);
+t('교수를 더했다', await page.evaluate(() => mtArr(Object.values(meets())[0].who).length) === 1);
+
+/* 2) 명단에 없는 분 */
+await page.fill('[data-mtq]', '행정실 이영수');
+await page.waitForTimeout(200);
+t('명단에 없으면 그대로 더하기가 뜬다', await page.evaluate(() => !!document.querySelector('[data-mtguest]')),
+  await page.evaluate(() => (document.querySelector('[data-mthits]') || {}).innerText));
+await page.click('[data-mtguest]');
+await page.waitForTimeout(150);
+t('명단 밖의 분이 더해졌다', await page.evaluate(() => JSON.stringify(mtArr(Object.values(meets())[0].guests))) === '["행정실 이영수"]',
+  await page.evaluate(() => JSON.stringify(Object.values(meets())[0].guests)));
+t('더한 뒤 찾는 칸이 비워진다', await page.evaluate(() => document.querySelector('[data-mtq]').value) === '');
+t('줄머리에 두 사람이 다 나온다', await page.evaluate(() => {
+  const s = document.querySelector('.cal-r.on .cal-r__w').textContent;
+  return s.includes('행정실 이영수') && s.split(',').length === 2;
+}), await page.evaluate(() => document.querySelector('.cal-r.on .cal-r__w').textContent));
+t('교수 칩과 색이 다르다', await page.evaluate(() => {
+  const g = document.querySelector('.cal-chip--g'), p = document.querySelector('[data-mtpicked] [data-mtwho]');
+  return !!g && !!p && getComputedStyle(g).backgroundColor !== getComputedStyle(p).backgroundColor;
+}));
+/* 같은 이름을 두 번 더하지 않는다 */
+await page.fill('[data-mtq]', '행정실 이영수');
+await page.waitForTimeout(200);
+t('이미 더한 이름은 또 안 권한다', await page.evaluate(() => !document.querySelector('[data-mtguest]')));
+
+/* 3) 만남으로 바꿔도 명단 밖의 분은 만난 횟수에 안 들어간다 */
+const before = await page.evaluate(() => getNote(rKey(state.rows[3])).met || 0);
+await page.locator('[data-mtdone="met"]').click();
+await page.waitForTimeout(250);
+t('교수만 만난 횟수가 오른다', await page.evaluate(x => (getNote(rKey(state.rows[3])).met || 0) === x + 1, before));
+t('센 사람에 명단 밖의 분은 없다', await page.evaluate(() =>
+  mtArr(Object.values(meets())[0].counted).every(k => state.rows.some(p => rKey(p) === k))));
+
+/* 4) 뺄 수도 있다 */
+await page.evaluate(() => { CAL.open = Object.keys(meets())[0]; renderCal(); });
+await page.waitForSelector('[data-mtguestx]', { timeout: 10000 });
+await page.click('[data-mtguestx]');
+await page.waitForTimeout(150);
+t('명단 밖의 분을 뺄 수 있다', await page.evaluate(() => mtArr(Object.values(meets())[0].guests).length) === 0);
+
+/* 5) 시트로 함께 저장된다 */
+t('guests 도 meets 에 담긴다', await page.evaluate(() => {
+  const id = Object.keys(meets())[0];
+  mtGuest(id, '외부 손님');
+  return JSON.parse(localStorage.getItem('jnu-meets'))[id].guests.includes('외부 손님');
+}));
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.q = ''; });
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

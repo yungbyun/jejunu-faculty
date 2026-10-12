@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chansoo Choi — 15s</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#05070c;display:grid;place-items:center;min-height:100vh}
+  canvas{display:block;width:1080px;height:1920px}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+/* 15초 세로 모션 그래픽 (1080x1920 · 30fps · 450프레임).
+ * 프레임 번호만 넣으면 같은 그림이 나오도록 짠다 — 그래야 한 장씩 떠서 영상으로 묶을 수 있다.
+ * 그림은 전부 여기서 만든다(바깥 소재를 쓰지 않는다). */
+const W = 1080, H = 1920, FPS = 30, DUR = 15, NF = DUR * FPS;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+
+/* ---------- 토막 시간(초) ---------- */
+const T = { hook: 0, body: 2.0, mesh: 3.3, dose: 6.5, card: 9.0, cred: 11.4, url: 13.4, end: 15 };
+
+/* ---------- 잔재주 ---------- */
+const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const inv = (t, a, b) => clamp((t - a) / (b - a));
+const smooth = t => t * t * (3 - 2 * t);
+const outCubic = t => 1 - Math.pow(1 - t, 3);
+const inOutCubic = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const outBack = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+/* 씨를 박은 난수 — 돌릴 때마다 같은 그림이 나와야 한다 */
+function rng(seed) { let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+/* ---------- 색 ---------- */
+const AMBER = '#f0a93a', INK = '#ffffff', DIM = 'rgba(169,186,210,1)';
+const DOSE = [[0, 30, 58, 138], [.34, 14, 165, 233], [.56, 34, 211, 238], [.72, 250, 204, 21], [.87, 249, 115, 22], [1, 239, 68, 68]];
+function doseColor(v, a) {
+  v = clamp(v);
+  let i = 0; while (i < DOSE.length - 2 && v > DOSE[i + 1][0]) i++;
+  const A = DOSE[i], B = DOSE[i + 1], k = clamp((v - A[0]) / (B[0] - A[0]));
+  return `rgba(${Math.round(lerp(A[1], B[1], k))},${Math.round(lerp(A[2], B[2], k))},${Math.round(lerp(A[3], B[3], k))},${a})`;
+}
+
+/* ---------- 사람 모형 ----------
+ * 머리·목·몸통·팔·다리를 거리함수로 합쳐 속을 판별하고, 격자를 깔아 삼각형을 만든다.
+ * 좌표는 0~1(키 기준), x 는 가운데가 0. */
+function sdSeg(px, py, ax, ay, bx, by, r) {
+  const dx = bx - ax, dy = by - ay;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1e-9));
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t)) - r;
+}
+const PARTS = [
+  [0, .078, 0, .078, .057],            // 머리
+  [0, .118, 0, .200, .028],            // 목 — 어깨까지 이어 붙인다
+  [-.112, .205, .112, .205, .030],     // 어깨
+  [-.078, .232, .078, .232, .046],     // 가슴
+  [-.070, .300, .070, .300, .043],     // 갈비
+  [-.060, .360, .060, .360, .041],     // 허리
+  [-.062, .420, .062, .420, .044],     // 아랫배
+  [-.058, .462, .058, .462, .046],     // 골반
+];
+for (const s of [-1, 1]) {
+  PARTS.push([s * .118, .215, s * .140, .345, .026]);   // 위팔
+  PARTS.push([s * .140, .345, s * .151, .470, .022]);   // 아래팔
+  PARTS.push([s * .152, .478, s * .152, .500, .024]);   // 손
+  PARTS.push([s * .050, .455, s * .057, .680, .043]);   // 넓적다리
+  PARTS.push([s * .057, .680, s * .052, .880, .031]);   // 정강이
+  PARTS.push([s * .052, .898, s * .078, .922, .021]);   // 발
+}
+const bodySDF = (x, y) => { let m = 1e9; for (const p of PARTS) m = Math.min(m, sdSeg(x, y, p[0], p[1], p[2], p[3], p[4])); return m; };
+
+/* ---------- 격자 → 삼각형 ---------- */
+const STEP = .0190, X0 = -.235, X1 = .235, Y0 = .005, Y1 = .955;
+const COLS = Math.round((X1 - X0) / STEP) + 1, ROWS = Math.round((Y1 - Y0) / STEP) + 1;
+const rnd = rng(20261010);
+const VX = new Float32Array(COLS * ROWS), VY = new Float32Array(COLS * ROWS);
+const VZ = new Float32Array(COLS * ROWS), VIN = new Uint8Array(COLS * ROWS);
+for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) {
+  const k = j * COLS + i;
+  const x = X0 + i * STEP, y = Y0 + j * STEP;
+  VIN[k] = bodySDF(x, y) < 0 ? 1 : 0;
+  /* 자리를 조금씩 흩뜨려 격자 티를 지운다 */
+  VX[k] = x + (rnd() - .5) * STEP * .40;
+  VY[k] = y + (rnd() - .5) * STEP * .40;
+}
+/* 가장자리 꼭짓점은 윤곽선 위로 끌어당긴다 — 격자 계단이 삐져나오지 않게.
+ * 거리함수의 기울기 방향으로 거리만큼 밀면 몸의 겉면에 정확히 얹힌다. */
+const outside = (i, j) => (i < 0 || j < 0 || i >= COLS || j >= ROWS) ? 1 : !VIN[j * COLS + i];
+for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) {
+  const k = j * COLS + i;
+  if (!VIN[k]) continue;
+  if (!(outside(i - 1, j) || outside(i + 1, j) || outside(i, j - 1) || outside(i, j + 1))) continue;
+  const ox = X0 + i * STEP, oy = Y0 + j * STEP;             // 흔들기 전 자리에서 출발
+  let x = ox, y = oy;
+  for (let it = 0; it < 3; it++) {                          // 몇 번 되풀이하면 겉면에 붙는다
+    const d = bodySDF(x, y), h = 1e-4;
+    const gx = (bodySDF(x + h, y) - bodySDF(x - h, y)) / (2 * h);
+    const gy = (bodySDF(x, y + h) - bodySDF(x, y - h)) / (2 * h);
+    const n = Math.hypot(gx, gy) || 1;
+    x -= d * gx / n; y -= d * gy / n;
+  }
+  /* 겨드랑이·목처럼 안으로 꺾인 자리에서는 엉뚱한 면으로 건너뛰어 가시가 돋는다.
+     되돌리면 이번엔 윤곽선 안쪽으로 물러나 틈이 생기므로, 움직임을 한 칸 안으로 묶는다. */
+  const mv = Math.hypot(x - ox, y - oy), cap = STEP * .62;
+  if (mv > cap) { x = ox + (x - ox) * cap / mv; y = oy + (y - oy) * cap / mv; }
+  VX[k] = x; VY[k] = y;
+}
+/* 줄마다 이어진 덩어리(몸통·왼팔·오른팔·두 다리)를 따로 잡아 두께를 준다 — 타원 단면 */
+for (let j = 0; j < ROWS; j++) {
+  let i = 0;
+  while (i < COLS) {
+    if (!VIN[j * COLS + i]) { i++; continue; }
+    let s = i; while (i < COLS && VIN[j * COLS + i]) i++;
+    const e = i - 1, xc = (VX[j * COLS + s] + VX[j * COLS + e]) / 2;
+    const hw = Math.max(STEP, (VX[j * COLS + e] - VX[j * COLS + s]) / 2);
+    for (let q = s; q <= e; q++) {
+      const k = j * COLS + q, u = clamp(Math.abs(VX[k] - xc) / hw, 0, 1);
+      VZ[k] = Math.sqrt(Math.max(0, 1 - u * u)) * hw * .70;
+    }
+  }
+}
+/* 장기별 선량 — 실제 수치가 아니라 '어디가 더 받는지'를 보여 주는 그림이다 */
+const ORGANS = [
+  [-.055, .265, .050, .072, .95], [.055, .265, .050, .072, .95],   // 허파
+  [0, .162, .030, .022, .80],                                       // 갑상샘
+  [.052, .352, .052, .055, .85], [-.050, .368, .045, .050, .70],    // 간 · 위
+  [0, .470, .045, .035, .78],                                       // 골반 장기
+  [0, .085, .045, .050, .55],                                       // 머리
+];
+function doseAt(x, y) {
+  let v = .10;
+  for (const [ox, oy, rx, ry, w] of ORGANS) {
+    const d = Math.hypot((x - ox) / rx, (y - oy) / ry);
+    v += w * Math.exp(-d * d * .9);
+  }
+  return clamp(v / 1.45);
+}
+/* 삼각형 목록 */
+const TRI = [];
+for (let j = 0; j < ROWS - 1; j++) for (let i = 0; i < COLS - 1; i++) {
+  const a = j * COLS + i, b = a + 1, c = a + COLS + 1, d = a + COLS;
+  if (!(VIN[a] && VIN[b] && VIN[c] && VIN[d])) continue;
+  for (const t of [[a, b, c], [a, c, d]]) {
+    const cx = (VX[t[0]] + VX[t[1]] + VX[t[2]]) / 3, cy = (VY[t[0]] + VY[t[1]] + VY[t[2]]) / 3;
+    TRI.push({ t, cy, cx, dose: doseAt(cx, cy), seed: rnd(), zc: (VZ[t[0]] + VZ[t[1]] + VZ[t[2]]) / 3 });
+  }
+}
+/* 윤곽선 — 격자 계단이 보이면 싸구려로 보인다. 거리함수에서 바로 뽑는다(marching squares).
+ * 테두리에서는 몸 두께가 0 이므로 z=0 으로 두고 같은 식으로 돌리면 된다. */
+const OSEG = [];
+(function contour() {
+  const CS = .0040, cx0 = X0 - .02, cy0 = Y0 - .02, cx1 = X1 + .02, cy1 = Y1 + .03;
+  const nx = Math.round((cx1 - cx0) / CS), ny = Math.round((cy1 - cy0) / CS);
+  let prev = new Float32Array(nx + 1), cur = new Float32Array(nx + 1);
+  for (let i = 0; i <= nx; i++) prev[i] = bodySDF(cx0 + i * CS, cy0);
+  for (let j = 1; j <= ny; j++) {
+    for (let i = 0; i <= nx; i++) cur[i] = bodySDF(cx0 + i * CS, cy0 + j * CS);
+    for (let i = 0; i < nx; i++) {
+      const a = prev[i], b = prev[i + 1], c = cur[i + 1], d = cur[i];
+      const code = (a < 0 ? 1 : 0) | (b < 0 ? 2 : 0) | (c < 0 ? 4 : 0) | (d < 0 ? 8 : 0);
+      if (code === 0 || code === 15) continue;
+      const x0 = cx0 + i * CS, y0 = cy0 + (j - 1) * CS, x1 = x0 + CS, y1 = y0 + CS;
+      const ip = (va, vb, pa, pb) => pa + (pb - pa) * (va / (va - vb));
+      const L = () => [x0, ip(a, d, y0, y1)], R = () => [x1, ip(b, c, y0, y1)];
+      const U = () => [ip(a, b, x0, x1), y0], D = () => [ip(d, c, x0, x1), y1];
+      const put = (p, q) => OSEG.push(p[0], p[1], q[0], q[1]);
+      if (code === 1 || code === 14) put(L(), U());
+      else if (code === 2 || code === 13) put(U(), R());
+      else if (code === 3 || code === 12) put(L(), R());
+      else if (code === 4 || code === 11) put(R(), D());
+      else if (code === 6 || code === 9) put(U(), D());
+      else if (code === 7 || code === 8) put(L(), D());
+      else if (code === 5) { put(L(), U()); put(R(), D()); }
+      else if (code === 10) { put(L(), D()); put(U(), R()); }
+    }
+    const t = prev; prev = cur; cur = t;
+  }
+})();
+/* 삼각형이 돋아나는 차례 — 머리에서 발끝으로 쓸듯이, 조금은 흩어지게 */
+const ORDER = TRI.map(t => clamp(t.cy * .80 + t.seed * .20));
+
+/* ---------- 입자 ---------- */
+const PR = rng(7788);
+const RAIN = Array.from({ length: 26 }, () => ({
+  x: PR() * 1.5 - .35, y: PR() * .6 - .6, v: .55 + PR() * .75, w: PR(), len: .05 + PR() * .09,
+}));
+
+/* ---------- 사진 ---------- */
+const photo = new Image(); photo.src = 'photo.png';
+let photoOK = false; photo.onload = () => { photoOK = true; };
+
+/* ---------- 글자 ---------- */
+function text(s, x, y, { size = 40, weight = 600, color = INK, align = 'center', ls = 0, alpha = 1, dy = 0 } = {}) {
+  if (alpha <= .001) return;
+  g.save();
+  g.globalAlpha = alpha;
+  g.fillStyle = color;
+  g.textAlign = ls ? 'left' : align;
+  g.textBaseline = 'alphabetic';
+  g.font = `${weight} ${size}px Inter, "Segoe UI", system-ui, sans-serif`;
+  if (ls) {                      // 자간을 벌릴 때는 한 자씩 찍는다
+    const chars = [...s];
+    let total = 0; for (const ch of chars) total += g.measureText(ch).width + ls;
+    total -= ls;
+    let cx = align === 'center' ? x - total / 2 : x;
+    for (const ch of chars) { g.fillText(ch, cx, y + dy); cx += g.measureText(ch).width + ls; }
+  } else g.fillText(s, x, y + dy);
+  g.restore();
+}
+/* 아래에서 떠오르며 나타나기 */
+const rise = (t, at, dur = .5) => { const k = outCubic(inv(t, at, at + dur)); return { alpha: k, dy: (1 - k) * 26 }; };
+
+/* ---------- 바탕 ---------- */
+function bg(t) {
+  const grd = g.createRadialGradient(540, 760, 60, 540, 900, 1250);
+  grd.addColorStop(0, '#111b2e'); grd.addColorStop(.55, '#0a1020'); grd.addColorStop(1, '#05070c');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  /* 아주 옅은 격자 — 계산 화면의 느낌만 */
+  g.save(); g.globalAlpha = .055 * clamp(inv(t, .4, 2.2)); g.strokeStyle = '#7aa2d8'; g.lineWidth = 1;
+  for (let x = 0; x <= W; x += 60) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, H); g.stroke(); }
+  for (let y = 0; y <= H; y += 60) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(W, y + .5); g.stroke(); }
+  g.restore();
+}
+
+/* ---------- 모형 그리기 ---------- */
+function drawFigure(t) {
+  /* 언제 어디에 얼마만 하게 */
+  const toCard = inOutCubic(inv(t, T.card - .35, T.card + .9));
+  const scale = lerp(1, .50, toCard);
+  const cxp = 540, cyp = lerp(880, 1392, toCard);
+  const hgt = 1250 * scale;
+  const build = inv(t, T.mesh - .15, T.dose - .35);          // 돋아나는 진행도
+  const fade = lerp(1, .11, toCard);
+  if (fade <= .01) return;
+
+  const ang = Math.sin((t - T.mesh) * .58) * 0.135 + 0.02;    // 좌우로 천천히 돌린다
+  const cosA = Math.cos(ang), sinA = Math.sin(ang), focal = 2.3;
+  const sweep = inv(t, T.dose - .15, T.dose + 1.5);          // 선량이 번지는 물결
+  const colored = inv(t, T.dose - .1, T.dose + 2.0);
+
+  const px = new Float32Array(COLS * ROWS), py = new Float32Array(COLS * ROWS), ps = new Float32Array(COLS * ROWS);
+  const project = (sign) => {
+    for (let k = 0; k < VX.length; k++) {
+      if (!VIN[k]) continue;
+      const x = VX[k], y = VY[k] - .5, z = VZ[k] * sign;
+      const zr = -x * sinA + z * cosA;
+      const s = focal / (focal + zr);
+      px[k] = cxp + (x * cosA + z * sinA) * hgt * s;
+      py[k] = cyp + y * hgt * s;
+      ps[k] = s;
+    }
+  };
+
+  const shell = (sign, baseAlpha) => {
+    project(sign);
+    for (let n = 0; n < TRI.length; n++) {
+      const tri = TRI[n];
+      const ap = clamp((build - ORDER[n]) / .16);
+      if (ap <= .001) continue;
+      const [a, b, c] = tri.t;
+      const e = outBack(ap);
+      /* 돋아날 때 제 무게중심에서 부풀어 오른다 */
+      const mx = (px[a] + px[b] + px[c]) / 3, my = (py[a] + py[b] + py[c]) / 3;
+      const k = lerp(.35, 1, clamp(e));
+      const X = i => mx + (px[i] - mx) * k, Y = i => my + (py[i] - my) * k;
+      /* 선량 물결: 왼쪽 앞에서 들어온다 */
+      const front = (tri.cx + .25) / .5 * .6 + (1 - tri.cy) * .4;
+      const lit = clamp((sweep * 1.5 - front * 1.0) / .45) * colored;
+      const al = baseAlpha * ap * fade;
+      g.beginPath(); g.moveTo(X(a), Y(a)); g.lineTo(X(b), Y(b)); g.lineTo(X(c), Y(c)); g.closePath();
+      if (lit > .01) {
+        g.fillStyle = doseColor(tri.dose, al * (.16 + .50 * lit));
+        g.fill();
+        g.strokeStyle = doseColor(tri.dose, al * (.18 + .42 * lit));
+      } else {
+        g.fillStyle = `rgba(86,132,205,${al * .085})`;
+        g.fill();
+        g.strokeStyle = `rgba(154,196,255,${al * .40})`;
+      }
+      g.lineWidth = 1.05 * scale;
+      g.stroke();
+    }
+  };
+
+  g.save();
+  g.lineJoin = 'round';
+  shell(-1, .30);            // 뒷면 — 흐리게 두어 두께가 느껴지게
+  shell(1, 1);               // 앞면
+  /* 윤곽에 은은한 빛 — 몸이 돋아나는 만큼 위에서 아래로 같이 그려진다 */
+  g.globalAlpha = fade * lerp(1, .40, clamp(inv(t, T.dose, T.dose + 1.2)));
+  g.strokeStyle = 'rgba(240,169,58,.62)';
+  g.lineWidth = 2.3 * scale;
+  g.shadowColor = 'rgba(240,169,58,.8)'; g.shadowBlur = 16 * scale;
+  g.beginPath();
+  for (let n = 0; n < OSEG.length; n += 4) {
+    if ((OSEG[n + 1] + OSEG[n + 3]) / 2 > build * 0.78) continue;
+    for (let q = 0; q < 2; q++) {
+      const x = OSEG[n + q * 2], y = OSEG[n + q * 2 + 1] - .5;
+      const sc = focal / (focal - x * sinA);
+      const X = cxp + x * cosA * hgt * sc, Y = cyp + y * hgt * sc;
+      q ? g.lineTo(X, Y) : g.moveTo(X, Y);
+    }
+  }
+  g.stroke();
+  g.restore();
+}
+
+/* ---------- 선량 눈금 ---------- */
+function doseBar(t) {
+  const a = clamp(inv(t, T.dose + .5, T.dose + 1.2)) * (1 - inv(t, T.card - .4, T.card + .2));
+  if (a <= .01) return;
+  const x = 946, y = 760, w = 16, h = 420;
+  g.save(); g.globalAlpha = a;
+  const grd = g.createLinearGradient(0, y + h, 0, y);
+  for (const [p, r, gg, b] of DOSE) grd.addColorStop(p, `rgb(${r},${gg},${b})`);
+  g.fillStyle = grd;
+  g.beginPath(); g.roundRect(x, y, w, h, 8); g.fill();
+  text('HIGH', x + w / 2, y - 22, { size: 20, weight: 700, color: DIM, ls: 3 });
+  text('LOW', x + w / 2, y + h + 38, { size: 20, weight: 700, color: DIM, ls: 3 });
+  g.save(); g.translate(x - 26, y + h / 2); g.rotate(-Math.PI / 2);
+  text('ABSORBED DOSE', 0, 0, { size: 21, weight: 600, color: DIM, ls: 4 });
+  g.restore();
+  g.restore();
+}
+
+/* ---------- 입자 ---------- */
+function particles(t) {
+  g.save();
+  g.lineCap = 'round';
+  /* 1) 첫 한 알 */
+  const p1 = inv(t, .02, 1.6);
+  if (p1 > 0 && p1 < 1) {
+    const x = lerp(-140, 1240, p1), y = lerp(250, 1180, p1);
+    const dx = 1240 + 140, dy = 1180 - 250, L = 190, n = Math.hypot(dx, dy);
+    const grd = g.createLinearGradient(x - dx / n * L, y - dy / n * L, x, y);
+    grd.addColorStop(0, 'rgba(240,169,58,0)'); grd.addColorStop(1, 'rgba(255,226,170,.95)');
+    g.strokeStyle = grd; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(x - dx / n * L, y - dy / n * L); g.lineTo(x, y); g.stroke();
+    g.fillStyle = '#fff6e2'; g.shadowColor = 'rgba(255,200,110,.95)'; g.shadowBlur = 26;
+    g.beginPath(); g.arc(x, y, 6.5, 0, 7); g.fill();
+  }
+  /* 2) 쏟아지는 알갱이 — 몸이 생긴 뒤에는 점점 옅어진다 */
+  const on = inv(t, T.body - .25, T.body + .5) * (1 - inv(t, T.dose + 1.4, T.card - .2));
+  if (on > .01) {
+    for (const r of RAIN) {
+      const prog = ((t - T.body + 1.4) * r.v + r.w) % 1.35;
+      if (prog < 0 || prog > 1.2) continue;
+      const x = lerp(-220, 1300, r.x + prog * .95), y = lerp(-260, 2100, r.y + prog * 1.05);
+      const L = 1520 * r.len, n = Math.hypot(1520, 2360);
+      const grd = g.createLinearGradient(x - 1520 / n * L, y - 2360 / n * L, x, y);
+      grd.addColorStop(0, 'rgba(150,200,255,0)'); grd.addColorStop(1, `rgba(206,232,255,${.75 * on})`);
+      g.strokeStyle = grd; g.lineWidth = 2.6;
+      g.beginPath(); g.moveTo(x - 1520 / n * L, y - 2360 / n * L); g.lineTo(x, y); g.stroke();
+    }
+  }
+  g.restore();
+}
+
+/* ---------- 글판 ---------- */
+function captions(t) {
+  /* 모형이 보이는 동안 위쪽에 작은 머리글 */
+  const ah = clamp(inv(t, T.mesh + .8, T.mesh + 1.4)) * (1 - inv(t, T.card - .5, T.card - .1));
+  if (ah > .01) {
+    text('MESH-TYPE COMPUTATIONAL PHANTOM', 540, 300, { size: 23, weight: 700, color: DIM, alpha: ah * .9, ls: 7 });
+    g.save(); g.globalAlpha = ah * .5; g.strokeStyle = 'rgba(240,169,58,.7)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(498, 328); g.lineTo(582, 328); g.stroke(); g.restore();
+  }
+  /* 훅 */
+  if (t < T.mesh + .35) {
+    const a1 = clamp(inv(t, .0, .45)) * (1 - inv(t, T.body - .25, T.body + .05));
+    const r1 = rise(t, .0, .5);
+    text('You can’t see radiation.', 540, 1430, { size: 70, weight: 800, alpha: a1 * r1.alpha, dy: r1.dy });
+    const a2 = clamp(inv(t, T.body, T.body + .35)) * (1 - inv(t, T.mesh, T.mesh + .3));
+    const r2 = rise(t, T.body, .45);
+    text('Your body does.', 540, 1430, { size: 70, weight: 800, alpha: a2 * r2.alpha, dy: r2.dy, color: AMBER });
+  }
+  /* 모형 설명 */
+  const a3 = clamp(inv(t, T.mesh + .55, T.mesh + 1.0)) * (1 - inv(t, T.dose - .1, T.dose + .25));
+  if (a3 > .01) {
+    const r = rise(t, T.mesh + .55, .5);
+    text('So he rebuilds the body', 540, 1596, { size: 52, weight: 600, alpha: a3 * r.alpha, dy: r.dy, color: DIM });
+    text('as a mesh of triangles.', 540, 1662, { size: 52, weight: 800, alpha: a3 * r.alpha, dy: r.dy * 1.3, color: INK });
+  }
+  /* 선량 설명 */
+  const a4 = clamp(inv(t, T.dose + .35, T.dose + .8)) * (1 - inv(t, T.card - .5, T.card - .1));
+  if (a4 > .01) {
+    const r = rise(t, T.dose + .35, .5);
+    text('and computes the dose —', 540, 1596, { size: 52, weight: 600, alpha: a4 * r.alpha, dy: r.dy, color: DIM });
+    text('organ by organ.', 540, 1662, { size: 52, weight: 800, alpha: a4 * r.alpha, dy: r.dy * 1.3, color: INK });
+  }
+}
+
+/* ---------- 이름판 ---------- */
+function card(t) {
+  const a = clamp(inv(t, T.card, T.card + .5));
+  if (a <= .01) return;
+  /* 글이 읽히도록 위쪽을 살짝 덮는다 */
+  g.save();
+  const scrim = g.createLinearGradient(0, 180, 0, 1340);
+  scrim.addColorStop(0, `rgba(5,7,12,${.92 * a})`); scrim.addColorStop(.72, `rgba(5,7,12,${.86 * a})`);
+  scrim.addColorStop(1, 'rgba(5,7,12,0)');
+  g.fillStyle = scrim; g.fillRect(0, 140, W, 1220);
+  g.restore();
+
+  /* 사진 */
+  const pk = outCubic(inv(t, T.card + .05, T.card + .65));
+  if (photoOK && pk > .01) {
+    const R = 158 * lerp(.86, 1, pk), cx = 540, cy = 520;
+    g.save(); g.globalAlpha = pk;
+    g.beginPath(); g.arc(cx, cy, R + 9, 0, 7);
+    g.strokeStyle = AMBER; g.lineWidth = 3.5;
+    g.shadowColor = 'rgba(240,169,58,.45)'; g.shadowBlur = 26; g.stroke();
+    g.shadowBlur = 0;
+    g.save(); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.clip();
+    const ar = photo.width / photo.height, dh = R * 2.08, dw = dh * ar;
+    g.drawImage(photo, cx - dw / 2, cy - dh / 2 - R * .06, dw, dh);
+    g.restore();
+    g.restore();
+  }
+  /* 이름 */
+  const r1 = rise(t, T.card + .35, .5);
+  text('CHANSOO CHOI', 540, 800, { size: 78, weight: 900, alpha: a * r1.alpha, dy: r1.dy, ls: 2 });
+  const r2 = rise(t, T.card + .52, .5);
+  text('Assistant Professor', 540, 862, { size: 36, weight: 700, color: AMBER, alpha: a * r2.alpha, dy: r2.dy, ls: 4 });
+  const r3 = rise(t, T.card + .66, .5);
+  text('Nuclear & Energy Engineering', 540, 936, { size: 40, weight: 600, color: INK, alpha: a * r3.alpha, dy: r3.dy });
+  text('Jeju National University', 540, 992, { size: 36, weight: 400, color: DIM, alpha: a * r3.alpha, dy: r3.dy });
+}
+
+/* ---------- 연구 세 줄 ---------- */
+const CRED = [
+  'ICRP mesh-type reference phantoms',
+  'Korean reference phantoms · dose coefficients',
+  'Monte Carlo dosimetry',
+];
+function creds(t) {
+  CRED.forEach((s, i) => {
+    const at = T.cred + i * .26;
+    const a = clamp(inv(t, at, at + .45));
+    if (a <= .01) return;
+    const r = rise(t, at, .45);
+    const y = 1096 + i * 76;
+    g.save(); g.globalAlpha = a * r.alpha;
+    g.fillStyle = AMBER;
+    g.beginPath(); g.arc(136, y - 11 + r.dy, 7, 0, 7); g.fill();
+    g.restore();
+    text(s, 172, y, { size: 37, weight: 500, color: '#dbe5f2', align: 'left', alpha: a * r.alpha, dy: r.dy });
+  });
+}
+
+/* ---------- 마무리 ---------- */
+function outro(t) {
+  const a = clamp(inv(t, T.url, T.url + .5));
+  if (a <= .01) return;
+  const r = rise(t, T.url, .5);
+  g.save(); g.globalAlpha = a * r.alpha;
+  g.strokeStyle = 'rgba(240,169,58,.5)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(330, 1452 + r.dy); g.lineTo(750, 1452 + r.dy); g.stroke();
+  g.restore();
+  text('nuclear.jejunu.ac.kr', 540, 1528, { size: 38, weight: 600, color: INK, alpha: a * r.alpha, dy: r.dy, ls: 2 });
+}
+
+/* ---------- 한 장 ---------- */
+function renderFrame(f) {
+  const t = f / FPS;
+  g.clearRect(0, 0, W, H);
+  bg(t);
+  if (t >= T.mesh - .4) drawFigure(t);
+  particles(t);
+  doseBar(t);
+  captions(t);
+  card(t);
+  creds(t);
+  outro(t);
+  /* 맨 끝 두 프레임은 아주 살짝 어둡게 — 반복 재생이 끊기지 않게 */
+  const fin = inv(t, T.end - .35, T.end);
+  if (fin > 0) { g.fillStyle = `rgba(5,7,12,${fin * .22})`; g.fillRect(0, 0, W, H); }
+}
+window.renderFrame = renderFrame;
+window.NF = NF;
+window.sceneReady = (async () => {
+  await document.fonts.load('900 78px Inter');
+  await document.fonts.load('600 40px Inter');
+  await document.fonts.ready;
+  if (!photoOK) await new Promise(r => { photo.onload = () => { photoOK = true; r(); }; photo.onerror = r; });
+  renderFrame(0);
+  return true;
+})();
+
+/* 브라우저에서 그냥 열면 제자리 재생(확인용) */
+if (!location.search.includes('still')) {
+  window.sceneReady.then(() => {
+    const t0 = performance.now();
+    const loop = () => {
+      const f = Math.floor((performance.now() - t0) / 1000 * FPS) % NF;
+      renderFrame(f);
+      requestAnimationFrame(loop);
+    };
+    loop();
+  });
+}
+</script>
+</body>
+</html>

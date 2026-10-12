@@ -2248,7 +2248,7 @@ function profCard(p, d, showDept = false) {
         ${loc || p.phone || mobileOf(p) ? `<div class="prof__office">
           ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
           ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
-          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.6h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(mobileOf(p))}</a><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
+          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="sms:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="문자 쓰기" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))} — 문자 쓰기">${SMS_SVG}${esc(mobileOf(p))}</a><a class="po__cp" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="전화 걸기" aria-label="${esc(p.name)} 전화 걸기">${TEL_SVG}</a><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
         </div>
@@ -3532,13 +3532,21 @@ function redrawAix(box, p, d) {
 /* 상세 화면의 번호 줄 — 영문 이름 바로 아래에, 같은 글꼴·색(.d-en)으로 둔다.
    번호를 누르면 전화가 걸리고, 옆 아이콘을 누르면 복사된다.
    핸드폰은 비공개 시트에만 있는 값이라 공개 파일에는 절대 들어가지 않는다. */
+const SMS_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.8 9.8 0 0 1-2.6-.35L4 21l1.4-3.9A8.1 8.1 0 0 1 3 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+const TEL_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
+  + '<path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>';
 const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>'
   + '<path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-function dPhone(label, num, who) {
+function dPhone(label, num, who, sms) {
   const tel = String(num).replace(/[^\d+]/g, '');
+  /* 핸드폰은 눌렀을 때 바로 문자 쓰기로 간다. 전화는 옆의 수화기로 건다. */
   return `<span class="d-ct">`
-    + `<a class="d-ct__n" href="tel:${esc(tel)}" aria-label="${esc(who)} ${esc(label)} ${esc(num)}">${esc(num)}</a>`
+    + `<a class="d-ct__n" href="${sms ? 'sms' : 'tel'}:${esc(tel)}"`
+    + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)}${sms ? ' — 문자 쓰기' : ' — 전화 걸기'}"`
+    + ` title="${sms ? '문자 쓰기' : '전화 걸기'}">${sms ? SMS_SVG : ''}${esc(num)}</a>`
+    + (sms ? `<a class="d-ct__c" href="tel:${esc(tel)}" title="전화 걸기" aria-label="${esc(who)} ${esc(label)} 전화 걸기">${TEL_SVG}</a>` : '')
     + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
     + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
 }
@@ -3546,7 +3554,7 @@ function dPhone(label, num, who) {
 function dPhones(p) {
   const a = [];
   if (p.phone) a.push(dPhone('연구실', p.phone, p.name));
-  if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name));
+  if (mobileOf(p)) a.push(dPhone('핸드폰', mobileOf(p), p.name, true));
   return a.length ? `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>` : '';
 }
 /* ---------- 식사 약속 ----------
@@ -3563,7 +3571,7 @@ const mtArr = v => Array.isArray(v) ? v : [];
 const mtList = () => Object.entries(meets())
   .map(([id, v]) => ({
     id, date: v.date || '', time: v.time || '', kind: v.kind || '', place: v.place || '', memo: v.memo || '',
-    who: mtArr(v.who), done: v.done || '', counted: mtArr(v.counted),
+    who: mtArr(v.who), guests: mtArr(v.guests), done: v.done || '', counted: mtArr(v.counted),
   }))
   .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || a.id.localeCompare(b.id));
 
@@ -3592,7 +3600,7 @@ function mtAdd(day, who, kind) {
   const id = mtNewId();
   const K = MT_KIND[kind];
   meets()[id] = { date: day || mtToday(), time: K ? K.time : '', kind: K ? kind : '',
-    place: '', memo: '', who: who ? [who] : [], done: '', counted: [] };
+    place: '', memo: '', who: who ? [who] : [], guests: [], done: '', counted: [] };
   mtSave();
   return id;
 }
@@ -3610,6 +3618,23 @@ function mtWho(id, k) {
   m.who = [...w];
   mtSave();
   return w.has(k);
+}
+/* 명단에 없는 분 — 교직원·외부 인사처럼 교수 명단에 없는 사람을 이름만으로 더한다.
+   교수 기록이 없으므로 만난 횟수 셈에는 들어가지 않는다. */
+function mtGuest(id, name) {
+  const m = meets()[id]; if (!m) return false;
+  const n = String(name || '').trim();
+  if (!n) return false;
+  const g = mtArr(m.guests);
+  if (g.includes(n)) return false;
+  m.guests = [...g, n];
+  mtSave();
+  return true;
+}
+function mtGuestDel(id, name) {
+  const m = meets()[id]; if (!m) return;
+  m.guests = mtArr(m.guests).filter(x => x !== name);
+  mtSave();
 }
 function mtUncount(m, k) {
   const c = new Set(mtArr(m.counted));
@@ -3637,7 +3662,8 @@ function mtWhen(day, time) {
   const w = isNaN(d.getTime()) ? '' : ` (${MT_DAYS[d.getDay()]})`;
   return `${fmtDate(day)}${w}${time ? ' ' + time : ''}`;
 }
-const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean);
+const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).name).filter(Boolean)
+  .concat(mtArr(m.guests));
 
 /* ---------- 식사 약속 화면 ---------- */
 const CAL = { ym: '', day: '', open: '', q: '', scroll: false };
@@ -3747,18 +3773,24 @@ function mtPickedHtml(m) {
   const a = m.who.map(k => {
     const p = state.rows.find(x => rKey(x) === k);
     return p ? `<button type="button" class="cal-chip on" data-mtwho="${esc(k)}" title="${esc(p.dept_name)} · ${esc(p.rank)} — 빼기">${esc(p.name)}<i>×</i></button>` : '';
-  }).join('');
+  }).join('')
+  + mtArr(m.guests).map(n =>
+    `<button type="button" class="cal-chip on cal-chip--g" data-mtguestx="${esc(n)}" title="명단 밖의 분 — 빼기">${esc(n)}<i>×</i></button>`).join('');
   return a || '<span class="st-note">아직 없습니다</span>';
 }
 function mtHitsHtml(m) {
-  const q = CAL.q.trim().toLowerCase();
+  const raw = CAL.q.trim(), q = raw.toLowerCase();
   if (!q) return '';
   const picked = new Set(m.who);
   const hits = state.rows.filter(p => !picked.has(rKey(p)) &&
     (p.name.toLowerCase().includes(q) || p.dept_name.toLowerCase().includes(q))).slice(0, 12);
-  if (!hits.length) return '<p class="st-note">찾는 분이 없습니다</p>';
+  /* 명단에 없는 분(교직원·외부 인사)도 이름만으로 더할 수 있게 한다 */
+  const same = state.rows.some(p => p.name.toLowerCase() === q) || mtArr(m.guests).some(n => n.toLowerCase() === q);
+  const asGuest = same ? '' :
+    `<button type="button" class="cal-chip cal-chip--add" data-mtguest="${esc(raw)}" title="교수 명단에 없는 분으로 더합니다">+ ‘${esc(raw)}’ 그대로 더하기</button>`;
+  if (!hits.length) return `<p class="st-note">명단에 없는 이름입니다</p>${asGuest}`;
   return hits.map(p =>
-    `<button type="button" class="cal-chip" data-mtwho="${esc(rKey(p))}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}<small>${esc(p.dept_name)}</small></button>`).join('');
+    `<button type="button" class="cal-chip" data-mtwho="${esc(rKey(p))}" title="${esc(p.dept_name)} · ${esc(p.rank)}">${esc(p.name)}<small>${esc(p.dept_name)}</small></button>`).join('') + asGuest;
 }
 /* 칩만 갈아 끼우고 머리줄 이름도 맞춘다 — 찾는 칸은 손대지 않는다 */
 function mtRefreshWho() {
@@ -3776,6 +3808,18 @@ function bindWho() {
     mtWho(CAL.open, b.dataset.mtwho);
     mtRefreshWho();
   }));
+  /* 명단 밖의 분 — 더하고 나면 찾는 칸을 비워 다음 사람을 바로 칠 수 있게 한다 */
+  $app.querySelectorAll('[data-mtguest]').forEach(b => b.addEventListener('click', () => {
+    mtGuest(CAL.open, b.dataset.mtguest);
+    CAL.q = '';
+    const q = $app.querySelector('[data-mtq]');
+    if (q) { q.value = ''; q.focus(); }
+    mtRefreshWho();
+  }));
+  $app.querySelectorAll('[data-mtguestx]').forEach(b => b.addEventListener('click', () => {
+    mtGuestDel(CAL.open, b.dataset.mtguestx);
+    mtRefreshWho();
+  }));
 }
 
 function mtEdit(m) {
@@ -3788,9 +3832,12 @@ function mtEdit(m) {
     <label class="cal-f__w cal-f__memo"><span>메모</span><input type="text" data-mtmemo value="${esc(m.memo)}" placeholder="무엇을 말씀드릴지"></label>
 
     <div class="cal-who">
-      <span class="cal-who__l">만날 분</span>
+      <div class="cal-who__hd">
+        <span class="cal-who__l">만날 분</span>
+        <button type="button" class="btn btn--go cal-who__add" data-mtmore>+ 만날 분 추가</button>
+      </div>
       <div class="cal-who__p" data-mtpicked>${mtPickedHtml(m)}</div>
-      <input type="search" class="cal-q" data-mtq value="${esc(CAL.q)}" placeholder="이름이나 학과로 찾아 더하기">
+      <input type="search" class="cal-q" data-mtq value="${esc(CAL.q)}" placeholder="이름이나 학과로 찾기 — 명단에 없으면 그대로 더할 수 있습니다">
       <div class="cal-who__h" data-mthits>${mtHitsHtml(m)}</div>
     </div>
 
@@ -3851,6 +3898,12 @@ function bindCal() {
   /* 한글이 조합되는 중에 화면을 다시 그리면 자모가 흩어진다. 찾은 사람 칸만 갈아 끼운다. */
   const q = $('[data-mtq]');
   q?.addEventListener('input', () => { CAL.q = q.value; mtRefreshWho(); });
+  /* '+ 만날 분 추가' — 찾는 칸으로 데려다 놓는다(폰에서 자판이 바로 올라온다) */
+  $('[data-mtmore]')?.addEventListener('click', () => {
+    if (!q) return;
+    q.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    q.focus(); q.select();
+  });
   bindWho();
   $app.querySelectorAll('[data-mtdone]').forEach(b => b.addEventListener('click', () => {
     mtDone(CAL.open, b.dataset.mtdone);

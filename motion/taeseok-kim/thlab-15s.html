@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>THLAB — Taeseok Kim · 15s</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --ink:#0b0d12; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#06070b;display:grid;place-items:center;min-height:100vh}
+  #stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#06070b;
+    font-family:Inter,"Noto Sans KR",system-ui,sans-serif;color:#fff}
+  .sec{position:absolute;inset:0;overflow:hidden;will-change:transform,opacity}
+  .pad{position:absolute;inset:0;padding:230px 76px 240px}
+  /* 머리글 */
+  .kicker{font-size:26px;font-weight:800;letter-spacing:.34em;text-transform:uppercase;opacity:.78}
+  .count{position:absolute;top:238px;right:76px;font-size:26px;font-weight:800;letter-spacing:.2em;opacity:.65}
+  h1{font-size:150px;line-height:.92;font-weight:900;letter-spacing:-.045em}
+  h2{font-size:112px;line-height:.94;font-weight:900;letter-spacing:-.04em}
+  .sub{font-size:33px;font-weight:600;line-height:1.35;opacity:.9;margin-top:22px;max-width:880px}
+  .dark{color:#0b0d12}
+  /* 사진 카드 */
+  .card{position:absolute;border-radius:26px;overflow:hidden;box-shadow:0 48px 90px rgba(0,0,0,.42);background:#111}
+  .card img{width:100%;height:100%;object-fit:cover;display:block}
+  .tag{position:absolute;left:0;bottom:0;background:#0b0d12;color:#fff;font-size:21px;font-weight:800;
+    letter-spacing:.14em;padding:12px 20px;border-radius:0 18px 0 0;text-transform:uppercase}
+  /* 사람 동그라미 */
+  .ring{border-radius:50%;overflow:hidden;border:5px solid #fff;box-shadow:0 18px 40px rgba(0,0,0,.4)}
+  .ring img{width:100%;height:100%;object-fit:cover;display:block}
+  /* 수치 알약 */
+  .chip{display:flex;align-items:center;gap:16px;background:#0b0d12;color:#fff;border-radius:18px;
+    padding:20px 26px;font-size:28px;font-weight:700;line-height:1.25}
+  .chip b{color:#ffd400}
+  .stripes{position:absolute;inset:0;background:repeating-linear-gradient(-45deg,#ffd400 0 56px,#f5c400 56px 112px)}
+  .big{font-size:250px;font-weight:900;letter-spacing:-.05em;line-height:.85}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.9}
+  .bar{height:12px;border-radius:99px;background:#0b0d12}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0 · 훅 (어둠) -->
+  <section class="sec" id="s0" style="background:#06070b">
+    <div class="glow" id="s0glow" style="width:1300px;height:1300px;left:-110px;top:420px;
+      background:radial-gradient(circle,#ff5a1f 0%,#ff2d78 42%,rgba(0,0,0,0) 70%)"></div>
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="kicker a" data-d="0" style="margin-bottom:28px">Thermal-hydraulics lab</div>
+      <h2 class="a" data-d=".12" style="opacity:.55;font-size:70px;letter-spacing:-.02em">A reactor is cooled</h2>
+      <h1 class="a" data-d=".22" style="margin-top:12px">BY BOILING<br>WATER.</h1>
+    </div>
+  </section>
+
+  <!-- 1 · 폭발 -->
+  <section class="sec" id="s1" style="background:linear-gradient(150deg,#ff8a00,#ff2d78 55%,#7b3cff)">
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center">
+      <h2 class="a" data-d="0" style="font-size:66px;opacity:.9">And boiling has</h2>
+      <h1 class="a" data-d=".1" style="font-size:190px;margin-top:6px">A LIMIT.</h1>
+      <div class="sub a" data-d=".3" style="font-size:38px;font-weight:800;opacity:1">We find it before a reactor does.</div>
+    </div>
+  </section>
+
+  <!-- 2 · 유동 불안정 -->
+  <section class="sec" id="s2" style="background:#1a4cff">
+    <div class="pad">
+      <div class="kicker a" data-d="0">Flow instability</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px">INSIDE<br>THE CHANNEL</h2>
+      <div class="sub a" data-d=".2">Subcooled boiling in a vertical annulus — bubbles born, grown and torn off a heated wall.</div>
+      <div class="card a" data-d=".3" style="left:76px;top:1000px;width:928px;height:560px">
+        <img src="img/g10.jpg" alt=""><div class="tag">Test loop · JNU</div>
+      </div>
+    </div>
+    <div class="count a" data-d=".05">01 / 04</div>
+  </section>
+
+  <!-- 3 · CHF 예측 -->
+  <section class="sec" id="s3" style="background:#00c2ff">
+    <div class="pad dark">
+      <div class="kicker a" data-d="0">AI-based prediction</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px">THE LIMIT,<br>PREDICTED</h2>
+      <div class="sub a" data-d=".2" style="opacity:.85">A physics-informed neural network trained on experiments <i>and</i> on the correlations.</div>
+      <svg id="chfsvg" class="a" data-d=".3" style="position:absolute;left:76px;top:1010px;width:928px;height:540px" viewBox="0 0 928 540">
+        <rect x="0" y="0" width="928" height="540" rx="26" fill="#0b0d12"/>
+        <g id="chfdots" fill="#ff9a3c"></g>
+        <path id="chfline" fill="none" stroke="#00e0ff" stroke-width="9" stroke-linecap="round"/>
+        <text x="40" y="500" fill="#8ea0b5" font-size="21" font-weight="800" letter-spacing="4">QUALITY →</text>
+        <text x="40" y="70" fill="#8ea0b5" font-size="21" font-weight="800" letter-spacing="4">CRITICAL HEAT FLUX</text>
+      </svg>
+    </div>
+    <div class="count a dark" data-d=".05">02 / 04</div>
+  </section>
+
+  <!-- 4 · PCHE -->
+  <section class="sec" id="s4" style="background:#ff6a00">
+    <div class="pad">
+      <div class="kicker a" data-d="0">PCHE steam generator</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px">A SMALLER<br>REACTOR</h2>
+      <div class="sub a" data-d=".2">Shrink the thing that moves the heat — printed-circuit plates, etched channel by channel.</div>
+      <svg id="pche" class="a" data-d=".3" style="position:absolute;left:76px;top:1000px;width:928px;height:560px" viewBox="0 0 928 560"></svg>
+    </div>
+    <div class="count a" data-d=".05">03 / 04</div>
+  </section>
+
+  <!-- 5 · 추진 열해석 -->
+  <section class="sec" id="s5" style="background:#ff2d78">
+    <div class="pad">
+      <div class="kicker a" data-d="0">Propulsion thermal analysis</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px">AND WHERE<br>IT GETS HOT</h2>
+      <div class="sub a" data-d=".2">Propellant flow, temperature fields and pressure loss — the same physics, a different machine.</div>
+      <div class="card a" data-d=".3" style="left:56px;top:960px;width:968px;height:620px">
+        <img src="img/g11.jpg" alt=""><div class="tag">Thermal-hydraulic test facility</div>
+      </div>
+    </div>
+    <div class="count a" data-d=".05">04 / 04</div>
+  </section>
+
+  <!-- 6 · 사람 -->
+  <section class="sec" id="s6" style="background:#6a2ff0">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(60,16,160,.55),rgba(40,8,120,.78))"></div>
+    <img src="img/g07.jpg" id="teambg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.17;filter:saturate(.6)">
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <div class="kicker a" data-d="0">Prof. Taeseok Kim’s group</div>
+      <h2 class="a" data-d=".1" style="margin-top:20px;font-size:104px">THE PEOPLE<br>WHO <span style="color:#ffd400">RUN IT</span></h2>
+      <div class="ring a" data-d=".26" style="width:360px;height:360px;margin-top:54px"><img src="photo.jpg" alt=""></div>
+      <div class="a" data-d=".34" style="margin-top:26px;font-size:46px;font-weight:900">Prof. Taeseok Kim</div>
+      <div class="a" data-d=".4" style="font-size:28px;font-weight:600;opacity:.85;margin-top:8px">Nuclear &amp; Energy Engineering · Jeju National University</div>
+      <div class="a" data-d=".48" style="display:flex;gap:18px;margin-top:40px">
+        <div class="ring" style="width:118px;height:118px"><img src="img/g06.jpg"></div>
+        <div class="ring" style="width:118px;height:118px"><img src="img/g08.jpg"></div>
+        <div class="ring" style="width:118px;height:118px"><img src="img/g09.jpg"></div>
+        <div class="ring" style="width:118px;height:118px;display:grid;place-items:center;background:#ffd400;color:#0b0d12;font-weight:900;font-size:26px">YOU</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · 실적 -->
+  <section class="sec" id="s7">
+    <div class="stripes"></div>
+    <div class="pad dark" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="big a" data-d="0">2025<span style="font-size:120px">–</span>29</div>
+      <div class="a" data-d=".1" style="font-size:40px;font-weight:900;letter-spacing:-.01em;margin-top:6px">
+        다목적 차세대 용융염원자로(MSR)<br>융복합인력 양성센터</div>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-top:48px">
+        <div class="chip a" data-d=".24"><b>2025</b><span>원자력정책연구사업 — 선진원자로 인허가 대응 전략</span></div>
+        <div class="chip a" data-d=".32"><b>EDITOR</b><span><i>Energies</i> Special Issue — Heat Transfer in Reactor Steam Generators</span></div>
+        <div class="chip a" data-d=".4"><b>2024</b><span>Int. J. Heat and Mass Transfer — Dropwise condensation I &amp; II</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · 끝 -->
+  <section class="sec" id="s8" style="background:#06070b">
+    <div class="glow" style="width:1100px;height:1100px;left:-10px;top:560px;
+      background:radial-gradient(circle,#1a4cff 0%,#00c2ff 45%,rgba(0,0,0,0) 70%);opacity:.45"></div>
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <img src="img/g01.png" class="a" data-d="0" style="width:620px;filter:brightness(0) invert(1)">
+      <div class="a" data-d=".14" style="font-size:40px;font-weight:800;margin-top:26px">차세대원자로를 위한 열수력 기술</div>
+      <div class="a" data-d=".22" style="font-size:30px;font-weight:600;opacity:.75;margin-top:14px">
+        Thermal-Hydraulics Lab · Jeju National University</div>
+      <div class="a" data-d=".34" style="margin-top:54px;font-size:34px;font-weight:800;letter-spacing:.04em">
+        sites.google.com/view/taeseok-kim</div>
+      <div class="a" data-d=".42" style="margin-top:12px;font-size:27px;font-weight:600;opacity:.7">tkim@jejunu.ac.kr · 공과대학 4호관 D330</div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* 15초 · 30fps · 1080x1920. 프레임 번호만 넣으면 같은 그림이 나온다. */
+const FPS = 30, DUR = 15, NF = DUR * FPS;
+const clamp = (v,a=0,b=1)=>v<a?a:v>b?b:v;
+const inv = (t,a,b)=>clamp((t-a)/(b-a));
+const outCubic = t=>1-Math.pow(1-t,3);
+const outExpo = t=>t>=1?1:1-Math.pow(2,-9*t);
+const inOut = t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+/* [들어오는 때, 나가는 때, 들어오는 꼴] */
+const SEC = [
+  ['s0', 0.00, 1.85, 'fade'],
+  ['s1', 1.85, 3.55, 'burst'],
+  ['s2', 3.55, 5.50, 'wipeL'],
+  ['s3', 5.50, 7.40, 'wipeL'],
+  ['s4', 7.40, 9.25, 'wipeL'],
+  ['s5', 9.25, 10.95, 'wipeL'],
+  ['s6', 10.95, 12.55, 'up'],
+  ['s7', 12.55, 13.95, 'up'],
+  ['s8', 13.95, 15.00, 'fade'],
+];
+const E = {};
+for (const [id] of SEC) { E[id] = { el: document.getElementById(id), kids: [...document.getElementById(id).querySelectorAll('.a')] }; }
+
+/* CHF 그래프 */
+const CD = document.getElementById('chfdots'), CL = document.getElementById('chfline');
+const f = u => 470 - 360 * (.92 * Math.exp(-2.6 * u) + .06);
+(function () {
+  let s = 12345; const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (let i = 0; i < 44; i++) {
+    const u = rnd(), c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', 70 + u * 790); c.setAttribute('cy', f(u) + (rnd() - .5) * 58);
+    c.setAttribute('r', 7); c.dataset.k = i / 44; CD.appendChild(c);
+  }
+})();
+/* PCHE 판 — 굵게 쌓는다 */
+(function () {
+  const svg = document.getElementById('pche'); let h = '';
+  for (let p = 0; p < 5; p++) {
+    const y = 74 + p * 96, sk = 92;
+    h += `<g class="plate" data-k="${p / 5}">
+      <path d="M30 ${y} L790 ${y - 34} L${790 + sk} ${y - 34 + 74} L${30 + sk} ${y + 74} Z"
+        fill="rgba(11,13,18,.30)" stroke="#0b0d12" stroke-width="5"/>
+      <path d="M30 ${y} L790 ${y - 34} L${790 + sk} ${y - 34 + 74} L${30 + sk} ${y + 74} Z"
+        fill="rgba(255,255,255,.16)"/>`;
+    for (let c = 0; c < 3; c++) {
+      const yy = y + 20 + c * 18 - 2;
+      let d = `M62 ${yy}`;
+      for (let x = 0; x <= 700; x += 40) d += ` l20 ${c % 2 ? 9 : -9} l20 ${c % 2 ? -9 : 9}`;
+      h += `<path d="${d}" fill="none" stroke="${c === 1 ? '#00e0ff' : '#ffd400'}" stroke-width="7" stroke-linecap="round"/>`;
+    }
+    h += '</g>';
+  }
+  svg.innerHTML = h;
+})();
+
+function renderFrame(n) {
+  const t = n / FPS;
+  for (const [id, a, b, kind] of SEC) {
+    const S = E[id], el = S.el;
+    const live = t >= a - .34 && t <= b + .34;
+    el.style.display = live ? 'block' : 'none';
+    if (!live) continue;
+    const kin = outExpo(inv(t, a - .28, a + .14));          // 들어옴
+    const kout = inv(t, b - .22, b + .06);                  // 나감
+    let tr = '', op = 1;
+    if (kind === 'fade') { op = kin * (1 - kout); tr = `scale(${1 + .04 * (1 - kin) - .03 * kout})`; }
+    if (kind === 'burst') { op = 1; tr = `scale(${0.55 + .45 * kin})`; el.style.borderRadius = `${(1 - kin) * 420}px`; op = kin < .02 ? 0 : (1 - kout); }
+    if (kind === 'wipeL') { tr = `translateX(${(1 - kin) * 1080 - kout * 300}px)`; op = kout > .9 ? 0 : 1; }
+    if (kind === 'up') { tr = `translateY(${(1 - kin) * 1920 - kout * 420}px)`; op = kout > .9 ? 0 : 1; }
+    el.style.opacity = op; el.style.transform = tr;
+    /* 안의 글·사진이 차례로 올라온다 */
+    for (const k of S.kids) {
+      const d = parseFloat(k.dataset.d || 0);
+      const kk = outCubic(inv(t, a + d, a + d + .42));
+      k.style.opacity = kk; k.style.transform = `translateY(${(1 - kk) * 34}px)`;
+    }
+  }
+  /* 훅의 빛무리 */
+  const gl = document.getElementById('s0glow');
+  const gk = inv(t, .35, 1.85);
+  gl.style.transform = `scale(${.35 + 1.5 * gk})`;
+  gl.style.opacity = (.25 + .75 * gk) * .9;
+  /* CHF 점과 선 */
+  const ck = inv(t, 5.95, 7.0);
+  [...CD.children].forEach(c => { c.style.opacity = +c.dataset.k < ck * 1.15 ? 1 : 0; });
+  const lk = inv(t, 6.35, 7.25);
+  let d = '';
+  for (let i = 0; i <= 80 * lk; i++) { const u = i / 80; d += (i ? 'L' : 'M') + (70 + u * 790) + ' ' + f(u) + ' '; }
+  CL.setAttribute('d', d);
+  /* PCHE 판이 쌓인다 */
+  const pk = inv(t, 7.75, 9.1);
+  document.querySelectorAll('#pche .plate').forEach(p => {
+    const k = outExpo(clamp((pk - +p.dataset.k * .5) / .5));
+    p.style.opacity = k; p.style.transform = `translateY(${(1 - k) * -120}px)`;
+  });
+}
+window.renderFrame = renderFrame; window.NF = NF;
+window.sceneReady = (async () => {
+  await document.fonts.load('900 150px Inter'); await document.fonts.load('900 40px "Noto Sans KR"');
+  await document.fonts.ready;
+  await Promise.all([...document.images].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+  renderFrame(0); return true;
+})();
+if (!location.search.includes('still')) window.sceneReady.then(() => {
+  const t0 = performance.now();
+  const loop = () => { renderFrame(Math.floor((performance.now() - t0) / 1000 * FPS) % NF); requestAnimationFrame(loop); };
+  loop();
+});
+</script>
+</body>
+</html>

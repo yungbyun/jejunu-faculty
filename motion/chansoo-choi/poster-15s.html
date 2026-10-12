@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chansoo Choi — poster 15s</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#06070b;display:grid;place-items:center;min-height:100vh}
+  #stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#06070b;
+    font-family:Inter,"Noto Sans KR",system-ui,sans-serif;color:#fff}
+  .sec{position:absolute;inset:0;overflow:hidden;will-change:transform,opacity}
+  .pad{position:absolute;inset:0;padding:230px 76px 240px}
+  .kicker{font-size:26px;font-weight:800;letter-spacing:.34em;text-transform:uppercase;opacity:.78}
+  .count{position:absolute;top:238px;right:76px;font-size:26px;font-weight:800;letter-spacing:.2em;opacity:.65}
+  h1{font-size:146px;line-height:.92;font-weight:900;letter-spacing:-.045em}
+  h2{font-size:106px;line-height:.94;font-weight:900;letter-spacing:-.04em}
+  .sub{font-size:33px;font-weight:600;line-height:1.35;opacity:.9;margin-top:22px;max-width:890px}
+  .dark{color:#0b0d12}
+  .card{position:absolute;border-radius:26px;overflow:hidden;box-shadow:0 48px 90px rgba(0,0,0,.45);background:#0a1020}
+  .card img{width:100%;height:100%;object-fit:cover;display:block}
+  .tag{position:absolute;left:0;bottom:0;background:#0b0d12;color:#fff;font-size:21px;font-weight:800;
+    letter-spacing:.14em;padding:12px 20px;border-radius:0 18px 0 0;text-transform:uppercase}
+  .ring{border-radius:50%;overflow:hidden;border:6px solid #fff;box-shadow:0 18px 44px rgba(0,0,0,.42)}
+  .ring img{width:100%;height:100%;object-fit:cover;display:block}
+  .chip{display:flex;align-items:center;gap:16px;background:#0b0d12;color:#fff;border-radius:18px;
+    padding:20px 26px;font-size:27px;font-weight:700;line-height:1.25}
+  .chip b{color:#ffd400;white-space:nowrap}
+  .stripes{position:absolute;inset:0;background:repeating-linear-gradient(-45deg,#ffd400 0 56px,#f5c400 56px 112px)}
+  .big{font-size:250px;font-weight:900;letter-spacing:-.05em;line-height:.85}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px)}
+  .pill{display:inline-block;background:#0b0d12;color:#fff;border-radius:999px;padding:12px 26px;
+    font-size:26px;font-weight:800;letter-spacing:.06em;margin:0 10px 12px 0}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0 · 훅 -->
+  <section class="sec" id="s0" style="background:#06070b">
+    <div class="glow" id="s0glow" style="width:1250px;height:1250px;left:-80px;top:430px;
+      background:radial-gradient(circle,#38bdf8 0%,#1d4ed8 42%,rgba(0,0,0,0) 70%)"></div>
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="kicker a" data-d="0" style="margin-bottom:28px">Radiation protection</div>
+      <h2 class="a" data-d=".12" style="opacity:.55;font-size:68px;letter-spacing:-.02em">You can’t see it.</h2>
+      <h1 class="a" data-d=".22" style="margin-top:10px">YOUR BODY<br>CAN.</h1>
+    </div>
+  </section>
+
+  <!-- 1 · 폭발 -->
+  <section class="sec" id="s1" style="background:linear-gradient(145deg,#22d3ee,#2563eb 50%,#7c3aed)">
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center">
+      <h2 class="a" data-d="0" style="font-size:64px;opacity:.85">So we built</h2>
+      <h1 class="a" data-d=".1" style="font-size:168px;margin-top:4px">A BODY<br>TO MEASURE.</h1>
+      <div class="sub a" data-d=".3" style="font-size:38px;font-weight:800;opacity:1">Hundreds of thousands of triangles. One human shape.</div>
+    </div>
+  </section>
+
+  <!-- 2 · 메쉬 -->
+  <section class="sec" id="s2" style="background:#1a4cff">
+    <div class="pad">
+      <div class="kicker a" data-d="0">Mesh-type reference phantom</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px;font-size:92px;max-width:520px">THE BODY,<br>REBUILT</h2>
+      <div class="sub a" data-d=".2" style="max-width:470px;font-size:31px">ICRP’s international reference human — modelled surface by surface.</div>
+      <div class="card a" data-d=".3" style="right:62px;top:640px;width:452px;height:1000px">
+        <img src="img/mesh-crop.jpg" alt=""><div class="tag">ICRP MRCP</div>
+      </div>
+    </div>
+    <div class="count a" data-d=".05">01 / 03</div>
+  </section>
+
+  <!-- 3 · 선량 -->
+  <section class="sec" id="s3" style="background:#e11d48">
+    <div class="pad">
+      <div class="kicker a" data-d="0">Dose coefficients</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px;font-size:92px;max-width:520px">ORGAN<br>BY ORGAN</h2>
+      <div class="sub a" data-d=".2" style="max-width:470px;font-size:31px">Monte Carlo transport — how much reaches the lungs, the thyroid, the marrow.</div>
+      <div class="card a" data-d=".3" style="right:52px;top:640px;width:560px;height:1000px">
+        <img src="img/dose-crop.jpg" alt=""><div class="tag">Absorbed dose map</div>
+      </div>
+    </div>
+    <div class="count a" data-d=".05">02 / 03</div>
+  </section>
+
+  <!-- 4 · 한국인 팬텀 -->
+  <section class="sec" id="s4" style="background:#059669">
+    <div class="pad">
+      <div class="kicker a" data-d="0">Korean reference phantoms</div>
+      <h2 class="a" data-d=".08" style="margin-top:18px">AND FOR<br>KOREANS</h2>
+      <div class="sub a" data-d=".2">MRKP external-exposure dose coefficients, computed with Monte Carlo and compared against ICRP.</div>
+      <div class="a" data-d=".3" style="position:absolute;left:76px;top:900px;font-size:218px;font-weight:900;letter-spacing:-.05em;line-height:.86">MRKP</div>
+      <div class="a" data-d=".42" style="position:absolute;left:76px;top:1180px;max-width:940px">
+        <span class="pill">Pregnant-female phantoms</span><span class="pill">Detailed skeleton</span>
+        <span class="pill">Photon SAF</span><span class="pill">Respiratory S-values</span>
+      </div>
+    </div>
+    <div class="count a" data-d=".05">03 / 03</div>
+  </section>
+
+  <!-- 5 · 사람 -->
+  <section class="sec" id="s5" style="background:#6a2ff0">
+    <div class="glow" style="width:900px;height:900px;right:-240px;top:120px;background:radial-gradient(circle,#38bdf8,rgba(0,0,0,0) 68%);opacity:.6"></div>
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <div class="kicker a" data-d="0">Jeju National University</div>
+      <h2 class="a" data-d=".1" style="margin-top:18px;font-size:96px">THE PERSON<br>WHO <span style="color:#ffd400">COUNTS IT</span></h2>
+      <div class="ring a" data-d=".26" style="width:380px;height:380px;margin-top:52px"><img src="photo.png" alt=""></div>
+      <div class="a" data-d=".34" style="margin-top:26px;font-size:48px;font-weight:900">Prof. Chansoo Choi</div>
+      <div class="a" data-d=".4" style="font-size:28px;font-weight:600;opacity:.9;margin-top:10px">
+        Nuclear &amp; Energy Engineering · 공과대학 4호관 D312</div>
+    </div>
+  </section>
+
+  <!-- 6 · 실적 -->
+  <section class="sec" id="s6">
+    <div class="stripes"></div>
+    <div class="pad dark" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="big a" data-d="0">ICRP</div>
+      <div class="a" data-d=".1" style="font-size:38px;font-weight:900;margin-top:4px">
+        메쉬형 참조 전산팬텀(MRCP) 개발 핵심 참여</div>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-top:46px">
+        <div class="chip a" data-d=".22"><b>2026</b><span>Physics in Medicine and Biology — Photon SAFs for ICRP mesh-type phantoms</span></div>
+        <div class="chip a" data-d=".3"><b>2025</b><span>Physics in Medicine and Biology — Pregnant-female mesh-type phantoms II</span></div>
+        <div class="chip a" data-d=".38"><b>2025</b><span>Nuclear Engineering and Technology — MRKP external dose coefficients</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · 끝 -->
+  <section class="sec" id="s7" style="background:#06070b">
+    <div class="glow" style="width:1050px;height:1050px;left:10px;top:580px;
+      background:radial-gradient(circle,#2563eb 0%,#22d3ee 48%,rgba(0,0,0,0) 72%);opacity:.4"></div>
+    <div class="pad" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+      <div class="a" data-d="0" style="font-size:96px;font-weight:900;letter-spacing:-.03em">CHANSOO CHOI</div>
+      <div class="a" data-d=".14" style="font-size:34px;font-weight:700;color:#38bdf8;margin-top:14px;letter-spacing:.12em">
+        ASSISTANT PROFESSOR</div>
+      <div class="a" data-d=".24" style="font-size:34px;font-weight:700;margin-top:34px">제주대학교 원자력공학과</div>
+      <div class="a" data-d=".3" style="font-size:29px;font-weight:600;opacity:.7;margin-top:10px">
+        Nuclear &amp; Energy Engineering, Jeju National University</div>
+      <div class="a" data-d=".42" style="margin-top:54px;font-size:33px;font-weight:800;letter-spacing:.03em">
+        nuclear.jejunu.ac.kr</div>
+      <div class="a" data-d=".5" style="margin-top:12px;font-size:27px;font-weight:600;opacity:.7">
+        chansoo.choi@jejunu.ac.kr</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const FPS = 30, DUR = 15, NF = DUR * FPS;
+const clamp=(v,a=0,b=1)=>v<a?a:v>b?b:v;
+const inv=(t,a,b)=>clamp((t-a)/(b-a));
+const outCubic=t=>1-Math.pow(1-t,3);
+const outExpo=t=>t>=1?1:1-Math.pow(2,-9*t);
+const SEC = [
+  ['s0', 0.00, 1.85, 'fade'],
+  ['s1', 1.85, 3.70, 'burst'],
+  ['s2', 3.70, 5.95, 'wipeL'],
+  ['s3', 5.95, 8.15, 'wipeL'],
+  ['s4', 8.15, 10.35, 'wipeL'],
+  ['s5', 10.35, 12.20, 'up'],
+  ['s6', 12.20, 13.90, 'up'],
+  ['s7', 13.90, 15.00, 'fade'],
+];
+const E = {};
+for (const [id] of SEC) E[id] = { el: document.getElementById(id), kids: [...document.getElementById(id).querySelectorAll('.a')] };
+function renderFrame(n) {
+  const t = n / FPS;
+  for (const [id, a, b, kind] of SEC) {
+    const S = E[id], el = S.el;
+    const live = t >= a - .34 && t <= b + .34;
+    el.style.display = live ? 'block' : 'none';
+    if (!live) continue;
+    const kin = outExpo(inv(t, a - .28, a + .14));
+    const kout = inv(t, b - .22, b + .06);
+    let tr = '', op = 1;
+    if (kind === 'fade') { op = kin * (1 - kout); tr = `scale(${1 + .04 * (1 - kin) - .03 * kout})`; }
+    if (kind === 'burst') { tr = `scale(${0.55 + .45 * kin})`; el.style.borderRadius = `${(1 - kin) * 420}px`; op = kin < .02 ? 0 : (1 - kout); }
+    if (kind === 'wipeL') { tr = `translateX(${(1 - kin) * 1080 - kout * 300}px)`; op = kout > .9 ? 0 : 1; }
+    if (kind === 'up') { tr = `translateY(${(1 - kin) * 1920 - kout * 420}px)`; op = kout > .9 ? 0 : 1; }
+    el.style.opacity = op; el.style.transform = tr;
+    for (const k of S.kids) {
+      const d = parseFloat(k.dataset.d || 0);
+      const kk = outCubic(inv(t, a + d, a + d + .42));
+      k.style.opacity = kk; k.style.transform = `translateY(${(1 - kk) * 34}px)`;
+    }
+  }
+  const gl = document.getElementById('s0glow');
+  const gk = inv(t, .35, 1.85);
+  gl.style.transform = `scale(${.35 + 1.5 * gk})`; gl.style.opacity = (.22 + .78 * gk) * .8;
+}
+window.renderFrame = renderFrame; window.NF = NF;
+window.sceneReady = (async () => {
+  await document.fonts.load('900 146px Inter'); await document.fonts.load('900 38px "Noto Sans KR"');
+  await document.fonts.ready;
+  await Promise.all([...document.images].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+  renderFrame(0); return true;
+})();
+if (!location.search.includes('still')) window.sceneReady.then(() => {
+  const t0 = performance.now();
+  const loop = () => { renderFrame(Math.floor((performance.now() - t0) / 1000 * FPS) % NF); requestAnimationFrame(loop); };
+  loop();
+});
+</script>
+</body>
+</html>
