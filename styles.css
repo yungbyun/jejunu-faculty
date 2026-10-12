@@ -1513,3 +1513,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   padding:7px 13px;font-size:13.5px;font-weight:700;border-radius:999px}
 .cal-new__b .mt-i{width:15px;height:15px;margin-right:5px}
 .cal-new__b:hover{border-color:var(--brand);color:var(--brand)}
+/* 상태 단추는 「완료」 하나 — 누르면 만난 횟수가 오른다 (2026-10-12) */
+.cal-d--done{padding:7px 18px;font-weight:700}
+/* 흰 글자를 올리므로 테마를 타지 않는 짙은 초록으로 못 박는다 (대비 5.9) */
+.cal-d--done.on{background:#2e6f17;border-color:#2e6f17;color:#fff}

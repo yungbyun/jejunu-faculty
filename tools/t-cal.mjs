@@ -28,7 +28,12 @@ t('달력 화면으로', await page.evaluate(() => location.hash) === '#/cal', a
 
 await reset();
 await page.waitForSelector('.cal-grid', { timeout: 10000 });
-t('길잡이에 식사 약속', (await page.locator('.crumbs').innerText()).includes('식사 약속'));
+/* 접촉을 누르면 바로 이 화면이 나온다 (2026-10-12) */
+t('길잡이는 학과 목록 / 접촉', (await page.locator('.crumbs').innerText()).includes('접촉'),
+  await page.locator('.crumbs').innerText());
+t('머리에 식사 약속이라 적혀 있다', (await page.locator('.hero .eyebrow').innerText()).includes('식사 약속'));
+t('문자 보내기·손으로 보낸 기록으로 가는 단추', await page.evaluate(() =>
+  !!document.querySelector('.ot-top a[href="#/outreach"]') && !!document.querySelector('.ot-top a[href="#/manual"]')));
 /* 머리글과 설명은 2026-10-08 에 뺐다 — 길잡이만으로 어디인지 안다 */
 t('큰 제목과 설명은 두지 않는다', await page.evaluate(() =>
   !document.querySelector('.view h1') && !document.querySelector('.hero p')));
@@ -136,32 +141,34 @@ t('시각·장소·메모가 저장된다', await page.evaluate(() => {
 t('글을 쓰는 동안 화면을 다시 안 그린다', await page.evaluate(() =>
   document.activeElement === document.querySelector('[data-mtmemo]') || true));
 
-/* 만남으로 바꾸면 만난 횟수가 오른다 — 이 기능이 이 화면의 핵심이다 */
+/* 「완료」를 누르면 만난 횟수가 오른다 — 이 기능이 이 화면의 핵심이다.
+   단추가 하나로 바뀌어(2026-10-12) 누를 때마다 완료 ↔ 예정을 오간다. */
 const k0 = await page.evaluate(() => Object.values(meets())[0].who[0]);
 const met0 = await page.evaluate(k => getNote(k).met || 0, k0);
-await page.locator('[data-mtdone="met"]').click();
+await page.locator('[data-mtdone]').click();
 await page.waitForTimeout(600);
-t('만남으로 바꾸면 만난 횟수가 1 오른다', await page.evaluate(k => getNote(k).met || 0, k0) === met0 + 1,
+t('완료로 바꾸면 만난 횟수가 1 오른다', await page.evaluate(k => getNote(k).met || 0, k0) === met0 + 1,
   `${met0} → ${await page.evaluate(k => getNote(k).met || 0, k0)}`);
 t('이미 셌다고 적어 둔다', await page.evaluate(() => Object.values(meets())[0].counted.length === 1));
-/* 같은 단추를 또 눌러도 두 번 세면 안 된다 */
-await page.locator('[data-mtdone="met"]').click();
+/* 완료인 채로 같은 값을 또 넣어도 두 번 세면 안 된다 */
+await page.evaluate(() => { mtDone(CAL.open, 'met'); renderCal(); });
 await page.waitForTimeout(600);
-t('다시 눌러도 두 번 세지 않는다', await page.evaluate(k => getNote(k).met || 0, k0) === met0 + 1,
+t('다시 넣어도 두 번 세지 않는다', await page.evaluate(k => getNote(k).met || 0, k0) === met0 + 1,
   String(await page.evaluate(k => getNote(k).met || 0, k0)));
-await page.locator('[data-mtdone=""]').click();
+await page.locator('[data-mtdone]').click();
 await page.waitForTimeout(600);
-t('예정으로 되돌리면 도로 내린다', await page.evaluate(k => getNote(k).met || 0, k0) === met0,
+t('완료를 풀면 도로 내린다', await page.evaluate(k => getNote(k).met || 0, k0) === met0,
   String(await page.evaluate(k => getNote(k).met || 0, k0)));
 t('센 기록도 비워진다', await page.evaluate(() => Object.values(meets())[0].counted.length === 0));
-await page.locator('[data-mtdone="met"]').click();
+/* 「못 만남」 단추는 뺐다 — 셈을 되돌리는 동작만 함수로 확인한다 */
+await page.locator('[data-mtdone]').click();
 await page.waitForTimeout(600);
-await page.locator('[data-mtdone="no"]').click();
+await page.evaluate(() => { mtDone(CAL.open, 'no'); renderCal(); });
 await page.waitForTimeout(600);
 t('못 만남으로 바꿔도 도로 내린다', await page.evaluate(k => getNote(k).met || 0, k0) === met0);
 
 // 사람을 빼면 센 것도 돌아온다
-await page.locator('[data-mtdone="met"]').click();
+await page.locator('[data-mtdone]').click();
 await page.waitForTimeout(600);
 await page.locator('.cal-who__p .cal-chip').first().click();
 await page.waitForTimeout(600);
@@ -370,7 +377,7 @@ t('이미 더한 이름은 또 안 권한다', await page.evaluate(() => !docume
 
 /* 3) 만남으로 바꿔도 명단 밖의 분은 만난 횟수에 안 들어간다 */
 const before = await page.evaluate(() => getNote(rKey(state.rows[3])).met || 0);
-await page.locator('[data-mtdone="met"]').click();
+await page.locator('[data-mtdone]').click();
 await page.waitForTimeout(250);
 t('교수만 만난 횟수가 오른다', await page.evaluate(x => (getNote(rKey(state.rows[3])).met || 0) === x + 1, before));
 t('센 사람에 명단 밖의 분은 없다', await page.evaluate(() =>
@@ -463,6 +470,26 @@ t('아이콘이 글자를 밀어내지 않는다', await page.evaluate(() => {
   const e = document.querySelector('.cal-r__t');
   return e.scrollWidth <= e.clientWidth + 1;
 }));
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
+/* 상태 단추는 「예정」과 「만남」 둘뿐 (2026-10-12) */
+await page.evaluate(() => { meetMap = {}; CAL.day = mtToday(); CAL.open = mtAdd(mtToday(), rKey(state.rows[0]), 'lunch'); renderCal(); });
+await page.waitForSelector('[data-mtdone]', { timeout: 10000 });
+t('상태 단추는 「완료」 하나', await page.locator('[data-mtdone]').count() === 1,
+  await page.evaluate(() => [...document.querySelectorAll('[data-mtdone]')].map(b => b.textContent.trim()).join('/')));
+t('예정·못 만남 단추는 없다', await page.evaluate(() =>
+  !/예정|못 만남/.test(document.querySelector('.cal-done').textContent)));
+const met1 = await page.evaluate(() => getNote(rKey(state.rows[0])).met || 0);
+await page.locator('[data-mtdone]').click();
+await page.waitForTimeout(250);
+t('완료를 누르면 만난 횟수가 1 오른다', await page.evaluate(k => getNote(k).met || 0, await page.evaluate(() => rKey(state.rows[0]))) === met1 + 1);
+t('누른 뒤에는 「완료됨」', (await page.locator('[data-mtdone]').innerText()).includes('완료됨'),
+  await page.locator('[data-mtdone]').innerText());
+await page.locator('[data-mtdone]').click();
+await page.waitForTimeout(250);
+t('다시 누르면 도로 내려간다', await page.evaluate(k => getNote(k).met || 0, await page.evaluate(() => rKey(state.rows[0]))) === met1);
+t('풀면 다시 「완료」', (await page.locator('[data-mtdone]').innerText()).trim() === '완료',
+  await page.locator('[data-mtdone]').innerText());
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* 해·달은 갈래가 아니라 **몇 시냐**로 정한다 (2026-10-12) */

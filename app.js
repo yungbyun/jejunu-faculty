@@ -306,7 +306,9 @@ function render() {
     renderHome();
     closeDrawer(false);
   }
-  document.querySelectorAll('[data-nav]').forEach(a => a.setAttribute('aria-current', a.dataset.nav === r.view ? 'page' : 'false'));
+  /* 접촉 탭 하나가 식사 약속·문자 보내기·손으로 보낸 기록 셋을 아우른다 — 어디에 있든 켜 둔다 */
+  const navOf = v => (v === 'cal' || v === 'manual') ? 'outreach' : v;
+  document.querySelectorAll('[data-nav]').forEach(a => a.setAttribute('aria-current', a.dataset.nav === navOf(r.view) ? 'page' : 'false'));
   window.scrollTo({ top: 0 });
 }
 
@@ -1248,7 +1250,7 @@ function renderManual() {
 
   $app.innerHTML = `
     <div class="view">
-      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>직접 보낸 기록</span></div>
+      <div class="crumbs"><a href="#/cal">접촉</a><span>/</span><span>직접 보낸 기록</span></div>
       <div class="hero"><div class="eyebrow">직접 보낸 기록</div>
         <h1>손으로 보낸 문자</h1>
         <p>폰으로 직접 보내신 뒤 여기에 찍어 두십시오. 앱이 보내는 것과는 따로 셉니다.</p></div>
@@ -1432,9 +1434,9 @@ function renderOutreach() {
 
   $app.innerHTML = `
     <div class="view">
-      <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
-      <div class="ot-top"><a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a>
-        <a class="chip" href="#/cal">식사 약속 →</a></div>
+      <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><a href="#/cal">접촉</a><span>/</span><span>문자 보내기</span></div>
+      <div class="ot-top"><a class="chip" href="#/cal">식사 약속 →</a>
+        <a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a></div>
 
       <section class="ot-sec">
         <div class="ot-sec__h"><h2>① 문자 쓰기</h2>
@@ -3777,7 +3779,9 @@ function renderCal() {
 
   $app.innerHTML = `
     <div class="view">
-      <div class="crumbs"><a href="#/outreach">접촉</a><span>/</span><span>식사 약속</span></div>
+      <div class="crumbs"><a href="#/">학과 목록</a><span>/</span><span>접촉</span></div>
+      <div class="ot-top"><a class="chip" href="#/outreach">문자 보내기 →</a>
+        <a class="chip" href="#/manual">손으로 보낸 문자 기록하기 →</a></div>
       <div class="hero hero--thin"><div class="eyebrow">식사 약속</div></div>
 
       <section class="cal-sec">
@@ -3826,6 +3830,9 @@ function renderCal() {
 }
 
 const MT_DONE = { '': '예정', met: '만남', no: '못 만남' };
+/* 상태 단추는 「완료」 하나뿐이다 — 예정·못 만남 단추는 2026-10-12 에 뺐다.
+   누르면 만난 횟수가 1 오르고, 다시 누르면 도로 내려간다.
+   예전 기록이 'no' 일 수 있어 뜻풀이(MT_DONE)는 줄머리 표를 위해 남겨 둔다. */
 function mtRow(m) {
   const open = m.id === CAL.open;
   const names = mtNames(m);
@@ -3919,8 +3926,11 @@ function mtEdit(m) {
     </div>
 
     <div class="cal-foot">
-      <div class="cal-done" role="group" aria-label="약속 상태">
-        ${Object.keys(MT_DONE).map(v => `<button type="button" class="cal-d${m.done === v ? ' on' : ''}" data-mtdone="${esc(v)}" aria-pressed="${m.done === v}">${esc(MT_DONE[v])}</button>`).join('')}
+      <div class="cal-done">
+        ${(() => { const on = m.done === 'met';
+          return `<button type="button" class="cal-d cal-d--done${on ? ' on' : ''}" data-mtdone="${on ? '' : 'met'}"
+            aria-pressed="${on}" title="${on ? '완료를 풀면 만난 횟수가 도로 내려갑니다' : '만나고 오셨으면 누르십시오 — 만난 횟수가 1 오릅니다'}"
+            >${on ? '완료됨 ✓' : '완료'}</button>`; })()}
       </div>
       <button type="button" class="btn cal-del" data-mtdel>이 약속 지우기</button>
     </div>
@@ -3990,7 +4000,7 @@ function bindCal() {
   bindWho();
   $app.querySelectorAll('[data-mtdone]').forEach(b => b.addEventListener('click', () => {
     mtDone(CAL.open, b.dataset.mtdone);
-    flashStatus(b.dataset.mtdone === 'met' ? '만남으로 적고 만난 횟수를 올렸습니다' : '약속 상태를 바꿨습니다');
+    flashStatus(b.dataset.mtdone === 'met' ? '완료로 적고 만난 횟수를 1 올렸습니다' : '완료를 풀고 만난 횟수를 1 내렸습니다');
     renderCal();
   }));
   $('[data-mtdel]')?.addEventListener('click', () => {
