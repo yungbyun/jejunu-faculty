@@ -3646,7 +3646,7 @@ const mtSoon = (n = 4) => { const t = mtToday(); return mtList().filter(m => m.d
    시각을 손으로 고치면 갈래는 지운다 — 18:00 인데 '점심' 이라고 적혀 있으면 안 된다. */
 const MT_KIND = {
   lunch:  { name: '점심', time: '12:00' },
-  dinner: { name: '저녁', time: '18:00' },
+  dinner: { name: '저녁', time: '18:30' },
   other:  { name: '',     time: '14:00' },   // 이름을 비워 두면 줄머리에 시각만 나온다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
@@ -3808,7 +3808,12 @@ function renderCal() {
 
       <section class="cal-sec">
         <div class="cal-head cal-head--day"><h2>${esc(mtWhen(CAL.day))}</h2>
-          <button type="button" class="btn btn--go" data-mtadd>+ 새 약속</button></div>
+          <div class="cal-new" role="group" aria-label="새 약속 잡기">
+            <span class="cal-new__l">새 약속</span>
+            <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('lunch')}점심 12:00</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('dinner')}저녁 18:30</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="">${mtIcon('')}직접</button>
+          </div></div>
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
       </section>
@@ -3938,7 +3943,16 @@ function bindCal() {
   $app.querySelectorAll('[data-mtgo]').forEach(b => b.addEventListener('click', () => {
     CAL.day = b.dataset.day; CAL.ym = mtMonth(b.dataset.day); CAL.open = b.dataset.mtgo; renderCal();
   }));
-  $('[data-mtadd]')?.addEventListener('click', () => { CAL.open = mtAdd(CAL.day); CAL.q = ''; renderCal(); });
+  $app.querySelectorAll('[data-mtadd]').forEach(b => b.addEventListener('click', () => {
+    const kind = b.dataset.mtadd;
+    CAL.open = mtAdd(CAL.day, '', kind); CAL.q = '';
+    renderCal();
+    const K = MT_KIND[kind];
+    flashStatus(K ? `${mtWhen(CAL.day)} ${K.name} ${K.time} 로 잡았습니다 — 바꾸시려면 아래에서 고치시면 됩니다`
+      : `${mtWhen(CAL.day)} 약속을 만들었습니다 — 시각을 골라 주십시오`);
+    /* 「직접」은 시각이 비어 있다. 그 칸으로 데려가 바로 고르게 한다. */
+    if (!K) { const t = $app.querySelector('[data-mttime]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus(); } }
+  }));
   /* 줄에서 바로 고치고 지운다 — 펼쳐서 찾아 들어갈 것 없이 */
   $app.querySelectorAll('[data-mtedit]').forEach(b => b.addEventListener('click', () => {
     CAL.open = CAL.open === b.dataset.mtedit ? '' : b.dataset.mtedit; CAL.q = ''; renderCal();

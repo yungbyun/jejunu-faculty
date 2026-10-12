@@ -1511,3 +1511,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-i--lunch{color:var(--mt-lunch)}
 .mt-i--dinner{color:var(--mt-dinner)}
 .mt-i--etc{color:var(--mt-etc)}
+
+/* 새 약속 — 점심·저녁·직접 중에서 고른다 (2026-10-12) */
+/* 날짜 제목과 같은 줄에 두면 제목이 눌려 잘린다 — 아랫줄을 통째로 쓴다 */
+.cal-new{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1 0 100%;margin-top:2px}
+.cal-new__l{font-size:11.5px;font-weight:700;color:var(--ink-3);letter-spacing:.04em}
+.cal-new__b{display:inline-flex;align-items:center;width:auto;flex:none;
+  padding:7px 13px;font-size:13.5px;font-weight:700;border-radius:999px}
+.cal-new__b .mt-i{width:15px;height:15px;margin-right:5px}
+.cal-new__b:hover{border-color:var(--brand);color:var(--brand)}
