@@ -10,6 +10,22 @@ await page.evaluate(() => { if (!document.body.classList.contains('authed')) ent
 await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
 const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
 
+/* 시각은 시·분 고르개로 넣는다 — 고를 때마다 화면을 다시 그리므로 매번 찾아 쓴다 */
+const setTime = async (hh, mm = '00') => {
+  await page.evaluate(h => {
+    const s2 = document.querySelector('[data-mth]');
+    s2.value = h; s2.dispatchEvent(new Event('change', { bubbles: true }));
+  }, hh);
+  await page.waitForTimeout(250);
+  if (hh) {
+    await page.evaluate(m => {
+      const s2 = document.querySelector('[data-mtm]');
+      s2.value = m; s2.dispatchEvent(new Event('change', { bubbles: true }));
+    }, mm);
+    await page.waitForTimeout(250);
+  }
+};
+
 const reset = () => page.evaluate(() => {
   meetMap = {}; localStorage.removeItem('jnu-meets');
   state.notes.clear();
@@ -129,8 +145,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(300);
 
 // 시각·장소·메모
-await page.fill('[data-mttime]', '15:00');
-await page.waitForTimeout(500);
+await setTime('15', '00');
 await page.fill('[data-mtplace]', '공과대학 3호관 C422호');
 await page.fill('[data-mtmemo]', '통신 쪽 현안 먼저');
 await page.waitForTimeout(500);
@@ -219,11 +234,11 @@ t('줄머리에 「점심 12:00」', (await page.locator('.cal-r.on .cal-r__t').
   await page.locator('.cal-r.on .cal-r__t').innerText());
 t('약속이 하나 늘었다', await page.evaluate(() => mtList().length) === n0 + 1);
 /* 저녁은 6시 반이 미리 들어가고, Tea 는 시각을 비워 둔다 (2026-10-13) */
-t('저녁은 18:30, Tea 는 시각 없이', await page.evaluate(() => {
+t('저녁은 18:30, Tea 는 14:00', await page.evaluate(() => {
   const a = mtAdd(mtToday(), rKey(state.rows[3]), 'dinner');
   const c = mtAdd(mtToday(), rKey(state.rows[3]), 'other');
   return a !== c && meets()[a].time === '18:30' && meets()[a].kind === 'dinner' &&
-    meets()[c].time === '' && meets()[c].kind === 'other';
+    meets()[c].time === '14:00' && meets()[c].kind === 'other';
 }), await page.evaluate(() => MT_KIND.dinner.time + ' / ' + JSON.stringify(MT_KIND.other)));
 t('Tea 는 줄머리에 이름이 붙는다', await page.evaluate(() => mtKindName('other') === 'Tea'));
 /* 같은 밀리초에 두 번 잡아도 앞 약속이 덮어써지면 안 된다 */
@@ -236,8 +251,11 @@ t('연달아 잡아도 id 가 겹치지 않는다', await page.evaluate(() => {
 t('시각을 손으로 고치면 끼니 이름이 사라진다', await page.evaluate(async () => {
   const id = mtAdd(mtToday(), rKey(state.rows[3]), 'lunch');
   CAL.open = id; CAL.day = mtToday(); renderCal();
-  const el = document.querySelector('[data-mttime]');
-  el.value = '19:30'; el.dispatchEvent(new Event('change', { bubbles: true }));
+  const h = document.querySelector('[data-mth]');
+  h.value = '19'; h.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  const mi = document.querySelector('[data-mtm]');
+  mi.value = '30'; mi.dispatchEvent(new Event('change', { bubbles: true }));
   await new Promise(r => setTimeout(r, 300));
   return meets()[id].time === '19:30' && meets()[id].kind === '';
 }));
@@ -528,8 +546,9 @@ t('빈 시각이면 갈래의 시각이 채워진다', await page.evaluate(() =>
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* Tea — 상세의 「기타」를 Tea 로 바꾸고 찻잔을 붙였다 (2026-10-13) */
-t('Tea 는 미리 정한 시각이 없다', await page.evaluate(() =>
-  MT_KIND.other.name === 'Tea' && MT_KIND.other.time === ''));
+t('Tea 는 오후 2시가 미리 들어간다', await page.evaluate(() =>
+  MT_KIND.other.name === 'Tea' && MT_KIND.other.time === '14:00'),
+  await page.evaluate(() => MT_KIND.other.time));
 t('Tea 는 몇 시든 찻잔', await page.evaluate(() =>
   mtSlot({ kind: 'other', time: '' }) === 'tea' && mtSlot({ kind: 'other', time: '15:30' }) === 'tea'
   && mtSlot({ kind: 'other', time: '20:00' }) === 'tea'));
@@ -563,21 +582,13 @@ t('다른 점과 크기가 같다', await page.evaluate(() => {
   .map(i => i.className.replace('cal-dot--', '') + ':' + Math.round(i.getBoundingClientRect().width)).join(' ')));
 
 /* 시각을 손으로 넣어도 Tea 가 풀리면 안 된다 */
-await page.evaluate(() => {
-  const t2 = document.querySelector('[data-mttime]');
-  t2.value = '15:30'; t2.dispatchEvent(new Event('change', { bubbles: true }));
-});
-await page.waitForTimeout(300);
+await setTime('15', '30');
 t('시각을 넣어도 Tea 가 그대로', await page.evaluate(() => meets()[CAL.open].kind === 'other'),
   await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
 t('그래도 찻잔', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--tea')));
 /* 점심은 시각을 바꾸면 갈래가 풀린다(예전 그대로) */
-await page.evaluate(() => {
-  CAL.open = mtAdd(mtToday(), rKey(state.rows[1]), 'lunch'); renderCal();
-  const t2 = document.querySelector('[data-mttime]');
-  t2.value = '16:00'; t2.dispatchEvent(new Event('change', { bubbles: true }));
-});
-await page.waitForTimeout(300);
+await page.evaluate(() => { CAL.open = mtAdd(mtToday(), rKey(state.rows[1]), 'lunch'); renderCal(); });
+await setTime('16', '00');
 t('점심은 시각을 바꾸면 갈래가 풀린다', await page.evaluate(() => meets()[CAL.open].kind === ''),
   await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
@@ -648,20 +659,57 @@ t('저녁으로 잡으면 18:30', await page.evaluate(() => {
 
 await page.click('[data-mtadd="other"]');
 await page.waitForTimeout(400);
-t('Tea 는 시각을 비워 둔다', await page.evaluate(() => {
-  const m = meets()[CAL.open]; return m.kind === 'other' && m.time === '';
+t('Tea 는 오후 2시로 잡힌다', await page.evaluate(() => {
+  const m = meets()[CAL.open]; return m.kind === 'other' && m.time === '14:00';
 }), await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
-t('Tea 는 시각 칸으로 데려간다', await page.evaluate(() =>
-  document.activeElement === document.querySelector('[data-mttime]')));
-/* 비워 둔 시각을 손으로 넣으면 그대로 붙는다 */
-await page.evaluate(() => {
-  const t2 = document.querySelector('[data-mttime]');
-  t2.value = '19:40'; t2.dispatchEvent(new Event('change', { bubbles: true }));
-});
-await page.waitForTimeout(250);
+t('고르개에도 오후 2시가 들어 있다', await page.evaluate(() =>
+  document.querySelector('[data-mth]').value === '14' && document.querySelector('[data-mtm]').value === '00'),
+  await page.evaluate(() => document.querySelector('[data-mth]').value + ':' + document.querySelector('[data-mtm]').value));
+/* 시각을 손으로 고르면 그대로 붙는다 */
+await setTime('19', '40');
 t('손으로 넣은 시각이 저장된다', await page.evaluate(() => mtList().some(m => m.time === '19:40')),
   await page.evaluate(() => mtList().map(m => m.time).join(',')));
 t('약속 셋이 모두 남아 있다', await page.evaluate(() => mtList().length) === 3);
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
+/* 시각은 입력 대신 시·분 고르개로 (2026-10-13) */
+await page.evaluate(() => {
+  meetMap = {}; mtSave(); const d = mtToday();
+  CAL.open = mtAdd(d, rKey(state.rows[0]), 'other'); CAL.day = d; CAL.ym = mtMonth(d); renderCal();
+});
+await page.waitForSelector('[data-mth]', { timeout: 10000 });
+t('시각은 고르개 둘, 입력 칸은 없다', await page.evaluate(() => {
+  const h = document.querySelector('[data-mth]'), m = document.querySelector('[data-mtm]');
+  return !!h && !!m && h.tagName === 'SELECT' && m.tagName === 'SELECT' && !document.querySelector('[data-mttime]');
+}));
+t('시는 미정과 스물넷', await page.evaluate(() => {
+  const o = [...document.querySelector('[data-mth]').options];
+  return o.length === 25 && o[0].value === '' && o[0].textContent === '미정'
+    && o[1].textContent === '오전 12시' && o[13].textContent === '오후 12시' && o[24].textContent === '오후 11시';
+}), await page.evaluate(() => [...document.querySelector('[data-mth]').options].map(o => o.textContent).join(',')));
+t('분은 10분 간격', await page.evaluate(() =>
+  [...document.querySelector('[data-mtm]').options].map(o => o.value).join() === '00,10,20,30,40,50'),
+  await page.evaluate(() => [...document.querySelector('[data-mtm]').options].map(o => o.textContent).join(' ')));
+t('지금 시각이 골라져 있다', await page.evaluate(() =>
+  document.querySelector('[data-mth]').value === '14' && document.querySelector('[data-mtm]').value === '00'));
+await setTime('09', '50');
+t('고르면 그대로 저장된다', await page.evaluate(() => meets()[CAL.open].time) === '09:50',
+  await page.evaluate(() => meets()[CAL.open].time));
+t('다시 그려도 고른 값이 남는다', await page.evaluate(() =>
+  document.querySelector('[data-mth]').value === '09' && document.querySelector('[data-mtm]').value === '50'));
+t('Tea 는 몇 시로 옮겨도 Tea', await page.evaluate(() => meets()[CAL.open].kind) === 'other');
+await setTime('');
+t('미정을 고르면 시각이 비워진다', await page.evaluate(() => meets()[CAL.open].time) === '',
+  await page.evaluate(() => JSON.stringify(meets()[CAL.open].time)));
+t('미정이면 분 고르개가 잠긴다', await page.evaluate(() => document.querySelector('[data-mtm]').disabled));
+t('미정이면 하루 종일로 나간다', (await page.evaluate(() => icsText())).includes('DTSTART;VALUE=DATE:'));
+/* 10분 자리가 아닌 예전 자료도 그대로 보여 준다 */
+await page.evaluate(() => { mtSet(CAL.open, { time: '18:03' }); renderCal(); });
+await page.waitForTimeout(250);
+t('10분 자리가 아닌 옛 시각도 그대로', await page.evaluate(() => {
+  const h = document.querySelector('[data-mth]'), m = document.querySelector('[data-mtm]');
+  return h.value === '18' && m.value === '03' && [...m.options].map(o => o.value).join() === '00,03,10,20,30,40,50';
+}), await page.evaluate(() => [...document.querySelector('[data-mtm]').options].map(o => o.value).join()));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 let bad = 0;

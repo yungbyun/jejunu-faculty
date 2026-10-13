@@ -3659,7 +3659,7 @@ const mtOf = day => mtList().filter(m => m.date === day);
 const MT_KIND = {
   lunch:  { name: '점심', time: '12:00' },
   dinner: { name: '저녁', time: '18:30' },
-  other:  { name: 'Tea',  time: '' },        // 차 한잔 — 시각은 비워 두고 손으로 고르신다
+  other:  { name: 'Tea',  time: '14:00' },   // 차 한잔 — 오후 2시가 기본, 고치시면 된다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
 /* 낮이면 해, 밤이면 달, 시각을 안 정했으면 시계.
@@ -3840,7 +3840,7 @@ function renderCal() {
             <span class="cal-new__l">새 약속</span>
             <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('day')}점심 12:00</button>
             <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('night')}저녁 18:30</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="other">${mtIcon('tea')}Tea</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="other">${mtIcon('tea')}Tea 14:00</button>
           </div></div>
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
@@ -3932,11 +3932,32 @@ function bindWho() {
   }));
 }
 
+/* 시각 고르개 — 손으로 쳐 넣는 대신 시와 분(10분 간격)을 고른다.
+   이미 적힌 분이 10분 자리가 아니면(예전 자료의 18:03) 그 값도 목록에 끼워 넣어 잃지 않는다. */
+const MT_MINS = ['00', '10', '20', '30', '40', '50'];
+const mtHourName = h => `${h < 12 ? '오전' : '오후'} ${(h % 12) || 12}시`;
+function mtTimePick(m) {
+  const t = /^(\d{1,2}):(\d{2})$/.exec(String(m.time || ''));
+  const hh = t ? pad2(Number(t[1])) : '', mm = t ? t[2] : '00';
+  const mins = MT_MINS.includes(mm) ? MT_MINS : [...MT_MINS, mm].sort();
+  return `<span class="cal-tp">
+    <select data-mth aria-label="몇 시">
+      <option value=""${hh === '' ? ' selected' : ''}>미정</option>
+      ${Array.from({ length: 24 }, (_, h) => {
+        const v = pad2(h);
+        return `<option value="${v}"${v === hh ? ' selected' : ''}>${esc(mtHourName(h))}</option>`;
+      }).join('')}
+    </select>
+    <select data-mtm aria-label="몇 분"${hh === '' ? ' disabled' : ''}>
+      ${mins.map(v => `<option value="${v}"${v === mm ? ' selected' : ''}>${v}분</option>`).join('')}
+    </select>
+  </span>`;
+}
 function mtEdit(m) {
   return `<div class="cal-e">
     <div class="cal-f">
       <label><span>날짜</span>${dpick('data-mtdate', m.date, '날짜 고르기', dayName(m.date) ? `(${dayName(m.date)})` : '')}</label>
-      <label><span>시각</span><input type="time" data-mttime value="${esc(m.time)}"></label>
+      <label><span>시각</span>${mtTimePick(m)}</label>
       <label class="cal-f__w"><span>장소</span><input type="text" data-mtplace value="${esc(m.place)}" placeholder="예) 공과대학 3호관 C422호"></label>
     </div>
     <div class="cal-kind" role="group" aria-label="약속 갈래">
@@ -3987,7 +4008,7 @@ function bindCal() {
     flashStatus(K && K.time ? `${mtWhen(CAL.day)} ${K.name} ${K.time} 로 잡았습니다 — 바꾸시려면 아래에서 고치시면 됩니다`
       : `${mtWhen(CAL.day)} ${(K && K.name) || '약속'} 을 만들었습니다 — 시각을 골라 주십시오`);
     /* 「직접」은 시각이 비어 있다. 그 칸으로 데려가 바로 고르게 한다. */
-    if (!K || !K.time) { const t = $app.querySelector('[data-mttime]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus(); } }
+    if (!K || !K.time) { const t = $app.querySelector('[data-mth]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus(); } }
   }));
   /* 줄에서 바로 고치고 지운다 — 펼쳐서 찾아 들어갈 것 없이 */
   $app.querySelectorAll('[data-mtedit]').forEach(b => b.addEventListener('click', () => {
@@ -4009,15 +4030,22 @@ function bindCal() {
     mtSet(CAL.open, { date: e.target.value });
     CAL.day = e.target.value; CAL.ym = mtMonth(e.target.value); renderCal();
   });
-  $('[data-mttime]')?.addEventListener('change', e => {
-    const m = meets()[CAL.open];
-    /* 시각을 손으로 고치면 갈래를 지운다 — 18:00 인데 '점심' 이면 안 되니까.
-       다만 Tea 처럼 **미리 정한 시각이 없는** 갈래는 시각을 넣어도 그대로 둔다. */
-    const K = m && MT_KIND[m.kind];
-    const keep = !!K && (!K.time || K.time === e.target.value);
-    mtSet(CAL.open, { time: e.target.value, kind: keep ? m.kind : '' });
+  /* 시·분을 고르면 합쳐서 넣는다. 시가 '미정' 이면 시각을 비운다(하루 종일). */
+  const pickTime = () => {
+    const m = meets()[CAL.open]; if (!m) return;
+    const h = ($('[data-mth]') || {}).value || '';
+    const mi = ($('[data-mtm]') || {}).value || '00';
+    const v = h ? `${h}:${mi}` : '';
+    /* 시각을 고치면 갈래를 지운다 — 18:00 인데 '점심' 이면 안 되니까.
+       다만 **시각으로 이름 붙인 갈래(점심·저녁)만** 그렇다. Tea 는 시각과 상관없는
+       이름이라 몇 시로 옮기든 Tea 그대로 둔다. */
+    const timeNamed = m.kind === 'lunch' || m.kind === 'dinner';
+    const keep = !timeNamed || (MT_KIND[m.kind] || {}).time === v;
+    mtSet(CAL.open, { time: v, kind: keep ? m.kind : '' });
     renderCal();
-  });
+  };
+  $('[data-mth]')?.addEventListener('change', pickTime);
+  $('[data-mtm]')?.addEventListener('change', pickTime);
   /* 글자를 쓰는 동안에는 다시 그리지 않는다 — 커서가 튄다 */
   const place = $('[data-mtplace]'), memo = $('[data-mtmemo]');
   place?.addEventListener('input', () => mtSet(CAL.open, { place: place.value }));
@@ -4133,7 +4161,7 @@ function openDrawer(p, d) {
           <button type="button" class="btn" data-mtnew="dinner">저녁</button>
           <button type="button" class="btn" data-mtnew="other">Tea</button>
         </div>
-        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 반 · Tea 는 시각을 직접.
+        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 반 · Tea 2시.
           날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
       </div>
 
