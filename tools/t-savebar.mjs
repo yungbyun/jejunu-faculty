@@ -82,6 +82,48 @@ t('버리기 전에 물어본다', await page.evaluate(() => {
 }));
 
 await page.evaluate(() => { sync.dirtyS.clear(); saveSetDirty(); sync.dirty.clear(); saveDirty(); });
+/* 새 버전 알림 — 저장 바와 따로 뜬다 (2026-10-13).
+   예전에는 같은 바를 써서, 미저장이 하나라도 있으면 아예 안 뜨고
+   저장이 한 번만 일어나도 지워졌다. */
+{
+  const fs = await import('fs');
+  const VER = '../version.json';
+  const keep = fs.readFileSync(VER, 'utf8');
+  try {
+  
+  t('처음엔 새 버전 알림이 없다', await page.evaluate(()=>!document.querySelector('.verbar')));
+
+  /* 서버의 version.json 만 새 것으로 바꾼다 */
+  fs.writeFileSync(VER, '{"v": "9999-test"}');
+  await page.evaluate(()=>checkVersion()); await page.waitForTimeout(400);
+  t('새 판이 올라오면 알린다', await page.evaluate(()=>{const v=document.querySelector('.verbar');
+    return !!v && !v.hidden && /새 버전/.test(v.textContent);}),
+    await page.evaluate(()=>(document.querySelector('.verbar')||{}).textContent||'(안 뜸)'));
+
+  /* 미저장이 있어도 떠야 한다 — 예전에는 이때 아예 안 떴다 */
+  await page.evaluate(()=>{ document.querySelector('.verbar').remove(); $verBar=null;
+    sync.dirty.set('x',{rating:'확'}); sync.dirtyS.set('meets','{}'); updateSaveBar(); });
+  await page.evaluate(()=>checkVersion()); await page.waitForTimeout(400);
+  t('미저장이 있어도 알린다', await page.evaluate(()=>{const v=document.querySelector('.verbar');
+    return !!v && !v.hidden;}), '예전에는 이때 아예 안 떴다');
+
+  /* 저장 바가 다시 그려져도 알림이 안 지워져야 한다 */
+  await page.evaluate(()=>{ for(let i=0;i<5;i++) updateSaveBar(); });
+  await page.waitForTimeout(200);
+  t('저장 바를 다시 그려도 안 지워진다', await page.evaluate(()=>{const v=document.querySelector('.verbar');
+    return !!v && !v.hidden;}));
+  t('저장 바도 함께 보인다', await page.evaluate(()=>{const s=document.querySelector('.savebar');
+    return !!s && !s.hidden && /미저장/.test(s.textContent);}),
+    await page.evaluate(()=>(document.querySelector('.savebar')||{}).textContent||'(없음)'));
+
+  /* 눌렀을 때 진짜로 새로 받는지 — 주소에 ?r= 이 붙으며 다시 불러온다 */
+  const before = page.url();
+  await page.click('.verbar #reloadNew');
+  await page.waitForTimeout(1200);
+  t('누르면 다시 불러온다', page.url() !== before && /[?&]r=\d+/.test(page.url()), page.url().slice(0, 48));
+  } finally { fs.writeFileSync(VER, keep); }
+}
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

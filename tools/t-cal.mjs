@@ -506,7 +506,7 @@ t('갈래 고르개가 넷', await page.locator('[data-mtkind]').count() === 4,
   await page.evaluate(() => [...document.querySelectorAll('[data-mtkind]')].map(b => b.textContent.trim()).join('/')));
 t('지금 갈래에 불이 켜져 있다', await page.evaluate(() =>
   document.querySelector('[data-mtkind=""]').classList.contains('on')));
-t('갈래가 없으면 시각대로 해', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--day')));
+t('갈래가 없고 애매한 시각이면 찻잔', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--tea')));
 await page.click('[data-mtkind="other"]');
 await page.waitForTimeout(350);
 t('Tea 로 고치면 찻잔이 된다', await page.evaluate(() =>
@@ -573,28 +573,31 @@ t('점심은 시각을 바꾸면 갈래가 풀린다', await page.evaluate(() =>
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* 해·달은 갈래가 아니라 **몇 시냐**로 정한다 (2026-10-12) */
-t('여섯 시부터 열여덟 시 앞까지가 낮', await page.evaluate(() =>
-  ['06:00', '12:00', '14:00', '17:59'].every(t2 => mtSlot({ time: t2 }) === 'day')));
-t('열여덟 시부터는 밤', await page.evaluate(() =>
-  ['18:00', '18:30', '19:40', '23:00', '05:30'].every(t2 => mtSlot({ time: t2 }) === 'night')));
+/* 끼니때로 가른다 — 낮/밤이 아니라 점심때·저녁때·그 밖 (2026-10-13) */
+t('11시부터 2시 앞까지가 점심때', await page.evaluate(() =>
+  ['11:00', '12:00', '13:59'].every(t2 => mtSlot({ time: t2 }) === 'day')));
+t('5시부터 9시 앞까지가 저녁때', await page.evaluate(() =>
+  ['17:00', '18:03', '18:30', '20:59'].every(t2 => mtSlot({ time: t2 }) === 'night')));
+t('그 밖의 시각은 찻잔', await page.evaluate(() =>
+  ['07:00', '10:30', '14:00', '15:20', '16:30', '21:00', '23:00', '05:30'].every(t2 => mtSlot({ time: t2 }) === 'tea')));
 t('시각이 없으면 갈래의 시각을 본다', await page.evaluate(() =>
   mtSlot({ time: '', kind: 'lunch' }) === 'day' && mtSlot({ time: '', kind: 'dinner' }) === 'night'));
 t('둘 다 없으면 시계', await page.evaluate(() => mtSlot({ time: '', kind: '' }) === 'none'));
 /* 갈래 없이 손으로 넣은 시각도 해·달로 갈린다 */
 await page.evaluate(() => {
   meetMap = {}; const d = mtToday();
-  mtSet(mtAdd(d, rKey(state.rows[0]), ''), { time: '14:00' });
+  mtSet(mtAdd(d, rKey(state.rows[0]), ''), { time: '12:00' });
   mtSet(mtAdd(d, rKey(state.rows[1]), ''), { time: '19:40' });
   mtAdd(d, rKey(state.rows[2]), '');
   CAL.day = d; CAL.ym = mtMonth(d); CAL.open = ''; renderCal();
 });
 await page.waitForSelector('.cal-r__t .mt-i', { timeout: 10000 });
-t('14:00 은 해, 19:40 은 달, 미정은 시계', await page.evaluate(() => {
+t('12:00 은 해, 19:40 은 달, 미정은 시계', await page.evaluate(() => {
   const m = {};
   document.querySelectorAll('.cal-r__t').forEach(e => {
     m[e.textContent.trim().split(/\s+/)[0]] = e.querySelector('.mt-i').className.replace('mt-i mt-i--', '');
   });
-  return m['14:00'] === 'day' && m['19:40'] === 'night' && m['시각'] === 'none';
+  return m['12:00'] === 'day' && m['19:40'] === 'night' && m['시각'] === 'none';
 }), await page.evaluate(() => [...document.querySelectorAll('.cal-r__t')]
   .map(e => e.querySelector('.mt-i').className.replace('mt-i mt-i--', '') + ':' + e.textContent.trim().split(/\s+/)[0]).join(' ')));
 t('달력 점도 같은 규칙', await page.evaluate(() => {

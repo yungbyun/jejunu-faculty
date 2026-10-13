@@ -3119,6 +3119,24 @@ function hardReload() {
   setTimeout(() => { try { location.replace(u); } catch { location.reload(); } }, 250);
 }
 
+/* 새 버전 알림은 **저장 바와 따로** 띄운다.
+ * 예전에는 같은 바를 같이 썼는데, 그 바는 저장할 때마다 다시 그려지므로
+ *   - 알림이 뜬 직후 다른 저장이 한 번만 일어나도 지워졌고,
+ *   - 미저장이 하나라도 남아 있으면(시트 401 등) 아예 뜨지 않았다.
+ * 새로고침해도 미저장은 그대로 남아 다시 올리므로, 미저장이 있어도 알려 주는 것이 맞다. */
+let $verBar = null;
+function showNewVersion() {
+  if (!$verBar) {
+    $verBar = document.createElement('div');
+    $verBar.className = 'verbar'; $verBar.hidden = true;
+    document.body.appendChild($verBar);
+  }
+  if (!$verBar.hidden) return;                 // 이미 떠 있으면 그대로 둔다
+  $verBar.innerHTML = '새 버전이 있습니다'
+    + ' <button type="button" class="savebar__btn" id="reloadNew">새로고침</button>';
+  $verBar.hidden = false;
+  $verBar.querySelector('#reloadNew').addEventListener('click', hardReload);
+}
 async function checkVersion() {
   if (!APP_V || document.visibilityState !== 'visible') return;
   try {
@@ -3126,13 +3144,7 @@ async function checkVersion() {
     if (!r.ok) return;
     const j = await r.json();
     if (!j || !j.v || String(j.v) === APP_V) return;
-    if (sync.queue.size || sync.dirty.size) return;          // 저장 중이면 나중에
-    updateSaveBar();                                          // $saveBar 준비
-    if (!$saveBar) return;
-    $saveBar.className = 'savebar savebar--busy'; $saveBar.dataset.mode = 'ver';
-    $saveBar.innerHTML = `새 버전이 있습니다 <button type="button" class="savebar__btn" id="reloadNew">새로고침</button>`;
-    $saveBar.hidden = false;
-    $saveBar.querySelector('#reloadNew').addEventListener('click', hardReload);
+    showNewVersion();
   } catch {}
 }
 
@@ -3666,16 +3678,25 @@ const MT_ICON = {
   none: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/>'
     + '<path d="M12 7.4V12l3 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
 };
-const MT_DAY0 = 6, MT_DAY1 = 18;
-/* 약속 하나가 낮인지 밤인지. 시각이 먼저고, 없으면 갈래에 적힌 시각을 본다. */
+/* 끼니때로 가른다 — 「낮이냐 밤이냐」가 아니라 「점심때냐 저녁때냐 그 밖이냐」다.
+   12:00 은 해, 18:03 은 달, 15:20 은 찻잔이 되도록. */
+const MT_LUNCH = [11, 14];        // 11:00 ~ 13:59
+const MT_DINNER = [17, 21];       // 17:00 ~ 20:59
+function mtSlotOfTime(t) {
+  if (!/^(\d{1,2}):/.test(String(t || ''))) return null;
+  const h = Number(String(t).slice(0, 2));
+  if (h >= MT_LUNCH[0] && h < MT_LUNCH[1]) return 'day';
+  if (h >= MT_DINNER[0] && h < MT_DINNER[1]) return 'night';
+  return 'tea';                   // 그 밖의 시각은 차 한잔
+}
+/* 갈래를 적어 두었으면 그것이 먼저고, 없으면 시각으로 가른다 */
 function mtSlot(m) {
-  if (m && m.kind === 'other') return 'tea';          // 차 한잔은 몇 시든 찻잔
-  const t = String((m && m.time) || '');
-  const h = /^(\d{1,2}):/.test(t) ? Number(t.slice(0, 2)) : null;
-  if (h !== null) return (h >= MT_DAY0 && h < MT_DAY1) ? 'day' : 'night';
-  const K = MT_KIND[(m && m.kind) || ''];
-  if (K && K.time) return Number(K.time.slice(0, 2)) < MT_DAY1 ? 'day' : 'night';
-  return 'none';
+  const k = (m && m.kind) || '';
+  if (k === 'lunch') return 'day';
+  if (k === 'dinner') return 'night';
+  if (k === 'other') return 'tea';
+  const byTime = mtSlotOfTime(m && m.time);
+  return byTime || 'none';        // 시각도 없으면 시계
 }
 const mtIcon = slot => `<i class="mt-i mt-i--${slot}" aria-hidden="true">${MT_ICON[slot] || MT_ICON.none}</i>`;
 /* 시각만으로 id 를 지으면 같은 밀리초에 두 번 부를 때 겹쳐 앞 약속이 덮어써진다.

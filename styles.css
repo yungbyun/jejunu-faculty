@@ -1530,3 +1530,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-k .mt-i{width:15px;height:15px;margin-right:0}
 .cal-k:hover{border-color:var(--brand)}
 .cal-k.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--ink);font-weight:800}
+
+/* 새 버전 알림 — 저장 바와 따로 띄운다(저장 바는 자주 다시 그려져 알림이 지워졌다) (2026-10-13) */
+.verbar{position:fixed;left:50%;bottom:calc(58px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  z-index:61;max-width:calc(100vw - 32px);padding:8px 14px;border-radius:999px;
+  font-size:12.5px;font-weight:700;color:#fff;background:#2563eb;
+  box-shadow:0 6px 20px rgba(0,0,0,.22);display:flex;align-items:center;gap:10px;white-space:nowrap}
+.verbar[hidden]{display:none}
