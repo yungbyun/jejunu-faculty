@@ -1327,7 +1327,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-r__m:hover{background:var(--surface-2)}
 .cal-r__a{flex:none;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
   font:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+/* 글자 대신 그림만 — 폰에서 「수정·지우기」 넉 자가 이름을 밀어냈다 (2026-10-13) */
+.cal-r__a{display:inline-flex;align-items:center;justify-content:center;min-width:34px;min-height:32px;padding:0}
+.cal-r__a svg{display:block}
 .cal-r__a:hover{border-color:var(--brand);color:var(--brand)}
+.cal-r__a.on{border-color:var(--brand);color:var(--brand);background:var(--surface-2)}
 .cal-r__a--x:hover{border-color:var(--rs-neg);color:var(--rs-neg)}
 .cal-r__t{flex:none;min-width:62px;font-size:12.5px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .cal-r__w{flex:1;min-width:0;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1386,7 +1390,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .hero--thin{margin-bottom:8px}
   .cal-sec{margin-bottom:12px}
   .cal-r__t{min-width:52px}
-  .cal-r__a{padding:4px 8px;font-size:11.5px}
+  .cal-r__a{min-width:32px;min-height:30px;padding:0}
   .cal-del{margin-left:0}
 }
 

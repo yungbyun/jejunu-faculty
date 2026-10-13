@@ -3563,6 +3563,16 @@ const TEL_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="tr
 const PEN_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<path d="M4 20h4l10-10-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>'
   + '<path d="M14.5 5.5l4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+/* 약속 줄 오른쪽의 조그만 단추 — 글자 대신 그림만 둔다(폰에서 이름이 가려졌다) */
+const PEN15_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">'
+  + '<path d="M4 20h4l10-10-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
+  + '<path d="M14.5 5.5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const ERASE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">'
+  + '<path d="M10 18.6 4.2 12.8a1.7 1.7 0 0 1 0-2.4l6.2-6.2a1.7 1.7 0 0 1 2.4 0l5.8 5.8a1.7 1.7 0 0 1 0 2.4'
+  + 'l-6.2 6.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
+  + '<path d="M8 8.4 14.8 15.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+  + '<path d="M4.5 21h15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
 /* 지금 번호를 고치고 있는 사람. 카드의 연필로 들어오면 상세가 열리면서 바로 고칠 수 있다. */
 let mobEditKey = '';
 const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
@@ -3868,10 +3878,12 @@ function mtRow(m) {
       <button type="button" class="cal-r__m" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
         <span class="cal-r__t">${mtIcon(mtSlot(m))}${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
         <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
-        <span class="cal-r__s cal-r__s--${esc(m.done || 'plan')}">${esc(MT_DONE[m.done] || '예정')}</span>
+${m.done ? `<span class="cal-r__s cal-r__s--${esc(m.done)}">${esc(MT_DONE[m.done] || '')}</span>` : ''}
       </button>
-      <button type="button" class="cal-r__a" data-mtedit="${esc(m.id)}">${open ? '접기' : '수정'}</button>
-      <button type="button" class="cal-r__a cal-r__a--x" data-mtrmv="${esc(m.id)}">지우기</button>
+      <button type="button" class="cal-r__a${open ? ' on' : ''}" data-mtedit="${esc(m.id)}" aria-expanded="${open}"
+        aria-label="${open ? '접기' : '고치기'}" title="${open ? '접기' : '고치기'}">${PEN15_SVG}</button>
+      <button type="button" class="cal-r__a cal-r__a--x" data-mtrmv="${esc(m.id)}"
+        aria-label="지우기" title="지우기">${ERASE_SVG}</button>
     </div>
     ${open ? mtEdit(m) : ''}
   </div>`;

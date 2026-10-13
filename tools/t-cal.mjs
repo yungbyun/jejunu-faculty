@@ -291,12 +291,37 @@ t('단추가 머리줄 안에 있다', await page.evaluate(() =>
 /* 단추 안에 단추를 넣으면 안 된다 — 머리줄은 묶음이어야 한다 */
 t('단추를 단추 안에 넣지 않았다', await page.evaluate(() =>
   ![...document.querySelectorAll('.cal-r__a')].some(b => b.parentElement.tagName === 'BUTTON')));
-t('상태 배지는 그대로', await page.evaluate(() => document.querySelectorAll('.cal-r__s').length === 2));
+/* 줄머리는 글자 대신 그림으로 — 폰에서 이름이 가려졌다 (2026-10-13) */
+t('「예정」 표는 안 단다', await page.evaluate(() => document.querySelectorAll('.cal-r__s').length === 1),
+  await page.evaluate(() => [...document.querySelectorAll('.cal-r__s')].map(e => e.textContent).join()));
+t('만난 약속에만 표가 붙는다', await page.evaluate(() => {
+  const e = document.querySelector('.cal-r__s');
+  return e.textContent.trim() === '만남' && e.closest('.cal-r').querySelector('.cal-r__w').textContent.length > 0;
+}));
+t('고치기는 연필, 지우기는 지우개', await page.evaluate(() => {
+  const e = document.querySelector('[data-mtedit]'), x = document.querySelector('[data-mtrmv]');
+  return !e.textContent.trim() && !x.textContent.trim() && !!e.querySelector('svg') && !!x.querySelector('svg')
+    && e.getAttribute('aria-label') === '고치기' && x.getAttribute('aria-label') === '지우기';
+}), await page.evaluate(() => document.querySelector('[data-mtedit]').outerHTML.slice(0, 90)));
+t('그림 단추도 손가락이 닿을 만큼', await page.evaluate(() =>
+  [...document.querySelectorAll('.cal-r__a')].every(b => {
+    const r = b.getBoundingClientRect(); return r.width >= 30 && r.height >= 28;
+  })), await page.evaluate(() => [...document.querySelectorAll('.cal-r__a')]
+    .map(b => Math.round(b.getBoundingClientRect().width) + 'x' + Math.round(b.getBoundingClientRect().height)).join(' ')));
+t('이름 칸이 단추보다 훨씬 넓다', await page.evaluate(() => {
+  const w = document.querySelector('.cal-r__w').getBoundingClientRect().width;
+  const a = [...document.querySelectorAll('.cal-r:first-child .cal-r__a')]
+    .reduce((s2, b) => s2 + b.getBoundingClientRect().width, 0);
+  return w > a;
+}));
 await page.locator('[data-mtedit]').first().click();
 await page.waitForTimeout(500);
 t('수정을 누르면 그 자리에서 펼쳐진다', await page.evaluate(() => !!document.querySelector('.cal-r.on .cal-e')));
-t('펼친 뒤에는 접기로 바뀐다', (await page.locator('.cal-r.on [data-mtedit]').innerText()).trim() === '접기',
-  await page.locator('.cal-r.on [data-mtedit]').innerText());
+t('펼친 뒤에는 접기로 바뀐다', await page.evaluate(() => {
+  const e = document.querySelector('.cal-r.on [data-mtedit]');
+  return e.getAttribute('aria-label') === '접기' && e.getAttribute('aria-expanded') === 'true'
+    && e.classList.contains('on');
+}), await page.evaluate(() => document.querySelector('.cal-r.on [data-mtedit]').getAttribute('aria-label')));
 await page.locator('.cal-r.on [data-mtedit]').click();
 await page.waitForTimeout(400);
 t('다시 누르면 접힌다', await page.locator('.cal-r.on').count() === 0);
