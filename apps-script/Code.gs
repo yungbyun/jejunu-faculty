@@ -913,17 +913,31 @@ function calDate_(day, time) {
   return Utilities.parseDate(day + ' ' + t, CAL_TZ, 'yyyy-MM-dd HH:mm');
 }
 
-/* 제목 — 낮이면 해, 밤이면 달. 몇 시냐로 가른다(앱과 같은 규칙). */
+/* 해·달·찻잔을 고른다 — 앱의 mtSlot() 과 **같은 규칙**이라야 한다.
+   갈래를 적어 두었으면 그것이 먼저, 없으면 끼니때로 가른다.
+   11:00~13:59 해 · 17:00~20:59 달 · 그 밖은 찻잔 · 시각이 없으면 아무것도 안 붙인다. */
+function calSlot_(m) {
+  const k = String(m.kind || '');
+  if (k === 'lunch') return 'day';
+  if (k === 'dinner') return 'night';
+  if (k === 'other') return 'tea';
+  if (!/^\d{1,2}:\d{2}$/.test(String(m.time || ''))) return '';
+  const hh = Number(String(m.time).slice(0, 2));
+  if (hh >= 11 && hh < 14) return 'day';
+  if (hh >= 17 && hh < 21) return 'night';
+  return 'tea';
+}
+
 function calTitle_(m) {
   const names = Array.isArray(m.names) ? m.names : [];
   const who = !names.length ? '약속'
     : names.length <= 2 ? names.join(', ')
     : names[0] + ' 외 ' + (names.length - 1) + '명';
-  const hh = /^(\d{1,2}):/.test(String(m.time || '')) ? Number(String(m.time).slice(0, 2)) : null;
-  const slot = hh === null ? '' : (hh >= 6 && hh < 18 ? '☀ ' : '🌙 ');
-  if (m.kind === 'other') return '\uD83C\uDF75 Tea · ' + who;   // 차 한잔 — 몇 시든 찻잔
-  const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · ' : '';
-  return slot + kind + who;
+  const slot = calSlot_(m);
+  const mark = slot === 'day' ? '\u2600 ' : slot === 'night' ? '\uD83C\uDF19 ' : slot === 'tea' ? '\uD83C\uDF75 ' : '';
+  const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · '
+    : m.kind === 'other' ? 'Tea · ' : '';
+  return mark + kind + who;
 }
 
 /* 시트의 meets 설정 → 맞출 약속 목록 */

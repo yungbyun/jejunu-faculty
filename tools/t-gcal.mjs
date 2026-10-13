@@ -75,7 +75,7 @@ function run(meets, rows, existingCal) {
     SpreadsheetApp_: null,
   };
   const keys = Object.keys(env);
-  const fn = new Function(...keys, SRC + '\nreturn { calendarSync, calTitle_, calWanted_ };');
+  const fn = new Function(...keys, SRC + '\nreturn { calendarSync, calTitle_, calWanted_, calSlot_ };');
   const api = fn(...keys.map(k => env[k]));
   const res = api.calendarSync(OWNER);
   return { res, cal, created, api };
@@ -131,7 +131,7 @@ t('지우면 캘린더에서도 지운다', r4.res.gone === 1 && r4.cal._events.
 const M4 = JSON.parse(JSON.stringify(M3)); M4.a3.time = '08:30';
 let r5 = run(M4, ROWS, r4.cal);
 const e3 = r5.cal._events.find(e => e.getTag('mtid') === 'a3');
-t('하루 종일에서 시각으로 바뀐다', e3._all === false && e3._t.startsWith('☀'), `${e3._all} ${e3._t}`);
+t('하루 종일에서 시각으로 바뀐다', e3._all === false && e3._t.startsWith('🍵'), `${e3._all} ${e3._t}`);
 
 /* 6) 남의 계정으로는 건드리지 않는다 */
 const sheets = makeSheets(MEETS, ROWS);
@@ -139,6 +139,24 @@ let r6 = run(MEETS, ROWS, r5.cal);
 t('주인만 맞춘다', r6.res.ok === true);
 const api = r6.api;
 t('다른 사람이면 건너뛴다', api.calendarSync('남@example.com').skip === 'not owner');
+
+/* 7) 폰 캘린더의 아이콘은 앱 화면과 같아야 한다 (2026-10-13)
+   교수님이 「김태석 15:20 이 폰 캘린더에서 해로 나온다」고 짚으신 자리다.
+   앱은 끼니때로 가르는데(mtSlot) 여기만 낮·밤(6~18시)으로 갈라 두어 어긋났다. */
+const slot = api.calSlot_, title = api.calTitle_;
+t('11시~2시 앞은 해', ['11:00', '12:00', '13:59'].every(x => slot({ time: x }) === 'day'));
+t('5시~9시 앞은 달', ['17:00', '18:03', '20:59'].every(x => slot({ time: x }) === 'night'));
+t('그 밖은 찻잔', ['08:30', '10:30', '14:00', '15:20', '16:30', '21:00'].every(x => slot({ time: x }) === 'tea'),
+  ['08:30', '10:30', '14:00', '15:20', '16:30', '21:00'].map(x => x + ':' + slot({ time: x })).join(' '));
+t('갈래를 적어 두면 그것이 먼저', slot({ kind: 'other', time: '12:00' }) === 'tea'
+  && slot({ kind: 'lunch', time: '20:00' }) === 'day' && slot({ kind: 'dinner', time: '12:00' }) === 'night');
+t('시각이 없으면 아무 표도 없다', slot({ time: '', kind: '' }) === '');
+t('15:20 은 찻잔으로 나간다', title({ time: '15:20', kind: '', names: ['김태석'] }) === '🍵 김태석',
+  title({ time: '15:20', kind: '', names: ['김태석'] }));
+t('Tea 로 적어 두면 이름도 붙는다', title({ time: '15:20', kind: 'other', names: ['김태석'] }) === '🍵 Tea · 김태석',
+  title({ time: '15:20', kind: 'other', names: ['김태석'] }));
+t('점심은 해, 저녁은 달', title({ time: '12:00', kind: 'lunch', names: ['가'] }) === '☀ 점심 · 가'
+  && title({ time: '18:30', kind: 'dinner', names: ['가'] }) === '🌙 저녁 · 가');
 
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
