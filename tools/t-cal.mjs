@@ -493,6 +493,40 @@ t('풀면 다시 「완료」', (await page.locator('[data-mtdone]').innerText()
   await page.locator('[data-mtdone]').innerText());
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
+/* 이미 잡아 둔 약속의 갈래를 고칠 수 있다 (2026-10-13).
+   예전에 시각을 손으로 고치면 갈래가 지워졌는데, 그렇게 표시를 잃은 약속을 되살리는 길이다. */
+await page.evaluate(() => {
+  meetMap = {};
+  const id = mtAdd('2026-10-13', rKey(state.rows[0]), '');
+  mtSet(id, { time: '15:20' });
+  CAL.day = '2026-10-13'; CAL.ym = '2026-10'; CAL.open = id; renderCal();
+});
+await page.waitForSelector('[data-mtkind]', { timeout: 10000 });
+t('갈래 고르개가 넷', await page.locator('[data-mtkind]').count() === 4,
+  await page.evaluate(() => [...document.querySelectorAll('[data-mtkind]')].map(b => b.textContent.trim()).join('/')));
+t('지금 갈래에 불이 켜져 있다', await page.evaluate(() =>
+  document.querySelector('[data-mtkind=""]').classList.contains('on')));
+t('갈래가 없으면 시각대로 해', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--day')));
+await page.click('[data-mtkind="other"]');
+await page.waitForTimeout(350);
+t('Tea 로 고치면 찻잔이 된다', await page.evaluate(() =>
+  mtList()[0].kind === 'other' && !!document.querySelector('.cal-r__t .mt-i--tea')));
+t('달력 점도 흰 점으로 바뀐다', await page.evaluate(() => !!document.querySelector('.cal-c__d i.cal-dot--tea')));
+t('적어 둔 시각은 안 건드린다', await page.evaluate(() => mtList()[0].time) === '15:20',
+  await page.evaluate(() => mtList()[0].time));
+t('줄머리에 Tea 가 붙는다', (await page.locator('.cal-r__t').innerText()).includes('Tea 15:20'),
+  await page.locator('.cal-r__t').innerText());
+/* 시각이 비어 있으면 그 갈래의 시각을 채운다 */
+await page.evaluate(() => {
+  meetMap = {}; CAL.open = mtAdd('2026-10-13', rKey(state.rows[1]), ''); renderCal();
+});
+await page.click('[data-mtkind="dinner"]');
+await page.waitForTimeout(350);
+t('빈 시각이면 갈래의 시각이 채워진다', await page.evaluate(() =>
+  mtList()[0].kind === 'dinner' && mtList()[0].time === '18:30'),
+  await page.evaluate(() => JSON.stringify([mtList()[0].kind, mtList()[0].time])));
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
 /* Tea — 상세의 「기타」를 Tea 로 바꾸고 찻잔을 붙였다 (2026-10-13) */
 t('Tea 는 미리 정한 시각이 없다', await page.evaluate(() =>
   MT_KIND.other.name === 'Tea' && MT_KIND.other.time === ''));

@@ -3918,6 +3918,11 @@ function mtEdit(m) {
       <label><span>시각</span><input type="time" data-mttime value="${esc(m.time)}"></label>
       <label class="cal-f__w"><span>장소</span><input type="text" data-mtplace value="${esc(m.place)}" placeholder="예) 공과대학 3호관 C422호"></label>
     </div>
+    <div class="cal-kind" role="group" aria-label="약속 갈래">
+      ${[['lunch', '점심'], ['dinner', '저녁'], ['other', 'Tea'], ['', '없음']].map(([k, n]) =>
+        `<button type="button" class="cal-k${m.kind === k ? ' on' : ''}" data-mtkind="${esc(k)}" aria-pressed="${m.kind === k}"
+          >${mtIcon(k === 'lunch' ? 'day' : k === 'dinner' ? 'night' : k === 'other' ? 'tea' : 'none')}${esc(n)}</button>`).join('')}
+    </div>
     <label class="cal-f__w cal-f__memo"><span>메모</span><input type="text" data-mtmemo value="${esc(m.memo)}" placeholder="무엇을 말씀드릴지"></label>
 
     <div class="cal-who">
@@ -4000,6 +4005,13 @@ function bindCal() {
   const q = $('[data-mtq]');
   q?.addEventListener('input', () => { CAL.q = q.value; mtRefreshWho(); });
   /* '+ 만날 분 추가' — 찾는 칸으로 데려다 놓는다(폰에서 자판이 바로 올라온다) */
+  $app.querySelectorAll('[data-mtkind]').forEach(b => b.addEventListener('click', () => {
+    const m = meets()[CAL.open]; if (!m) return;
+    const kind = b.dataset.mtkind;
+    /* 적어 둔 시각이 있으면 그대로 두고, 비어 있으면 그 갈래의 시각을 채운다 */
+    mtSet(CAL.open, { kind: kind, time: m.time || (MT_KIND[kind] || {}).time || '' });
+    renderCal();
+  }));
   $('[data-mtmore]')?.addEventListener('click', () => {
     if (!q) return;
     q.scrollIntoView({ behavior: 'smooth', block: 'center' });
