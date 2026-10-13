@@ -153,7 +153,7 @@ t('갈래를 적어 두면 그것이 먼저', slot({ kind: 'other', time: '12:00
 t('시각이 없으면 아무 표도 없다', slot({ time: '', kind: '' }) === '');
 t('15:20 은 찻잔으로 나간다', title({ time: '15:20', kind: '', names: ['김태석'] }) === '🍵 김태석',
   title({ time: '15:20', kind: '', names: ['김태석'] }));
-t('Tea 로 적어 두면 이름도 붙는다', title({ time: '15:20', kind: 'other', names: ['김태석'] }) === '🍵 Tea · 김태석',
+t('Tea 라고 또 적지 않는다 — 찻잔이면 안다', title({ time: '15:20', kind: 'other', names: ['김태석'] }) === '🍵 김태석',
   title({ time: '15:20', kind: 'other', names: ['김태석'] }));
 t('점심은 해, 저녁은 달', title({ time: '12:00', kind: 'lunch', names: ['가'] }) === '☀ 점심 · 가'
   && title({ time: '18:30', kind: 'dinner', names: ['가'] }) === '🌙 저녁 · 가');

@@ -3672,6 +3672,12 @@ const MT_KIND = {
   other:  { name: 'Tea',  time: '14:00' },   // 차 한잔 — 오후 2시가 기본, 고치시면 된다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
+/* 줄머리에 적을 글 — 찻잔은 그림만으로 뜻이 서니 「Tea」는 적지 않는다.
+   점심·저녁은 12:00·18:30 이 끼니인지 한눈에 안 보여 이름을 함께 적는다. */
+function mtWhenText(m) {
+  const kn = (m && m.kind) === 'other' ? '' : mtKindName(m && m.kind);
+  return [kn, m && m.time].filter(Boolean).join(' ') || '시각 미정';
+}
 /* 낮이면 해, 밤이면 달, 시각을 안 정했으면 시계.
  * 점심·저녁이라는 갈래가 아니라 **몇 시냐**로 가른다 — 14시 커피도 해, 19시 40분도 달이다.
  * 여섯 시부터 열여덟 시 앞까지를 낮으로 본다. */
@@ -3876,7 +3882,7 @@ function mtRow(m) {
   return `<div class="cal-r${open ? ' on' : ''}${m.done ? ' cal-r--' + m.done : ''}">
     <div class="cal-r__h">
       <button type="button" class="cal-r__m" data-mtopen="${esc(m.id)}" aria-expanded="${open}">
-        <span class="cal-r__t">${mtIcon(mtSlot(m))}${esc(mtKindName(m.kind) ? mtKindName(m.kind) + ' ' + m.time : (m.time || '시각 미정'))}</span>
+        <span class="cal-r__t">${mtIcon(mtSlot(m))}${esc(mtWhenText(m))}</span>
         <span class="cal-r__w">${esc(names.join(', ') || '사람 없음')}</span>
 ${m.done ? `<span class="cal-r__s cal-r__s--${esc(m.done)}">${esc(MT_DONE[m.done] || '')}</span>` : ''}
       </button>

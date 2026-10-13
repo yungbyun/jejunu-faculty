@@ -240,7 +240,7 @@ t('저녁은 18:30, Tea 는 14:00', await page.evaluate(() => {
   return a !== c && meets()[a].time === '18:30' && meets()[a].kind === 'dinner' &&
     meets()[c].time === '14:00' && meets()[c].kind === 'other';
 }), await page.evaluate(() => MT_KIND.dinner.time + ' / ' + JSON.stringify(MT_KIND.other)));
-t('Tea 는 줄머리에 이름이 붙는다', await page.evaluate(() => mtKindName('other') === 'Tea'));
+t('Tea 는 단추·안내에 쓸 이름이 있다', await page.evaluate(() => mtKindName('other') === 'Tea'));
 /* 같은 밀리초에 두 번 잡아도 앞 약속이 덮어써지면 안 된다 */
 t('연달아 잡아도 id 가 겹치지 않는다', await page.evaluate(() => {
   const before = mtList().length;
@@ -558,7 +558,8 @@ t('Tea 로 고치면 찻잔이 된다', await page.evaluate(() =>
 t('달력 점도 흰 점으로 바뀐다', await page.evaluate(() => !!document.querySelector('.cal-c__d i.cal-dot--tea')));
 t('적어 둔 시각은 안 건드린다', await page.evaluate(() => mtList()[0].time) === '15:20',
   await page.evaluate(() => mtList()[0].time));
-t('줄머리에 Tea 가 붙는다', (await page.locator('.cal-r__t').innerText()).includes('Tea 15:20'),
+/* 찻잔은 그림만으로 뜻이 선다 — 「Tea」라고 또 적지 않는다 (2026-10-13) */
+t('줄머리에 Tea 라고 적지 않는다', (await page.locator('.cal-r__t').innerText()).trim() === '15:20',
   await page.locator('.cal-r__t').innerText());
 /* 시각이 비어 있으면 그 갈래의 시각을 채운다 */
 await page.evaluate(() => {
@@ -594,10 +595,17 @@ await page.evaluate(() => {
   CAL.day = d; CAL.ym = mtMonth(d); renderCal();
 });
 await page.waitForSelector('.cal-r__t .mt-i', { timeout: 10000 });
-t('줄에 찻잔과 Tea', await page.evaluate(() => {
+t('줄에는 찻잔과 시각만', await page.evaluate(() => {
   const e = document.querySelector('.cal-r__t');
-  return e.querySelector('.mt-i--tea') && e.textContent.includes('Tea');
+  return !!e.querySelector('.mt-i--tea') && e.textContent.trim() === '14:00';
 }), await page.evaluate(() => document.querySelector('.cal-r__t').textContent.trim()));
+t('점심·저녁은 이름을 적는다', await page.evaluate(() =>
+  mtWhenText({ kind: 'lunch', time: '12:00' }) === '점심 12:00'
+  && mtWhenText({ kind: 'dinner', time: '18:30' }) === '저녁 18:30'
+  && mtWhenText({ kind: 'other', time: '16:00' }) === '16:00'
+  && mtWhenText({ kind: '', time: '15:20' }) === '15:20'
+  && mtWhenText({ kind: 'other', time: '' }) === '시각 미정'),
+  await page.evaluate(() => mtWhenText({ kind: 'other', time: '16:00' })));
 t('달력 점은 연두, 다른 점과 같은 크기', await page.evaluate(() => {
   const tea = document.querySelector('.cal-c__d i.cal-dot--tea');
   if (!tea) return false;

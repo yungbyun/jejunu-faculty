@@ -935,8 +935,8 @@ function calTitle_(m) {
     : names[0] + ' 외 ' + (names.length - 1) + '명';
   const slot = calSlot_(m);
   const mark = slot === 'day' ? '\u2600 ' : slot === 'night' ? '\uD83C\uDF19 ' : slot === 'tea' ? '\uD83C\uDF75 ' : '';
-  const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · '
-    : m.kind === 'other' ? 'Tea · ' : '';
+  /* 찻잔 그림만으로 뜻이 서니 「Tea」는 적지 않는다(앱 줄머리와 같다) */
+  const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · ' : '';
   return mark + kind + who;
 }
 
