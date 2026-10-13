@@ -86,6 +86,8 @@ function doPost(e) {
   if (body.action === 'setting') {
     if (!body.key) return out({ error: 'missing key' });
     upsertSetting(email, String(body.key), String(body.value == null ? '' : body.value));
+    /* 식사 약속이 바뀌면 구글 캘린더도 함께 맞춘다 — 캘린더가 말썽이어도 저장은 막지 않는다 */
+    if (String(body.key) === SET_ME_KEY) { try { calendarSync(email); } catch (err) {} }
     return out({ ok: true });
   }
   if (body.action === 'set') {
@@ -872,4 +874,161 @@ function smsQueueTest() {
     '', '[시험] 대기열을 거쳐 나가는 문자입니다.', at, 'queued', '', '', 'sms']);
   Logger.log('1분 뒤에 나가도록 넣었습니다. 5분마다 도는 트리거가 집어 갑니다.\n'
     + '지금 상태 — 보내기: ' + (outboxOn_() ? (outDry_() ? '연습 모드(실제로 안 나감)' : '켜짐') : '꺼짐'));
+}
+
+/* ==========================================================
+ * 식사 약속 → 구글 캘린더
+ * 앱에서 잡은 식사 약속을 「식사 약속」이라는 **따로 만든 캘린더**에 넣습니다.
+ * 아이폰 캘린더는 일정마다 색을 주지 않고 캘린더 단위로 색을 주므로,
+ * 캘린더를 따로 두어야 기존 일정과 색으로 갈립니다.
+ *
+ * 처음 한 번: 편집기에서 calendarSyncNow() 를 실행 → 캘린더 권한 허용
+ *             그 뒤 아이폰에서 색을 고르십시오(안 보이면 calendar.google.com/syncselect 에서 체크).
+ * 그 뒤로는 앱에서 약속을 저장할 때마다 저절로 맞춰집니다.
+ *
+ * 메모는 넣지 않습니다(사용자 요청) — 폰 캘린더에 전략 메모가 보이지 않게.
+ * ========================================================== */
+const SET_ME_KEY = 'meets';        // app.js 의 SET_ME 와 같은 값
+const CAL_NAME = '식사 약속';
+const CAL_TZ = 'Asia/Seoul';
+const CAL_TAG = 'mtid';              // 약속 번호를 일정에 붙여 두는 꼬리표
+const CAL_BACK_DAYS = 400;           // 얼마나 지난 것까지 맞출지
+const CAL_AHEAD_DAYS = 500;
+
+/* 캘린더를 찾고, 없으면 만든다 */
+function calGet_() {
+  const found = CalendarApp.getCalendarsByName(CAL_NAME);
+  if (found && found.length) return found[0];
+  const cal = CalendarApp.createCalendar(CAL_NAME, {
+    summary: '제주대 교수진 앱에서 잡은 식사 약속',
+    timeZone: CAL_TZ,
+    color: CalendarApp.Color.ORANGE,   // 아이폰에서 바꾸셔도 됩니다
+  });
+  return cal;
+}
+
+/* 날짜·시각 문자열 → Date (한국 시간으로 읽는다) */
+function calDate_(day, time) {
+  const t = /^\d{1,2}:\d{2}$/.test(String(time || '')) ? time : '00:00';
+  return Utilities.parseDate(day + ' ' + t, CAL_TZ, 'yyyy-MM-dd HH:mm');
+}
+
+/* 제목 — 낮이면 해, 밤이면 달. 몇 시냐로 가른다(앱과 같은 규칙). */
+function calTitle_(m) {
+  const names = Array.isArray(m.names) ? m.names : [];
+  const who = !names.length ? '약속'
+    : names.length <= 2 ? names.join(', ')
+    : names[0] + ' 외 ' + (names.length - 1) + '명';
+  const hh = /^(\d{1,2}):/.test(String(m.time || '')) ? Number(String(m.time).slice(0, 2)) : null;
+  const slot = hh === null ? '' : (hh >= 6 && hh < 18 ? '☀ ' : '🌙 ');
+  const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · ' : '';
+  return slot + kind + who;
+}
+
+/* 시트의 meets 설정 → 맞출 약속 목록 */
+function calWanted_(email) {
+  const raw = listSettings(email)[SET_ME_KEY] || '';
+  let obj = {};
+  try { obj = JSON.parse(raw) || {}; } catch (err) { obj = {}; }
+  const names = calNameMap_(email);
+  const out = [];
+  Object.keys(obj).forEach(id => {
+    const v = obj[id] || {};
+    if (!v.date || !/^\d{4}-\d{2}-\d{2}$/.test(String(v.date))) return;
+    const who = (Array.isArray(v.who) ? v.who : []).map(k => names[k]).filter(String);
+    const guests = Array.isArray(v.guests) ? v.guests.filter(String) : [];
+    out.push({ id: id, date: String(v.date), time: String(v.time || ''), kind: String(v.kind || ''),
+      place: String(v.place || ''), names: who.concat(guests) });
+  });
+  return out;
+}
+
+/* 열쇠(<학과>/<slug>) → 이름. ratings 탭에 이름이 함께 적혀 있다. */
+function calNameMap_(email) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const map = {};
+  if (!sh || sh.getLastRow() < 2) return map;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().forEach(r => {
+    if (String(r[0]).toLowerCase() !== email) return;
+    if (r[1] && r[2] && r[3]) map[String(r[1]) + '/' + String(r[2])] = String(r[3]);
+  });
+  return map;
+}
+
+/* 캘린더를 시트에 맞춘다 — 없으면 넣고, 바뀌었으면 고치고, 지워진 것은 지운다 */
+function calendarSync(email) {
+  const owner = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  if (!owner || String(email).toLowerCase() !== owner) return { skip: 'not owner' };
+
+  const cal = calGet_();
+  const from = new Date(Date.now() - CAL_BACK_DAYS * 86400000);
+  const to = new Date(Date.now() + CAL_AHEAD_DAYS * 86400000);
+  const have = {};
+  cal.getEvents(from, to).forEach(ev => {
+    const id = ev.getTag(CAL_TAG);
+    if (!id) return;
+    if (have[id]) { ev.deleteEvent(); return; }   // 어쩌다 겹친 것은 하나만 남긴다
+    have[id] = ev;
+  });
+
+  const wanted = calWanted_(email);
+  const keep = {};
+  let made = 0, fixed = 0, gone = 0;
+
+  wanted.forEach(m => {
+    keep[m.id] = true;
+    const title = calTitle_(m);
+    const allDay = !/^\d{1,2}:\d{2}$/.test(m.time);
+    const start = calDate_(m.date, m.time);
+    const end = allDay ? null : new Date(start.getTime() + 3600000);   // 한 시간
+    let ev = have[m.id];
+
+    if (!ev) {
+      ev = allDay ? cal.createAllDayEvent(title, start)
+                  : cal.createEvent(title, start, end);
+      ev.setTag(CAL_TAG, m.id);
+      if (m.place) ev.setLocation(m.place);
+      made++;
+      return;
+    }
+    /* 이미 있는 것 — 달라진 데만 고친다 */
+    let dirty = false;
+    if (ev.getTitle() !== title) { ev.setTitle(title); dirty = true; }
+    if (ev.getLocation() !== (m.place || '')) { ev.setLocation(m.place || ''); dirty = true; }
+    const wasAllDay = ev.isAllDayEvent();
+    const sameStart = Math.abs(ev.getStartTime().getTime() - start.getTime()) < 60000;
+    if (wasAllDay !== allDay || !sameStart) {
+      allDay ? ev.setAllDayDate(start) : ev.setTime(start, end);
+      dirty = true;
+    }
+    if (dirty) fixed++;
+  });
+
+  Object.keys(have).forEach(id => { if (!keep[id]) { have[id].deleteEvent(); gone++; } });
+  return { ok: true, calendar: cal.getName(), made: made, fixed: fixed, gone: gone, total: wanted.length };
+}
+
+/* 편집기에서 손으로 한 번 돌리는 용도 — 처음 설치와 점검에 씁니다 */
+function calendarSyncNow() {
+  const email = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  const r = calendarSync(email);
+  Logger.log(JSON.stringify(r));
+  Logger.log('아이폰에 안 보이면 사파리에서 calendar.google.com/syncselect 로 들어가'
+    + ' 「' + CAL_NAME + '」에 체크하고 저장하십시오.');
+  return r;
+}
+
+/* 15분마다 한 번 더 맞춰 두는 안전망 (앱에서 저장할 때 이미 맞추지만, 놓친 것을 줍는다) */
+function calendarTriggerOn() {
+  calendarTriggerOff();
+  ScriptApp.newTrigger('calendarSyncOwner').timeBased().everyMinutes(15).create();
+  Logger.log('15분마다 맞추도록 걸었습니다.');
+}
+function calendarTriggerOff() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'calendarSyncOwner')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+}
+function calendarSyncOwner() {
+  calendarSync(String(Session.getEffectiveUser().getEmail() || '').toLowerCase());
 }
