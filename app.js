@@ -3647,7 +3647,7 @@ const mtOf = day => mtList().filter(m => m.date === day);
 const MT_KIND = {
   lunch:  { name: '점심', time: '12:00' },
   dinner: { name: '저녁', time: '18:30' },
-  other:  { name: '',     time: '14:00' },   // 이름을 비워 두면 줄머리에 시각만 나온다
+  other:  { name: 'Tea',  time: '' },        // 차 한잔 — 시각은 비워 두고 손으로 고르신다
 };
 const mtKindName = k => (MT_KIND[k] || {}).name || '';
 /* 낮이면 해, 밤이면 달, 시각을 안 정했으면 시계.
@@ -3659,12 +3659,17 @@ const MT_ICON = {
     + '<path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></g></svg>',
   night: '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<path d="M20 14.2A8.3 8.3 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z" fill="currentColor"/></svg>',
+  tea: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M4 9h12v5.5A4.5 4.5 0 0 1 11.5 19h-3A4.5 4.5 0 0 1 4 14.5V9z"/>'
+    + '<path d="M16 10.3h1.6a2.4 2.4 0 0 1 0 4.8H16"/>'
+    + '<path d="M7.6 3.2c-.7 1 .7 1.7 0 2.7M11.4 3.2c-.7 1 .7 1.7 0 2.7"/></svg>',
   none: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/>'
     + '<path d="M12 7.4V12l3 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
 };
 const MT_DAY0 = 6, MT_DAY1 = 18;
 /* 약속 하나가 낮인지 밤인지. 시각이 먼저고, 없으면 갈래에 적힌 시각을 본다. */
 function mtSlot(m) {
+  if (m && m.kind === 'other') return 'tea';          // 차 한잔은 몇 시든 찻잔
   const t = String((m && m.time) || '');
   const h = /^(\d{1,2}):/.test(t) ? Number(t.slice(0, 2)) : null;
   if (h !== null) return (h >= MT_DAY0 && h < MT_DAY1) ? 'day' : 'night';
@@ -3935,7 +3940,7 @@ function mtEdit(m) {
       <button type="button" class="btn cal-del" data-mtdel>이 약속 지우기</button>
     </div>
     <p class="st-note">${m.counted.length ? `만난 횟수를 ${m.counted.length}분께 올려 두었습니다 — 예정이나 못 만남으로 되돌리면 도로 내립니다.`
-      : '만남으로 바꾸면 여기 적힌 분들의 만난 횟수가 1씩 오릅니다.'}</p>
+      : '완료를 누르면 여기 적힌 분들의 만난 횟수가 1씩 오릅니다. 다시 누르면 도로 내려갑니다.'}</p>
   </div>`;
 }
 
@@ -3980,7 +3985,10 @@ function bindCal() {
   });
   $('[data-mttime]')?.addEventListener('change', e => {
     const m = meets()[CAL.open];
-    const keep = m && MT_KIND[m.kind] && MT_KIND[m.kind].time === e.target.value;
+    /* 시각을 손으로 고치면 갈래를 지운다 — 18:00 인데 '점심' 이면 안 되니까.
+       다만 Tea 처럼 **미리 정한 시각이 없는** 갈래는 시각을 넣어도 그대로 둔다. */
+    const K = m && MT_KIND[m.kind];
+    const keep = !!K && (!K.time || K.time === e.target.value);
     mtSet(CAL.open, { time: e.target.value, kind: keep ? m.kind : '' });
     renderCal();
   });
@@ -4090,9 +4098,9 @@ function openDrawer(p, d) {
         <div class="d-appt">
           <button type="button" class="btn" data-mtnew="lunch">점심</button>
           <button type="button" class="btn" data-mtnew="dinner">저녁</button>
-          <button type="button" class="btn" data-mtnew="other">기타</button>
+          <button type="button" class="btn" data-mtnew="other">Tea</button>
         </div>
-        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 · 기타 2시.
+        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 반 · Tea 는 시각을 직접.
           날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
       </div>
 
@@ -4137,7 +4145,10 @@ function openDrawer(p, d) {
     CAL.open = mtAdd(mtToday(), rKey(p), kind);
     CAL.day = mtToday(); CAL.ym = mtMonth(mtToday()); CAL.q = ''; CAL.scroll = true;
     location.hash = '#/cal';
-    flashStatus(`${p.name} 교수님과 오늘 ${mtKindName(kind) || '약속'} ${(MT_KIND[kind] || {}).time || ''} 로 잡았습니다 — 날짜·시각은 여기서 바꾸시면 됩니다`);
+    const kt = (MT_KIND[kind] || {}).time || '';
+    flashStatus(kt
+      ? `${p.name} 교수님과 오늘 ${mtKindName(kind) || '약속'} ${kt} 로 잡았습니다 — 날짜·시각은 여기서 바꾸시면 됩니다`
+      : `${p.name} 교수님과 오늘 ${mtKindName(kind) || '약속'} 을 잡았습니다 — 시각을 골라 주십시오`);
   }));
   bindNotes($panel);
   bindAix($panel, p, d);

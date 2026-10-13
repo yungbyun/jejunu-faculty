@@ -200,9 +200,9 @@ await page.evaluate(() => {
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
 });
 await page.waitForSelector('[data-mtnew]', { timeout: 10000 });
-t('점심·저녁·기타 세 갈래', await page.evaluate(() =>
+t('점심·저녁·Tea 세 갈래', await page.evaluate(() =>
   [...document.querySelectorAll('[data-mtnew]')].map(b => b.dataset.mtnew + ':' + b.textContent.trim()).join()) ===
-  'lunch:점심,dinner:저녁,other:기타',
+  'lunch:점심,dinner:저녁,other:Tea',
   await page.evaluate(() => [...document.querySelectorAll('[data-mtnew]')].map(b => b.textContent.trim()).join()));
 const n0 = await page.evaluate(() => mtList().length);
 await page.click('[data-mtnew="lunch"]');
@@ -218,13 +218,14 @@ t('점심은 12:00', await page.evaluate(() => meets()[CAL.open].time) === '12:0
 t('줄머리에 「점심 12:00」', (await page.locator('.cal-r.on .cal-r__t').innerText()).includes('점심 12:00'),
   await page.locator('.cal-r.on .cal-r__t').innerText());
 t('약속이 하나 늘었다', await page.evaluate(() => mtList().length) === n0 + 1);
-t('저녁은 18:30, 기타는 14:00', await page.evaluate(() => {
+/* 저녁은 6시 반이 미리 들어가고, Tea 는 시각을 비워 둔다 (2026-10-13) */
+t('저녁은 18:30, Tea 는 시각 없이', await page.evaluate(() => {
   const a = mtAdd(mtToday(), rKey(state.rows[3]), 'dinner');
   const c = mtAdd(mtToday(), rKey(state.rows[3]), 'other');
   return a !== c && meets()[a].time === '18:30' && meets()[a].kind === 'dinner' &&
-    meets()[c].time === '14:00' && meets()[c].kind === 'other';
-}), await page.evaluate(() => MT_KIND.dinner.time));
-t('기타는 줄머리에 시각만', await page.evaluate(() => mtKindName('other') === ''));
+    meets()[c].time === '' && meets()[c].kind === 'other';
+}), await page.evaluate(() => MT_KIND.dinner.time + ' / ' + JSON.stringify(MT_KIND.other)));
+t('Tea 는 줄머리에 이름이 붙는다', await page.evaluate(() => mtKindName('other') === 'Tea'));
 /* 같은 밀리초에 두 번 잡아도 앞 약속이 덮어써지면 안 된다 */
 t('연달아 잡아도 id 가 겹치지 않는다', await page.evaluate(() => {
   const before = mtList().length;
@@ -490,6 +491,51 @@ await page.waitForTimeout(250);
 t('다시 누르면 도로 내려간다', await page.evaluate(k => getNote(k).met || 0, await page.evaluate(() => rKey(state.rows[0]))) === met1);
 t('풀면 다시 「완료」', (await page.locator('[data-mtdone]').innerText()).trim() === '완료',
   await page.locator('[data-mtdone]').innerText());
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
+
+/* Tea — 상세의 「기타」를 Tea 로 바꾸고 찻잔을 붙였다 (2026-10-13) */
+t('Tea 는 미리 정한 시각이 없다', await page.evaluate(() =>
+  MT_KIND.other.name === 'Tea' && MT_KIND.other.time === ''));
+t('Tea 는 몇 시든 찻잔', await page.evaluate(() =>
+  mtSlot({ kind: 'other', time: '' }) === 'tea' && mtSlot({ kind: 'other', time: '15:30' }) === 'tea'
+  && mtSlot({ kind: 'other', time: '20:00' }) === 'tea'));
+await page.evaluate(() => {
+  meetMap = {}; const d = mtToday();
+  CAL.open = mtAdd(d, rKey(state.rows[0]), 'other');
+  CAL.day = d; CAL.ym = mtMonth(d); renderCal();
+});
+await page.waitForSelector('.cal-r__t .mt-i', { timeout: 10000 });
+t('줄에 찻잔과 Tea', await page.evaluate(() => {
+  const e = document.querySelector('.cal-r__t');
+  return e.querySelector('.mt-i--tea') && e.textContent.includes('Tea');
+}), await page.evaluate(() => document.querySelector('.cal-r__t').textContent.trim()));
+t('달력 점은 흰 바탕에 진한 테두리', await page.evaluate(() => {
+  const i = document.querySelector('.cal-c__d i.cal-dot--tea');
+  if (!i) return false;
+  const c = getComputedStyle(i);
+  return c.backgroundColor === 'rgb(255, 255, 255)' && /rgb\(75, 85, 99\)/.test(c.boxShadow);
+}), await page.evaluate(() => {
+  const i = document.querySelector('.cal-c__d i.cal-dot--tea');
+  return i ? getComputedStyle(i).backgroundColor + ' / ' + getComputedStyle(i).boxShadow : '(없음)';
+}));
+/* 시각을 손으로 넣어도 Tea 가 풀리면 안 된다 */
+await page.evaluate(() => {
+  const t2 = document.querySelector('[data-mttime]');
+  t2.value = '15:30'; t2.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.waitForTimeout(300);
+t('시각을 넣어도 Tea 가 그대로', await page.evaluate(() => meets()[CAL.open].kind === 'other'),
+  await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
+t('그래도 찻잔', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--tea')));
+/* 점심은 시각을 바꾸면 갈래가 풀린다(예전 그대로) */
+await page.evaluate(() => {
+  CAL.open = mtAdd(mtToday(), rKey(state.rows[1]), 'lunch'); renderCal();
+  const t2 = document.querySelector('[data-mttime]');
+  t2.value = '16:00'; t2.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.waitForTimeout(300);
+t('점심은 시각을 바꾸면 갈래가 풀린다', await page.evaluate(() => meets()[CAL.open].kind === ''),
+  await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* 해·달은 갈래가 아니라 **몇 시냐**로 정한다 (2026-10-12) */

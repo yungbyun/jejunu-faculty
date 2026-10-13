@@ -921,6 +921,7 @@ function calTitle_(m) {
     : names[0] + ' 외 ' + (names.length - 1) + '명';
   const hh = /^(\d{1,2}):/.test(String(m.time || '')) ? Number(String(m.time).slice(0, 2)) : null;
   const slot = hh === null ? '' : (hh >= 6 && hh < 18 ? '☀ ' : '🌙 ');
+  if (m.kind === 'other') return '\uD83C\uDF75 Tea · ' + who;   // 차 한잔 — 몇 시든 찻잔
   const kind = m.kind === 'lunch' ? '점심 · ' : m.kind === 'dinner' ? '저녁 · ' : '';
   return slot + kind + who;
 }
