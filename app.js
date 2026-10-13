@@ -3816,7 +3816,8 @@ function renderCal() {
           <h2>${esc(cy)}년 ${esc(String(Number(cm)))}월</h2>
           <button type="button" class="btn cal-nav" data-mtnext aria-label="다음달">›</button>
           <button type="button" class="btn" data-mttoday>오늘</button>
-          <button type="button" class="btn" data-mtics${mtList().length ? '' : ' disabled'}>캘린더로 내보내기</button>
+          <button type="button" class="btn cal-ics" data-mtics${mtList().length ? '' : ' disabled'}
+            title="이 달 약속을 .ics 파일로 내려받습니다">내보내기</button>
         </div>
         <div class="cal-grid" role="grid">
           ${MT_DAYS.map((d, i) => `<div class="cal-dow${i === 0 ? ' cal-dow--sun' : ''}">${d}</div>`).join('')}
@@ -3838,9 +3839,9 @@ function renderCal() {
         <div class="cal-head cal-head--day"><h2>${esc(mtWhen(CAL.day))}</h2>
           <div class="cal-new" role="group" aria-label="새 약속 잡기">
             <span class="cal-new__l">새 약속</span>
-            <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('day')}점심 12:00</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('night')}저녁 18:30</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="other">${mtIcon('tea')}Tea 14:00</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="lunch" title="점심 ${MT_KIND.lunch.time}">${mtIcon('day')}점심</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="dinner" title="저녁 ${MT_KIND.dinner.time}">${mtIcon('night')}저녁</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="other" title="Tea ${MT_KIND.other.time}">${mtIcon('tea')}Tea</button>
           </div></div>
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
@@ -3961,9 +3962,9 @@ function mtEdit(m) {
       <label class="cal-f__w"><span>장소</span><input type="text" data-mtplace value="${esc(m.place)}" placeholder="예) 공과대학 3호관 C422호"></label>
     </div>
     <div class="cal-kind" role="group" aria-label="약속 갈래">
-      ${[['lunch', '점심'], ['dinner', '저녁'], ['other', 'Tea'], ['', '없음']].map(([k, n]) =>
+      ${[['lunch', '점심', 'day'], ['dinner', '저녁', 'night'], ['other', 'Tea', 'tea']].map(([k, n, ic]) =>
         `<button type="button" class="cal-k${m.kind === k ? ' on' : ''}" data-mtkind="${esc(k)}" aria-pressed="${m.kind === k}"
-          >${mtIcon(k === 'lunch' ? 'day' : k === 'dinner' ? 'night' : k === 'other' ? 'tea' : 'none')}${esc(n)}</button>`).join('')}
+          title="${esc(m.kind === k ? n + ' — 다시 누르면 지웁니다' : n + '으로')}">${mtIcon(ic)}${esc(n)}</button>`).join('')}
     </div>
     <label class="cal-f__w cal-f__memo"><span>메모</span><input type="text" data-mtmemo value="${esc(m.memo)}" placeholder="무엇을 말씀드릴지"></label>
 
@@ -4056,7 +4057,8 @@ function bindCal() {
   /* '+ 만날 분 추가' — 찾는 칸으로 데려다 놓는다(폰에서 자판이 바로 올라온다) */
   $app.querySelectorAll('[data-mtkind]').forEach(b => b.addEventListener('click', () => {
     const m = meets()[CAL.open]; if (!m) return;
-    const kind = b.dataset.mtkind;
+    /* 켜져 있는 단추를 다시 누르면 갈래를 지운다 — 「없음」 단추를 두는 대신이다 */
+    const kind = m.kind === b.dataset.mtkind ? '' : b.dataset.mtkind;
     /* 적어 둔 시각이 있으면 그대로 두고, 비어 있으면 그 갈래의 시각을 채운다 */
     mtSet(CAL.open, { kind: kind, time: m.time || (MT_KIND[kind] || {}).time || '' });
     renderCal();

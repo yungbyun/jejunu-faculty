@@ -520,10 +520,11 @@ await page.evaluate(() => {
   CAL.day = '2026-10-13'; CAL.ym = '2026-10'; CAL.open = id; renderCal();
 });
 await page.waitForSelector('[data-mtkind]', { timeout: 10000 });
-t('갈래 고르개가 넷', await page.locator('[data-mtkind]').count() === 4,
+t('갈래 고르개는 셋 — 「없음」은 뺐다', await page.evaluate(() =>
+  [...document.querySelectorAll('[data-mtkind]')].map(b => b.dataset.mtkind).join() === 'lunch,dinner,other'),
   await page.evaluate(() => [...document.querySelectorAll('[data-mtkind]')].map(b => b.textContent.trim()).join('/')));
-t('지금 갈래에 불이 켜져 있다', await page.evaluate(() =>
-  document.querySelector('[data-mtkind=""]').classList.contains('on')));
+t('갈래가 없으면 아무 단추도 안 켜진다', await page.evaluate(() =>
+  ![...document.querySelectorAll('[data-mtkind]')].some(b => b.classList.contains('on'))));
 t('갈래가 없고 애매한 시각이면 찻잔', await page.evaluate(() => !!document.querySelector('.cal-r__t .mt-i--tea')));
 await page.click('[data-mtkind="other"]');
 await page.waitForTimeout(350);
@@ -543,6 +544,16 @@ await page.waitForTimeout(350);
 t('빈 시각이면 갈래의 시각이 채워진다', await page.evaluate(() =>
   mtList()[0].kind === 'dinner' && mtList()[0].time === '18:30'),
   await page.evaluate(() => JSON.stringify([mtList()[0].kind, mtList()[0].time])));
+/* 「없음」 단추를 뺀 자리 — 켜진 단추를 다시 누르면 갈래가 지워진다 (2026-10-13) */
+t('켜진 단추에 불이 들어와 있다', await page.evaluate(() =>
+  document.querySelector('[data-mtkind="dinner"]').classList.contains('on')));
+await page.click('[data-mtkind="dinner"]');
+await page.waitForTimeout(350);
+t('다시 누르면 갈래가 지워진다', await page.evaluate(() => mtList()[0].kind) === '',
+  await page.evaluate(() => JSON.stringify([mtList()[0].kind, mtList()[0].time])));
+t('지워도 적어 둔 시각은 그대로', await page.evaluate(() => mtList()[0].time) === '18:30');
+t('지우면 줄머리가 시각만 남는다', await page.evaluate(() =>
+  !!document.querySelector('.cal-r__t .mt-i--night')));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
 /* Tea — 상세의 「기타」를 Tea 로 바꾸고 찻잔을 붙였다 (2026-10-13) */
@@ -632,10 +643,13 @@ await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.day = mtT
 await page.waitForSelector('[data-mtadd]', { timeout: 10000 });
 t('고를 단추가 셋', await page.locator('[data-mtadd]').count() === 3,
   await page.evaluate(() => [...document.querySelectorAll('[data-mtadd]')].map(b => b.dataset.mtadd).join('/')));
-t('단추에 시각이 적혀 있다', await page.evaluate(() => {
-  const g = k => document.querySelector(`[data-mtadd="${k}"]`).textContent;
-  return g('lunch').includes('12:00') && g('dinner').includes('18:30') && g('other').includes('Tea');
+t('단추에는 이름만 — 시각은 안 적는다', await page.evaluate(() => {
+  const g = k => document.querySelector(`[data-mtadd="${k}"]`).textContent.trim();
+  return g('lunch') === '점심' && g('dinner') === '저녁' && g('other') === 'Tea';
 }), await page.evaluate(() => [...document.querySelectorAll('[data-mtadd]')].map(b => b.textContent.trim()).join(' | ')));
+t('시각은 손대면 나오는 귀띔에 둔다', await page.evaluate(() =>
+  document.querySelector('[data-mtadd="dinner"]').title.includes('18:30')),
+  await page.evaluate(() => document.querySelector('[data-mtadd="dinner"]').title));
 t('단추에도 해·달 아이콘', await page.evaluate(() =>
   !!document.querySelector('[data-mtadd="lunch"] .mt-i--day') && !!document.querySelector('[data-mtadd="dinner"] .mt-i--night')));
 t('날짜 제목과 다른 줄에 있다', await page.evaluate(() => {

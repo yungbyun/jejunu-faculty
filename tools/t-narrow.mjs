@@ -55,6 +55,27 @@ for (const w of [320, 390]) {
   t(`${w}px 원고 단추가 한 줄`, btn.length === 2 && btn.every(x => x.h < 45),
     btn.map(x => `${x.txt} ${x.w}x${x.h}`).join(' | '));
   t(`${w}px 원고 단추 글이 안 잘림`, btn.every(x => x.w >= 60), btn.map(x => x.w).join(' '));
+  /* 폰에서 달력 한 판이 한눈에 들어와야 한다 — 머리줄이 두 줄로 접히면 아랫단이 밀려난다 (2026-10-13) */
+  await page.evaluate(() => { meetMap = {}; CAL.open = ''; location.hash = '#/cal'; render(); });
+  await page.waitForSelector('.cal-grid', { timeout: 10000 });
+  await page.waitForTimeout(400);
+  const cal = await page.evaluate(() => {
+    const line = sel => {
+      const es = [...document.querySelectorAll(sel)];
+      if (!es.length) return 99;
+      const r = es.map(e => e.getBoundingClientRect());
+      return Math.max(...r.map(x => x.bottom)) - Math.min(...r.map(x => x.top));
+    };
+    const top = document.querySelector('.crumbs').getBoundingClientRect().top;
+    const bot = document.querySelector('.cal-new').getBoundingClientRect().bottom;
+    return { head: Math.round(line('.cal-head:not(.cal-head--day) > *')), neu: Math.round(line('.cal-new__b')),
+      tall: Math.round(bot - top), wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  t(`${w}px 달 머리줄이 한 줄`, cal.head <= 46, `${cal.head}px`);
+  t(`${w}px 새 약속 단추가 한 줄`, cal.neu <= 46, `${cal.neu}px`);
+  t(`${w}px 달력 한 판이 한 화면에`, cal.tall <= 520, `길잡이부터 새 약속까지 ${cal.tall}px`);
+  t(`${w}px 가로로 넘치지 않음`, !cal.wide);
+
   await page.evaluate(() => {
     pushSet = new Set(); sureSet = new Set(); mobileMap = {};
     localStorage.removeItem('jnu-push'); localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-mobile');

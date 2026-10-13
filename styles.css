@@ -1373,7 +1373,18 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 
 @media (max-width:520px){
   .cal-grid{gap:3px}
-  .cal-c{min-height:36px}
+  .cal-c{min-height:34px;aspect-ratio:1/.74}
+  /* 달 머리줄을 한 줄에 — 두 줄이 되면 달력 아랫단이 화면 밖으로 밀린다 */
+  .cal-head{gap:5px;margin-bottom:6px}
+  /* 달 이름은 넘길 단추 사이에 두고, 오늘·내보내기만 오른쪽으로 민다 */
+  .cal-head h2{min-width:0;font-size:14.5px}
+  .cal-head [data-mttoday]{margin-left:auto}
+  .cal-nav{padding:4px 9px}
+  .cal-head .btn{padding:5px 9px;font-size:12px}
+  .cal-head--day{gap:6px}
+  .crumbs{margin-bottom:8px}
+  .hero--thin{margin-bottom:8px}
+  .cal-sec{margin-bottom:12px}
   .cal-r__t{min-width:52px}
   .cal-r__a{padding:4px 8px;font-size:11.5px}
   .cal-del{margin-left:0}
