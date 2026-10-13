@@ -3840,7 +3840,7 @@ function renderCal() {
             <span class="cal-new__l">새 약속</span>
             <button type="button" class="btn cal-new__b" data-mtadd="lunch">${mtIcon('day')}점심 12:00</button>
             <button type="button" class="btn cal-new__b" data-mtadd="dinner">${mtIcon('night')}저녁 18:30</button>
-            <button type="button" class="btn cal-new__b" data-mtadd="">${mtIcon('none')}직접</button>
+            <button type="button" class="btn cal-new__b" data-mtadd="other">${mtIcon('tea')}Tea</button>
           </div></div>
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
@@ -3984,10 +3984,10 @@ function bindCal() {
     CAL.open = mtAdd(CAL.day, '', kind); CAL.q = '';
     renderCal();
     const K = MT_KIND[kind];
-    flashStatus(K ? `${mtWhen(CAL.day)} ${K.name} ${K.time} 로 잡았습니다 — 바꾸시려면 아래에서 고치시면 됩니다`
-      : `${mtWhen(CAL.day)} 약속을 만들었습니다 — 시각을 골라 주십시오`);
+    flashStatus(K && K.time ? `${mtWhen(CAL.day)} ${K.name} ${K.time} 로 잡았습니다 — 바꾸시려면 아래에서 고치시면 됩니다`
+      : `${mtWhen(CAL.day)} ${(K && K.name) || '약속'} 을 만들었습니다 — 시각을 골라 주십시오`);
     /* 「직접」은 시각이 비어 있다. 그 칸으로 데려가 바로 고르게 한다. */
-    if (!K) { const t = $app.querySelector('[data-mttime]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus(); } }
+    if (!K || !K.time) { const t = $app.querySelector('[data-mttime]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus(); } }
   }));
   /* 줄에서 바로 고치고 지운다 — 펼쳐서 찾아 들어갈 것 없이 */
   $app.querySelectorAll('[data-mtedit]').forEach(b => b.addEventListener('click', () => {

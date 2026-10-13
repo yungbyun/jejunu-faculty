@@ -62,8 +62,8 @@ await page.click('[data-mttoday]');
 await page.waitForTimeout(400);
 t('오늘 단추로 되돌아온다', await page.evaluate(() => CAL.ym === mtMonth(mtToday()) && CAL.day === mtToday()));
 
-// 새 약속 — 「직접」으로 만든다(시각 미정)
-await page.click('[data-mtadd=""]');
+// 새 약속 — 「Tea」로 만든다(시각 미정)
+await page.click('[data-mtadd="other"]');
 await page.waitForSelector('.cal-e', { timeout: 10000 });
 t('새 약속이 펼쳐진 채로 생김', await page.locator('.cal-e').count() === 1);
 t('오늘 날짜로 잡힌다', await page.evaluate(() => document.querySelector('[data-mtdate]').value) === await page.evaluate(() => mtToday()));
@@ -332,7 +332,7 @@ await page.evaluate(() => {
   location.hash = '#/cal'; render();
 });
 await page.waitForSelector('[data-mtadd]', { timeout: 10000 });
-await page.click('[data-mtadd=""]');
+await page.click('[data-mtadd="other"]');
 await page.waitForSelector('[data-mtmore]', { timeout: 10000 });
 
 t('「+ 만날 분 추가」 단추가 있다', (await page.locator('[data-mtmore]').innerText()).includes('만날 분 추가'));
@@ -543,15 +543,25 @@ t('줄에 찻잔과 Tea', await page.evaluate(() => {
   const e = document.querySelector('.cal-r__t');
   return e.querySelector('.mt-i--tea') && e.textContent.includes('Tea');
 }), await page.evaluate(() => document.querySelector('.cal-r__t').textContent.trim()));
-t('달력 점은 흰 바탕에 진한 테두리', await page.evaluate(() => {
-  const i = document.querySelector('.cal-c__d i.cal-dot--tea');
-  if (!i) return false;
-  const c = getComputedStyle(i);
-  return c.backgroundColor === 'rgb(255, 255, 255)' && /rgb\(75, 85, 99\)/.test(c.boxShadow);
+t('달력 점은 연두, 다른 점과 같은 크기', await page.evaluate(() => {
+  const tea = document.querySelector('.cal-c__d i.cal-dot--tea');
+  if (!tea) return false;
+  const c = getComputedStyle(tea), r = tea.getBoundingClientRect();
+  const [red, g, bl] = (c.backgroundColor.match(/\d+/g) || []).map(Number);
+  const green = g > red + 30 && g > bl + 30;          // 연두
+  const plain = c.boxShadow === 'none';               // 테두리를 두르면 그만큼 커 보인다
+  return green && plain && Math.round(r.width) === 5;
 }), await page.evaluate(() => {
-  const i = document.querySelector('.cal-c__d i.cal-dot--tea');
-  return i ? getComputedStyle(i).backgroundColor + ' / ' + getComputedStyle(i).boxShadow : '(없음)';
+  const t2 = document.querySelector('.cal-c__d i.cal-dot--tea');
+  const c = t2 && getComputedStyle(t2);
+  return t2 ? `${c.backgroundColor} / 테두리 ${c.boxShadow} / ${Math.round(t2.getBoundingClientRect().width)}px` : '(없음)';
 }));
+t('다른 점과 크기가 같다', await page.evaluate(() => {
+  const w = [...document.querySelectorAll('.cal-c__d i')].map(i => Math.round(i.getBoundingClientRect().width));
+  return new Set(w).size === 1;
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-c__d i')]
+  .map(i => i.className.replace('cal-dot--', '') + ':' + Math.round(i.getBoundingClientRect().width)).join(' ')));
+
 /* 시각을 손으로 넣어도 Tea 가 풀리면 안 된다 */
 await page.evaluate(() => {
   const t2 = document.querySelector('[data-mttime]');
@@ -613,7 +623,7 @@ t('고를 단추가 셋', await page.locator('[data-mtadd]').count() === 3,
   await page.evaluate(() => [...document.querySelectorAll('[data-mtadd]')].map(b => b.dataset.mtadd).join('/')));
 t('단추에 시각이 적혀 있다', await page.evaluate(() => {
   const g = k => document.querySelector(`[data-mtadd="${k}"]`).textContent;
-  return g('lunch').includes('12:00') && g('dinner').includes('18:30');
+  return g('lunch').includes('12:00') && g('dinner').includes('18:30') && g('other').includes('Tea');
 }), await page.evaluate(() => [...document.querySelectorAll('[data-mtadd]')].map(b => b.textContent.trim()).join(' | ')));
 t('단추에도 해·달 아이콘', await page.evaluate(() =>
   !!document.querySelector('[data-mtadd="lunch"] .mt-i--day') && !!document.querySelector('[data-mtadd="dinner"] .mt-i--night')));
@@ -636,12 +646,12 @@ t('저녁으로 잡으면 18:30', await page.evaluate(() => {
   const m = meets()[CAL.open]; return m.kind === 'dinner' && m.time === '18:30';
 }), await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
 
-await page.click('[data-mtadd=""]');
+await page.click('[data-mtadd="other"]');
 await page.waitForTimeout(400);
-t('직접은 시각을 비워 둔다', await page.evaluate(() => {
-  const m = meets()[CAL.open]; return m.kind === '' && m.time === '';
-}));
-t('직접은 시각 칸으로 데려간다', await page.evaluate(() =>
+t('Tea 는 시각을 비워 둔다', await page.evaluate(() => {
+  const m = meets()[CAL.open]; return m.kind === 'other' && m.time === '';
+}), await page.evaluate(() => JSON.stringify([meets()[CAL.open].kind, meets()[CAL.open].time])));
+t('Tea 는 시각 칸으로 데려간다', await page.evaluate(() =>
   document.activeElement === document.querySelector('[data-mttime]')));
 /* 비워 둔 시각을 손으로 넣으면 그대로 붙는다 */
 await page.evaluate(() => {

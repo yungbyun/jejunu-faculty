@@ -1309,7 +1309,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-c.today .cal-c__n{color:var(--brand)}
 .cal-c.on{background:var(--brand);border-color:var(--brand)}
 .cal-c.on .cal-c__n,.cal-c.on.sun .cal-c__n{color:var(--bg)}
-.cal-c__d{display:flex;align-items:center;gap:3.5px;line-height:0}
+.cal-c__d{display:flex;align-items:center;gap:2.5px;line-height:0}
 .cal-c__d i{width:5px;height:5px;border-radius:50%;background:var(--rs-high)}
 .cal-c__d b{font-size:9.5px;font-weight:800;color:var(--ink-3);line-height:1}
 .cal-c.on .cal-c__d i{background:var(--bg)}
@@ -1486,22 +1486,22 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    점심·저녁이라는 갈래가 아니라 몇 시냐로 가른다. */
 /* 고른 날(-on)은 칸 바탕이 뒤집히므로 테마마다 반대로 간다 —
    라이트에서는 칸이 짙어 밝은 점을, 다크에서는 칸이 밝아 짙은 점을 쓴다. */
-:root{--mt-day:#f0a93a;--mt-night:#3d4a86;--mt-none:#6b7280;--mt-tea:#4b5563;
-  --mt-day-on:#ffd089;--mt-night-on:#aab8f2;--mt-none-on:#cdd5e0}
+:root{--mt-day:#f0a93a;--mt-night:#3d4a86;--mt-none:#6b7280;--mt-tea:#5cb034;
+  --mt-day-on:#ffd089;--mt-night-on:#aab8f2;--mt-none-on:#cdd5e0;--mt-tea-on:#9ae06f}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--mt-night:#8fa0e0;
-  --mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d}}
-:root[data-theme="dark"]{--mt-night:#8fa0e0;--mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d}
+  --mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d;--mt-tea-on:#2d5e15}}
+:root[data-theme="dark"]{--mt-night:#8fa0e0;--mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d;--mt-tea-on:#2d5e15}
 /* 기본 규칙 .cal-c__d i 가 class+type 이라 더 세다 — 같은 꼴로 받아쳐야 색이 먹는다 */
 .cal-c__d i.cal-dot--day{background:var(--mt-day)}
 .cal-c__d i.cal-dot--night{background:var(--mt-night)}
 .cal-c__d i.cal-dot--none{background:var(--mt-none)}
-/* Tea 는 흰 점에 진한 회색 테두리 — 색이 아니라 생김새로 갈린다 */
-.cal-c__d i.cal-dot--tea{background:#fff;box-shadow:0 0 0 1.4px var(--mt-tea)}
+/* Tea 는 연두 — 테두리를 두르면 그만큼 커 보여 다른 점과 안 맞는다. 색만 쓴다. */
+.cal-c__d i.cal-dot--tea{background:var(--mt-tea)}
 /* 고른 날은 바탕이 짙다 — 점을 밝은 쪽으로 바꿔 점심·저녁 구분을 지키다 */
 .cal-c.on .cal-c__d i.cal-dot--day{background:var(--mt-day-on)}
 .cal-c.on .cal-c__d i.cal-dot--night{background:var(--mt-night-on)}
 .cal-c.on .cal-c__d i.cal-dot--none{background:var(--mt-none-on)}
-.cal-c.on .cal-c__d i.cal-dot--tea{background:#fff;box-shadow:0 0 0 1.4px var(--mt-tea)}
+.cal-c.on .cal-c__d i.cal-dot--tea{background:var(--mt-tea-on)}
 .mt-i{flex:none;display:inline-grid;place-items:center;width:17px;height:17px;margin-right:6px;vertical-align:-3px}
 .mt-i svg{width:100%;height:100%}
 .mt-i--day{color:var(--mt-day)}
@@ -1509,7 +1509,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-i--none{color:var(--mt-none)}
 .mt-i--tea{color:var(--mt-tea)}
 
-/* 새 약속 — 점심·저녁·직접 중에서 고른다 (2026-10-12) */
+/* 새 약속 — 점심·저녁·Tea 중에서 고른다 (2026-10-12) */
 /* 날짜 제목과 같은 줄에 두면 제목이 눌려 잘린다 — 아랫줄을 통째로 쓴다 */
 .cal-new{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1 0 100%;margin-top:2px}
 .cal-new__l{font-size:11.5px;font-weight:700;color:var(--ink-3);letter-spacing:.04em}
