@@ -124,6 +124,27 @@ await page.evaluate(() => { sync.dirtyS.clear(); saveSetDirty(); sync.dirty.clea
   } finally { fs.writeFileSync(VER, keep); }
 }
 
+/* 잘 되고 있을 때의 알림은 짧아야 한다 — 시각·건수까지 적으면 글이 길어 눈에 거슬린다 (2026-10-14) */
+await page.evaluate(() => {
+  sync.dirty.clear(); sync.dirtyS.clear(); sync.queue.clear(); sync.busyS.clear();
+  sync.authNeeded = false; sync.lastError = '';
+  sync.savedAt = Date.now();
+  delete document.querySelector('.savebar')?.dataset.sig;
+  updateSaveBar();
+});
+await page.waitForTimeout(200);
+t('저장되면 「저장됨 ✓」 넉 자만', await page.evaluate(() =>
+  document.querySelector('.savebar').textContent.trim()) === '저장됨 ✓',
+  await page.evaluate(() => document.querySelector('.savebar').textContent));
+await page.evaluate(() => { sync.queue.set('x/y', { next: undefined }); updateSaveBar(); });
+await page.waitForTimeout(200);
+t('저장 중에도 「저장 중…」만', await page.evaluate(() =>
+  document.querySelector('.savebar').textContent.trim()) === '저장 중…',
+  await page.evaluate(() => document.querySelector('.savebar').textContent));
+t('건수·시각은 안 적는다', await page.evaluate(() =>
+  !/\d/.test(document.querySelector('.savebar').textContent)));
+await page.evaluate(() => { sync.queue.clear(); sync.savedAt = 0; updateSaveBar(); });
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

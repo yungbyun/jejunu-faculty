@@ -3095,7 +3095,7 @@ function updateSaveBar() {
   }
   delete $saveBar.dataset.mode;
   if (!dirty || saving) delete $saveBar.dataset.sig;
-  if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = `시트에 저장 중… (${saving}건)`; $saveBar.hidden = false; }
+  if (saving) { $saveBar.className = 'savebar savebar--busy'; $saveBar.textContent = '저장 중…'; $saveBar.hidden = false; }
   else if (dirty) {
     /* 같은 내용이면 다시 만들지 않는다 — innerHTML 을 갈아 끼우면 누르는 순간 단추가 사라져
        클릭이 먹히지 않는다. 이 화면은 저장할 때마다 자주 불린다. */
@@ -3111,7 +3111,7 @@ function updateSaveBar() {
     }
     $saveBar.hidden = false;
   }
-  else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = `시트에 저장됨 ✓ ${new Date(sync.savedAt).toLocaleTimeString('ko-KR')}`; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
+  else if (sync.savedAt) { $saveBar.className = 'savebar savebar--ok'; $saveBar.textContent = '저장됨 ✓'; $saveBar.hidden = false; clearTimeout($saveBar._t); $saveBar._t = setTimeout(() => { if (!sync.queue.size && !sync.dirty.size) $saveBar.hidden = true; }, 2500); }
   else $saveBar.hidden = true;
 }
 
