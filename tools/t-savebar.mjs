@@ -143,7 +143,37 @@ t('저장 중에도 「저장 중…」만', await page.evaluate(() =>
   await page.evaluate(() => document.querySelector('.savebar').textContent));
 t('건수·시각은 안 적는다', await page.evaluate(() =>
   !/\d/.test(document.querySelector('.savebar').textContent)));
-await page.evaluate(() => { sync.queue.clear(); sync.savedAt = 0; updateSaveBar(); });
+/* 색도 눈에 덜 띄어야 한다 — 파랑·초록 알약이 아니라 무채색. 막힌 것만 빨강 (2026-10-14) */
+for (const theme of ['light', 'dark']) {
+  const look = await page.evaluate(th => {
+    document.documentElement.setAttribute('data-theme', th);
+    const bar = document.querySelector('.savebar');
+    const n = x => { const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
+    const L = c => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+      return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+    const read = () => { const cs = getComputedStyle(bar), bg = n(cs.backgroundColor), fg = n(cs.color);
+      const [hi, lo] = [L(bg), L(fg)].sort((a, b) => b - a);
+      return { bg, grey: Math.max(...bg) - Math.min(...bg), text: (hi + .05) / (lo + .05) }; };
+    const set = fn => { sync.dirty.clear(); sync.dirtyS.clear(); sync.queue.clear(); sync.busyS.clear();
+      sync.authNeeded = false; sync.lastError = ''; sync.savedAt = 0; fn();
+      delete bar.dataset.sig; updateSaveBar(); };
+    set(() => { sync.savedAt = Date.now(); }); const ok = read();
+    set(() => sync.queue.set('x/y', { next: undefined })); const busy = read();
+    set(() => { sync.dirtyS.set('sure', ['x/y']); sync.lastError = 'HTTP 404'; }); const warn = read();
+    set(() => {});
+    document.documentElement.setAttribute('data-theme', 'light');
+    return { ok, busy, warn };
+  }, theme);
+  t(`${theme}: 저장 알림은 무채색`, look.ok.grey < 20 && look.busy.grey < 20,
+    `저장됨 ${look.ok.bg.join(',')} / 저장 중 ${look.busy.bg.join(',')}`);
+  t(`${theme}: 그래도 글자는 읽힌다(4.5 이상)`, look.ok.text >= 4.5 && look.busy.text >= 4.5,
+    `${look.ok.text.toFixed(2)} / ${look.busy.text.toFixed(2)}`);
+  t(`${theme}: 막혔을 때만 빨강으로 눈에 띈다`, look.warn.bg[0] - Math.max(look.warn.bg[1], look.warn.bg[2]) > 60,
+    look.warn.bg.join(','));
+}
+await page.evaluate(() => { sync.queue.clear(); sync.savedAt = 0; sync.dirty.clear(); sync.dirtyS.clear();
+  sync.lastError = ''; delete document.querySelector('.savebar')?.dataset.sig; updateSaveBar(); });
 
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
