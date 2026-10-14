@@ -23,7 +23,7 @@ const arm = () => page.evaluate(() => {
 await arm();
 await page.waitForSelector('#retrySave', { timeout: 10000 });
 
-t('무엇이 막혔는지 이름으로 적는다', (await page.locator('.savebar').innerText()).includes('확실 · 공략'),
+t('무엇이 막혔는지 이름으로 적는다', (await page.locator('.savebar').innerText()).includes('강화 · 공략'),
   await page.locator('.savebar').innerText());
 t('몇 건인지도 적는다', (await page.locator('.savebar').innerText()).includes('미저장 2건'));
 t('오류도 그대로 보인다', (await page.locator('.savebar').innerText()).includes('HTTP 404'));

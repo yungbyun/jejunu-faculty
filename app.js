@@ -1834,7 +1834,7 @@ function stChip(p, r) {
   const met = getMet(p), pu = isPush(p), su = isSure(p), vi = isVip(p), k = rKey(p);
   const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${vi ? ' vip' : ''}`;
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, su ? '#ffffff' : RCOLOR[r])}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · VIP' : ''}${su ? ' · 확실' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
   return STP.pick
     ? `<li><button type="button" class="${cls}" data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
     : `<li><a class="${cls}" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
@@ -2332,8 +2332,10 @@ function pushSave() {
 }
 function pushToggle(p) { const s = pushes(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); pushSave(); return s.has(k); }
 
-/* ---------- 확실 (지금 이 시점에 확실한 사람) ----------
- * 선호도 '확' 과는 다른 것이다. 선호도는 내가 매긴 평가이고, 이것은 만나 보고 굳어진 결론이다.
+/* ---------- 강화 (그 선호도가 더 굳은 사람) ----------
+ * 선호도 위에 한 칸 얹는 표시다 — 확이면 더 확실하고, 긍이면 더 긍정적이라는 뜻.
+ * 예전 이름은 「확실」이었는데(2026-10-14 에 바꿨다) 선호도 「확(확실)」과 글자가 겹쳐
+ * 분석 화면에서 뒤섞여 읽혔다. 저장 열쇠는 그대로 sure 라 적어 둔 자료는 건드리지 않는다.
  * 공략과 나란히 쓰는 표시라 저장하는 길도 같다(settings 탭의 sure 키). */
 const SURE_KEY = 'jnu-sure';
 let sureSet = null;
@@ -2352,8 +2354,8 @@ function sureSave() {
 function sureToggle(p) { const s = sures(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); sureSave(); return s.has(k); }
 
 /* ---------- VIP ----------
- * 확실·공략과 나란히 쓰는 셋째 표시다. 저장하는 길도 같다(settings 탭의 vip 키).
- * 분석 목록에서는 색이 아니라 **테두리를 두 줄로** 그려 나타낸다 — 바탕(확실)과 깃발(공략)을
+ * 강화·공략과 나란히 쓰는 셋째 표시다. 저장하는 길도 같다(settings 탭의 vip 키).
+ * 분석 목록에서는 색이 아니라 **테두리를 두 줄로** 그려 나타낸다 — 바탕(강화)과 깃발(공략)을
  * 이미 쓰고 있어, 겹쳐 달아도 서로 가리지 않는 표시가 필요했다. */
 const VIP_KEY = 'jnu-vip';
 let vipSet = null;
@@ -2404,9 +2406,10 @@ const dorderCustom = () => dorder().length > 0;
 /* VIP 표식 — 별 */
 const VIP_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.3l6-.8z" fill="currentColor"/></svg>';
-/* 확실 표식 — 굳어졌다는 뜻이라 체크 */
+/* 강화 표식 — 선호도를 한 칸 올린다는 뜻이라 위 화살표.
+   체크(✓)는 「확인·완료」로 읽혀, 「공략해야 할 사람」처럼 할 일로 오해될 수 있었다. */
 const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
-  + '<path d="M4 12.5l5.5 5.5L20 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  + '<path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PUSH_FLAG = '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">'
   + '<path d="M6 22V3h12l-3 5 3 5H6" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 
@@ -2847,7 +2850,7 @@ const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_E
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '확실', [SET_DO]: '학과 순서', [SET_VI]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -4185,17 +4188,18 @@ function openDrawer(p, d) {
           날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
       </div>
 
-      <div class="d-section"><h3>표시</h3>
+      <div class="d-section"><h3>선호도 추가정보</h3>
         <div class="d-marks">
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
           <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}">
-            ${SURE_MARK}<span>확실</span></button>
+            ${SURE_MARK}<span>강화</span></button>
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
             ${VIP_MARK}<span>VIP</span></button>
         </div>
-        <p class="st-note"><b>확실</b>은 이름 바탕이 진한 색으로, <b>공략</b>은 깃발로, <b>VIP</b>는 두 줄 테두리</p>
+        <p class="st-note"><b>강화</b>는 그 선호도가 더 굳다는 뜻(이름 바탕이 진한 색),
+          <b>공략</b>은 더 다가갈 분(깃발), <b>VIP</b>는 남을 설득해 줄 분(두 줄 테두리)</p>
       </div>
 
       <div class="d-section"><h3>메모</h3>
@@ -4243,7 +4247,7 @@ function openDrawer(p, d) {
     const btn = e.currentTarget, on = sureToggle(p);
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
-    flashStatus(on ? `${p.name} 교수를 확실로 표시했습니다` : `${p.name} 교수의 확실 표시를 풀었습니다`);
+    flashStatus(on ? `${p.name} 교수를 강화로 표시했습니다` : `${p.name} 교수의 강화 표시를 풀었습니다`);
   });
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = pushToggle(p);

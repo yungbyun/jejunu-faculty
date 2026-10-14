@@ -132,7 +132,7 @@ const look = async sel => {
   return { off, offHover, on, onHover };
 };
 const clear = c => c.replace(/\s/g, '');
-for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushbtn]'], ['VIP', '[data-vipbtn]']]) {
+for (const [name, sel] of [['강화', '[data-surebtn]'], ['공략', '[data-pushbtn]'], ['VIP', '[data-vipbtn]']]) {
   const L = await look(sel);
   t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg) && L.on.fg === 'rgb(255, 255, 255)',
     `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
@@ -144,20 +144,31 @@ for (const [name, sel] of [['확실', '[data-surebtn]'], ['공략', '[data-pushb
     !document.querySelector(s).classList.contains('on'), sel));
 }
 
-// 5-2) 확실 — 선호도 '확' 과는 다른, 지금 이 시점의 결론
-t('단추 차례는 확실·공략·VIP', await page.evaluate(() => {
+/* 5-2) 강화 — 선호도 위에 한 칸 얹는 표시(확이면 더 확실, 긍이면 더 긍정).
+   2026-10-14 에 「확실」에서 이름을 바꿨다 — 선호도 「확(확실)」과 글자가 겹쳤다. */
+t('단추 차례는 강화·공략·VIP', await page.evaluate(() => {
   const b = [...document.querySelectorAll('.d-marks button')];
   return b.length === 3 && b[0].hasAttribute('data-surebtn') &&
     b[1].hasAttribute('data-pushbtn') && b[2].hasAttribute('data-vipbtn');
 }));
-t('단추 글자는 확실·공략·VIP', await page.evaluate(() =>
-  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '확실,공략,VIP',
+t('단추 글자는 강화·공략·VIP', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '강화,공략,VIP',
   await page.evaluate(() => [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()));
 await page.click('[data-surebtn]');
 await page.waitForTimeout(400);
-t('확실이 켜진다', await page.evaluate(() => sures().size === 1 &&
+t('강화가 켜진다', await page.evaluate(() => sures().size === 1 &&
   document.querySelector('[data-surebtn]').getAttribute('aria-pressed') === 'true'));
-t('확실 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '확실');
+t('강화 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '강화');
+/* 선호도 「확(확실)」과 글자가 겹치지 않아야 한다 — 이름을 바꾼 까닭이다 */
+t('어디에도 「확실」이라는 표시는 없다', await page.evaluate(() =>
+  ![...document.querySelectorAll('.d-marks button span, .d-section h3')].some(e => e.textContent.includes('확실'))));
+t('칸 이름은 「선호도 추가정보」', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-section h3')].some(e => e.textContent.trim() === '선호도 추가정보')),
+  await page.evaluate(() => [...document.querySelectorAll('.d-section h3')].map(e => e.textContent.trim()).join('/')));
+t('표식은 위 화살표 — 한 칸 올린다는 뜻', await page.evaluate(() => {
+  const d = document.querySelector('[data-surebtn] svg path').getAttribute('d');
+  return /^M12 20V5/.test(d);
+}), await page.evaluate(() => document.querySelector('[data-surebtn] svg path').getAttribute('d')));
 t('공략과는 따로 간다', await page.evaluate(() => sures().size === 1 && pushes().size === 0));
 t('선호도도 건드리지 않는다', await page.evaluate(() => {
   const before = getRating(state.rows[0]);
@@ -170,19 +181,19 @@ await page.evaluate(() => { setRating(rKey(state.rows[0]), '중'); location.hash
 await page.waitForSelector('.st-c.sure', { timeout: 10000 });
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
-t('확실인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
+t('강화인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
 t('바탕이 진한 색으로 찬다', await page.evaluate(() => {
   const el = document.querySelector('.st-c.sure');
   const want = getComputedStyle(document.documentElement).getPropertyValue('--sure').trim();
   const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
   return hex(getComputedStyle(el).backgroundColor) === want && getComputedStyle(el).color === 'rgb(255, 255, 255)';
 }), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.sure')).backgroundColor));
-t('확실이 아니면 바탕이 비어 있다', await page.evaluate(() => {
+t('강화가 아니면 바탕이 비어 있다', await page.evaluate(() => {
   const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('sure'));
   return !!el && getComputedStyle(el).color !== 'rgb(255, 255, 255)';
 }));
-/* 확실이면서 공략일 때 — 진한 바탕에 주황 테는 안 보이므로 깃발만 남긴다 */
-t('확실+공략이면 깃발이 흰색', await page.evaluate(() => {
+/* 강화이면서 공략일 때 — 진한 바탕에 주황 테는 안 보이므로 깃발만 남긴다 */
+t('강화+공략이면 깃발이 흰색', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); pushSave(); render();
   const el = document.querySelector('.st-c.sure.on');
@@ -227,7 +238,7 @@ t('두 줄 사이에 틈이 있다', await page.evaluate(() => {
   return gap.includes(panel.replace(/\s/g, '')) || gap.includes(panel);
 }), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip')).boxShadow));
 /* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 */
-t('확실·공략과 겹쳐 달아도 두 줄이 남는다', await page.evaluate(() => {
+t('강화·공략과 겹쳐 달아도 두 줄이 남는다', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); sures().add(rKey(p)); render();
   const el = document.querySelector('.st-c.vip');
@@ -251,7 +262,7 @@ await page.evaluate(() => {
 
 // 6) 시트로도 저장된다
 t('settings 의 push 키로 등록', await page.evaluate(() => SET_KEYS.includes('push') && SET_LABEL['push'] === '공략'));
-t('settings 의 sure 키로도 등록', await page.evaluate(() => SET_KEYS.includes('sure') && SET_LABEL['sure'] === '확실'));
+t('settings 의 sure 키로도 등록', await page.evaluate(() => SET_KEYS.includes('sure') && SET_LABEL['sure'] === '강화'));
 t('settings 의 vip 키로도 등록', await page.evaluate(() => SET_KEYS.includes('vip') && SET_LABEL['vip'] === 'VIP'));
 t('받은 값을 이 기기에 적용', await page.evaluate(() => {
   const k = rKey(state.rows[3]);
@@ -259,7 +270,7 @@ t('받은 값을 이 기기에 적용', await page.evaluate(() => {
   return isPush(state.rows[3]) && JSON.parse(localStorage.getItem('jnu-push') || '[]')[0] === k;
 }));
 
-t('확실도 시트에서 내려받는다', await page.evaluate(() => {
+t('강화도 시트에서 내려받는다', await page.evaluate(() => {
   const k = rKey(state.rows[5]);
   settingApplyLocal('sure', [k]);
   return isSure(state.rows[5]) && JSON.parse(localStorage.getItem('jnu-sure') || '[]')[0] === k;

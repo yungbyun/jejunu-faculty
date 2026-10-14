@@ -419,10 +419,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* --push-fill 은 바탕을 채울 때 쓴다. 어두운 화면의 --push(#fb923c)는 흰 글자 대비가 2.26 이라 못 쓴다 */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--push:#fb923c;--push-fill:#c2410c}}
 :root[data-theme="dark"]{--push:#fb923c;--push-fill:#c2410c}
-/* 확실 — 이름 바탕을 채우는 색. 흰 글자가 얹히므로 충분히 진해야 한다
+/* 강화 — 이름 바탕을 채우는 색. 흰 글자가 얹히므로 충분히 진해야 한다
    (밝은 #2d6b16 은 흰 글자 6.51, 어두운 #2f7d1a 는 5.16).
    단추 글자·테두리는 --sure-ink 로 따로 둔다 — 어두운 화면에서 칠하는 색을 그대로 쓰면 4.29 로 모자란다. */
-/* VIP — 색이 아니라 '두 줄 테두리' 로 나타낸다(바탕은 확실, 깃발은 공략이 이미 쓴다).
+/* VIP — 색이 아니라 '두 줄 테두리' 로 나타낸다(바탕은 강화, 깃발은 공략이 이미 쓴다).
    --vip 는 테와 글자, --vip-fill 은 단추를 채울 때. 어두운 화면의 --vip(#e3b341)는
    흰 글자 대비가 1.95 라 채우는 데 못 쓴다. */
 :root{--vip:#8a6300;--vip-fill:#8a6300}
@@ -607,17 +607,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 공략으로 고른 사람 — 이름 왼쪽에 깃발, 칩 테두리는 안쪽 선으로 굵게 한다
    (border-width 를 올리면 칩 크기가 흔들려 줄이 밀린다) */
 .st-c.on{border-color:var(--push);box-shadow:inset 0 0 0 1px var(--push)}
-/* 확실 — 이름 바탕을 진한 색으로 채운다. 안쪽 것들은 모두 흰색으로 뒤집는다 */
+/* 강화 — 이름 바탕을 진한 색으로 채운다. 안쪽 것들은 모두 흰색으로 뒤집는다 */
 .st-c.sure{background:var(--sure);border-color:var(--sure);color:#fff}
 .st-c.sure:hover{border-color:var(--sure);filter:brightness(1.12)}
 .st-c.sure .pushm{color:#fff}
 .st-c.sure .metlit b{box-shadow:none}
-/* 확실이면서 공략일 때 — 진한 바탕에 주황 테는 잘 안 보인다. 깃발 하나로 충분하다 */
+/* 강화이면서 공략일 때 — 진한 바탕에 주황 테는 잘 안 보인다. 깃발 하나로 충분하다 */
 .st-c.sure.on{border-color:var(--sure);box-shadow:none}
 /* VIP — 이름 테두리를 두 줄로. 칩이 본래 가진 테를 안쪽 줄로 쓰되 색을 --vip 로 맞추고
    (옅은 회색 그대로 두면 한 줄로만 보인다), 바깥 줄은 그림자로 그린다. 가운데 틈은 칩이 놓인
    바탕색(--surface)으로 메워야 두 줄로 갈린다. 그림자는 자리를 차지하지 않아 칩 크기가 안 흔들린다.
-   확실(채움)·공략(깃발)과 겹쳐 달 수 있다. 공략의 안쪽 주황 선은 VIP 일 때 그리지 않는다 —
+   강화(채움)·공략(깃발)과 겹쳐 달 수 있다. 공략의 안쪽 주황 선은 VIP 일 때 그리지 않는다 —
    금색 두 줄에 주황까지 겹치면 어지럽고, 공략은 깃발로 이미 보인다. */
 .st-c.vip,.st-c.on.vip,.st-c.sure.vip,.st-c.sure.on.vip{
   border-color:var(--vip);
@@ -652,7 +652,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 마우스를 올렸을 때는 테두리만 물들인다 — 글자색까지 바꾸면 켜진 모습과 똑같아 보여
    누른 자리에 커서가 있는 동안 토글이 된 티가 나지 않았다 (2026-10-04) */
 .surebtn:hover{border-color:var(--sure-ink)}
-/* 켜짐은 색으로 꽉 채우고 흰 글자 — 분석 목록의 확실 칩과 같은 꼴이라 뜻이 바로 통한다 */
+/* 켜짐은 색으로 꽉 채우고 흰 글자 — 분석 목록의 강화 칩과 같은 꼴이라 뜻이 바로 통한다 */
 .surebtn.on{background:var(--sure);border-color:var(--sure);color:#fff}
 .pushbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
