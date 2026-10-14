@@ -134,7 +134,7 @@ const look = async sel => {
 const clear = c => c.replace(/\s/g, '');
 for (const [name, sel] of [['강화', '[data-surebtn]'], ['공략', '[data-pushbtn]'], ['VIP', '[data-vipbtn]']]) {
   const L = await look(sel);
-  t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg) && L.on.fg === 'rgb(255, 255, 255)',
+  t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg),
     `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
   t(`${name}: 마우스만 올린 것과 켜진 것이 다르다`, clear(L.offHover.bg) !== clear(L.on.bg),
     `${L.offHover.bg} vs ${L.on.bg}`);
@@ -159,6 +159,28 @@ await page.waitForTimeout(400);
 t('강화가 켜진다', await page.evaluate(() => sures().size === 1 &&
   document.querySelector('[data-surebtn]').getAttribute('aria-pressed') === 'true'));
 t('강화 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '강화');
+/* 단추 색도 그 교수의 선호도를 따라간다 — 선호도를 바꾸면 바로 따라와야 한다 (2026-10-14) */
+t('단추에 그 선호도 색이 실린다', await page.evaluate(() => {
+  const p = state.rows[0], get = () => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc').trim();
+  setRating(rKey(p), '부'); const a = get();
+  setRating(rKey(p), '긍'); const b = get();
+  setRating(rKey(p), ''); const c = get();
+  return a === RCOLOR['부'] && b === RCOLOR['긍'] && c === '';
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc')));
+t('선호도가 없으면 무채색으로, 글자는 읽힌다', await page.evaluate(() => {
+  const btn = document.querySelector('[data-vipbtn]');
+  if (!btn.classList.contains('on')) btn.click();
+  const cs = getComputedStyle(btn);
+  const n = x => { const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
+  const L = c => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+    return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+  const bg = n(cs.backgroundColor), fg = n(cs.color);
+  const [hi, lo] = [L(bg), L(fg)].sort((a, b) => b - a);
+  const grey = Math.max(...bg) - Math.min(...bg) < 30;
+  btn.click();
+  return grey && (hi + .05) / (lo + .05) >= 4.5;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('[data-vipbtn]')).backgroundColor));
 /* 선호도 「확(확실)」과 글자가 겹치지 않아야 한다 — 이름을 바꾼 까닭이다 */
 t('어디에도 「확실」이라는 표시는 없다', await page.evaluate(() =>
   ![...document.querySelectorAll('.d-marks button span, .d-section h3')].some(e => e.textContent.includes('확실'))));
@@ -181,28 +203,50 @@ t('선호도도 건드리지 않는다', await page.evaluate(() => {
   return getRating(state.rows[0]) === before && isSure(state.rows[0]);
 }));
 
-// 분석 목록에서 이름 바탕이 진한 색으로 찬다
+// 분석 목록 — 바탕이 「얼마나 든든한가」를 말한다(강화 반쯤 · VIP 꽉 · 공략은 테두리)
 await page.evaluate(() => { setRating(rKey(state.rows[0]), '중'); location.hash = '#/stats'; render(); });
 await page.waitForSelector('.st-c.sure', { timeout: 10000 });
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
 t('강화인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
-t('바탕이 진한 색으로 찬다', await page.evaluate(() => {
-  const el = document.querySelector('.st-c.sure');
-  const want = getComputedStyle(document.documentElement).getPropertyValue('--sure').trim();
-  const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
-  return hex(getComputedStyle(el).backgroundColor) === want && getComputedStyle(el).color === 'rgb(255, 255, 255)';
-}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.sure')).backgroundColor));
-t('강화가 아니면 바탕이 비어 있다', await page.evaluate(() => {
-  const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('sure'));
-  return !!el && getComputedStyle(el).color !== 'rgb(255, 255, 255)';
+t('강화는 그 선호도 색을 반쯤 깐다', await page.evaluate(() => {
+  const el = document.querySelector('.st-c.sure'), cs = getComputedStyle(el);
+  const rc = cs.getPropertyValue('--rc').trim();          // 그 선호도 색이 칩에 실려 온다
+  const base = getComputedStyle(document.querySelector('.st-c:not(.sure):not(.vip)')).backgroundColor;
+  /* #rrggbb · rgb(…) · color(srgb 0~1 …) 를 모두 0~255 로 읽는다 */
+  const n = x => { x = String(x).trim();
+    if (x[0] === '#') { const h = x.slice(1); const q = h.length === 3 ? h.split('').map(c => c + c) : h.match(/../g);
+      return q.slice(0, 3).map(v => parseInt(v, 16)); }
+    const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
+  const want = n(rc).map((v, i) => Math.round((v + n(base)[i]) / 2));
+  const got = n(cs.backgroundColor);
+  return rc === RCOLOR['중'] && got.every((v, i) => Math.abs(v - want[i]) <= 2);
+}), await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.st-c.sure'));
+  return cs.getPropertyValue('--rc') + ' → ' + cs.backgroundColor;
 }));
-/* 강화이면서 공략일 때 — 진한 바탕에 주황 테는 안 보이므로 깃발만 남긴다 */
-t('강화+공략이면 깃발이 흰색', await page.evaluate(() => {
+t('강화 글자는 흰색이 아니다 — 옅은 바탕이라', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('.st-c.sure')).color !== 'rgb(255, 255, 255)'));
+t('강화가 아니면 바탕이 회색 그대로', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('sure') && !e.classList.contains('vip'));
+  const want = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim();
+  const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
+  return !!el && hex(getComputedStyle(el).backgroundColor) === want;
+}), await page.evaluate(() => getComputedStyle([...document.querySelectorAll('.st-c')]
+  .find(e => !e.classList.contains('sure') && !e.classList.contains('vip'))).backgroundColor));
+/* 강화이면서 공략 — 바탕이 옅어졌으니 주황 테가 제대로 보인다 */
+t('강화+공략이면 주황 테가 남는다', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); pushSave(); render();
-  const el = document.querySelector('.st-c.sure.on');
-  return !!el && getComputedStyle(el.querySelector('.pushm')).color === 'rgb(255, 255, 255)';
+  const el = document.querySelector('.st-c.sure.on'), cs = getComputedStyle(el);
+  const push = cs.getPropertyValue('--push').trim();
+  const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
+  return !!el && hex(cs.borderTopColor) === push && /inset/.test(cs.boxShadow)
+    && hex(getComputedStyle(el.querySelector('.pushm')).color) === push;
+}), await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.st-c.sure.on'));
+  return cs.borderTopColor + ' / ' + cs.boxShadow;
 }));
 await page.evaluate(() => {
   sureSet = new Set(); localStorage.removeItem('jnu-sure');
@@ -210,7 +254,7 @@ await page.evaluate(() => {
   setRating(rKey(state.rows[0]), '');
 });
 
-// 5-3) VIP — 분석 목록에서 이름 테두리를 두 줄로
+// 5-3) VIP — 분석 목록에서 그 선호도 색으로 꽉 채운다(2026-10-14, 전에는 두 줄 테두리)
 t('상세에 VIP 단추가 셋째로', await page.evaluate(() => {
   const b = [...document.querySelectorAll('.d-marks button')];
   return b.length === 3 && b[2].hasAttribute('data-vipbtn') && b[2].querySelector('span').textContent.trim() === 'VIP';
@@ -225,36 +269,58 @@ await page.waitForSelector('.st-c.vip', { timeout: 10000 });
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
 t('VIP 인 칩에만 vip', await page.evaluate(() => document.querySelectorAll('.st-c.vip').length === vips().size));
-const ring = await page.evaluate(() => {
-  const el = document.querySelector('.st-c.vip'), cs = getComputedStyle(el);
-  const hex = x => { const m = x.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : x; };
-  const want = cs.getPropertyValue('--vip').trim();
-  /* 바깥 줄은 그림자로 그린다. 두 줄로 보이려면 가운데 틈(바탕색)이 사이에 있어야 한다 */
-  const sh = cs.boxShadow;
-  const parts = sh.split(/,(?![^(]*\))/).map(x => x.trim());
-  return { border: hex(cs.borderTopColor), want, parts, n: parts.length, inset: /inset/.test(sh) };
-});
-t('안쪽 줄이 VIP 색', ring.border === ring.want, `${ring.border} / ${ring.want}`);
-t('바깥 줄이 따로 하나 더', ring.n === 2 && !ring.inset, `${ring.n}겹 ${ring.parts.join(' | ')}`);
-t('두 줄 사이에 틈이 있다', await page.evaluate(() => {
+t('VIP 는 그 선호도 색으로 꽉 채운다', await page.evaluate(() => {
   const cs = getComputedStyle(document.querySelector('.st-c.vip'));
-  const gap = cs.boxShadow.split(/,(?![^(]*\))/)[0];
-  const panel = getComputedStyle(document.querySelector('.st-list')).backgroundColor;
-  return gap.includes(panel.replace(/\s/g, '')) || gap.includes(panel);
-}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip')).boxShadow));
-/* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 */
-t('강화·공략과 겹쳐 달아도 두 줄이 남는다', await page.evaluate(() => {
+  /* #rrggbb · rgb(…) · color(srgb 0~1 …) 를 모두 0~255 로 읽는다 */
+  const n = x => { x = String(x).trim();
+    if (x[0] === '#') { const h = x.slice(1); const q = h.length === 3 ? h.split('').map(c => c + c) : h.match(/../g);
+      return q.slice(0, 3).map(v => parseInt(v, 16)); }
+    const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
+  const rc = n(cs.getPropertyValue('--rc').trim()), got = n(cs.backgroundColor);
+  /* 흰 글자를 얹으려고 7% 만 어둡게 한다 — 그 선호도 색에서 거의 안 벗어나야 한다 */
+  return got.every((v, i) => v <= rc[i] + 1 && v >= rc[i] * .9 - 3);
+}), await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.st-c.vip'));
+  return cs.getPropertyValue('--rc') + ' → ' + cs.backgroundColor;
+}));
+t('VIP 글자는 흰색', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('.st-c.vip')).color === 'rgb(255, 255, 255)'));
+t('VIP 는 강화보다 진하다', await page.evaluate(() => {
+  const p = state.rows[1];
+  setRating(rKey(p), '중'); sures().add(rKey(p)); render();
+  const L = el => { const c = (getComputedStyle(el).backgroundColor.match(/[\d.]+/g) || [])
+      .slice(0, 3).map(v => v > 1.001 ? +v : v * 255);
+    const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+    return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+  const vip = L(document.querySelector('.st-c.vip')), sure = L(document.querySelector('.st-c.sure:not(.vip)'));
+  const d = Math.abs(vip - sure);
+  sures().delete(rKey(p)); render();
+  return d > .05;
+}));
+/* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 — 바탕은 VIP 가 이기고, 공략은 테로 남는다 */
+t('셋을 겹쳐 달면 VIP 바탕에 공략 테', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); sures().add(rKey(p)); render();
-  const el = document.querySelector('.st-c.vip');
-  const cs = getComputedStyle(el);
-  const hex = x => { const m = x.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('') : x; };
-  return el.classList.contains('sure') && el.classList.contains('on') &&
-    hex(cs.borderTopColor) === cs.getPropertyValue('--vip').trim() &&
-    cs.boxShadow !== 'none' && !/inset/.test(cs.boxShadow);
-}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip')).boxShadow));
-t('VIP 가 아니면 두 줄이 아니다', await page.evaluate(() => {
-  const el = [...document.querySelectorAll('.st-c')].find(e => !e.classList.contains('vip'));
+  const el = document.querySelector('.st-c.vip'), cs = getComputedStyle(el);
+  /* #rrggbb · rgb(…) · color(srgb 0~1 …) 를 모두 0~255 로 읽는다 */
+  const n = x => { x = String(x).trim();
+    if (x[0] === '#') { const h = x.slice(1); const q = h.length === 3 ? h.split('').map(c => c + c) : h.match(/../g);
+      return q.slice(0, 3).map(v => parseInt(v, 16)); }
+    const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
+  const rc = n(cs.getPropertyValue('--rc').trim()), got = n(cs.backgroundColor);
+  return el.classList.contains('sure') && el.classList.contains('on')
+    && got.every((v, i) => v <= rc[i] + 1 && v >= rc[i] * .9 - 3)      // 강화에 안 묻힌다
+    && cs.color === 'rgb(255, 255, 255)'
+    && /inset/.test(cs.boxShadow);                                     // 공략 테는 남는다
+}), await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.st-c.vip'));
+  return cs.backgroundColor + ' / ' + cs.boxShadow;
+}));
+t('아무 표시도 없으면 테도 없다', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.st-c')].find(e =>
+    !e.classList.contains('vip') && !e.classList.contains('on'));
   return !!el && getComputedStyle(el).boxShadow === 'none';
 }));
 t('도움말에 VIP 라고 적힌다', await page.evaluate(() =>
@@ -263,6 +329,57 @@ await page.evaluate(() => {
   vipSet = new Set(); pushSet = new Set(); sureSet = new Set();
   ['jnu-vip', 'jnu-push', 'jnu-sure'].forEach(k => localStorage.removeItem(k));
   setRating(rKey(state.rows[0]), '');
+});
+
+/* 5-4) 여섯 선호도 × 두 테마 — 글자가 읽히고, 보통·강화·VIP 가 서로 갈려야 한다 (2026-10-14) */
+for (const theme of ['light', 'dark']) {
+  const got = await page.evaluate(th => {
+    document.documentElement.setAttribute('data-theme', th);
+    const R = ['확', '긍', '중', '모', '부', '비'];
+    sureSet = new Set(); pushSet = new Set(); vipSet = new Set();
+    state.rows.forEach((p, i) => applyEntry(rKey(p), { rating: R[i % 6] }));
+    R.forEach(r => {
+      const ps = state.rows.filter(p => getRating(p) === r);
+      if (ps[0]) sures().add(rKey(ps[0]));
+      if (ps[1]) vips().add(rKey(ps[1]));
+    });
+    location.hash = '#/stats'; render();
+    const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d');
+    const px = (...cs) => { x.clearRect(0, 0, 1, 1); for (const c of cs) { x.fillStyle = c; x.fillRect(0, 0, 1, 1); }
+      return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+    const L = ([r, g, b]) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+      return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+    const ratio = (a, b) => { const [hi, lo] = [L(a), L(b)].sort((m, n) => n - m); return (hi + .05) / (lo + .05); };
+    const panel = getComputedStyle(document.querySelector('.st-list')).backgroundColor;
+    const out = [];
+    document.querySelectorAll('.st-list').forEach(list => {
+      const pick = sel => list.querySelector(sel);
+      const kinds = { 강화: pick('.st-c.sure'), VIP: pick('.st-c.vip'), 보통: pick('.st-c:not(.sure):not(.vip)') };
+      const bg = {};
+      Object.entries(kinds).forEach(([k, el]) => {
+        if (!el) return;
+        const cs = getComputedStyle(el);
+        bg[k] = px(panel, cs.backgroundColor);
+        out.push({ r: list.dataset.rslist, k, text: ratio(bg[k], px(cs.color)) });
+      });
+      if (bg.강화 && bg.보통) out.push({ r: list.dataset.rslist, k: '강화≠보통', text: 0, sep: ratio(bg.강화, bg.보통) });
+      if (bg.VIP && bg.강화) out.push({ r: list.dataset.rslist, k: 'VIP≠강화', text: 0, sep: ratio(bg.VIP, bg.강화) });
+    });
+    document.documentElement.setAttribute('data-theme', 'light');
+    return out;
+  }, theme);
+  const texts = got.filter(o => !o.sep);
+  const seps = got.filter(o => o.sep);
+  t(`${theme}: 여섯 선호도 모두 글자가 읽힌다(4.5 이상)`, texts.every(o => o.text >= 4.5),
+    texts.filter(o => o.text < 5).map(o => `${o.r}${o.k} ${o.text.toFixed(2)}`).join(' ') || '모두 5 이상');
+  t(`${theme}: 보통·강화·VIP 가 눈으로 갈린다(1.3 이상)`, seps.every(o => o.sep >= 1.3),
+    seps.filter(o => o.sep < 1.6).map(o => `${o.r}${o.k} ${o.sep.toFixed(2)}`).join(' ') || '모두 1.6 이상');
+}
+await page.evaluate(() => {
+  vipSet = new Set(); pushSet = new Set(); sureSet = new Set();
+  ['jnu-vip', 'jnu-push', 'jnu-sure'].forEach(k => localStorage.removeItem(k));
+  state.rows.forEach(p => applyEntry(rKey(p), { rating: '' }));
+  document.documentElement.setAttribute('data-theme', 'light');
 });
 
 // 6) 시트로도 저장된다

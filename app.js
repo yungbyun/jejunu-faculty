@@ -1833,11 +1833,14 @@ const STP = { pick: false, only: false };
 function stChip(p, r) {
   const met = getMet(p), pu = isPush(p), su = isSure(p), vi = isVip(p), k = rKey(p);
   const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${vi ? ' vip' : ''}`;
-  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, su ? '#ffffff' : RCOLOR[r])}`;
+  /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
+  const rc = RCOLOR[r] || '#6b7280';
+  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
   const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
+  const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
-    ? `<li><button type="button" class="${cls}" data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
-    : `<li><a class="${cls}" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
+    ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
+    : `<li><a class="${cls}"${sty} href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
 }
 
 function renderStats() {
@@ -3180,6 +3183,12 @@ function refreshRatingUI(key, val) {
   });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"] .prof__note`).forEach(el => { el.innerHTML = noteBadge(entryOf(key)); });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
+  /* 선호도를 바꾸면 강화·VIP 단추에 깔린 색도 따라간다(--rc) */
+  document.querySelectorAll(`.d-marks`).forEach(m => {
+    if (!m.querySelector(`[data-surebtn="${CSS.escape(key)}"]`)) return;
+    const rc = RCOLOR[val] || '';
+    rc ? m.style.setProperty('--rc', rc) : m.style.removeProperty('--rc');
+  });
   const r = route();
   if (r.view === 'dept') {
     const d = state.depts.find(x => x.id === r.dept);
@@ -4175,7 +4184,7 @@ function openDrawer(p, d) {
       </div>
 
       <div class="d-section"><h3>선호도 추가정보</h3>
-        <div class="d-marks">
+        <div class="d-marks"${RCOLOR[getRating(p)] ? ` style="--rc:${esc(RCOLOR[getRating(p)])}"` : ''}>
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
           <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}">
             ${SURE_MARK}<span>강화</span></button>
@@ -4184,8 +4193,9 @@ function openDrawer(p, d) {
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
             ${VIP_MARK}<span>VIP</span></button>
         </div>
-        <p class="st-note"><b>강화</b>는 그 선호도가 더 굳다는 뜻(이름 바탕이 진한 색),
-          <b>공략</b>은 더 다가갈 분(깃발), <b>VIP</b>는 남을 설득해 줄 분(두 줄 테두리)</p>
+        <p class="st-note">분석 목록에서 <b>강화</b>는 그 선호도가 더 굳다는 뜻으로 <b>그 색을 옅게</b>,
+          <b>VIP</b>는 남을 설득해 줄 분이라 <b>그 색을 꽉</b> 칠합니다. <b>공략</b>은 더 다가갈 분이라
+          바탕이 아니라 <b>주황 테두리</b>와 깃발로 둘러 둡니다.</p>
       </div>
 
       <div class="d-section"><h3>만난 횟수</h3>
