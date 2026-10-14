@@ -4174,20 +4174,6 @@ function openDrawer(p, d) {
         ${rateWide(p)}
       </div>
 
-      <div class="d-section"><h3>만난 횟수</h3>
-        ${meetCounter(p)}
-      </div>
-
-      <div class="d-section"><h3>약속 잡기</h3>
-        <div class="d-appt">
-          <button type="button" class="btn" data-mtnew="lunch">점심</button>
-          <button type="button" class="btn" data-mtnew="dinner">저녁</button>
-          <button type="button" class="btn" data-mtnew="other">Tea</button>
-        </div>
-        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 반 · Tea 2시.
-          날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
-      </div>
-
       <div class="d-section"><h3>선호도 추가정보</h3>
         <div class="d-marks">
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
@@ -4200,6 +4186,20 @@ function openDrawer(p, d) {
         </div>
         <p class="st-note"><b>강화</b>는 그 선호도가 더 굳다는 뜻(이름 바탕이 진한 색),
           <b>공략</b>은 더 다가갈 분(깃발), <b>VIP</b>는 남을 설득해 줄 분(두 줄 테두리)</p>
+      </div>
+
+      <div class="d-section"><h3>만난 횟수</h3>
+        ${meetCounter(p)}
+      </div>
+
+      <div class="d-section"><h3>약속 잡기</h3>
+        <div class="d-appt">
+          <button type="button" class="btn" data-mtnew="lunch">점심</button>
+          <button type="button" class="btn" data-mtnew="dinner">저녁</button>
+          <button type="button" class="btn" data-mtnew="other">Tea</button>
+        </div>
+        <p class="st-note">오늘 날짜와 이 교수님으로 잡아 달력을 엽니다 — 점심 12시 · 저녁 6시 반 · Tea 2시.
+          날짜·시각·장소는 거기서 바꾸시면 됩니다.</p>
       </div>
 
       <div class="d-section"><h3>메모</h3>

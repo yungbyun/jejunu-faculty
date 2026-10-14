@@ -165,6 +165,11 @@ t('어디에도 「확실」이라는 표시는 없다', await page.evaluate(() 
 t('칸 이름은 「선호도 추가정보」', await page.evaluate(() =>
   [...document.querySelectorAll('.d-section h3')].some(e => e.textContent.trim() === '선호도 추가정보')),
   await page.evaluate(() => [...document.querySelectorAll('.d-section h3')].map(e => e.textContent.trim()).join('/')));
+/* 선호도를 매긴 바로 그 자리에서 덧붙이게 — 선호도 바로 아래다 (2026-10-14) */
+t('선호도 바로 아래 칸이다', await page.evaluate(() => {
+  const h = [...document.querySelectorAll('.d-section h3')].map(e => e.textContent.trim());
+  return h.indexOf('선호도 추가정보') === h.indexOf('선호도') + 1;
+}), await page.evaluate(() => [...document.querySelectorAll('.d-section h3')].map(e => e.textContent.trim()).join(' / ')));
 t('표식은 위 화살표 — 한 칸 올린다는 뜻', await page.evaluate(() => {
   const d = document.querySelector('[data-surebtn] svg path').getAttribute('d');
   return /^M12 20V5/.test(d);
