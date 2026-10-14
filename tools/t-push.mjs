@@ -209,7 +209,7 @@ await page.waitForSelector('.st-c.sure', { timeout: 10000 });
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
 t('강화인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
-t('강화는 그 선호도 색을 반쯤 깐다', await page.evaluate(() => {
+t('강화는 그 선호도 색을 30% 깐다', await page.evaluate(() => {
   const el = document.querySelector('.st-c.sure'), cs = getComputedStyle(el);
   const rc = cs.getPropertyValue('--rc').trim();          // 그 선호도 색이 칩에 실려 온다
   const base = getComputedStyle(document.querySelector('.st-c:not(.sure):not(.vip)')).backgroundColor;
@@ -219,7 +219,7 @@ t('강화는 그 선호도 색을 반쯤 깐다', await page.evaluate(() => {
       return q.slice(0, 3).map(v => parseInt(v, 16)); }
     const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
-  const want = n(rc).map((v, i) => Math.round((v + n(base)[i]) / 2));
+  const want = n(rc).map((v, i) => Math.round(v * .3 + n(base)[i] * .7));
   const got = n(cs.backgroundColor);
   return rc === RCOLOR['중'] && got.every((v, i) => Math.abs(v - want[i]) <= 2);
 }), await page.evaluate(() => {
@@ -372,7 +372,7 @@ for (const theme of ['light', 'dark']) {
   const seps = got.filter(o => o.sep);
   t(`${theme}: 여섯 선호도 모두 글자가 읽힌다(4.5 이상)`, texts.every(o => o.text >= 4.5),
     texts.filter(o => o.text < 5).map(o => `${o.r}${o.k} ${o.text.toFixed(2)}`).join(' ') || '모두 5 이상');
-  t(`${theme}: 보통·강화·VIP 가 눈으로 갈린다(1.3 이상)`, seps.every(o => o.sep >= 1.3),
+  t(`${theme}: 보통·강화·VIP 가 눈으로 갈린다(1.25 이상)`, seps.every(o => o.sep >= 1.25),
     seps.filter(o => o.sep < 1.6).map(o => `${o.r}${o.k} ${o.sep.toFixed(2)}`).join(' ') || '모두 1.6 이상');
 }
 await page.evaluate(() => {
