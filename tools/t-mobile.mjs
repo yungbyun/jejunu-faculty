@@ -110,12 +110,13 @@ check('한 줄에 나란히', await page.evaluate(() => {
   const r0 = a[0].getBoundingClientRect(), r1 = a[1].getBoundingClientRect();
   return Math.abs((r0.top + r0.bottom) / 2 - (r1.top + r1.bottom) / 2) < 4;
 }));
-check('연구실은 tel:, 핸드폰은 sms:', ct.length === 2 && /^tel:[\d+]+$/.test(ct[0].href) && /^sms:[\d+]+$/.test(ct[1].href),
+/* 2026-10-15 — 번호를 누르면 어느 쪽이든 전화. 문자는 핸드폰 옆의 말풍선으로 */
+check('번호는 둘 다 tel:', ct.length === 2 && ct.every(x => /^tel:[\d+]+$/.test(x.href)),
   ct.map(x => x.href).join(' '));
-check('상세에도 전화 걸기 단추', await page.evaluate(() => {
+check('핸드폰 옆에 문자 단추', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct')][1].querySelector('a.d-ct__c');
-  return !!a && /^tel:/.test(a.getAttribute('href'));
-}));
+  return !!a && /^sms:/.test(a.getAttribute('href'));
+}), await page.evaluate(() => ([...document.querySelectorAll('.d-ct')][1].querySelector('a.d-ct__c') || {}).outerHTML || '(없음)'));
 check('둘 다 복사 아이콘', ct.length === 2 && ct.every(x => x.cp));
 /* 상세에서 복사 아이콘을 눌러도 화면이 닫히거나 넘어가면 안 된다 */
 const dHash = await page.evaluate(() => location.hash);
@@ -230,8 +231,12 @@ await page.press('[data-mobin]', 'Enter');
 await page.waitForTimeout(250);
 check('엔터로도 저장된다', await page.evaluate(() => mobileOf(state.rows[2])) === '010-8765-1234',
   await page.evaluate(() => mobileOf(state.rows[2])));
-check('저장하면 바로 문자 링크', await page.evaluate(() => {
-  const a = document.querySelector('.d-ct__n[href^="sms:"]');
+check('저장하면 바로 전화 링크', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct__n')].pop();
+  return !!a && a.getAttribute('href') === 'tel:01087651234';
+}), await page.evaluate(() => ([...document.querySelectorAll('.d-ct__n')].pop() || {}).getAttribute?.('href')));
+check('옆의 말풍선은 문자로 간다', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct')].pop().querySelector('a.d-ct__c');
   return !!a && a.getAttribute('href') === 'sms:01087651234';
 }));
 check('시트에도 올라간다', await page.evaluate(() =>
@@ -273,13 +278,22 @@ check('연구실 번호 앞에 수화기', await page.evaluate(() => {
   const tel = document.querySelector('.d-ct__n[href^="tel:"]');
   return !!tel && !!tel.querySelector('svg');
 }), await page.evaluate(() => (document.querySelector('.d-ct__n[href^="tel:"]') || {}).outerHTML || '(없음)'));
-check('핸드폰 앞은 말풍선 그대로', await page.evaluate(() => {
-  const sms = document.querySelector('.d-ct__n[href^="sms:"]');
-  return !!sms && !!sms.querySelector('svg');
+check('핸드폰 번호 앞에도 수화기', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct__n')].pop();
+  return !!a && /^tel:/.test(a.getAttribute('href')) && !!a.querySelector('svg');
 }));
-check('두 그림이 서로 다르다', await page.evaluate(() => {
-  const d = s => (document.querySelector(`.d-ct__n[href^="${s}"] svg path`) || {}).getAttribute?.('d') || s;
-  return d('tel:') !== d('sms:');
+/* 그림과 하는 일이 맞아떨어져야 한다 — 수화기는 전화, 말풍선은 문자 */
+check('번호 앞 수화기와 옆 말풍선은 다른 그림', await page.evaluate(() => {
+  const d = e => (e && e.querySelector('svg path') || {}).getAttribute?.('d') || '';
+  const num = [...document.querySelectorAll('.d-ct__n')].pop();
+  const sms = [...document.querySelectorAll('.d-ct')].pop().querySelector('a.d-ct__c[href^="sms:"]');
+  return !!sms && d(num) !== d(sms);
+}));
+check('문자 단추의 그림은 연구실 수화기와도 다르다', await page.evaluate(() => {
+  const d = e => (e && e.querySelector('svg path') || {}).getAttribute?.('d') || '';
+  const tel = document.querySelector('.d-ct__n[href^="tel:"]');
+  const sms = [...document.querySelectorAll('.d-ct')].pop().querySelector('a.d-ct__c[href^="sms:"]');
+  return !!sms && d(tel) !== d(sms);
 }));
 check('그림이 번호를 밀어내지 않는다', await page.evaluate(() => {
   const e = document.querySelector('.d-phones');
@@ -320,9 +334,9 @@ check('방 번호가 번호 줄 위에 온다', await page.evaluate(() => {
   return after(en, o) && after(o, ph) && after(ph, tg);
 }), await page.evaluate(() => [...document.querySelector('.d-profile').lastElementChild.children]
   .map(e => e.className).join(' / ')));
-check('번호 줄 안에서는 전화 다음 핸드폰', await page.evaluate(() => {
-  const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').split(':')[0]);
-  return a.join() === 'tel,sms';
+check('번호 줄 안에서는 연구실 다음 핸드폰', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').replace(/\D/g, ''));
+  return a.length === 2 && a[0].startsWith('064') && a[1].startsWith('010');
 }), await page.evaluate(() => [...document.querySelectorAll('.d-ct__n')].map(x => x.getAttribute('href')).join(' ')));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
 await page.evaluate(() => closeDrawer(false));

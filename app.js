@@ -3601,15 +3601,15 @@ let mobEditKey = '';
 const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>'
   + '<path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-function dPhone(label, num, who, sms) {
+function dPhone(label, num, who, mob) {
   const tel = String(num).replace(/[^\d+]/g, '');
-  /* 번호 앞 그림은 **누르면 무엇이 되는지**를 말한다 — 연구실은 수화기(전화), 핸드폰은 말풍선(문자).
-     핸드폰은 옆의 수화기로 전화를 건다. */
+  /* 그림이 곧 그 일이다 (2026-10-15) — **번호를 누르면 전화**, 그래서 번호 앞은 어느 쪽이든 수화기.
+     핸드폰은 옆의 **말풍선**으로 문자를 쓴다. 예전에는 핸드폰 번호를 누르면 문자였는데,
+     수화기 그림이 문자 옆에 놓여 그림과 하는 일이 어긋났다. */
   return `<span class="d-ct">`
-    + `<a class="d-ct__n" href="${sms ? 'sms' : 'tel'}:${esc(tel)}"`
-    + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)}${sms ? ' — 문자 쓰기' : ' — 전화 걸기'}"`
-    + ` title="${sms ? '문자 쓰기' : '전화 걸기'}">${sms ? SMS_SVG : TEL_SVG}${esc(num)}</a>`
-    + (sms ? `<a class="d-ct__c" href="tel:${esc(tel)}" title="전화 걸기" aria-label="${esc(who)} ${esc(label)} 전화 걸기">${TEL_SVG}</a>`
+    + `<a class="d-ct__n" href="tel:${esc(tel)}"`
+    + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)} — 전화 걸기" title="전화 걸기">${TEL_SVG}${esc(num)}</a>`
+    + (mob ? `<a class="d-ct__c" href="sms:${esc(tel)}" title="문자 쓰기" aria-label="${esc(who)} ${esc(label)} 문자 쓰기">${SMS_SVG}</a>`
       + `<button type="button" class="d-ct__c" data-mobed title="번호 고치기" aria-label="${esc(who)} 핸드폰 번호 고치기">${PEN_SVG}</button>` : '')
     + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
     + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
