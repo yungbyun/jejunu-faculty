@@ -215,7 +215,7 @@ await page.waitForSelector('.st-c.sure', { timeout: 10000 });
 await page.mouse.move(0, 0);
 await page.waitForTimeout(300);
 t('강화인 칩에만 sure', await page.evaluate(() => document.querySelectorAll('.st-c.sure').length === sures().size));
-t('강화는 그 선호도 색을 40% 깐다', await page.evaluate(() => {
+t('강화는 그 선호도 색을 20% 깐다', await page.evaluate(() => {
   const el = document.querySelector('.st-c.sure'), cs = getComputedStyle(el);
   const rc = cs.getPropertyValue('--rc').trim();          // 그 선호도 색이 칩에 실려 온다
   const base = getComputedStyle(document.querySelector('.st-c:not(.sure):not(.vip)')).backgroundColor;
@@ -225,7 +225,7 @@ t('강화는 그 선호도 색을 40% 깐다', await page.evaluate(() => {
       return q.slice(0, 3).map(v => parseInt(v, 16)); }
     const m = (x.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     return /^color\(/.test(x) ? m.map(v => Math.round(v * 255)) : m.map(Math.round); };
-  const want = n(rc).map((v, i) => Math.round(v * .4 + n(base)[i] * .6));
+  const want = n(rc).map((v, i) => Math.round(v * .2 + n(base)[i] * .8));
   const got = n(cs.backgroundColor);
   return rc === RCOLOR['중'] && got.every((v, i) => Math.abs(v - want[i]) <= 2);
 }), await page.evaluate(() => {
@@ -382,16 +382,29 @@ for (const theme of ['light', 'dark']) {
       });
       if (bg.강화 && bg.보통) out.push({ r: list.dataset.rslist, k: '강화≠보통', text: 0, sep: ratio(bg.강화, bg.보통) });
       if (bg.VIP && bg.강화) out.push({ r: list.dataset.rslist, k: 'VIP≠강화', text: 0, sep: ratio(bg.VIP, bg.강화) });
+      if (kinds.강화 && kinds.보통) {
+        const c = e => getComputedStyle(e).borderTopColor;
+        out.push({ r: list.dataset.rslist, k: '강화 테≠보통 테', text: 0,
+          edge: c(kinds.강화) !== c(kinds.보통) });
+      }
     });
     document.documentElement.setAttribute('data-theme', 'light');
     return out;
   }, theme);
-  const texts = got.filter(o => !o.sep);
+  const texts = got.filter(o => !o.sep && o.edge === undefined);
   const seps = got.filter(o => o.sep);
+  const edges = got.filter(o => o.edge !== undefined);
+  const sure = seps.filter(o => o.k === '강화≠보통'), vip = seps.filter(o => o.k === 'VIP≠강화');
   t(`${theme}: 여섯 선호도 모두 글자가 읽힌다(4.5 이상)`, texts.every(o => o.text >= 4.5),
     texts.filter(o => o.text < 5).map(o => `${o.r}${o.k} ${o.text.toFixed(2)}`).join(' ') || '모두 5 이상');
-  t(`${theme}: 보통·강화·VIP 가 눈으로 갈린다(1.25 이상)`, seps.every(o => o.sep >= 1.25),
-    seps.filter(o => o.sep < 1.6).map(o => `${o.r}${o.k} ${o.sep.toFixed(2)}`).join(' ') || '모두 1.6 이상');
+  /* 강화 바탕은 교수님이 맞추시는 값이라 옅을 수 있다(지금 20%). 그래서 바탕은 **다르기만** 하면
+     되고(1.1), 갈라 주는 몫은 **테두리**(55%)가 함께 집니다. VIP 와는 넉넉히 떨어져야 한다. */
+  t(`${theme}: 강화 바탕이 보통과 다르다(1.1 이상)`, sure.every(o => o.sep >= 1.1),
+    sure.map(o => `${o.r} ${o.sep.toFixed(2)}`).join(' '));
+  t(`${theme}: 강화 테두리가 보통과 다르다`, edges.every(o => o.edge),
+    edges.filter(o => !o.edge).map(o => o.r).join(' ') || '여섯 줄 모두 다름');
+  t(`${theme}: VIP 는 강화와 또렷이 갈린다(1.25 이상)`, vip.every(o => o.sep >= 1.25),
+    vip.map(o => `${o.r} ${o.sep.toFixed(2)}`).join(' '));
 }
 await page.evaluate(() => {
   vipSet = new Set(); pushSet = new Set(); sureSet = new Set();

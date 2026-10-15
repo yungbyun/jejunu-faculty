@@ -130,7 +130,19 @@ const dots = await page.evaluate(()=>{
 });
 t('만난 횟수만큼 점이 찍힌다', dots.small);
 t('다섯을 넘으면 점 다섯에 숫자', dots.capped && dots.many>0, `${dots.many}명`);
-t('점은 전보다 작다(7px 미만)', dots.size>0 && dots.size<7, `${dots.size}px`);
+t('점은 작고 또렷하다(4px 이하)', dots.size>0 && dots.size<=4, `${dots.size}px`);
+t('번지는 빛을 두르지 않는다', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('.metlit b')).boxShadow === 'none'),
+  await page.evaluate(() => getComputedStyle(document.querySelector('.metlit b')).boxShadow));
+t('동그라미다', await page.evaluate(() => {
+  const b = document.querySelector('.metlit b'), cs = getComputedStyle(b), r = b.getBoundingClientRect();
+  return cs.borderRadius === '50%' && Math.abs(r.width - r.height) < 0.5;
+}));
+t('점끼리 붙지 않는다', await page.evaluate(() => {
+  const w = document.querySelector('.metlit');
+  const bs = [...w.querySelectorAll('b')].map(b => b.getBoundingClientRect());
+  return bs.length < 2 || bs.slice(1).every((r, i) => r.left - bs[i].right >= 2);
+}));
 const cols = await page.evaluate(()=>{
   const v=['확','긍','중','모','부','비']; state.ratings.clear(); state.notes.clear();
   state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%6]); state.notes.set(rKey(p),{met:1,memo:''}); });
