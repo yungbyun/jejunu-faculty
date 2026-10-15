@@ -48,11 +48,17 @@ t('깃발이 이름 왼쪽에', await page.evaluate(() => {
 }));
 await page.mouse.move(0, 0);   // :hover 가 걸려 있으면 테두리가 brand 색으로 바뀐다
 await page.waitForTimeout(200);
-t('테두리가 공략 색', await page.evaluate(() => {
+/* 2026-10-16 — 공략은 테를 두르지 않는다. 깃발이 주황이라 그것만으로 눈에 든다 */
+t('깃발이 공략 색', await page.evaluate(() => {
   const el = document.querySelector('[data-pushkey].on');
   const want = getComputedStyle(document.documentElement).getPropertyValue('--push').trim();
   const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
-  return hex(getComputedStyle(el).borderTopColor) === want;
+  return hex(getComputedStyle(el.querySelector('.pushm')).color) === want;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('[data-pushkey].on .pushm')).color));
+t('테두리는 켜기 전과 같다', await page.evaluate(() => {
+  const on = document.querySelector('[data-pushkey].on');
+  const off = document.querySelector('[data-pushkey]:not(.on)');
+  return !off || getComputedStyle(on).borderTopColor === getComputedStyle(off).borderTopColor;
 }), await page.evaluate(() => getComputedStyle(document.querySelector('[data-pushkey].on')).borderTopColor));
 t('저장된다', await page.evaluate(() => pushes().size === 1));
 t('누를 때 화면을 다시 그리지 않는다', await page.evaluate(() => !!document.querySelector('.st-note')));
@@ -235,18 +241,24 @@ t('강화가 아니면 바탕이 회색 그대로', await page.evaluate(() => {
   return !!el && hex(getComputedStyle(el).backgroundColor) === want;
 }), await page.evaluate(() => getComputedStyle([...document.querySelectorAll('.st-c')]
   .find(e => !e.classList.contains('sure') && !e.classList.contains('vip'))).backgroundColor));
-/* 강화이면서 공략 — 바탕이 옅어졌으니 주황 테가 제대로 보인다 */
-t('강화+공략이면 주황 테가 남는다', await page.evaluate(() => {
+/* 공략은 테 없이 깃발만 (2026-10-16, 사용자 지정) */
+t('공략은 깃발만 — 테는 두르지 않는다', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); pushSave(); render();
   const el = document.querySelector('.st-c.sure.on'), cs = getComputedStyle(el);
   const push = cs.getPropertyValue('--push').trim();
   const hex = x => '#' + x.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16).padStart(2, '0')).join('');
-  return !!el && hex(cs.borderTopColor) === push && /inset/.test(cs.boxShadow)
+  return !!el && cs.boxShadow === 'none' && !!el.querySelector('.pushm svg')
     && hex(getComputedStyle(el.querySelector('.pushm')).color) === push;
 }), await page.evaluate(() => {
   const cs = getComputedStyle(document.querySelector('.st-c.sure.on'));
   return cs.borderTopColor + ' / ' + cs.boxShadow;
+}));
+t('테 색도 강화 그대로 — 공략이 끼어들지 않는다', await page.evaluate(() => {
+  const on = document.querySelector('.st-c.sure.on');
+  const off = [...document.querySelectorAll('.st-c.sure:not(.on)')]
+    .find(e => getComputedStyle(e).getPropertyValue('--rc') === getComputedStyle(on).getPropertyValue('--rc'));
+  return !off || getComputedStyle(on).borderTopColor === getComputedStyle(off).borderTopColor;
 }));
 await page.evaluate(() => {
   sureSet = new Set(); localStorage.removeItem('jnu-sure');
@@ -298,8 +310,8 @@ t('VIP 는 강화보다 진하다', await page.evaluate(() => {
   sures().delete(rKey(p)); render();
   return d > .05;
 }));
-/* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 — 바탕은 VIP 가 이기고, 공략은 테로 남는다 */
-t('셋을 겹쳐 달면 VIP 바탕에 공략 테', await page.evaluate(() => {
+/* 세 표시를 한꺼번에 달아도 서로 가리지 않아야 한다 — 바탕은 VIP 가 이기고, 공략은 깃발로 남는다 */
+t('셋을 겹쳐 달면 VIP 바탕에 공략 깃발', await page.evaluate(() => {
   const p = state.rows[0];
   pushes().add(rKey(p)); sures().add(rKey(p)); render();
   const el = document.querySelector('.st-c.vip'), cs = getComputedStyle(el);
@@ -313,16 +325,22 @@ t('셋을 겹쳐 달면 VIP 바탕에 공략 테', await page.evaluate(() => {
   return el.classList.contains('sure') && el.classList.contains('on')
     && got.every((v, i) => v <= rc[i] + 1 && v >= rc[i] * .9 - 3)      // 강화에 안 묻힌다
     && cs.color === 'rgb(255, 255, 255)'
-    && /inset/.test(cs.boxShadow);                                     // 공략 테는 남는다
+    && cs.boxShadow === 'none'                                         // 테는 두르지 않는다
+    && !!el.querySelector('.pushm svg');                               // 공략은 깃발로 남는다
 }), await page.evaluate(() => {
   const cs = getComputedStyle(document.querySelector('.st-c.vip'));
   return cs.backgroundColor + ' / ' + cs.boxShadow;
 }));
-t('아무 표시도 없으면 테도 없다', await page.evaluate(() => {
-  const el = [...document.querySelectorAll('.st-c')].find(e =>
-    !e.classList.contains('vip') && !e.classList.contains('on'));
-  return !!el && getComputedStyle(el).boxShadow === 'none';
-}));
+t('진한 바탕에서는 깃발을 옅은 주황으로', await page.evaluate(() => {
+  const el = document.querySelector('.st-c.vip .pushm');
+  if (!el) return false;
+  const c = (getComputedStyle(el).color.match(/\d+/g) || []).map(Number);
+  return c[0] > 200 && c[1] > 150 && c[2] > 120;        // 어두운 바탕 위에서도 보이는 밝은 주황
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.st-c.vip .pushm')).color));
+t('어느 칩에도 테를 두르지 않는다', await page.evaluate(() =>
+  [...document.querySelectorAll('.st-c')].every(e => getComputedStyle(e).boxShadow === 'none')),
+  await page.evaluate(() => [...document.querySelectorAll('.st-c')]
+    .map(e => getComputedStyle(e).boxShadow).find(x => x !== 'none') || '모두 없음'));
 t('도움말에 VIP 라고 적힌다', await page.evaluate(() =>
   (document.querySelector('.st-c.vip').getAttribute('title') || '').includes('VIP')));
 await page.evaluate(() => {
