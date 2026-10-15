@@ -2232,6 +2232,17 @@ function officeParts(o) {
   return { lab: '', loc: t };
 }
 
+/* 상세의 연구실 줄 — 이름이 적혀 있으면 이름과 호실을 함께, 호실만 있으면 호실만.
+   카드(`.prof__office`)와 같은 핀 그림을 쓴다. */
+const PIN_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/>'
+  + '<circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+function dOffice(p) {
+  const { lab, loc } = officeParts(p.office);
+  if (!lab && !loc) return '';
+  return `<div class="d-office">${PIN_SVG}<span>${esc([lab, loc].filter(Boolean).join(' · '))}</span></div>`;
+}
+
 function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
   const { lab, loc } = officeParts(p.office);
@@ -4174,6 +4185,7 @@ function openDrawer(p, d) {
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
           ${dPhones(p)}
+          ${dOffice(p)}
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         </div>
       </div>

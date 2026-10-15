@@ -260,6 +260,38 @@ check('비우면 번호가 지워진다', await page.evaluate(() => mobileOf(sta
 check('지우면 다시 등록 단추', await page.evaluate(() => !!document.querySelector('[data-mobed]')));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); closeDrawer(false); });
 
+/* 연구실 방 번호 — 상세에도 적는다 (2026-10-15) */
+const ofc = await page.evaluate(() => {
+  const pick = f => state.rows.find(f);
+  const both = pick(x => /[(（]/.test(x.office || ''));              // 연구실 이름 (건물 호실)
+  const only = pick(x => (x.office || '') && !/[(（]/.test(x.office) && /\d/.test(x.office));  // 호실만
+  const lab = pick(x => (x.office || '') && !/\d/.test(x.office));   // 이름만, 호실 없음
+  const show = p => { location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+    const el = document.querySelector('.d-office');
+    return { want: p.office, got: el ? el.textContent.trim() : '', svg: !!(el && el.querySelector('svg')) }; };
+  return { both: both && show(both), only: only && show(only), lab: lab && show(lab),
+    none: (() => { const p = state.rows[0], keep = p.office; p.office = '';
+      const r = show(p); p.office = keep; return r; })() };
+});
+check('연구실 이름과 호실을 함께 적는다', !ofc.both || (ofc.both.got.includes('7212') || /\d/.test(ofc.both.got))
+  && ofc.both.got.includes('·'), ofc.both && `${ofc.both.want} → ${ofc.both.got}`);
+check('호실만 적힌 분은 호실만', !ofc.only || ofc.only.got === ofc.only.want,
+  ofc.only && `${ofc.only.want} → ${ofc.only.got}`);
+check('호실이 없으면 연구실 이름만', !ofc.lab || ofc.lab.got === ofc.lab.want,
+  ofc.lab && `${ofc.lab.want} → ${ofc.lab.got}`);
+check('연구실 칸이 비면 줄을 안 만든다', ofc.none.got === '', JSON.stringify(ofc.none));
+check('핀 그림이 앞에 붙는다', !ofc.both || ofc.both.svg);
+check('번호 줄 바로 아래에 온다', await page.evaluate(() => {
+  const p = state.rows.find(x => /\d/.test(x.office || '')) || state.rows[0];
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+  const o = document.querySelector('.d-office'), ph = document.querySelector('.d-phones'),
+    tg = document.querySelector('.d-tags');
+  if (!o || !ph || !tg) return false;
+  return ph.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING
+    && o.compareDocumentPosition(tg) & Node.DOCUMENT_POSITION_FOLLOWING;
+}));
+await page.evaluate(() => closeDrawer(false));
+
 let bad = 0;
 for (const [t, v, extra] of checks) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${t}${extra ? '   (' + extra + ')' : ''}`); }
 console.log(`\n${checks.length - bad}/${checks.length} 통과`);
