@@ -83,8 +83,13 @@ await page.evaluate(x => {
 await page.waitForSelector('.d-phones', { timeout: 10000 });
 check('연락처 칸을 따로 두지 않는다', await page.evaluate(() =>
   ![...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '연락처')));
-check('영문 이름 바로 다음 줄', await page.evaluate(() =>
-  document.querySelector('.d-en').nextElementSibling === document.querySelector('.d-phones')));
+/* 2026-10-15 에 연구실 줄이 사이에 들어왔다 — 영문 이름 / 연구실 / 번호 차례 */
+check('영문 이름 — 연구실 — 번호 차례', await page.evaluate(() => {
+  const en = document.querySelector('.d-en:not(.d-phones)'), ph = document.querySelector('.d-phones');
+  const of = document.querySelector('.d-office');
+  return of ? (en.nextElementSibling === of && of.nextElementSibling === ph)
+            : en.nextElementSibling === ph;
+}), await page.evaluate(() => [...document.querySelector('.d-profile').lastElementChild.children].map(e => e.className).join(' / ')));
 check('글꼴·크기·색이 영문 이름과 같다', await page.evaluate(() => {
   const a = getComputedStyle(document.querySelector('.d-en'));
   const b = getComputedStyle(document.querySelector('.d-ct__n'));
@@ -260,6 +265,28 @@ check('비우면 번호가 지워진다', await page.evaluate(() => mobileOf(sta
 check('지우면 다시 등록 단추', await page.evaluate(() => !!document.querySelector('[data-mobed]')));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); closeDrawer(false); });
 
+/* 번호 앞 그림 — 누르면 무엇이 되는지를 말한다 (2026-10-15) */
+check('연구실 번호 앞에 수화기', await page.evaluate(() => {
+  const p = state.rows.find(x => x.phone) || state.rows[0];
+  mobiles()[rKey(p)] = '010-1234-5678';
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+  const tel = document.querySelector('.d-ct__n[href^="tel:"]');
+  return !!tel && !!tel.querySelector('svg');
+}), await page.evaluate(() => (document.querySelector('.d-ct__n[href^="tel:"]') || {}).outerHTML || '(없음)'));
+check('핸드폰 앞은 말풍선 그대로', await page.evaluate(() => {
+  const sms = document.querySelector('.d-ct__n[href^="sms:"]');
+  return !!sms && !!sms.querySelector('svg');
+}));
+check('두 그림이 서로 다르다', await page.evaluate(() => {
+  const d = s => (document.querySelector(`.d-ct__n[href^="${s}"] svg path`) || {}).getAttribute?.('d') || s;
+  return d('tel:') !== d('sms:');
+}));
+check('그림이 번호를 밀어내지 않는다', await page.evaluate(() => {
+  const e = document.querySelector('.d-phones');
+  return e.scrollWidth <= e.clientWidth + 1;
+}), await page.evaluate(() => { const e = document.querySelector('.d-phones'); return e.scrollWidth + '/' + e.clientWidth; }));
+await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
+
 /* 연구실 방 번호 — 상세에도 적는다 (2026-10-15) */
 const ofc = await page.evaluate(() => {
   const pick = f => state.rows.find(f);
@@ -281,15 +308,23 @@ check('호실이 없으면 연구실 이름만', !ofc.lab || ofc.lab.got === ofc
   ofc.lab && `${ofc.lab.want} → ${ofc.lab.got}`);
 check('연구실 칸이 비면 줄을 안 만든다', ofc.none.got === '', JSON.stringify(ofc.none));
 check('핀 그림이 앞에 붙는다', !ofc.both || ofc.both.svg);
-check('번호 줄 바로 아래에 온다', await page.evaluate(() => {
-  const p = state.rows.find(x => /\d/.test(x.office || '')) || state.rows[0];
+/* 차례는 학과 카드와 같이 방 번호 → 전화 → 핸드폰 */
+check('방 번호가 번호 줄 위에 온다', await page.evaluate(() => {
+  const p = state.rows.find(x => /\d/.test(x.office || '') && x.phone) || state.rows[0];
+  mobiles()[rKey(p)] = '010-1234-5678';
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
   const o = document.querySelector('.d-office'), ph = document.querySelector('.d-phones'),
-    tg = document.querySelector('.d-tags');
-  if (!o || !ph || !tg) return false;
-  return ph.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING
-    && o.compareDocumentPosition(tg) & Node.DOCUMENT_POSITION_FOLLOWING;
-}));
+    en = document.querySelector('.d-en:not(.d-phones)'), tg = document.querySelector('.d-tags');
+  if (!o || !ph || !en || !tg) return false;
+  const after = (a, b2) => !!(a.compareDocumentPosition(b2) & Node.DOCUMENT_POSITION_FOLLOWING);
+  return after(en, o) && after(o, ph) && after(ph, tg);
+}), await page.evaluate(() => [...document.querySelector('.d-profile').lastElementChild.children]
+  .map(e => e.className).join(' / ')));
+check('번호 줄 안에서는 전화 다음 핸드폰', await page.evaluate(() => {
+  const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').split(':')[0]);
+  return a.join() === 'tel,sms';
+}), await page.evaluate(() => [...document.querySelectorAll('.d-ct__n')].map(x => x.getAttribute('href')).join(' ')));
+await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
 await page.evaluate(() => closeDrawer(false));
 
 let bad = 0;
