@@ -4,6 +4,13 @@ import { chromium } from 'playwright';
 const b = await chromium.launch();
 const page = await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();
 const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
+/* 화면 깨우기(Screen Wake Lock)를 흉내 내어 걸고 푸는지만 본다 */
+await page.addInitScript(() => {
+  window.__wake = [];
+  Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+    request: async type => { window.__wake.push('on:' + type);
+      return { release: async () => { window.__wake.push('off'); }, addEventListener() {} }; } } });
+});
 await page.goto('http://127.0.0.1:8080/',{waitUntil:'load'});
 await page.waitForFunction(()=>typeof enterApp==='function',null,{timeout:20000});
 await page.evaluate(()=>{ if(!document.body.classList.contains('authed')) enterApp(null); });
@@ -94,6 +101,13 @@ await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('.memo[contenteditable]',{timeout:10000});
 t('칸이 서식 편집기', await page.evaluate(()=>document.querySelector('.memo').getAttribute('contenteditable'))==='true');
 t('단추 세 개', await page.locator('.memo__b').count()===3);
+/* 서식 단추는 글칸 **위**에 (2026-10-15) — 아이폰에서 글자를 고르면 「오려두기·복사」 말풍선이
+   고른 자리 아래에 떠서, 글칸 밑에 있던 단추를 덮어 누를 수가 없었다. */
+t('서식 단추가 글칸 위에', await page.evaluate(() => {
+  const bar = document.querySelector('.memo__bar'), ed = document.querySelector('.memo[contenteditable]');
+  return !!(bar.compareDocumentPosition(ed) & Node.DOCUMENT_POSITION_FOLLOWING)
+    && bar.getBoundingClientRect().bottom <= ed.getBoundingClientRect().top + 1;
+}), await page.evaluate(() => [...document.querySelector('.memo-box').children].map(e => e.className).join(' / ')));
 t('미리보기 칸은 사라짐', await page.locator('.memo__prev').count()===0);
 
 // 글을 쓰고 굵게
@@ -194,7 +208,28 @@ t('켜진 단추는 눈에도 띈다', await page.evaluate(async () => {
   const on = document.querySelector('.memo__b.on'), off = document.querySelector('.memo__b:not(.on)');
   return getComputedStyle(on).backgroundColor !== getComputedStyle(off).backgroundColor;
 }));
-await page.evaluate(() => closeDrawer());
+/* 글을 쓰는 동안 화면이 꺼지지 않게 (2026-10-15) */
+await page.evaluate(() => { document.activeElement.blur(); window.__wake.length = 0; });
+await page.waitForTimeout(400);
+await page.evaluate(() => { window.__wake.length = 0; });
+await page.click('.memo');
+await page.waitForTimeout(250);
+t('메모에 손을 대면 화면을 깨워 둔다', await page.evaluate(() => window.__wake.join()) === 'on:screen',
+  await page.evaluate(() => window.__wake.join()));
+await page.evaluate(() => document.querySelector('.memo').blur());
+await page.waitForTimeout(400);
+t('칸을 떠나면 바로 놓는다', await page.evaluate(() => window.__wake.join()) === 'on:screen,off',
+  await page.evaluate(() => window.__wake.join()));
+t('잠금을 쥔 채로 두지 않는다', await page.evaluate(() => wakeLock === null && wakeWant === false));
+/* 없는 기기에서도 탈이 나면 안 된다 */
+t('화면 깨우기가 없어도 그냥 넘어간다', await page.evaluate(async () => {
+  const keep = navigator.wakeLock;
+  Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: undefined });
+  try { await wakeOn(); await wakeOff(); } finally {
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: keep }); }
+  return wakeLock === null;
+}));
+await page.evaluate(() => { window.__wake.length = 0; closeDrawer(); });
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);

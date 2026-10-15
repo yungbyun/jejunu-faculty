@@ -2583,6 +2583,38 @@ function meetCounter(p) {
     <button type="button" class="counter__b" data-inc aria-label="1회 늘리기">+</button>
   </div>`;
 }
+/* ---------- 글 쓰는 동안 화면 켜 두기 (2026-10-15) ----------
+ * 교수님이 「메모를 쓰는 동안 화면이 어두워지고 꺼진다」고 하셨습니다. 아이폰은 글을 쓰다
+ * 잠깐 멈추면 자동 잠금이 그대로 돌아갑니다(웹에서는 자판을 쳐도 잠금 시계가 멈추지 않습니다).
+ * 사파리 16.4 부터 쓸 수 있는 **화면 깨우기(Screen Wake Lock)** 를 긴 글칸(메모·원고)에
+ * 손을 댄 동안만 걸고, 칸을 떠나면 바로 놓습니다.
+ * - 화면을 가렸다 돌아오면 잠금이 **저절로 풀리므로** 다시 겁니다.
+ * - 안 되는 기기(옛 사파리 등)에서는 조용히 넘어갑니다 — 없다고 탈 날 일은 없습니다. */
+let wakeLock = null, wakeWant = false;
+const isLongField = el => !!el && (el.tagName === 'TEXTAREA' || el.isContentEditable);
+async function wakeOn() {
+  wakeWant = true;
+  if (wakeLock || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch { wakeLock = null; }
+}
+async function wakeOff() {
+  wakeWant = false;
+  const w = wakeLock; wakeLock = null;
+  try { await (w && w.release()); } catch {}
+}
+document.addEventListener('focusin', e => { if (isLongField(e.target)) wakeOn(); });
+document.addEventListener('focusout', e => {
+  if (!isLongField(e.target)) return;
+  /* 단추를 누르느라 잠깐 떠난 것일 수 있다 — 바로 다시 들어오면 그대로 둔다 */
+  setTimeout(() => { if (!isLongField(document.activeElement)) wakeOff(); }, 150);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && wakeWant && isLongField(document.activeElement)) wakeOn();
+});
+
 function bindNotes(root) {
   root.querySelectorAll('.counter').forEach(c => c.addEventListener('click', e => {
     const b = e.target.closest('.counter__b'); if (!b) return;
@@ -4222,10 +4254,10 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
-          <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           <div class="memo__bar">
             ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
           </div>
+          <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>

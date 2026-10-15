@@ -862,7 +862,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .counter--zero .counter__n{color:var(--ink-3)}
 .counter--zero .counter__b[data-dec]{opacity:.35;pointer-events:none}
 .memo-box{position:relative}
-.memo__bar{display:flex;align-items:center;gap:8px;margin-top:6px}
+/* 서식 단추는 **글칸 위**에 둔다 (2026-10-15) — 아이폰에서 글자를 고르면 「오려두기·복사」
+   말풍선이 고른 자리 아래에 떠서, 글칸 밑에 있던 단추를 덮어 누를 수가 없었다. */
+.memo__bar{display:flex;align-items:center;gap:8px;margin:0 0 6px}
 .memo__b{width:28px;height:28px;flex:none;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);
   color:var(--ink);font:inherit;font-size:13px;cursor:pointer;display:grid;place-items:center}
 .memo__b b{font-weight:800}
