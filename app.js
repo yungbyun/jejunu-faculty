@@ -1703,22 +1703,23 @@ function donut(profs) {
    * 숫자가 절반이어서 기준을 절반에 두고, 말도 절반이라고 쓴다.
    * 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다. 부(부정)는 세지
    * 않는다 — 돌려세우는 것은 다른 일이다. */
-  /* 확+긍에 공략을 더한 값. 더하는 사람은 **중·모 안의 공략**뿐이다 (2026-10-09).
-   * - 확·긍인 공략은 이미 확+긍에 들어 있다 — 또 더하면 두 번 세는 것이다.
+  /* 확+긍에 **중인 강화**를 더한 값 (2026-10-17, 사용자 지정. 전에는 중·모인 공략이었다).
+   * 「중(보통)인데 강화」는 **중립이지만 내 쪽으로 굳은 분**이라 지지로 셀 만합니다.
+   * - 확·긍인 강화는 이미 확+긍에 들어 있다 — 또 더하면 두 번 세는 것이다.
+   * - 모(모름)는 아직 어느 쪽인지 모르는 분이라 빼 둔다.
    * - 부(부정)는 돌려세우는 것이 다른 일이라 세지 않는다(절반 계산에서도 줄곧 뺐다).
-   * - 비(평가제외)는 모수(total)에서 빠진 사람이라 더하면 분자만 늘어 100%를 넘을 수 있다.
-   * - 미지정은 아직 어느 쪽인지 모르는 사람이라 지지로 세지 않는다.
-   * 그래서 '더 끌어올 수 있는 분은 중·모' 라는 아래 문장과 셈이 똑같아진다. */
-  const PU_IN = ['중', '모'];
-  const puAdd = profs.filter(p => isPush(p) && PU_IN.includes(getRating(p)));
+   * - 비(평가제외)는 모수(total)에서 빠진 사람이라 더하면 분자만 늘어 100%를 넘을 수 있다. */
+  const PU_IN = ['중'];
+  const puAdd = profs.filter(p => isSure(p) && PU_IN.includes(getRating(p)));
   const added = new Set(puAdd.map(rKey)).size;
   const reach = base + added;
   /* 왜 안 더했는지도 적어 둔다 — 숫자를 못 믿겠을 때 눌러(마우스를 올려) 확인하시라고 */
-  const puCnt = r => profs.filter(p => isPush(p) && (getRating(p) || '미지정') === r).length;
+  const puCnt = r => profs.filter(p => isSure(p) && (getRating(p) || '미지정') === r).length;
   const puDup = puCnt('확') + puCnt('긍');
   const puWhy = PU_IN.map(r => [r, puAdd.filter(p => getRating(p) === r).length])
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}`).join(' · ');
-  const puOut = [['확·긍(이미 셈)', puDup], ['부', puCnt('부')], ['비참여', puCnt('비')], ['미지정', puCnt('미지정')]]
+  const puOut = [['확·긍(이미 셈)', puDup], ['모', puCnt('모')], ['부', puCnt('부')],
+    ['비참여', puCnt('비')], ['미지정', puCnt('미지정')]]
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}명`).join(' · ');
   const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
@@ -1758,7 +1759,7 @@ function donut(profs) {
   return `
     <div class="pie">
       <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 공략까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 중인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
@@ -1768,9 +1769,9 @@ function donut(profs) {
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
           <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span></div>
-        ${profs.some(isPush) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중·모인 공략 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 공략: ${puOut}` : ''}">
-          <span class="pie__kl">+공략</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명+${added}명(중·모 공략)</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+        ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
+          <span class="pie__kl">+강화</span><b>${pct(reach)}%${gap(reach)}</b>
+          <span class="pie__kn">${reach}명+${added}명(중 강화)</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">

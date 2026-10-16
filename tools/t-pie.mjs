@@ -156,14 +156,15 @@ const cols = await page.evaluate(()=>{
 t('불 색이 그 선호도 대표색', cols.length===6 && cols.every(c=>c.got===c.want),
   cols.map(c=>`${c.r} ${c.got}${c.got===c.want?'':'≠'+c.want}`).join(' '));
 
-// 7) 확+긍에 공략을 더한 값 — 더하는 사람은 중·모 안의 공략뿐 (2026-10-09)
+// 7) 확+긍에 **중인 강화**를 더한 값 (2026-10-17, 전에는 중·모인 공략이었다)
 const setup = (pushEvery) => page.evaluate(n => {
+  sureSet = new Set(); localStorage.removeItem('jnu-sure');
   pushSet = new Set(); localStorage.removeItem('jnu-push');
   state.ratings.clear(); state.notes.clear();
   const v = ['확','긍','중','모','부','비'];
   state.rows.forEach((p,i)=>{
     if (i % 9 !== 8) setRating(rKey(p), v[i%6]);     // 아홉에 하나는 미지정으로 남긴다
-    if (n && i % n === 0) pushes().add(rKey(p));
+    if (n && i % n === 0) sures().add(rKey(p));
   });
   render();
 }, pushEvery);
@@ -171,106 +172,106 @@ const setup = (pushEvery) => page.evaluate(n => {
 const truth = () => page.evaluate(() => {
   const inPool = p => getRating(p) !== '비';
   const base = new Set(state.rows.filter(p => ['확','긍'].includes(getRating(p))).map(rKey));
-  const pu = new Set(state.rows.filter(p => isPush(p) && ['중','모'].includes(getRating(p))).map(rKey));
+  const pu = new Set(state.rows.filter(p => isSure(p) && getRating(p) === '중').map(rKey));
   const total = state.rows.filter(inPool).length;
-  const union = new Set([...base, ...pu]);          // 중·모 공략은 확·긍과 겹칠 수 없다
+  const union = new Set([...base, ...pu]);          // 중인 강화는 확·긍과 겹칠 수 없다
   return { total, base: base.size, add: pu.size, union: union.size,
-           dup: state.rows.filter(p => isPush(p) && ['확','긍'].includes(getRating(p))).length,
-           out: state.rows.filter(p => isPush(p) && !['중','모'].includes(getRating(p))).length,
+           dup: state.rows.filter(p => isSure(p) && ['확','긍'].includes(getRating(p))).length,
+           out: state.rows.filter(p => isSure(p) && getRating(p) !== '중').length,
            pct: Math.round(union.size/total*100) };
 });
 
 await setup(0);
 await page.waitForTimeout(500);
-t('공략이 없으면 카드도 없다', await page.locator('.pie__k--push').count() === 0);
+t('강화가 없으면 카드도 없다', await page.locator('.pie__k--push').count() === 0);
 
 await setup(5);
 await page.waitForTimeout(500);
 const T = await truth();
-t('공략이 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
-t('확+긍에 중·모 공략만 더한 값', await page.evaluate(() =>
+t('강화가 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
+t('확+긍에 중인 강화만 더한 값', await page.evaluate(() =>
   document.querySelector('.pie__k--push .pie__kn').textContent.split('명')[0]) === String(T.base + T.add),
   `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`+${T.add}명(중·모 공략)`),
+t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`+${T.add}명(중 강화)`),
   await page.locator('.pie__k--push .pie__kn').innerText());
-t('안 더한 공략이 실제로 있다', T.out > 0, `${T.out}명`);
+t('안 더한 강화가 실제로 있다', T.out > 0, `${T.out}명`);
 t('줄에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await page.locator('.pie__k--push .pie__kn').innerText()),
   await page.locator('.pie__k--push .pie__kn').innerText());
-t('공략 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
+t('강화 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('모수는 옆 카드에 그대로 있다', (await page.locator('.pie__k--pos .pie__kn').innerText()).includes('/'),
   await page.locator('.pie__k--pos .pie__kn').innerText());
-t('도움말이 중·모 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중·모인 공략'),
+t('도움말이 「중인 강화」 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중인 강화'),
   await page.getAttribute('.pie__k--push', 'title'));
 t('도움말이 안 더한 까닭도 밝힌다', await page.evaluate(() => {
   const txt = document.querySelector('.pie__k--push').title;
-  const n = r => state.rows.filter(p => isPush(p) && (getRating(p)||'미지정') === r).length;
+  const n = r => state.rows.filter(p => isSure(p) && (getRating(p)||'미지정') === r).length;
   const want = [['부', n('부')], ['비참여', n('비')], ['미지정', n('미지정')]].filter(x => x[1]);
   return want.every(([r, c]) => txt.includes(`${r} ${c}명`));
 }), await page.getAttribute('.pie__k--push', 'title'));
 
-// 부·비·미지정만 공략으로 몰면 한 명도 안 더해진다
+// 중이 아닌 분만 강화로 몰면 한 명도 안 더해진다
 await page.evaluate(() => {
-  pushSet = new Set();
-  state.rows.filter(p => !['중','모'].includes(getRating(p))).forEach(p => pushes().add(rKey(p)));
-  pushSave(); renderStats();
+  sureSet = new Set();
+  state.rows.filter(p => getRating(p) !== '중').forEach(p => sures().add(rKey(p)));
+  sureSave(); renderStats();
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중·모가 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중·모 공략)'),
+t('중이 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중 강화)'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
-t('부도 공략이지만 안 더한다', T1.out > 0 && T1.add === 0, JSON.stringify(T1));
+t('부도 강화지만 안 더한다', T1.out > 0 && T1.add === 0, JSON.stringify(T1));
 
-// 모두 공략으로 몰아도 확+긍+중·모를 넘지 않는다
-await page.evaluate(() => { state.rows.forEach(p => pushes().add(rKey(p))); pushSave(); renderStats(); });
+// 모두 강화로 몰아도 확+긍+중을 넘지 않는다
+await page.evaluate(() => { state.rows.forEach(p => sures().add(rKey(p))); sureSave(); renderStats(); });
 await page.waitForTimeout(500);
 const T2 = await truth();
-t('전원을 공략으로 해도 100% 이하', await page.evaluate(() =>
+t('전원을 강화로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 확+긍+중·모 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명+`),
+t('그때는 확+긍+중 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명+`),
   `${await page.locator('.pie__k--push .pie__kn').innerText()} / ${T2.base}+${T2.add}`);
 t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
 t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
   await page.locator('.pie__k--pos .pie__kn').innerText());
-await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); });
+await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
 
-/* 확·긍과 겹친 공략은 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
+/* 확·긍과 겹친 강화는 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
 await page.evaluate(() => {
-  pushSet = new Set();
-  state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => pushes().add(rKey(p)));
-  pushSave(); renderStats();
+  sureSet = new Set();
+  state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => sures().add(rKey(p)));
+  sureSave(); renderStats();
 });
-t('확·긍만 공략이면 더해지는 사람이 없다',
-  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중·모 공략)'),
+t('확·긍만 강화면 더해지는 사람이 없다',
+  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중 강화)'),
   await page.locator('.pie__k--push .pie__kn').innerText());
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--pos b').innerText()));
 t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
-  const n = state.rows.filter(p => isPush(p) && ['확','긍'].includes(getRating(p))).length;
+  const n = state.rows.filter(p => isSure(p) && ['확','긍'].includes(getRating(p))).length;
   return document.querySelector('.pie__k--push').title.includes(`확·긍(이미 셈) ${n}명`);
 }), await page.getAttribute('.pie__k--push', 'title'));
-await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
+await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
 /* 두 줄의 생김새 — 꼬리말을 괄호로 묶는다 (2026-10-09) */
-await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });
+await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 t('확+긍 줄은 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(
   (await page.locator('.pie__k--pos .pie__kn').innerText()).trim()),
   await page.locator('.pie__k--pos .pie__kn').innerText());
-t('공략 줄은 「N명+K명(중·모 공략)」', /^\d+명\+\d+명\(중·모 공략\)$/.test(
+t('강화 줄은 「N명+K명(중 강화)」', /^\d+명\+\d+명\(중 강화\)$/.test(
   (await page.locator('.pie__k--push .pie__kn').innerText()).trim()),
   await page.locator('.pie__k--push .pie__kn').innerText());
-await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); renderStats(); });
+await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름은 「+공략」 한 마디로 (2026-10-09) */
-await page.evaluate(() => { pushes().add(rKey(state.rows.find(p => getRating(p) === '중'))); pushSave(); renderStats(); });
-t('공략 카드 이름', await page.evaluate(() =>
-  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+공략',
+/* 카드 이름은 「+강화」 한 마디로 (2026-10-17) */
+await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
+t('강화 카드 이름', await page.evaluate(() =>
+  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+강화',
   await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
 
 /* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
