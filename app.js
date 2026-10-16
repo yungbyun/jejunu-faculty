@@ -276,6 +276,7 @@ function route() {
 
 function render() {
   const r = route();
+  relStop();                 // 관계 그림이 화면에서 사라지면 셈을 멈춘다(배터리)
   document.body.classList.toggle('is-home', r.view === 'home' && !state.query.trim()); // 첫 화면에서는 새로고침 아이콘 숨김(J 로고가 대신함)
   if (!state.rows.length && state.source !== 'error') { renderSkeleton(r); return; }
   if (r.view === 'dept') {
@@ -3452,55 +3453,17 @@ function relView(g) {
   return { nodes, edges };
 }
 
-/* 자리 잡기 — 밀어내고, 선으로 당기고, 같은 학과끼리 모은다.
-   씨앗을 이름에서 뽑으므로 **다시 그려도 자리가 안 흔들린다**. */
-function relLayout(nodes, edges, W, H) {
-  const seed = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
-  const R = Math.min(W, H) * .40;
-  nodes.forEach((n, i) => {
-    const t = (seed(n.key) % 1000) / 1000 * Math.PI * 2;
-    const r = n.me ? 0 : R * (.45 + (seed(n.key + 'r') % 1000) / 1000 * .55);
-    n.x = W / 2 + Math.cos(t) * r; n.y = H / 2 + Math.sin(t) * r;
-  });
-  const idx = new Map(nodes.map((n, i) => [n.key, i]));
-  const link = edges.map(e => [idx.get(e.a), idx.get(e.b), e.kind === 'memo' ? 80 : 150])
-    .filter(l => l[0] != null && l[1] != null);
-  const STEP = 260;
-  for (let s = 0; s < STEP; s++) {
-    const cool = 1 - s / STEP;
-    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i], b = nodes[j];
-      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || .01;
-      const want = a.p.dept_id === b.p.dept_id ? 52 : 74;   // 같은 학과는 조금 더 가까이
-      if (d < want) { const f = (want - d) / d * .5 * cool; a.x -= dx * f; a.y -= dy * f; b.x += dx * f; b.y += dy * f; }
-    }
-    link.forEach(([i, j, len]) => {
-      const a = nodes[i], b = nodes[j];
-      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || .01;
-      const f = (d - len) / d * .035 * cool;
-      a.x += dx * f; a.y += dy * f; b.x -= dx * f; b.y -= dy * f;
-    });
-    nodes.forEach(n => {                                   // 가운데로 모으기 · 나는 한가운데 고정
-      if (n.me) { n.x += (W / 2 - n.x) * .25; n.y += (H / 2 - n.y) * .25; return; }
-      n.x += (W / 2 - n.x) * .006 * cool; n.y += (H / 2 - n.y) * .006 * cool;
-    });
-  }
-  /* 다 그린 뒤 **그림을 상자에 맞춰 늘린다** — 몇 명이든 빈 데 없이 꽉 차게 */
-  const M = 36;
-  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const k = Math.min((W - M * 2) / Math.max(1, x1 - x0), (H - M * 2) / Math.max(1, y1 - y0), 2.2);
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  nodes.forEach(n => {
-    n.x = W / 2 + (n.x - cx) * k;
-    n.y = H / 2 + (n.y - cy) * k;
-    n.x = Math.max(M, Math.min(W - M, n.x)); n.y = Math.max(M, Math.min(H - M, n.y));
-  });
-}
+/* 살아 있는 그림 (2026-10-17) — 옵시디언의 지식 그래프처럼 **손으로 끌고 밀고 키워** 본다.
+ * 자리를 한 번 잡고 멈추는 것이 아니라, 매 프레임 힘을 조금씩 먹이며 **스스로 자리를 찾아간다**.
+ * 점을 끌면 그 점만 손에 붙고 이웃이 따라오고, 바탕을 끌면 화면이 밀리고, 바퀴로 키우고 줄인다.
+ * 점을 한 번 누르면 **그 사람 중심**으로 둘레만 남기고 흐려진다 — 나를 거치지 않는 관계를 보려는 것. */
+const SIM = { nodes: [], edges: [], byKey: new Map(), W: 720, H: 460, alpha: 0, raf: 0,
+  tx: 0, ty: 0, k: 1, drag: null, pan: null, moved: 0, pts: new Map(), pinch: 0, built: '' };
 
 const relColor = e => e.kind === 'alum' ? 'var(--rel-mid)'
   : e.pol > 0 ? 'var(--rel-pos)' : e.pol < 0 ? 'var(--rel-neg)' : 'var(--rel-mid)';
 const relWord = e => e.kind === 'alum' ? '동문(추정)' : e.pol > 0 ? '가까움' : e.pol < 0 ? '껄끄러움' : '언급';
+const nameOfKey = k => { const p = state.rows.find(x => rKey(x) === k); return p ? p.name : k; };
 
 function relSection() {
   return `<section class="st-sec rel" id="relSec">
@@ -3509,70 +3472,251 @@ function relSection() {
   </section>`;
 }
 
-/* 화면을 그린다. edu.json 을 아직 못 읽었으면 읽고 나서 다시 부른다. */
-function relRefresh() {
+/* 나 → 다리 → 그분. 간접으로 부탁할 길을 찾는다(사용자 요청 2026-10-17) */
+function relBridges(target, g) {
+  if (!target || target === g.meKey) return [];
+  const near = k => g.edges.filter(e => e.a === k || e.b === k).map(e => ({ o: e.a === k ? e.b : e.a, e }));
+  const mine = new Map(near(g.meKey).map(x => [x.o, x.e]));
+  const out = [];
+  near(target).forEach(({ o, e }) => {
+    const m = mine.get(o);
+    if (!m) return;
+    const p = state.rows.find(x => rKey(x) === o);
+    const r = p ? getRating(p) : '';
+    const score = (isVip(p) ? 4 : 0) + (isSure(p) ? 2 : 0) + ({ '확': 3, '긍': 2, '중': 1 }[r] || 0)
+      + (m.pol > 0 ? 2 : 0) + (e.pol > 0 ? 1 : 0) + (e.kind === 'memo' ? 1 : 0);
+    out.push({ key: o, name: p ? p.name : o, mine: m, theirs: e, score });
+  });
+  return out.sort((x, y) => y.score - x.score).slice(0, 8);
+}
+
+/* 그림을 새로 짠다 — 자료가 바뀐 때만. 자리는 물려받아 튀지 않게 한다. */
+function relRefresh(keep) {
   const box = $app.querySelector('[data-relbox]');
   if (!box) return;
   if (!eduMap) { loadEdu().then(() => relRefresh()); return; }
   const g = relGraph(), v = relView(g);
+  SIM.g = g;
   const W = Math.max(320, Math.min(980, Math.round(box.clientWidth || 720)));
-  const H = Math.round(W * (W < 520 ? 1.05 : .62));
-  relLayout(v.nodes, v.edges, W, H);
-  const at = new Map(v.nodes.map(n => [n.key, n]));
-  const memoN = g.edges.filter(e => e.kind === 'memo').length;
+  const H = Math.round(W * (W < 520 ? 1.05 : .66));
+  const old = keep ? SIM.byKey : new Map();
+  const seed = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+  SIM.W = W; SIM.H = H;
+  SIM.nodes = v.nodes.map(n => {
+    const o = old.get(n.key);
+    const t = (seed(n.key) % 1000) / 1000 * Math.PI * 2;
+    const r = n.me ? 0 : Math.min(W, H) * (.18 + (seed(n.key + 'r') % 1000) / 1000 * .28);
+    return { ...n, x: o ? o.x : W / 2 + Math.cos(t) * r, y: o ? o.y : H / 2 + Math.sin(t) * r,
+      vx: 0, vy: 0, free: false };
+  });
+  SIM.byKey = new Map(SIM.nodes.map(n => [n.key, n]));
+  SIM.edges = v.edges.filter(e => SIM.byKey.has(e.a) && SIM.byKey.has(e.b));
+  if (!keep) { SIM.tx = 0; SIM.ty = 0; SIM.k = 1; }
 
-  const lines = v.edges.map((e, i) => {
-    const a = at.get(e.a), b = at.get(e.b);
-    if (!a || !b) return '';
-    return `<line data-rele="${i}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"
-      stroke="${relColor(e)}" stroke-width="${e.kind === 'memo' ? 1 + Math.abs(e.pol) : 1}"
-      ${e.kind === 'alum' ? 'stroke-dasharray="4 4"' : ''} class="rel-l${RELV.open === String(i) ? ' on' : ''}"><title>${esc(`${nameOfKey(e.a)} — ${nameOfKey(e.b)} · ${relWord(e)}`)}</title></line>`;
-  }).join('');
-
-  const dots = v.nodes.map(n => {
-    const r = getRating(n.p), c = RCOLOR[r] || '#b9c0cc';
-    return `<g class="rel-n${n.me ? ' rel-n--me' : ''}" data-relnode="${esc(n.key)}" tabindex="0" role="button"
-      aria-label="${esc(n.p.name)} ${esc(n.p.dept_name)}${n.me ? ' — 나' : ''}">
-      <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.me ? 13 : 9}" fill="${esc(c)}"></circle>
-      <text x="${n.x.toFixed(1)}" y="${(n.y + (n.me ? 26 : 21)).toFixed(1)}" text-anchor="middle">${esc(n.p.name)}</text>
-    </g>`;
-  }).join('');
-
-  const rows = v.edges.map((e, i) => `<li${RELV.open === String(i) ? ' class="on"' : ''}>
-      <button type="button" data-relrow="${i}">
-        <b>${esc(nameOfKey(e.a))} — ${esc(nameOfKey(e.b))}</b>
-        <span class="rel-k rel-k--${e.kind === 'alum' ? 'alum' : e.pol > 0 ? 'pos' : e.pol < 0 ? 'neg' : 'mid'}">${esc(relWord(e))}</span>
-        <small>${esc(e.why)}</small>
-      </button></li>`).join('');
+  const hot = SIM.focus && SIM.byKey.has(SIM.focus) ? SIM.focus : '';
+  const near = new Set(hot ? [hot] : []);
+  if (hot) SIM.edges.forEach(e => { if (e.a === hot) near.add(e.b); if (e.b === hot) near.add(e.a); });
 
   box.innerHTML = `
     <div class="rel-tools">
       <button type="button" class="btn${RELV.all ? '' : ' on'}" data-relme aria-pressed="${!RELV.all}">나와 이어진 것만</button>
       <button type="button" class="btn${RELV.alum ? ' on' : ''}" data-relalum aria-pressed="${RELV.alum}">동문선 보기</button>
+      <button type="button" class="btn" data-relfit>맞춤</button>
       <span class="st-note">실선은 메모에 적힌 것 · 점선은 자료로 미룬 것${g.skipped ? ` · 비참여 ${g.skipped}명 뺌` : ''}</span>
     </div>
-    ${v.edges.length ? `<svg class="rel-svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
-      aria-label="교수 사이 관계 그림 — 점 ${v.nodes.length}개, 선 ${v.edges.length}개">
-      <g>${lines}</g><g>${dots}</g></svg>`
+    ${SIM.edges.length ? `<svg class="rel-svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
+        aria-label="교수 사이 관계 그림 — 점 ${SIM.nodes.length}개, 선 ${SIM.edges.length}개. 점을 끌어 옮기고, 바탕을 끌어 밀고, 바퀴로 키웁니다.">
+        <g class="rel-vp">
+          <g class="rel-ls">${SIM.edges.map((e, i) => `<line data-rele="${i}" class="rel-l${hot && !(near.has(e.a) && near.has(e.b)) ? ' off' : ''}"
+            stroke="${relColor(e)}" stroke-width="${e.kind === 'memo' ? 1 + Math.abs(e.pol) : 1}"
+            ${e.kind === 'alum' ? 'stroke-dasharray="4 4"' : ''}><title>${esc(`${nameOfKey(e.a)} — ${nameOfKey(e.b)} · ${relWord(e)}`)}</title></line>`).join('')}</g>
+          <g class="rel-ns">${SIM.nodes.map(n => {
+            const c = RCOLOR[getRating(n.p)] || '#b9c0cc';
+            return `<g class="rel-n${n.me ? ' rel-n--me' : ''}${n.key === hot ? ' on' : ''}${hot && !near.has(n.key) ? ' off' : ''}"
+              data-relnode="${esc(n.key)}" tabindex="0" role="button"
+              aria-label="${esc(n.p.name)} ${esc(n.p.dept_name)}${n.me ? ' — 나' : ''}">
+              <circle r="${n.me ? 13 : 9}" fill="${esc(c)}"></circle>
+              <text dy="${n.me ? 27 : 22}" text-anchor="middle">${esc(n.p.name)}</text></g>`;
+          }).join('')}</g>
+        </g></svg>`
       : `<div class="empty"><strong>아직 그릴 관계가 없습니다</strong>메모에 다른 교수 이름을 적으시면 바로 이어집니다.</div>`}
-    <div class="rel-why" data-relwhy aria-live="polite">${RELV.open && v.edges[RELV.open]
-      ? esc(`${nameOfKey(v.edges[RELV.open].a)} — ${nameOfKey(v.edges[RELV.open].b)} · ${relWord(v.edges[RELV.open])} · ${v.edges[RELV.open].why}`) : ''}</div>
-    <ul class="rel-list">${rows}</ul>
-    <p class="st-note">메모에서 찾은 관계 ${memoN}건 · 그림의 점을 누르면 그 교수로 갑니다.</p>`;
+    <div class="rel-why" data-relwhy aria-live="polite">${relWhyHtml(g)}</div>
+    <ul class="rel-list">${SIM.edges.map((e, i) => `<li${RELV.open === String(i) ? ' class="on"' : ''}>
+      <button type="button" data-relrow="${i}">
+        <b>${esc(nameOfKey(e.a))} — ${esc(nameOfKey(e.b))}</b>
+        <span class="rel-k rel-k--${e.kind === 'alum' ? 'alum' : e.pol > 0 ? 'pos' : e.pol < 0 ? 'neg' : 'mid'}">${esc(relWord(e))}</span>
+        <small>${esc(e.why)}</small></button></li>`).join('')}</ul>
+    <p class="st-note">메모에서 찾은 관계 ${g.edges.filter(e => e.kind === 'memo').length}건 ·
+      점을 누르면 그 사람 중심으로 봅니다 · 끌어 옮기고 바퀴로 키울 수 있습니다.</p>`;
+
+  relBind(box);
+  relApply();
+  SIM.alpha = keep ? Math.max(SIM.alpha, .35) : 1;
+  relRun();
+}
+
+/* 고른 사람 — 둘레에 누가 있고, 내가 누구를 거쳐 닿을 수 있는지 */
+function relWhyHtml(g) {
+  if (RELV.open !== '' && SIM.edges[RELV.open]) {
+    const e = SIM.edges[RELV.open];
+    return `<b>${esc(nameOfKey(e.a))} — ${esc(nameOfKey(e.b))}</b> · ${esc(relWord(e))} · ${esc(e.why)}`;
+  }
+  const hot = SIM.focus;
+  if (!hot || !SIM.byKey.has(hot)) return '';
+  const p = SIM.byKey.get(hot).p;
+  if (hot === g.meKey) return `<b>${esc(p.name)}</b> — 나입니다. 다른 점을 누르면 그분께 닿는 길을 찾아 드립니다.`;
+  const br = relBridges(hot, g);
+  const ties = g.edges.filter(e => e.a === hot || e.b === hot).length;
+  return `<b>${esc(p.name)}</b> <span class="rel-sub">${esc(p.dept_name)} · 이어진 분 ${ties}명</span>
+    <a class="rel-go" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">상세 열기 →</a>
+    ${br.length ? `<div class="rel-br"><b>다리 놓기</b>${br.map(x =>
+      `<span class="rel-brx" data-relbr="${esc(x.key)}">${esc(x.name)}<small>${esc(x.mine.kind === 'memo' ? '나와 메모' : x.mine.why)} · ${esc(x.theirs.kind === 'memo' ? relWord(x.theirs) : x.theirs.why)}</small></span>`).join('')}</div>`
+      : `<div class="rel-br st-note">나와 이분을 함께 아는 분이 아직 안 보입니다.</div>`}`;
+}
+
+/* 매 프레임 조금씩 — 밀어내고, 선으로 당기고, 가운데로 모은다 */
+function relStep() {
+  const { nodes, edges, W, H } = SIM, a = SIM.alpha;
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const p = nodes[i], q = nodes[j];
+    let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || .01;
+    const want = p.p.dept_id === q.p.dept_id ? 54 : 78;
+    if (d < want) { const f = (want - d) / d * .25 * a; p.vx -= dx * f; p.vy -= dy * f; q.vx += dx * f; q.vy += dy * f; }
+  }
+  edges.forEach(e => {
+    const p = SIM.byKey.get(e.a), q = SIM.byKey.get(e.b);
+    let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || .01;
+    const len = e.kind === 'memo' ? 90 : 150;
+    const f = (d - len) / d * .035 * a;
+    p.vx += dx * f; p.vy += dy * f; q.vx -= dx * f; q.vy -= dy * f;
+  });
+  nodes.forEach(n => {
+    if (SIM.drag && SIM.drag.n === n) { n.vx = n.vy = 0; return; }
+    const pull = n.me && !n.free ? .08 : .004;         // 나는 한가운데 가까이 둔다(끌면 풀린다)
+    n.vx += (W / 2 - n.x) * pull * a; n.vy += (H / 2 - n.y) * pull * a;
+    n.vx *= .82; n.vy *= .82;
+    n.x += n.vx; n.y += n.vy;
+    const M = 26;
+    n.x = Math.max(M, Math.min(W - M, n.x)); n.y = Math.max(M, Math.min(H - M, n.y));
+  });
+  SIM.alpha = Math.max(0, a * .985 - .0008);
+}
+
+/* 자리를 화면에 옮겨 그린다 */
+function relApply() {
+  const box = $app.querySelector('[data-relbox]'); if (!box) return;
+  const vp = box.querySelector('.rel-vp');
+  if (vp) vp.setAttribute('transform', `translate(${SIM.tx.toFixed(1)} ${SIM.ty.toFixed(1)}) scale(${SIM.k.toFixed(3)})`);
+  const ls = box.querySelectorAll('.rel-l');
+  SIM.edges.forEach((e, i) => {
+    const l = ls[i]; if (!l) return;
+    const p = SIM.byKey.get(e.a), q = SIM.byKey.get(e.b);
+    l.setAttribute('x1', p.x.toFixed(1)); l.setAttribute('y1', p.y.toFixed(1));
+    l.setAttribute('x2', q.x.toFixed(1)); l.setAttribute('y2', q.y.toFixed(1));
+  });
+  box.querySelectorAll('[data-relnode]').forEach(el => {
+    const n = SIM.byKey.get(el.dataset.relnode); if (!n) return;
+    el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`);
+  });
+}
+
+function relRun() {
+  cancelAnimationFrame(SIM.raf);
+  const loop = () => {
+    relStep(); relApply();
+    if (SIM.alpha > .004 || SIM.drag) SIM.raf = requestAnimationFrame(loop);
+  };
+  SIM.raf = requestAnimationFrame(loop);
+}
+
+/* 화면에서 사라지면 셈을 멈춘다 — 배터리를 괜히 먹지 않게 */
+function relStop() { cancelAnimationFrame(SIM.raf); SIM.alpha = 0; }
+
+function relBind(box) {
+  const svg = box.querySelector('.rel-svg');
+  const at = ev => {                                    // 화면 좌표 → 그림 좌표
+    const r = svg.getBoundingClientRect();
+    const sx = SIM.W / r.width, sy = SIM.H / r.height;
+    return { x: ((ev.clientX - r.left) * sx - SIM.tx) / SIM.k, y: ((ev.clientY - r.top) * sy - SIM.ty) / SIM.k,
+      rx: (ev.clientX - r.left) * sx, ry: (ev.clientY - r.top) * sy };
+  };
+  const focus = key => { SIM.focus = SIM.focus === key ? '' : key; RELV.open = ''; relRefresh(true); };
 
   box.querySelectorAll('[data-relnode]').forEach(el => {
-    const go = () => { const p = state.rows.find(x => rKey(x) === el.dataset.relnode);
-      if (p) location.hash = `#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}`; };
-    el.addEventListener('click', go);
-    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focus(el.dataset.relnode); }
+    });
   });
-  const open = i => { RELV.open = RELV.open === String(i) ? '' : String(i); relRefresh(); };
+  if (svg) {
+    svg.addEventListener('pointerdown', ev => {
+      const g = ev.target.closest('[data-relnode]');
+      SIM.moved = 0;
+      const pos = at(ev);
+      svg.setPointerCapture(ev.pointerId);
+      SIM.pts.set(ev.pointerId, pos);
+      if (SIM.pts.size === 2) { SIM.pinch = relSpan(); SIM.drag = null; SIM.pan = null; return; }
+      if (g) { const n = SIM.byKey.get(g.dataset.relnode); if (n) { SIM.drag = { n, key: g.dataset.relnode }; n.free = true; SIM.alpha = Math.max(SIM.alpha, .5); relRun(); } }
+      else SIM.pan = { x: pos.rx - SIM.tx, y: pos.ry - SIM.ty };
+      ev.preventDefault();
+    });
+    svg.addEventListener('pointermove', ev => {
+      if (!SIM.pts.has(ev.pointerId)) return;
+      const pos = at(ev);
+      const was = SIM.pts.get(ev.pointerId);
+      SIM.moved += Math.abs(pos.rx - was.rx) + Math.abs(pos.ry - was.ry);
+      SIM.pts.set(ev.pointerId, pos);
+      if (SIM.pts.size === 2 && SIM.pinch) {            // 두 손가락으로 키우고 줄이기
+        const now = relSpan();
+        if (now && SIM.pinch) { relZoom(now / SIM.pinch, SIM.W / 2, SIM.H / 2); SIM.pinch = now; relApply(); }
+        return;
+      }
+      if (SIM.drag) { SIM.drag.n.x = pos.x; SIM.drag.n.y = pos.y; SIM.alpha = Math.max(SIM.alpha, .35); relApply(); }
+      else if (SIM.pan) { SIM.tx = pos.rx - SIM.pan.x; SIM.ty = pos.ry - SIM.pan.y; relApply(); }
+    });
+    const up = ev => {
+      SIM.pts.delete(ev.pointerId);
+      if (SIM.pts.size < 2) SIM.pinch = 0;
+      const wasDrag = SIM.drag;
+      SIM.drag = null; SIM.pan = null;
+      if (SIM.moved < 6) {                              // 끌지 않고 톡 누른 것 — 고르기
+        const g = ev.target.closest && ev.target.closest('[data-relnode]');
+        if (g) focus(g.dataset.relnode);
+      } else if (wasDrag) { SIM.alpha = Math.max(SIM.alpha, .25); relRun(); }
+    };
+    svg.addEventListener('pointerup', up);
+    svg.addEventListener('pointercancel', ev => { SIM.pts.delete(ev.pointerId); SIM.drag = null; SIM.pan = null; });
+    svg.addEventListener('wheel', ev => {
+      ev.preventDefault();
+      const r = svg.getBoundingClientRect();
+      relZoom(Math.exp(-ev.deltaY * .0015), (ev.clientX - r.left) * SIM.W / r.width, (ev.clientY - r.top) * SIM.H / r.height);
+      relApply();
+    }, { passive: false });
+    svg.addEventListener('dblclick', ev => {
+      const g = ev.target.closest('[data-relnode]'); if (!g) return;
+      const p = state.rows.find(x => rKey(x) === g.dataset.relnode);
+      if (p) location.hash = `#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}`;
+    });
+  }
+  const open = i => { RELV.open = RELV.open === String(i) ? '' : String(i); relRefresh(true); };
   box.querySelectorAll('[data-rele]').forEach(el => el.addEventListener('click', () => open(el.dataset.rele)));
   box.querySelectorAll('[data-relrow]').forEach(el => el.addEventListener('click', () => open(el.dataset.relrow)));
-  box.querySelector('[data-relme]')?.addEventListener('click', () => { RELV.all = !RELV.all; RELV.open = ''; relRefresh(); });
+  box.querySelectorAll('[data-relbr]').forEach(el => el.addEventListener('click', () => {
+    SIM.focus = el.dataset.relbr; RELV.open = ''; relRefresh(true);
+  }));
+  box.querySelector('[data-relme]')?.addEventListener('click', () => { RELV.all = !RELV.all; RELV.open = ''; SIM.focus = ''; relRefresh(); });
   box.querySelector('[data-relalum]')?.addEventListener('click', () => { RELV.alum = !RELV.alum; RELV.open = ''; relRefresh(); });
+  box.querySelector('[data-relfit]')?.addEventListener('click', () => { SIM.tx = 0; SIM.ty = 0; SIM.k = 1; SIM.focus = ''; RELV.open = ''; relRefresh(); });
 }
-const nameOfKey = k => { const p = state.rows.find(x => rKey(x) === k); return p ? p.name : k; };
+const relSpan = () => {
+  const v = [...SIM.pts.values()];
+  return v.length === 2 ? Math.hypot(v[0].rx - v[1].rx, v[0].ry - v[1].ry) : 0;
+};
+function relZoom(mul, cx, cy) {
+  const k = Math.max(.4, Math.min(3.5, SIM.k * mul));
+  SIM.tx = cx - (cx - SIM.tx) * (k / SIM.k);
+  SIM.ty = cy - (cy - SIM.ty) * (k / SIM.k);
+  SIM.k = k;
+}
 
 /* ---------- 검색 결과 (data/insights/<학과>.json) ----------
  * GitHub Pages는 정적 호스팅이라 브라우저에서 검색 API를 부를 수 없어, 미리 모아 둔 파일을 읽어 보여줍니다.

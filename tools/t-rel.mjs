@@ -109,24 +109,66 @@ await page.evaluate(() => { RELV.all = false; RELV.alum = true; relRefresh(); })
 await page.waitForTimeout(300);
 
 /* 자리는 다시 그려도 안 흔들린다 — 씨앗을 이름에서 뽑는다 */
-t('다시 그려도 자리가 그대로', await page.evaluate(() => {
-  const pos = () => [...document.querySelectorAll('.rel-n circle')].map(c => c.getAttribute('cx') + ',' + c.getAttribute('cy')).join('|');
-  const a = pos(); relRefresh(); return a === pos();
+t('새로 그려도 시작 자리가 같다', await page.evaluate(() => {
+  const pos = () => [...document.querySelectorAll('[data-relnode]')].map(e => e.getAttribute('transform')).join('|');
+  relRefresh(); const a = pos(); relRefresh(); return a === pos() && a.length > 10;
 }));
 
-/* 나는 한가운데, 테가 둘러 있다 */
+/* 나는 한가운데로 당겨 둔다 — 끌면 풀린다 */
 t('나는 한가운데 선다', await page.evaluate(() => {
-  const me = document.querySelector('.rel-n--me circle'), svg = document.querySelector('.rel-svg');
-  const [, , W, H] = svg.getAttribute('viewBox').split(' ').map(Number);
-  return Math.abs(+me.getAttribute('cx') - W / 2) < 30 && Math.abs(+me.getAttribute('cy') - H / 2) < 30;
+  const me = SIM.nodes.find(n => n.me);
+  return Math.abs(me.x - SIM.W / 2) < 40 && Math.abs(me.y - SIM.H / 2) < 40;
+}), await page.evaluate(() => {
+  const m = SIM.nodes.find(n => n.me);
+  return Math.round(m.x) + ',' + Math.round(m.y) + ' / ' + SIM.W + 'x' + SIM.H;
 }));
 
-/* 점을 누르면 그 교수로 간다 */
-await page.evaluate(() => { const n = [...document.querySelectorAll('.rel-n')].find(x => !x.classList.contains('rel-n--me')); n.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
-await page.waitForTimeout(500);
-t('점을 누르면 그 교수로 간다', /#\/dept\/[^/]+\/prof\//.test(await page.evaluate(() => location.hash)),
-  await page.evaluate(() => location.hash));
-await page.evaluate(() => { closeDrawer(false); location.hash = '#/stats'; render(); });
+/* 손으로 끌면 그 자리로 옮겨지고, 바퀴로 키우고 줄인다 (옵시디언처럼) */
+t('점을 끌면 따라온다', await page.evaluate(async () => {
+  const svg = document.querySelector('.rel-svg');
+  const g = [...document.querySelectorAll('.rel-n')].find(x => !x.classList.contains('rel-n--me'));
+  const key = g.dataset.relnode, before = { ...SIM.byKey.get(key) };
+  const r = svg.getBoundingClientRect();
+  const ev = (t2, x, y, el) => el.dispatchEvent(new PointerEvent(t2, { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+  svg.setPointerCapture = () => {};
+  ev('pointerdown', r.left + before.x * r.width / SIM.W, r.top + before.y * r.height / SIM.H, g);
+  ev('pointermove', r.left + r.width * .8, r.top + r.height * .2, svg);
+  ev('pointerup', r.left + r.width * .8, r.top + r.height * .2, svg);
+  await new Promise(r2 => setTimeout(r2, 50));
+  const now = SIM.byKey.get(key);
+  return Math.hypot(now.x - before.x, now.y - before.y) > 40;
+}));
+t('바퀴로 키우고 줄인다', await page.evaluate(() => {
+  const svg = document.querySelector('.rel-svg'), k0 = SIM.k;
+  svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -300, clientX: 10, clientY: 10 }));
+  const up = SIM.k;
+  svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 600, clientX: 10, clientY: 10 }));
+  return up > k0 && SIM.k < up;
+}));
+t('「맞춤」을 누르면 되돌아온다', await page.evaluate(async () => {
+  document.querySelector('[data-relfit]').click();
+  await new Promise(r => setTimeout(r, 300));
+  return SIM.k === 1 && SIM.tx === 0 && SIM.ty === 0 && SIM.focus === '';
+}));
+
+/* 점을 고르면 그 사람 중심 — 나를 거치지 않는 관계를 본다 */
+await page.evaluate(() => { RELV.all = true; SIM.focus = ''; relRefresh(); });
+await page.waitForTimeout(400);
+t('점을 고르면 그 사람 둘레만 또렷해진다', await page.evaluate(async () => {
+  const g = [...document.querySelectorAll('.rel-n')].find(x => !x.classList.contains('rel-n--me'));
+  const key = g.dataset.relnode;
+  SIM.focus = key; relRefresh(true);
+  await new Promise(r => setTimeout(r, 300));
+  const on = document.querySelector('.rel-n.on');
+  return !!on && on.dataset.relnode === key && document.querySelectorAll('.rel-n.off').length > 0;
+}));
+t('고른 사람 설명에 상세 열기가 붙는다', await page.evaluate(() =>
+  !!document.querySelector('.rel-why .rel-go')));
+t('나를 빼고도 둘끼리 이어진 선이 있다', await page.evaluate(() => {
+  const g = relGraph();
+  return relView(g).edges.some(e => e.a !== g.meKey && e.b !== g.meKey);
+}), await page.evaluate(() => { const g = relGraph(); return relView(g).edges.filter(e => e.a !== g.meKey && e.b !== g.meKey).length + '건'; }));
+await page.evaluate(() => { SIM.focus = ''; RELV.all = false; relRefresh(); });
 await page.waitForSelector('.rel-svg', { timeout: 10000 });
 
 /* 근거 보기 */
