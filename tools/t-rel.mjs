@@ -90,18 +90,19 @@ t('너무 큰 동문 묶음은 안 긋는다', await page.evaluate(() => {
 }));
 
 /* 보기 설정 */
-await page.evaluate(() => { RELV.all = false; RELV.alum = true; relRefresh(); });
-await page.waitForTimeout(300);
-t('처음엔 나와 이어진 것만', await page.evaluate(() => {
+/* 처음부터 **모든 관계**를 보여 준다 (2026-10-17, 사용자 지정) */
+t('처음엔 모든 관계를 보여 준다', await page.evaluate(() => {
   const g = relGraph(), v = relView(g);
-  return v.edges.every(e => e.a === g.meKey || e.b === g.meKey) && v.edges.length > 0;
+  return RELV.all && v.edges.some(e => e.a !== g.meKey && e.b !== g.meKey);
+}), await page.evaluate(() => relView(relGraph()).edges.length + '선'));
+await page.click('[data-relme]');
+await page.waitForTimeout(400);
+t('누르면 나와 이어진 것만 남는다', await page.evaluate(() => {
+  const g = relGraph(), v = relView(g);
+  return !RELV.all && v.edges.every(e => e.a === g.meKey || e.b === g.meKey) && v.edges.length > 0;
 }));
 await page.click('[data-relme]');
 await page.waitForTimeout(400);
-t('누르면 전부 보여 준다', await page.evaluate(() => {
-  const g = relGraph(), v = relView(g);
-  return RELV.all && v.edges.length > relView({ ...g, meKey: g.meKey }).edges.length - 1;
-}));
 await page.click('[data-relalum]');
 await page.waitForTimeout(400);
 t('동문선을 끌 수 있다', await page.evaluate(() => !RELV.alum && relView(relGraph()).edges.every(e => e.kind !== 'alum')));
@@ -145,11 +146,44 @@ t('바퀴로 키우고 줄인다', await page.evaluate(() => {
   svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 600, clientX: 10, clientY: 10 }));
   return up > k0 && SIM.k < up;
 }));
-t('「맞춤」을 누르면 되돌아온다', await page.evaluate(async () => {
+/* 바탕을 끌면 **상하좌우로 돌아간다** (2026-10-17) */
+t('바탕을 끌면 돌아간다', await page.evaluate(async () => {
+  const svg = document.querySelector('.rel-svg'), r = svg.getBoundingClientRect();
+  svg.setPointerCapture = () => {};
+  const ev = (t2, x, y) => svg.dispatchEvent(new PointerEvent(t2, { bubbles: true, pointerId: 9, clientX: x, clientY: y }));
+  SIM.yaw = 0; SIM.pitch = 0;
+  const before = [...document.querySelectorAll('[data-relnode]')].map(e => e.getAttribute('transform')).join('|');
+  ev('pointerdown', r.left + r.width * .5, r.top + r.height * .5);
+  for (let i = 1; i <= 8; i++) ev('pointermove', r.left + r.width * (.5 + i * .02), r.top + r.height * (.5 + i * .015));
+  ev('pointerup', r.left + r.width * .66, r.top + r.height * .62);
+  await new Promise(x => setTimeout(x, 80));
+  const after = [...document.querySelectorAll('[data-relnode]')].map(e => e.getAttribute('transform')).join('|');
+  return Math.abs(SIM.yaw) > .1 && Math.abs(SIM.pitch) > .1 && before !== after;
+}), await page.evaluate(() => `yaw ${SIM.yaw.toFixed(2)} pitch ${SIM.pitch.toFixed(2)}`));
+t('위아래로 돌려도 뒤집히지 않는다', await page.evaluate(() => {
+  SIM.pitch = 0;
+  const svg = document.querySelector('.rel-svg'), r = svg.getBoundingClientRect();
+  const ev = (t2, x, y) => svg.dispatchEvent(new PointerEvent(t2, { bubbles: true, pointerId: 11, clientX: x, clientY: y }));
+  ev('pointerdown', r.left + r.width * .5, r.top + r.height * .5);
+  for (let i = 0; i < 60; i++) ev('pointermove', r.left + r.width * .5, r.top + r.height * .5 + i * 20);
+  ev('pointerup', r.left + r.width * .5, r.top + r.height * .9);
+  return Math.abs(SIM.pitch) <= 1.2001;
+}), await page.evaluate(() => SIM.pitch.toFixed(2)));
+t('「맞춤」을 누르면 똑바로 서고 상자에 맞는다', await page.evaluate(async () => {
   document.querySelector('[data-relfit]').click();
-  await new Promise(r => setTimeout(r, 300));
-  return SIM.k === 1 && SIM.tx === 0 && SIM.ty === 0 && SIM.focus === '';
+  await new Promise(r => setTimeout(r, 400));
+  const xs = SIM.nodes.map(n => n.px * SIM.k + SIM.tx), ys = SIM.nodes.map(n => n.py * SIM.k + SIM.ty);
+  const inBox = Math.min(...xs) > -1 && Math.max(...xs) < SIM.W + 1 && Math.min(...ys) > -1 && Math.max(...ys) < SIM.H + 1;
+  return SIM.yaw === 0 && SIM.pitch === 0 && SIM.focus === '' && inBox;
 }));
+t('붐비면 이름표를 감춘다 — 나는 늘 보인다', await page.evaluate(async () => {
+  RELV.all = true; SIM.focus = ''; relRefresh();
+  await new Promise(r => setTimeout(r, 400));
+  const ns = document.querySelector('.rel-ns');
+  if (SIM.nodes.length <= 36) return false;                 // 전부 보기면 서른 명은 넘어야 한다
+  const me = document.querySelector('.rel-n--me text');
+  return ns.classList.contains('rel-ns--hide') && getComputedStyle(me).opacity === '1';
+}), await page.evaluate(() => SIM.nodes.length + '명 · ' + document.querySelector('.rel-ns').getAttribute('class')));
 
 /* 점을 고르면 그 사람 중심 — 나를 거치지 않는 관계를 본다 */
 await page.evaluate(() => { RELV.all = true; SIM.focus = ''; relRefresh(); });

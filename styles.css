@@ -612,9 +612,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    예전에는 주황 테까지 둘렀는데, 바탕이 선호도 색을 입은 뒤로는 테까지 겹쳐 어지러웠다.
    깃발은 이름 왼쪽에 붙고 색도 주황이라 그것만으로 눈에 들어온다. */
 /* 바탕은 「얼마나 든든한가」를 말한다 (2026-10-14) — 기본은 회색,
-   강화는 그 선호도 색을 20%, VIP 는 그 색으로 꽉. 색은 칩마다 --rc 로 들어온다.
+   강화는 그 선호도 색을 10%, VIP 는 그 색으로 꽉. 색은 칩마다 --rc 로 들어온다.
    공략은 바탕을 건드리지 않고 **깃발**로만 말한다 — 할 일이라 결이 달라야 섞이지 않는다. */
-.st-c.sure{background:color-mix(in srgb,var(--rc,#5f6672) 20%,var(--surface-2));
+.st-c.sure{background:color-mix(in srgb,var(--rc,#5f6672) 10%,var(--surface-2));
   border-color:color-mix(in srgb,var(--rc,#5f6672) 55%,var(--line))}
 .st-c.sure:hover{border-color:var(--rc,#5f6672)}
 /* VIP — 투명도 없이 꽉 채우고 흰 글자. 7% 만 어둡게 해 대비를 4.5 위로 올린다
@@ -662,8 +662,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 /* 마우스를 올렸을 때는 테두리만 물들인다 — 글자색까지 바꾸면 켜진 모습과 똑같아 보여
    누른 자리에 커서가 있는 동안 토글이 된 티가 나지 않았다 (2026-10-04) */
 .surebtn:hover{border-color:var(--sure-ink)}
-/* 켜짐은 분석 목록의 칩과 같은 꼴 — 강화는 그 선호도 색을 20% 깐다(--rc 가 없으면 무채색) */
-.surebtn.on{background:color-mix(in srgb,var(--rc,#5f6672) 20%,var(--surface-2));
+/* 켜짐은 분석 목록의 칩과 같은 꼴 — 강화는 그 선호도 색을 10% 깐다(--rc 가 없으면 무채색) */
+.surebtn.on{background:color-mix(in srgb,var(--rc,#5f6672) 10%,var(--surface-2));
   border-color:color-mix(in srgb,var(--rc,#5f6672) 55%,var(--line-2));color:var(--ink)}
 .pushbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
@@ -703,6 +703,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .rel-l.on{stroke-width:3}
 /* 한 사람을 고르면 그 둘레만 또렷하게 — 나를 거치지 않는 관계를 보려는 것 */
 .rel-l.off{opacity:.12}
+/* 붐비면 이름표를 감춘다 — 나·고른 사람·그 이웃만, 키우면 모두 (옵시디언처럼) */
+.rel-ns--hide .rel-n text{opacity:0;transition:opacity .12s}
+.rel-ns--hide .rel-n--me text,.rel-ns--hide .rel-n.on text,.rel-ns--hide .rel-n.near text{opacity:1}
+.rel-n:hover text,.rel-n:focus-visible text{opacity:1}
 .rel-n.off{opacity:.2}
 .rel-n.on circle{stroke:var(--ink);stroke-width:3}
 .rel-n.on text{fill:var(--ink)}

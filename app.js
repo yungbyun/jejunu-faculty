@@ -3387,7 +3387,7 @@ const REL_POS = ['가깝', '친하', '친분', '함께', '같이', '도와', '�
 const REL_NEG = ['서먹', '껄끄', '갈등', '틀어', '반대', '불편', '앙금', '거리감', '멀어', '비판',
   '부정적', '경쟁', '사이가 안', '사이가 좋지', '안 좋', '싫어', '껄끄럽'];
 const REL_FLIP = /(않|않다|안\s|못\s|아니|별로)/;
-const RELV = { all: false, alum: true, open: '' };   // 보기 설정 — 기본은 「나와 이어진 것만」
+const RELV = { all: true, alum: true, open: '' };   // 보기 설정 — 기본은 **전부**(사용자 지정 2026-10-17)
 
 /* 메모 한 토막에서 그 이름에 대한 마음을 −2…+2 로 읽는다 */
 function relPolar(sentence, name) {
@@ -3458,7 +3458,22 @@ function relView(g) {
  * 점을 끌면 그 점만 손에 붙고 이웃이 따라오고, 바탕을 끌면 화면이 밀리고, 바퀴로 키우고 줄인다.
  * 점을 한 번 누르면 **그 사람 중심**으로 둘레만 남기고 흐려진다 — 나를 거치지 않는 관계를 보려는 것. */
 const SIM = { nodes: [], edges: [], byKey: new Map(), W: 720, H: 460, alpha: 0, raf: 0,
-  tx: 0, ty: 0, k: 1, drag: null, pan: null, moved: 0, pts: new Map(), pinch: 0, built: '' };
+  tx: 0, ty: 0, k: 1, yaw: 0, pitch: 0, drag: null, pan: null, spin: null, moved: 0,
+  pts: new Map(), pinch: 0, built: '' };
+
+/* 깊이를 두고 돌려 본다 (2026-10-17) — 점은 공간에 떠 있고(x·y·z), 바탕을 끌면 **상하좌우로 돌아갑니다**.
+ * 멀리 있는 점은 작아 보이게(원근) 줄이고, 선은 돌아간 자리끼리 잇습니다. */
+function relProj() {
+  const { W, H, yaw, pitch } = SIM, cx = W / 2, cy = H / 2, D = Math.max(W, H) * 1.7;
+  const cY = Math.cos(yaw), sY = Math.sin(yaw), cP = Math.cos(pitch), sP = Math.sin(pitch);
+  return n => {
+    const x = n.x - cx, y = n.y - cy, z = n.z || 0;
+    const x1 = x * cY + z * sY, z1 = -x * sY + z * cY;
+    const y1 = y * cP - z1 * sP, z2 = y * sP + z1 * cP;
+    const s = D / (D + z2);
+    return { x: cx + x1 * s, y: cy + y1 * s, s };
+  };
+}
 
 const relColor = e => e.kind === 'alum' ? 'var(--rel-mid)'
   : e.pol > 0 ? 'var(--rel-pos)' : e.pol < 0 ? 'var(--rel-neg)' : 'var(--rel-mid)';
@@ -3506,12 +3521,13 @@ function relRefresh(keep) {
     const o = old.get(n.key);
     const t = (seed(n.key) % 1000) / 1000 * Math.PI * 2;
     const r = n.me ? 0 : Math.min(W, H) * (.18 + (seed(n.key + 'r') % 1000) / 1000 * .28);
+    const z = (seed(n.key + 'z') % 1000) / 1000 - .5;
     return { ...n, x: o ? o.x : W / 2 + Math.cos(t) * r, y: o ? o.y : H / 2 + Math.sin(t) * r,
-      vx: 0, vy: 0, free: false };
+      z: o ? o.z : (n.me ? 0 : z * r * 1.2), vx: 0, vy: 0, vz: 0, free: false };
   });
   SIM.byKey = new Map(SIM.nodes.map(n => [n.key, n]));
   SIM.edges = v.edges.filter(e => SIM.byKey.has(e.a) && SIM.byKey.has(e.b));
-  if (!keep) { SIM.tx = 0; SIM.ty = 0; SIM.k = 1; }
+  if (!keep) { SIM.tx = 0; SIM.ty = 0; SIM.k = 1; SIM.yaw = 0; SIM.pitch = 0; }
 
   const hot = SIM.focus && SIM.byKey.has(SIM.focus) ? SIM.focus : '';
   const near = new Set(hot ? [hot] : []);
@@ -3532,8 +3548,7 @@ function relRefresh(keep) {
             ${e.kind === 'alum' ? 'stroke-dasharray="4 4"' : ''}><title>${esc(`${nameOfKey(e.a)} — ${nameOfKey(e.b)} · ${relWord(e)}`)}</title></line>`).join('')}</g>
           <g class="rel-ns">${SIM.nodes.map(n => {
             const c = RCOLOR[getRating(n.p)] || '#b9c0cc';
-            return `<g class="rel-n${n.me ? ' rel-n--me' : ''}${n.key === hot ? ' on' : ''}${hot && !near.has(n.key) ? ' off' : ''}"
-              data-relnode="${esc(n.key)}" tabindex="0" role="button"
+            return `<g class="rel-n${n.me ? ' rel-n--me' : ''}${n.key === hot ? ' on' : ''}${hot && !near.has(n.key) ? ' off' : ''}${hot && near.has(n.key) && n.key !== hot ? ' near' : ''}" data-relnode="${esc(n.key)}" tabindex="0" role="button"
               aria-label="${esc(n.p.name)} ${esc(n.p.dept_name)}${n.me ? ' — 나' : ''}">
               <circle r="${n.me ? 13 : 9}" fill="${esc(c)}"></circle>
               <text dy="${n.me ? 27 : 22}" text-anchor="middle">${esc(n.p.name)}</text></g>`;
@@ -3547,11 +3562,13 @@ function relRefresh(keep) {
         <span class="rel-k rel-k--${e.kind === 'alum' ? 'alum' : e.pol > 0 ? 'pos' : e.pol < 0 ? 'neg' : 'mid'}">${esc(relWord(e))}</span>
         <small>${esc(e.why)}</small></button></li>`).join('')}</ul>
     <p class="st-note">메모에서 찾은 관계 ${g.edges.filter(e => e.kind === 'memo').length}건 ·
-      점을 누르면 그 사람 중심으로 봅니다 · 끌어 옮기고 바퀴로 키울 수 있습니다.</p>`;
+      바탕을 끌면 상하좌우로 돌아가고, 점을 끌면 옮겨지며, 바퀴로 키웁니다 ·
+      점을 누르면 그 사람 중심 · Shift 를 누른 채 끌면 밀기.</p>`;
 
   relBind(box);
   relApply();
   SIM.alpha = keep ? Math.max(SIM.alpha, .35) : 1;
+  if (!keep) SIM.wantFit = true;
   relRun();
 }
 
@@ -3579,25 +3596,27 @@ function relStep() {
   const { nodes, edges, W, H } = SIM, a = SIM.alpha;
   for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
     const p = nodes[i], q = nodes[j];
-    let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || .01;
-    const want = p.p.dept_id === q.p.dept_id ? 54 : 78;
-    if (d < want) { const f = (want - d) / d * .25 * a; p.vx -= dx * f; p.vy -= dy * f; q.vx += dx * f; q.vy += dy * f; }
+    let dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z, d = Math.hypot(dx, dy, dz) || .01;
+    const want = p.p.dept_id === q.p.dept_id ? 64 : 96;
+    if (d < want) { const f = (want - d) / d * .25 * a;
+      p.vx -= dx * f; p.vy -= dy * f; p.vz -= dz * f; q.vx += dx * f; q.vy += dy * f; q.vz += dz * f; }
   }
   edges.forEach(e => {
     const p = SIM.byKey.get(e.a), q = SIM.byKey.get(e.b);
-    let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || .01;
-    const len = e.kind === 'memo' ? 90 : 150;
+    let dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z, d = Math.hypot(dx, dy, dz) || .01;
+    const len = e.kind === 'memo' ? 95 : 165;
     const f = (d - len) / d * .035 * a;
-    p.vx += dx * f; p.vy += dy * f; q.vx -= dx * f; q.vy -= dy * f;
+    p.vx += dx * f; p.vy += dy * f; p.vz += dz * f; q.vx -= dx * f; q.vy -= dy * f; q.vz -= dz * f;
   });
   nodes.forEach(n => {
-    if (SIM.drag && SIM.drag.n === n) { n.vx = n.vy = 0; return; }
+    if (SIM.drag && SIM.drag.n === n) { n.vx = n.vy = n.vz = 0; return; }
     const pull = n.me && !n.free ? .08 : .004;         // 나는 한가운데 가까이 둔다(끌면 풀린다)
-    n.vx += (W / 2 - n.x) * pull * a; n.vy += (H / 2 - n.y) * pull * a;
-    n.vx *= .82; n.vy *= .82;
-    n.x += n.vx; n.y += n.vy;
-    const M = 26;
+    n.vx += (W / 2 - n.x) * pull * a; n.vy += (H / 2 - n.y) * pull * a; n.vz += (0 - n.z) * pull * a;
+    n.vx *= .82; n.vy *= .82; n.vz *= .82;
+    n.x += n.vx; n.y += n.vy; n.z += n.vz;
+    const M = 26, Z = Math.max(SIM.W, SIM.H) * .45;
     n.x = Math.max(M, Math.min(W - M, n.x)); n.y = Math.max(M, Math.min(H - M, n.y));
+    n.z = Math.max(-Z, Math.min(Z, n.z));
   });
   SIM.alpha = Math.max(0, a * .985 - .0008);
 }
@@ -3607,23 +3626,41 @@ function relApply() {
   const box = $app.querySelector('[data-relbox]'); if (!box) return;
   const vp = box.querySelector('.rel-vp');
   if (vp) vp.setAttribute('transform', `translate(${SIM.tx.toFixed(1)} ${SIM.ty.toFixed(1)}) scale(${SIM.k.toFixed(3)})`);
+  const ns = box.querySelector('.rel-ns');
+  if (ns) ns.classList.toggle('rel-ns--hide', SIM.nodes.length > 36 && SIM.k < 2.2);
+  const pj = relProj();
+  SIM.nodes.forEach(n => { const q = pj(n); n.px = q.x; n.py = q.y; n.ps = q.s; });
   const ls = box.querySelectorAll('.rel-l');
   SIM.edges.forEach((e, i) => {
     const l = ls[i]; if (!l) return;
     const p = SIM.byKey.get(e.a), q = SIM.byKey.get(e.b);
-    l.setAttribute('x1', p.x.toFixed(1)); l.setAttribute('y1', p.y.toFixed(1));
-    l.setAttribute('x2', q.x.toFixed(1)); l.setAttribute('y2', q.y.toFixed(1));
+    l.setAttribute('x1', p.px.toFixed(1)); l.setAttribute('y1', p.py.toFixed(1));
+    l.setAttribute('x2', q.px.toFixed(1)); l.setAttribute('y2', q.py.toFixed(1));
   });
   box.querySelectorAll('[data-relnode]').forEach(el => {
     const n = SIM.byKey.get(el.dataset.relnode); if (!n) return;
-    el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`);
+    el.setAttribute('transform', `translate(${n.px.toFixed(1)} ${n.py.toFixed(1)}) scale(${n.ps.toFixed(3)})`);
   });
+}
+
+/* 그림을 상자에 맞춰 키운다 — 자리를 잡고 나면 한 번 저절로, 「맞춤」을 누르면 다시 */
+function relFit() {
+  if (!SIM.nodes.length) return;
+  const M = 44, W = SIM.W, H = SIM.H;   // 점 크기와 이름표가 삐져나오지 않게
+  const xs = SIM.nodes.map(n => n.px), ys = SIM.nodes.map(n => n.py);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const k = Math.max(.5, Math.min(1.6, Math.min((W - M * 2) / Math.max(40, x1 - x0), (H - M * 2) / Math.max(40, y1 - y0))));
+  SIM.k = k;
+  SIM.tx = W / 2 - (x0 + x1) / 2 * k;
+  SIM.ty = H / 2 - (y0 + y1) / 2 * k;
+  relApply();
 }
 
 function relRun() {
   cancelAnimationFrame(SIM.raf);
   const loop = () => {
     relStep(); relApply();
+    if (SIM.alpha <= .05 && SIM.wantFit) { SIM.wantFit = false; relFit(); }
     if (SIM.alpha > .004 || SIM.drag) SIM.raf = requestAnimationFrame(loop);
   };
   SIM.raf = requestAnimationFrame(loop);
@@ -3656,7 +3693,8 @@ function relBind(box) {
       SIM.pts.set(ev.pointerId, pos);
       if (SIM.pts.size === 2) { SIM.pinch = relSpan(); SIM.drag = null; SIM.pan = null; return; }
       if (g) { const n = SIM.byKey.get(g.dataset.relnode); if (n) { SIM.drag = { n, key: g.dataset.relnode }; n.free = true; SIM.alpha = Math.max(SIM.alpha, .5); relRun(); } }
-      else SIM.pan = { x: pos.rx - SIM.tx, y: pos.ry - SIM.ty };
+      else if (ev.shiftKey || ev.button === 1) SIM.pan = { x: pos.rx - SIM.tx, y: pos.ry - SIM.ty };
+      else SIM.spin = { rx: pos.rx, ry: pos.ry };     // 바탕을 끌면 상하좌우로 돌린다
       ev.preventDefault();
     });
     svg.addEventListener('pointermove', ev => {
@@ -3670,21 +3708,33 @@ function relBind(box) {
         if (now && SIM.pinch) { relZoom(now / SIM.pinch, SIM.W / 2, SIM.H / 2); SIM.pinch = now; relApply(); }
         return;
       }
-      if (SIM.drag) { SIM.drag.n.x = pos.x; SIM.drag.n.y = pos.y; SIM.alpha = Math.max(SIM.alpha, .35); relApply(); }
-      else if (SIM.pan) { SIM.tx = pos.rx - SIM.pan.x; SIM.ty = pos.ry - SIM.pan.y; relApply(); }
+      if (SIM.drag) {                                 /* 보고 있는 면 위에서 끈다 */
+        const n = SIM.drag.n, s = (n.ps || 1) * SIM.k || 1;
+        const dx = (pos.rx - was.rx) / s, dy = (pos.ry - was.ry) / s;
+        n.x += dx * Math.cos(SIM.yaw);
+        n.z += dx * Math.sin(SIM.yaw);
+        n.y += dy / Math.max(.25, Math.cos(SIM.pitch));
+        SIM.alpha = Math.max(SIM.alpha, .35); relApply();
+      } else if (SIM.pan) { SIM.tx = pos.rx - SIM.pan.x; SIM.ty = pos.ry - SIM.pan.y; relApply(); }
+      else if (SIM.spin) {
+        SIM.yaw += (pos.rx - SIM.spin.rx) * .008;
+        SIM.pitch = Math.max(-1.2, Math.min(1.2, SIM.pitch + (pos.ry - SIM.spin.ry) * .008));
+        SIM.spin = { rx: pos.rx, ry: pos.ry };
+        relApply();
+      }
     });
     const up = ev => {
       SIM.pts.delete(ev.pointerId);
       if (SIM.pts.size < 2) SIM.pinch = 0;
       const wasDrag = SIM.drag;
-      SIM.drag = null; SIM.pan = null;
+      SIM.drag = null; SIM.pan = null; SIM.spin = null;
       if (SIM.moved < 6) {                              // 끌지 않고 톡 누른 것 — 고르기
         const g = ev.target.closest && ev.target.closest('[data-relnode]');
         if (g) focus(g.dataset.relnode);
       } else if (wasDrag) { SIM.alpha = Math.max(SIM.alpha, .25); relRun(); }
     };
     svg.addEventListener('pointerup', up);
-    svg.addEventListener('pointercancel', ev => { SIM.pts.delete(ev.pointerId); SIM.drag = null; SIM.pan = null; });
+    svg.addEventListener('pointercancel', ev => { SIM.pts.delete(ev.pointerId); SIM.drag = null; SIM.pan = null; SIM.spin = null; });
     svg.addEventListener('wheel', ev => {
       ev.preventDefault();
       const r = svg.getBoundingClientRect();
@@ -3705,7 +3755,10 @@ function relBind(box) {
   }));
   box.querySelector('[data-relme]')?.addEventListener('click', () => { RELV.all = !RELV.all; RELV.open = ''; SIM.focus = ''; relRefresh(); });
   box.querySelector('[data-relalum]')?.addEventListener('click', () => { RELV.alum = !RELV.alum; RELV.open = ''; relRefresh(); });
-  box.querySelector('[data-relfit]')?.addEventListener('click', () => { SIM.tx = 0; SIM.ty = 0; SIM.k = 1; SIM.focus = ''; RELV.open = ''; relRefresh(); });
+  box.querySelector('[data-relfit]')?.addEventListener('click', () => {
+    SIM.yaw = 0; SIM.pitch = 0; SIM.focus = ''; RELV.open = '';
+    SIM.tx = 0; SIM.ty = 0; SIM.k = 1; relApply(); relFit();
+  });
 }
 const relSpan = () => {
   const v = [...SIM.pts.values()];
