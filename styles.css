@@ -619,7 +619,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   border-color:color-mix(in srgb,var(--rc,#5f6672) 93%,#000);color:#fff}
 .st-c.vip .pushm{color:#ffd9b8}
 .st-c.vip:hover{filter:brightness(1.12)}
-/* VIP 이면서 공략 — 진한 바탕에서는 깃발을 옅은 주황으로 (바로 위 .st-c.vip .pushm) */
+/* 지원이면서 공략 — 진한 바탕에서는 깃발을 옅은 주황으로 (바로 위 .st-c.vip .pushm) */
+/* VIP(총장님이 청할 수 있는 분) — 바탕은 안 건드리고 **테두리 두 줄**로만 (2026-10-16).
+   바깥 줄은 그림자로 그린다 — 자리를 안 차지해 칩 크기가 안 흔들린다. 가운데 틈은 놓인 바탕색으로. */
+.st-c.pres{border-color:var(--vip);box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--vip)}
+.st-c.pres:hover{border-color:var(--vip)}
 .pushm{display:inline-flex;align-items:center;margin-right:4px;color:var(--push);line-height:0}
 .n--push{color:var(--push);display:inline-flex;align-items:center;gap:2px;margin-left:6px}
 /* 고르기 모드의 단추들 */
@@ -668,8 +672,46 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .vipbtn.on{background:color-mix(in srgb,var(--rc,#5f6672) 93%,#000);
   border-color:color-mix(in srgb,var(--rc,#5f6672) 93%,#000);color:#fff}
 .vipbtn.on:hover{filter:brightness(1.12)}
+/* VIP 단추 — 켜지면 칩과 같은 꼴로 테두리 두 줄 */
+.presbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
+  font-weight:700;cursor:pointer}
+.presbtn:hover{border-color:var(--vip)}
+.presbtn.on{border-color:var(--vip);color:var(--vip);
+  box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--vip)}
 .pushbtn.on{background:var(--push-fill);border-color:var(--push-fill);color:#fff}
 .surebtn.on:hover,.pushbtn.on:hover{filter:brightness(1.06)}
+
+/* ---------- 관계 지도 (2026-10-16) ---------- */
+:root{--rel-pos:#1f8a5b;--rel-neg:#c0392b;--rel-mid:#9aa3b2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rel-pos:#35b07a;--rel-neg:#d85f52;--rel-mid:#6f7a8a}}
+:root[data-theme="dark"]{--rel-pos:#35b07a;--rel-neg:#d85f52;--rel-mid:#6f7a8a}
+.rel-box{display:flex;flex-direction:column;gap:10px}
+.rel-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rel-tools .btn{display:inline-flex;width:auto;flex:none}
+.rel-tools .btn.on{border-color:var(--brand);color:var(--brand);background:var(--surface-2)}
+.rel-svg{display:block;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);touch-action:pan-y}
+.rel-l{cursor:pointer}
+.rel-l.on{stroke-width:3}
+.rel-n{cursor:pointer}
+.rel-n circle{stroke:var(--surface);stroke-width:2}
+.rel-n--me circle{stroke:var(--brand);stroke-width:3}
+.rel-n text{font-size:11px;font-weight:700;fill:var(--ink-2);paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.rel-n--me text{fill:var(--ink);font-size:12px}
+.rel-n:hover text,.rel-n:focus-visible text{fill:var(--brand)}
+/* 근거 — 유추한 것이면 어디서 미뤘는지 그대로 보여 준다 */
+.rel-why:empty{display:none}
+.rel-why{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.rel-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto}
+.rel-list button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;
+  font:inherit;font-size:12.5px;padding:5px 8px;border-radius:8px;color:inherit;cursor:pointer}
+.rel-list button:hover,.rel-list li.on button{background:var(--surface-2)}
+.rel-list b{flex:none;font-weight:700}
+.rel-list small{color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rel-k{flex:none;font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+.rel-k--pos{color:#fff;background:var(--rel-pos)}
+.rel-k--neg{color:#fff;background:var(--rel-neg)}
+.rel-k--alum{color:var(--ink-2);background:var(--surface-2);border:1px dashed var(--line-2)}
 
 /* 만난 적이 있는 교수 — 이름 오른쪽에 만난 횟수만큼 작은 불. 색은 그 선호도의 대표 색(--lit) */
 .metlit{display:inline-flex;align-items:center;gap:3px;margin-left:6px;

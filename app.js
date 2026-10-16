@@ -1831,12 +1831,12 @@ const STP = { pick: false, only: false };
 
 /* 이름 칩 하나. 고르기 모드에서는 링크가 아니라 단추가 되어 눌러도 상세로 가지 않는다 */
 function stChip(p, r) {
-  const met = getMet(p), pu = isPush(p), su = isSure(p), vi = isVip(p), k = rKey(p);
-  const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${vi ? ' vip' : ''}`;
+  const met = getMet(p), pu = isPush(p), su = isSure(p), vi = isVip(p), pr = isPres(p), k = rKey(p);
+  const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 지원' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
@@ -1896,8 +1896,11 @@ function renderStats() {
             </div>`; }).join('')}
         </div>
       </section>
+
+      ${relSection()}
     </div>`;
 
+  relRefresh();
   $app.querySelectorAll('[data-go]').forEach(el => {
     const go = () => { state.ratingFilter = el.dataset.rating; state._keepRating = true; location.hash = `#/dept/${encodeURIComponent(el.dataset.go)}`; };
     el.addEventListener('click', go);
@@ -2387,6 +2390,26 @@ function vipSave() {
 }
 function vipToggle(p) { const s = vips(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); vipSave(); return s.has(k); }
 
+/* ---------- VIP (2026-10-16) ----------
+ * 「지원」이 **나를 밀어 주는 분**이라면, 이것은 **총장님이 거들어 달라고 청할 수 있는 분**이다.
+ * 분석 목록에서는 바탕을 건드리지 않고 **테두리**로만 나타낸다 — 바탕은 강화·지원이 이미 쓴다.
+ * 저장 열쇠는 pres(총장) 이다. 보이는 글자만 VIP 이고, 자료는 지원(vip)과 섞이지 않는다. */
+const PRES_KEY = 'jnu-pres';
+let presSet = null;
+function press() {
+  if (!presSet) {
+    presSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(PRES_KEY) || '[]'); if (Array.isArray(v)) presSet = new Set(v); } catch {}
+  }
+  return presSet;
+}
+const isPres = p => press().has(rKey(p));
+function presSave() {
+  try { const s = press(); s.size ? localStorage.setItem(PRES_KEY, JSON.stringify([...s])) : localStorage.removeItem(PRES_KEY); } catch {}
+  saveSetting(SET_PR, settingValue(SET_PR));
+}
+function presToggle(p) { const s = press(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); presSave(); return s.has(k); }
+
 /* ---------- 학과 순서 ----------
  * 첫 화면에서 손잡이를 끌어 바꾼 차례. 값은 학과 id 의 배열이고 **순서 자체가 뜻**이라
  * 관심 교수처럼 정렬하지 않는다. 명단에 없는 학과(새로 생겼거나 이름이 바뀐 것)는 원래 자리에 남는다. */
@@ -2424,6 +2447,9 @@ const VIP_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="t
    체크(✓)는 「확인·완료」로 읽혀, 「공략해야 할 사람」처럼 할 일로 오해될 수 있었다. */
 const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
   + '<path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* VIP 표식 — 총장님이 청하는 자리라 왕관 */
+const PRES_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
+  + '<path d="M4 18h16l1.2-9-5.2 3.4L12 5 8 12.4 2.8 9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 const PUSH_FLAG = '<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">'
   + '<path d="M6 22V3h12l-3 5 3 5H6" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
 
@@ -2888,15 +2914,15 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
-const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip';
+const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SET_PR = 'pres';
 const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO, SET_VI, SET_ME];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO, SET_VI, SET_PR, SET_ME];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: '지원', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -2910,6 +2936,7 @@ function settingValue(key) {
   if (key === SET_PU) return [...pushes()].sort();   // 고른 순서는 뜻이 없다
   if (key === SET_SU) return [...sures()].sort();
   if (key === SET_VI) return [...vips()].sort();
+  if (key === SET_PR) return [...press()].sort();
   if (key === SET_DO) return [...dorder()];   // 정렬하지 않는다: 차례가 곧 값이다
   if (key === SET_MC) return mails();
   if (key === SET_MB) return mobiles();
@@ -2930,6 +2957,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_PU) { pushSet = new Set(v); v.length ? localStorage.setItem(PUSH_KEY, JSON.stringify(v)) : localStorage.removeItem(PUSH_KEY); }
     if (key === SET_SU) { sureSet = new Set(v); v.length ? localStorage.setItem(SURE_KEY, JSON.stringify(v)) : localStorage.removeItem(SURE_KEY); }
     if (key === SET_VI) { vipSet = new Set(v); v.length ? localStorage.setItem(VIP_KEY, JSON.stringify(v)) : localStorage.removeItem(VIP_KEY); }
+    if (key === SET_PR) { presSet = new Set(v); v.length ? localStorage.setItem(PRES_KEY, JSON.stringify(v)) : localStorage.removeItem(PRES_KEY); }
     if (key === SET_DO) { dorderList = v.map(String); v.length ? localStorage.setItem(DORDER_KEY, JSON.stringify(v)) : localStorage.removeItem(DORDER_KEY); dorderApply(); }
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
@@ -2940,7 +2968,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_ME]: MEET_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -3321,6 +3349,230 @@ function bindCards() {
   bindMobGo($app);
   $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
 }
+
+/* ---------- 관계 지도 (2026-10-16) ----------
+ * 「누구를 거쳐 누구에게 닿는가」를 한 장에 본다. 선을 긋는 근거는 셋이고, **섞지 않는다**.
+ *   동문(점선·회색)  — 같은 대학에서 학위를 받은 사이. 자료에서 나오는 것이라 **중립**이다.
+ *   메모(실선)       — 교수님이 적어 두신 말에 다른 교수 이름이 나오는 사이. 말투로 긍정·부정을 가린다.
+ *   학과             — 선을 긋지 않고 **자리**로 말한다(같은 학과끼리 모여 선다).
+ * 셈은 **그릴 때마다 브라우저에서** 한다 — 메모를 고치면 다음 그림에 바로 든다(배포가 필요 없다).
+ * 비참여(비)는 뺀다(사용자 지정). */
+
+let eduMap = null, eduWait = null;
+function loadEdu() {
+  if (eduMap) return Promise.resolve(eduMap);
+  if (eduWait) return eduWait;
+  eduWait = fetch(`data/edu.json?v=${encodeURIComponent(APP_V || '1')}`)
+    .then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(d => { eduMap = (d && d.profs) || {}; eduWait = null; return eduMap; });
+  return eduWait;
+}
+/* 교수님이 고쳐 둔 학력이 있으면 그것이 먼저 — 파일은 초벌일 뿐이다(시트의 edu 키) */
+const EDU_KEY = 'jnu-edu';
+let eduFix = null;
+function eduFixes() {
+  if (!eduFix) {
+    eduFix = {};
+    try { const v = JSON.parse(localStorage.getItem(EDU_KEY) || '{}'); if (v && typeof v === 'object') eduFix = v; } catch {}
+  }
+  return eduFix;
+}
+const eduOf = p => { const k = rKey(p); return eduFixes()[k] || (eduMap && eduMap[k]) || null; };
+const eduUnivs = e => e ? [...new Set([e.bs, e.ms, e.phd].filter(Boolean))] : [];
+
+/* 말투로 긍정·부정을 가린다. 사전은 시트(설정)에서 더 늘릴 수 있게 둔다. */
+const REL_POS = ['가깝', '친하', '친분', '함께', '같이', '도와', '도움', '소개', '추천', '밀어', '챙겨',
+  '우호', '호의', '지지', '협력', '공동', '동기', '선배', '후배', '한편', '편', '설득', '의기투합'];
+const REL_NEG = ['서먹', '껄끄', '갈등', '틀어', '반대', '불편', '앙금', '거리감', '멀어', '비판',
+  '부정적', '경쟁', '사이가 안', '사이가 좋지', '안 좋', '싫어', '껄끄럽'];
+const REL_FLIP = /(않|않다|안\s|못\s|아니|별로)/;
+const RELV = { all: false, alum: true, open: '' };   // 보기 설정 — 기본은 「나와 이어진 것만」
+
+/* 메모 한 토막에서 그 이름에 대한 마음을 −2…+2 로 읽는다 */
+function relPolar(sentence, name) {
+  const at = sentence.indexOf(name);
+  if (at < 0) return 0;
+  const near = sentence.slice(Math.max(0, at - 25), Math.min(sentence.length, at + name.length + 25));
+  let s = 0;
+  REL_POS.forEach(w => { if (near.includes(w)) s += 1; });
+  REL_NEG.forEach(w => { if (near.includes(w)) s -= 1; });
+  if (s > 0 && REL_FLIP.test(near)) s = -s;          // 「가깝지 않다」 처럼 뒤집는 말
+  return Math.max(-2, Math.min(2, s));
+}
+
+/* 관계를 뽑는다 — { nodes, edges, skipped } */
+function relGraph() {
+  const rows = state.rows.filter(p => getRating(p) !== '비');
+  const skipped = state.rows.length - rows.length;
+  const byKey = new Map(rows.map(p => [rKey(p), p]));
+  const meKey = (state.rows.find(p => p.name === ME.name) || {}) && rKey(state.rows.find(p => p.name === ME.name) || rows[0]);
+  const edges = [];
+  const add = e => { const i = edges.findIndex(x => x.a === e.a && x.b === e.b && x.kind === e.kind);
+    if (i < 0) edges.push(e); else if (Math.abs(e.pol) > Math.abs(edges[i].pol)) edges[i] = e; };
+
+  /* 1) 동문 — 같은 대학에서 학위를 받은 사이 */
+  const byUni = new Map();
+  rows.forEach(p => eduUnivs(eduOf(p)).forEach(u => {
+    if (!byUni.has(u)) byUni.set(u, []);
+    byUni.get(u).push(rKey(p));
+  }));
+  byUni.forEach((ks, u) => {
+    if (ks.length < 2 || ks.length > 14) return;         // 너무 큰 묶음은 실타래가 된다
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++)
+      add({ a: ks[i], b: ks[j], kind: 'alum', pol: 0, why: `${u} 동문`, uni: u });
+  });
+
+  /* 2) 메모 — 적어 두신 말에 다른 교수 이름이 나오면 */
+  rows.forEach(p => {
+    const memo = String(getMemo(p) || '');
+    if (!memo.trim()) return;
+    memo.split(/[.!?\n·]+/).forEach(raw => {
+      const sent = raw.trim();
+      if (!sent) return;
+      rows.forEach(q => {
+        if (q === p || !sent.includes(q.name)) return;
+        add({ a: rKey(p), b: rKey(q), kind: 'memo', pol: relPolar(sent, q.name), why: sent.slice(0, 80) });
+      });
+    });
+  });
+
+  const used = new Set();
+  edges.forEach(e => { used.add(e.a); used.add(e.b); });
+  const nodes = rows.filter(p => used.has(rKey(p)) || rKey(p) === meKey)
+    .map(p => ({ key: rKey(p), p, me: rKey(p) === meKey }));
+  return { nodes, edges, skipped, meKey };
+}
+
+/* 보기 설정에 맞춰 걸러 낸다 */
+function relView(g) {
+  let edges = g.edges.filter(e => RELV.alum || e.kind !== 'alum');
+  if (!RELV.all) edges = edges.filter(e => e.a === g.meKey || e.b === g.meKey);
+  const used = new Set(); edges.forEach(e => { used.add(e.a); used.add(e.b); });
+  const nodes = g.nodes.filter(n => used.has(n.key) || n.me);
+  return { nodes, edges };
+}
+
+/* 자리 잡기 — 밀어내고, 선으로 당기고, 같은 학과끼리 모은다.
+   씨앗을 이름에서 뽑으므로 **다시 그려도 자리가 안 흔들린다**. */
+function relLayout(nodes, edges, W, H) {
+  const seed = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+  const R = Math.min(W, H) * .40;
+  nodes.forEach((n, i) => {
+    const t = (seed(n.key) % 1000) / 1000 * Math.PI * 2;
+    const r = n.me ? 0 : R * (.45 + (seed(n.key + 'r') % 1000) / 1000 * .55);
+    n.x = W / 2 + Math.cos(t) * r; n.y = H / 2 + Math.sin(t) * r;
+  });
+  const idx = new Map(nodes.map((n, i) => [n.key, i]));
+  const link = edges.map(e => [idx.get(e.a), idx.get(e.b), e.kind === 'memo' ? 80 : 150])
+    .filter(l => l[0] != null && l[1] != null);
+  const STEP = 260;
+  for (let s = 0; s < STEP; s++) {
+    const cool = 1 - s / STEP;
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || .01;
+      const want = a.p.dept_id === b.p.dept_id ? 52 : 74;   // 같은 학과는 조금 더 가까이
+      if (d < want) { const f = (want - d) / d * .5 * cool; a.x -= dx * f; a.y -= dy * f; b.x += dx * f; b.y += dy * f; }
+    }
+    link.forEach(([i, j, len]) => {
+      const a = nodes[i], b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || .01;
+      const f = (d - len) / d * .035 * cool;
+      a.x += dx * f; a.y += dy * f; b.x -= dx * f; b.y -= dy * f;
+    });
+    nodes.forEach(n => {                                   // 가운데로 모으기 · 나는 한가운데 고정
+      if (n.me) { n.x += (W / 2 - n.x) * .25; n.y += (H / 2 - n.y) * .25; return; }
+      n.x += (W / 2 - n.x) * .006 * cool; n.y += (H / 2 - n.y) * .006 * cool;
+    });
+  }
+  /* 다 그린 뒤 **그림을 상자에 맞춰 늘린다** — 몇 명이든 빈 데 없이 꽉 차게 */
+  const M = 36;
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const k = Math.min((W - M * 2) / Math.max(1, x1 - x0), (H - M * 2) / Math.max(1, y1 - y0), 2.2);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  nodes.forEach(n => {
+    n.x = W / 2 + (n.x - cx) * k;
+    n.y = H / 2 + (n.y - cy) * k;
+    n.x = Math.max(M, Math.min(W - M, n.x)); n.y = Math.max(M, Math.min(H - M, n.y));
+  });
+}
+
+const relColor = e => e.kind === 'alum' ? 'var(--rel-mid)'
+  : e.pol > 0 ? 'var(--rel-pos)' : e.pol < 0 ? 'var(--rel-neg)' : 'var(--rel-mid)';
+const relWord = e => e.kind === 'alum' ? '동문(추정)' : e.pol > 0 ? '가까움' : e.pol < 0 ? '껄끄러움' : '언급';
+
+function relSection() {
+  return `<section class="st-sec rel" id="relSec">
+    <div class="cal-head"><h2>관계 지도</h2></div>
+    <div class="rel-box" data-relbox><p class="st-note">불러오는 중…</p></div>
+  </section>`;
+}
+
+/* 화면을 그린다. edu.json 을 아직 못 읽었으면 읽고 나서 다시 부른다. */
+function relRefresh() {
+  const box = $app.querySelector('[data-relbox]');
+  if (!box) return;
+  if (!eduMap) { loadEdu().then(() => relRefresh()); return; }
+  const g = relGraph(), v = relView(g);
+  const W = Math.max(320, Math.min(980, Math.round(box.clientWidth || 720)));
+  const H = Math.round(W * (W < 520 ? 1.05 : .62));
+  relLayout(v.nodes, v.edges, W, H);
+  const at = new Map(v.nodes.map(n => [n.key, n]));
+  const memoN = g.edges.filter(e => e.kind === 'memo').length;
+
+  const lines = v.edges.map((e, i) => {
+    const a = at.get(e.a), b = at.get(e.b);
+    if (!a || !b) return '';
+    return `<line data-rele="${i}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"
+      stroke="${relColor(e)}" stroke-width="${e.kind === 'memo' ? 1 + Math.abs(e.pol) : 1}"
+      ${e.kind === 'alum' ? 'stroke-dasharray="4 4"' : ''} class="rel-l${RELV.open === String(i) ? ' on' : ''}"><title>${esc(`${nameOfKey(e.a)} — ${nameOfKey(e.b)} · ${relWord(e)}`)}</title></line>`;
+  }).join('');
+
+  const dots = v.nodes.map(n => {
+    const r = getRating(n.p), c = RCOLOR[r] || '#b9c0cc';
+    return `<g class="rel-n${n.me ? ' rel-n--me' : ''}" data-relnode="${esc(n.key)}" tabindex="0" role="button"
+      aria-label="${esc(n.p.name)} ${esc(n.p.dept_name)}${n.me ? ' — 나' : ''}">
+      <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.me ? 13 : 9}" fill="${esc(c)}"></circle>
+      <text x="${n.x.toFixed(1)}" y="${(n.y + (n.me ? 26 : 21)).toFixed(1)}" text-anchor="middle">${esc(n.p.name)}</text>
+    </g>`;
+  }).join('');
+
+  const rows = v.edges.map((e, i) => `<li${RELV.open === String(i) ? ' class="on"' : ''}>
+      <button type="button" data-relrow="${i}">
+        <b>${esc(nameOfKey(e.a))} — ${esc(nameOfKey(e.b))}</b>
+        <span class="rel-k rel-k--${e.kind === 'alum' ? 'alum' : e.pol > 0 ? 'pos' : e.pol < 0 ? 'neg' : 'mid'}">${esc(relWord(e))}</span>
+        <small>${esc(e.why)}</small>
+      </button></li>`).join('');
+
+  box.innerHTML = `
+    <div class="rel-tools">
+      <button type="button" class="btn${RELV.all ? '' : ' on'}" data-relme aria-pressed="${!RELV.all}">나와 이어진 것만</button>
+      <button type="button" class="btn${RELV.alum ? ' on' : ''}" data-relalum aria-pressed="${RELV.alum}">동문선 보기</button>
+      <span class="st-note">실선은 메모에 적힌 것 · 점선은 자료로 미룬 것${g.skipped ? ` · 비참여 ${g.skipped}명 뺌` : ''}</span>
+    </div>
+    ${v.edges.length ? `<svg class="rel-svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
+      aria-label="교수 사이 관계 그림 — 점 ${v.nodes.length}개, 선 ${v.edges.length}개">
+      <g>${lines}</g><g>${dots}</g></svg>`
+      : `<div class="empty"><strong>아직 그릴 관계가 없습니다</strong>메모에 다른 교수 이름을 적으시면 바로 이어집니다.</div>`}
+    <div class="rel-why" data-relwhy aria-live="polite">${RELV.open && v.edges[RELV.open]
+      ? esc(`${nameOfKey(v.edges[RELV.open].a)} — ${nameOfKey(v.edges[RELV.open].b)} · ${relWord(v.edges[RELV.open])} · ${v.edges[RELV.open].why}`) : ''}</div>
+    <ul class="rel-list">${rows}</ul>
+    <p class="st-note">메모에서 찾은 관계 ${memoN}건 · 그림의 점을 누르면 그 교수로 갑니다.</p>`;
+
+  box.querySelectorAll('[data-relnode]').forEach(el => {
+    const go = () => { const p = state.rows.find(x => rKey(x) === el.dataset.relnode);
+      if (p) location.hash = `#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}`; };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  const open = i => { RELV.open = RELV.open === String(i) ? '' : String(i); relRefresh(); };
+  box.querySelectorAll('[data-rele]').forEach(el => el.addEventListener('click', () => open(el.dataset.rele)));
+  box.querySelectorAll('[data-relrow]').forEach(el => el.addEventListener('click', () => open(el.dataset.relrow)));
+  box.querySelector('[data-relme]')?.addEventListener('click', () => { RELV.all = !RELV.all; RELV.open = ''; relRefresh(); });
+  box.querySelector('[data-relalum]')?.addEventListener('click', () => { RELV.alum = !RELV.alum; RELV.open = ''; relRefresh(); });
+}
+const nameOfKey = k => { const p = state.rows.find(x => rKey(x) === k); return p ? p.name : k; };
 
 /* ---------- 검색 결과 (data/insights/<학과>.json) ----------
  * GitHub Pages는 정적 호스팅이라 브라우저에서 검색 API를 부를 수 없어, 미리 모아 둔 파일을 읽어 보여줍니다.
@@ -4236,7 +4488,9 @@ function openDrawer(p, d) {
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
-            ${VIP_MARK}<span>VIP</span></button>
+            ${VIP_MARK}<span>지원</span></button>
+          <button type="button" class="presbtn${isPres(p) ? ' on' : ''}" data-presbtn="${esc(rKey(p))}" aria-pressed="${isPres(p)}">
+            ${PRES_MARK}<span>VIP</span></button>
         </div>
       </div>
 
@@ -4289,6 +4543,12 @@ function openDrawer(p, d) {
   bindAix($panel, p, d);
   $panel.querySelector('[data-vipbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = vipToggle(p);
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    flashStatus(on ? `${p.name} 교수를 지원으로 표시했습니다` : `${p.name} 교수의 지원 표시를 풀었습니다`);
+  });
+  $panel.querySelector('[data-presbtn]')?.addEventListener('click', e => {
+    const btn = e.currentTarget, on = presToggle(p);
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
     flashStatus(on ? `${p.name} 교수를 VIP 로 표시했습니다` : `${p.name} 교수의 VIP 표시를 풀었습니다`);
