@@ -48,11 +48,11 @@ check('연구실 전화 다음에 온다', await page.evaluate(() => {
   return kids.indexOf('po__tel') < kids.findIndex(c => c.includes('po__mob'));
 }));
 /* 핸드폰을 누르면 바로 문자 쓰기로 간다. 전화는 옆의 수화기로 건다. (2026-10-12) */
-check('핸드폰은 sms: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'sms:01012345678'),
+check('핸드폰은 sms: 링크', await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href') === 'sms:+821012345678'),
   await page.evaluate(() => document.querySelector('.po__mob').getAttribute('href')));
 check('옆에 전화 걸기 단추', await page.evaluate(() => {
   const a = document.querySelector('.po__mobw a.po__cp');
-  return !!a && a.getAttribute('href') === 'tel:01012345678';
+  return !!a && a.getAttribute('href') === 'tel:+821012345678';
 }));
 check('연구실 번호는 그대로 tel:', await page.evaluate(() => {
   const a = document.querySelector('.prof__office a.po__tel:not(.po__mob)');
@@ -113,6 +113,8 @@ check('한 줄에 나란히', await page.evaluate(() => {
 /* 2026-10-15 — 번호를 누르면 어느 쪽이든 전화. 문자는 핸드폰 옆의 말풍선으로 */
 check('번호는 둘 다 tel:', ct.length === 2 && ct.every(x => /^tel:[\d+]+$/.test(x.href)),
   ct.map(x => x.href).join(' '));
+/* 나라 번호를 붙여 적는다 — 안 붙이면 컴퓨터 문자 앱이 미국 번호(+1…)로 읽는다 (2026-10-17) */
+check('번호에 +82 를 붙여 적는다', ct.every(x => x.href.startsWith('tel:+82')), ct.map(x => x.href).join(' '));
 check('핸드폰 옆에 문자 단추', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct')][1].querySelector('a.d-ct__c');
   return !!a && /^sms:/.test(a.getAttribute('href'));
@@ -233,11 +235,11 @@ check('엔터로도 저장된다', await page.evaluate(() => mobileOf(state.rows
   await page.evaluate(() => mobileOf(state.rows[2])));
 check('저장하면 바로 전화 링크', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct__n')].pop();
-  return !!a && a.getAttribute('href') === 'tel:01087651234';
+  return !!a && a.getAttribute('href') === 'tel:+821087651234';
 }), await page.evaluate(() => ([...document.querySelectorAll('.d-ct__n')].pop() || {}).getAttribute?.('href')));
 check('옆의 말풍선은 문자로 간다', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct')].pop().querySelector('a.d-ct__c');
-  return !!a && a.getAttribute('href') === 'sms:01087651234';
+  return !!a && a.getAttribute('href') === 'sms:+821087651234';
 }));
 check('시트에도 올라간다', await page.evaluate(() =>
   JSON.parse(localStorage.getItem('jnu-mobile'))[rKey(state.rows[2])] === '010-8765-1234'));
@@ -336,7 +338,7 @@ check('방 번호가 번호 줄 위에 온다', await page.evaluate(() => {
   .map(e => e.className).join(' / ')));
 check('번호 줄 안에서는 연구실 다음 핸드폰', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').replace(/\D/g, ''));
-  return a.length === 2 && a[0].startsWith('064') && a[1].startsWith('010');
+  return a.length === 2 && a[0].startsWith('8264') && a[1].startsWith('8210');
 }), await page.evaluate(() => [...document.querySelectorAll('.d-ct__n')].map(x => x.getAttribute('href')).join(' ')));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
 await page.evaluate(() => closeDrawer(false));

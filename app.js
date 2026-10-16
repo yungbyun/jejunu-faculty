@@ -2267,8 +2267,8 @@ function profCard(p, d, showDept = false) {
         <div class="prof__bottom">
         ${loc || p.phone || mobileOf(p) ? `<div class="prof__office">
           ${loc ? `<span class="po__room"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="po__t">${esc(loc)}</span></span>` : ''}
-          ${p.phone ? `<a class="po__tel" href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
-          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="sms:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="문자 쓰기" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))} — 문자 쓰기">${SMS_SVG}${esc(mobileOf(p))}</a><a class="po__cp" href="tel:${esc(mobileOf(p).replace(/[^\d+]/g, ''))}" title="전화 걸기" aria-label="${esc(p.name)} 전화 걸기">${TEL_SVG}</a><button type="button" class="po__cp" data-mobgo="${esc(rKey(p))}" title="번호 고치기" aria-label="${esc(p.name)} 핸드폰 번호 고치기">${PEN_SVG}</button><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
+          ${p.phone ? `<a class="po__tel" href="tel:${esc(telE164(p.phone))}" aria-label="${esc(p.name)} 전화 ${esc(p.phone)}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.3.2 2.5.57 3.6a1 1 0 0 1-.25 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(p.phone)}</a>` : ''}
+          ${mobileOf(p) ? `<span class="po__mobw"><a class="po__tel po__mob" href="sms:${esc(telE164(mobileOf(p)))}" title="문자 쓰기" aria-label="${esc(p.name)} 핸드폰 ${esc(mobileOf(p))} — 문자 쓰기">${SMS_SVG}${esc(mobileOf(p))}</a><a class="po__cp" href="tel:${esc(telE164(mobileOf(p)))}" title="전화 걸기" aria-label="${esc(p.name)} 전화 걸기">${TEL_SVG}</a><button type="button" class="po__cp" data-mobgo="${esc(rKey(p))}" title="번호 고치기" aria-label="${esc(p.name)} 핸드폰 번호 고치기">${PEN_SVG}</button><button type="button" class="po__cp" data-copynum="${esc(mobileOf(p))}" title="번호 복사" aria-label="${esc(p.name)} 핸드폰 번호 복사"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>` : ''}
         </div>` : ''}
         <div class="prof__foot"><span class="prof__note">${noteBadge(entryOf(rKey(p)))}</span>${rateChips(p)}${meetCounter(p)}</div>
         </div>
@@ -4082,8 +4082,19 @@ let mobEditKey = '';
 const CP_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<rect x="9" y="9" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>'
   + '<path d="M15 6H6a2 2 0 0 0-2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+/* 번호를 **나라 번호까지 붙여** 적는다 (2026-10-17).
+   01088927419 처럼 그냥 넘기면 컴퓨터의 문자 앱이 **미국 번호(+1 0108892…)로 잘못 읽습니다** —
+   교수님이 겪으신 일입니다. 맨 앞의 0 을 떼고 +82 를 붙이면 어느 기기에서나 한국 번호로 읽힙니다. */
+function telE164(num) {
+  const d = String(num || '').replace(/[^\d+]/g, '');
+  if (!d) return '';
+  if (d[0] === '+') return d;
+  if (d[0] === '0') return '+82' + d.slice(1);
+  return d;
+}
+
 function dPhone(label, num, who, mob) {
-  const tel = String(num).replace(/[^\d+]/g, '');
+  const tel = telE164(num);
   /* 그림이 곧 그 일이다 (2026-10-15) — **번호를 누르면 전화**, 그래서 번호 앞은 어느 쪽이든 수화기.
      핸드폰은 옆의 **말풍선**으로 문자를 쓴다. 예전에는 핸드폰 번호를 누르면 문자였는데,
      수화기 그림이 문자 옆에 놓여 그림과 하는 일이 어긋났다. */
