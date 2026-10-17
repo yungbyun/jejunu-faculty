@@ -75,6 +75,18 @@ for (const w of [320, 390]) {
   t(`${w}px 새 약속 단추가 한 줄`, cal.neu <= 46, `${cal.neu}px`);
   t(`${w}px 달력 한 판이 한 화면에`, cal.tall <= 520, `길잡이부터 새 약속까지 ${cal.tall}px`);
   t(`${w}px 가로로 넘치지 않음`, !cal.wide);
+  /* 좁은 폰에서 **토요일 칸이 상자 밖으로 밀려났다** — 일곱 칸이 다 안에 들어와야 한다 (2026-10-17) */
+  const dow = await page.evaluate(() => {
+    const g = document.querySelector('.cal-grid').getBoundingClientRect();
+    const es = [...document.querySelectorAll('.cal-dow')].map(e => e.getBoundingClientRect());
+    const cs = [...document.querySelectorAll('.cal-c')].map(e => e.getBoundingClientRect());
+    return { n: es.length, out: es.filter(r => r.right > g.right + 1 || r.left < g.left - 1).length,
+      cout: cs.filter(r => r.right > g.right + 1).length,
+      sat: es.length === 7 ? Math.round(es[6].right) : 0, right: Math.round(g.right) };
+  });
+  t(`${w}px 요일이 일곱이고 다 상자 안에`, dow.n === 7 && dow.out === 0,
+    `토 ${dow.sat} / 상자 ${dow.right}`);
+  t(`${w}px 날짜 칸도 안 밀려난다`, dow.cout === 0, `${dow.cout}칸 밖`);
 
   await page.evaluate(() => {
     pushSet = new Set(); sureSet = new Set(); mobileMap = {};
