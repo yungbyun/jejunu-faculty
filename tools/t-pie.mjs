@@ -80,9 +80,11 @@ t('비 3명은 모수에서 빠짐', maj.u.includes(`전체 ${maj.n-3}명`), maj
 t('절반도 도넛 아래에 적는다', maj.u === `전체 ${maj.n-3}명(절반 ${Math.ceil((maj.n-3)/2)}명)`, maj.u);
 /* 「절반까지」 카드는 2026-09-25 에 없앴다 — 모자란 인원은 % 옆 괄호로 간다 */
 t('절반까지 카드는 없다', !maj.goal);
-/* 절반과의 거리는 **카드 아랫줄에 말로** 적는다 — 「절반 33명까지 3-」 (2026-10-20) */
-t('모자란 인원이 아랫줄에', maj.ks[1].includes(`절반 ${Math.ceil((maj.n-3)/2)}명까지 ${Math.ceil((maj.n-3)/2)-30}-`), maj.ks[1]);
+/* 절반과의 거리는 **카드 맨 아랫줄에** 적는다 — 「3명 부족」 (2026-10-20, 사용자 지정).
+ * 「절반」이라는 말은 화면에 적지 않는다 — 도넛 아래와 말풍선에 있다. */
+t('모자란 인원이 맨 아랫줄에', maj.ks[1].includes(`${Math.ceil((maj.n-3)/2)-30}명 부족`), maj.ks[1]);
 t('모자랄 때 「초과」라 하지 않는다', !maj.ks[1].includes('초과'), maj.ks[1]);
+t('카드에는 「절반」이라 적지 않는다', !maj.ks.some(k => k.includes('절반')), maj.ks.join(' | '));
 t('큰 숫자는 % 하나뿐', await page.evaluate(() =>
   document.querySelector('.pie__k--pos b').textContent) === '45%',
   await page.evaluate(() => document.querySelector('.pie__k--pos b').textContent));
@@ -100,7 +102,7 @@ const over = await page.evaluate(()=>{
   return { k: document.querySelector('.pie__k--pos').textContent,
            want: state.rows.length - half };
 });
-t('절반을 넘으면 「절반에서 N명 초과」', over.k.includes(`절반에서 ${over.want}명 초과`), over.k);
+t('절반을 넘으면 「N명 초과」', over.k.includes(`${over.want}명 초과`), over.k);
 t('넘침을 도움말에도 적는다',
   (await page.getAttribute('.pie__k--pos .pie__kn', 'title')).includes(`${over.want}명 넘습니다`),
   await page.getAttribute('.pie__k--pos .pie__kn', 'title'));
@@ -272,12 +274,12 @@ t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
 }), await page.getAttribute('.pie__k--push', 'title'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 세 카드의 아랫줄 생김새 — 「절반 K명까지 N-」 또는 「절반에서 N명 초과」 (2026-10-20) */
+/* 세 카드의 맨 아랫줄 생김새 — 「N명 부족」 · 「N명 초과」 · 「딱 맞음」 (2026-10-20) */
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').textContent.trim(), k);
-const GAPRE = /^(절반 \d+명까지 \d+-|절반에서 \d+명 초과|절반 \d+명과 같음)$/;
+const GAPRE = /^(\d+명 부족|\d+명 초과|딱 맞음)$/;
 for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
-  t(`${k.split('--')[1]} 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
+  t(`${k.split('--')[1]} 맨 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
 t('세 카드 이름은 「이름 인원」', await page.evaluate(() =>
   [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
@@ -312,8 +314,10 @@ const vsl = await page.evaluate(() => {
            base: state.rows.filter(p => ['확','긍'].includes(getRating(p))).length,
            add: state.rows.filter(p => isSure(p) && getRating(p) === '중').length,
            pos: txt('.pie__k--pos'), push: txt('.pie__k--push'),
-           last: ['.pie__k--pos', '.pie__k--push']
-             .map(k => document.querySelector(k).lastElementChild.className).join(' / ') };
+           order: ['.pie__k--pos', '.pie__k--push']
+             .map(k => [...document.querySelector(k).children]
+               .map(c => c.className.split(' ')[0] || c.tagName.toLowerCase()).join('>'))
+             .join(' / ') };
 });
 t('확+긍 카드에 내 표 vs 상대 표', vsl.pos === `${vsl.base} vs ${vsl.total - vsl.base}`,
   `${vsl.pos} (모수 ${vsl.total})`);
@@ -322,7 +326,9 @@ t('강화 카드에도 같은 줄 — 강화만큼 늘어난다',
   vsl.push === `${vsl.base + vsl.add} vs ${vsl.total - vsl.base - vsl.add}`,
   `${vsl.push} (+${vsl.add})`);
 t('두 표를 더하면 모수', vsl.add > 0 && vsl.total === vsl.base + (vsl.total - vsl.base), JSON.stringify(vsl));
-t('그 줄이 카드의 맨 아래', vsl.last === 'pie__kv / pie__kv', vsl.last);
+/* 줄 차례: 이름 · % · 표 수 · 모자람/넘침 (2026-10-20, 사용자 지정) */
+const ORDER = 'pie__kl>b>pie__kv>pie__kn';
+t('줄 차례는 이름 · 표 수 · 모자람/넘침', vsl.order === `${ORDER} / ${ORDER}`, vsl.order);
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); render(); });
 
 /* 카드가 셋이어도 폰(390px)에서 한 줄에 서야 한다 (2026-10-20).
@@ -335,7 +341,7 @@ const lay = w => page.evaluate(() => {
            rows: new Set(ks.map(k => Math.round(k.getBoundingClientRect().top))).size,
            out: ks.filter(k => k.getBoundingClientRect().right > box.right + 1).length,
            over: ks.filter(k => k.scrollWidth > k.clientWidth + 1).length,
-           tail: ks.filter(k => k.querySelector('.pie__kt').getClientRects().length).length };
+           lines: ks.map(k => [...k.children].map(c => c.getClientRects().length).join('')).join('/') };
 });
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); render(); });
 await page.setViewportSize({ width: 390, height: 1200 });   /* 이 시험은 1440px 에서 돈다 */
@@ -344,16 +350,18 @@ const phone = await lay();
 t('카드는 셋', phone.n === 3, `${phone.n}장`);
 t('폰에서도 한 줄에 선다', phone.rows === 1 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
 t('폰에서 글이 칸을 넘지 않는다', phone.over === 0, `${phone.over}장 넘침`);
-t('390px 에서는 꼬리말이 다 보인다', phone.tail === 3, `${phone.tail}장에 보임`);
-/* 더 좁아지면(360px 따위) 꼬리말만 접는다 — 칸을 넘기느니 접는 것이 낫다 */
-await page.setViewportSize({ width: 360, height: 1200 });
+t('390px 에서 줄이 흐트러지지 않는다', phone.lines === '1111/1111/1111', phone.lines);
+/* 더 좁은 폰(320px)에서도 넘치지 않아야 한다 */
+await page.setViewportSize({ width: 320, height: 1200 });
 await page.waitForTimeout(250);
 const tiny = await lay();
-t('360px 에서는 꼬리말을 접는다', tiny.tail === 0 && tiny.rows === 1 && tiny.over === 0, JSON.stringify(tiny));
+t('320px 에서도 한 줄에 서고 안 넘친다',
+  tiny.rows === 1 && tiny.out === 0 && tiny.over === 0 && tiny.lines === '1111/1111/1111',
+  JSON.stringify(tiny));
 await page.setViewportSize({ width: 900, height: 1200 });
 await page.waitForTimeout(250);
 const wide = await lay();
-t('넓은 화면에서는 꼬리말이 다시 보인다', wide.tail === 3 && wide.rows === 1, JSON.stringify(wide));
+t('넓은 화면에서도 한 줄', wide.rows === 1 && wide.over === 0, JSON.stringify(wide));
 await page.setViewportSize({ width: 1440, height: 900 });    /* 뒤의 시험을 위해 되돌린다 */
 await page.waitForTimeout(250);
 

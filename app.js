@@ -1726,16 +1726,16 @@ function donut(profs) {
   const need = half - base;
   /* 절반까지 몇 명인지를 따로 카드로 두지 않고 % 옆에 붙인다 (2026-09-25).
    * 모자라면 N-, 넘으면 N+, 딱 맞으면 ±0. 둘 다 '절반' 기준이다 (2026-10-19 글투 바뀜). */
-  /* 카드 **아랫줄**에 절반과의 거리를 말로 적습니다 (2026-10-20, 사용자 지정).
-   * 모자라면 「절반 32명까지 3-」, 넘으면 「절반에서 5명 초과」, 딱 맞으면 「절반 32명과 같음」.
-   * 2026-10-19~10-20 아침에는 큰 숫자 옆에 `(3-)` `(5+)` 로 붙였는데, 큰 숫자는 % 하나만
-   * 남기고 이 줄로 내렸습니다. 좁은 화면에서는 `.pie__kt` 로 묶은 데를 숨깁니다. */
+  /* 카드 **맨 아랫줄**에 절반과의 거리를 적습니다 (2026-10-20, 사용자 지정).
+   * 「3명 부족」 · 「5명 초과」 · 「딱 맞음」 — **화면에는 「절반」이라는 말을 적지 않습니다.**
+   * 무엇에 견준 몫인지는 도넛 아래(`전체 63명(절반 32명)`)와 말풍선에 있습니다.
+   * 10-19 에는 큰 숫자 옆에 `(3-)`, 10-20 낮에는 「절반 32명까지 3-」 이었습니다. */
   const gapLine = n => {
     const d = n - half;
     const num = (cls, txt) => `<em class="pie__kg pie__kg--${cls}">${txt}</em>`;
-    const body = d === 0 ? `절반<span class="pie__kt"> ${half}명</span>과 같음`
-      : d < 0 ? `절반<span class="pie__kt"> ${half}명</span>까지 ${num('short', `${-d}-`)}`
-      : `<span class="pie__kt">절반에서 </span>${num('over', d)}명 초과`;
+    const body = d === 0 ? '딱 맞음'
+      : d < 0 ? `${num('short', -d)}명 부족`
+      : `${num('over', d)}명 초과`;
     const say = d === 0 ? '과 같습니다' : d < 0 ? `보다 ${-d}명 모자랍니다` : `를 ${d}명 넘습니다`;
     return `<span class="pie__kn" title="${n}명은 절반 ${half}명${say}">${body}</span>`;
   };
@@ -1780,15 +1780,14 @@ function donut(profs) {
       </svg>
       <div class="pie__kpi">
         <div class="pie__k pie__k--high"><span class="pie__kl">확실 <i>${sure}</i></span>
-          <b>${pct(sure)}%</b>${gapLine(sure)}
-          ${vs(sure)}</div>
+          <b>${pct(sure)}%</b>
+          ${vs(sure)}${gapLine(sure)}</div>
         <div class="pie__k pie__k--pos"><span class="pie__kl">+긍정(${pos}) <i>${base}</i></span>
-          <b>${pct(base)}%</b>${gapLine(base)}
-          ${vs(base)}</div>
+          <b>${pct(base)}%</b>
+          ${vs(base)}${gapLine(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
           <span class="pie__kl">+강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
-          ${gapLine(reach)}
-          ${vs(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          ${vs(reach)}${gapLine(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
