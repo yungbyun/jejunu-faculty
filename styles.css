@@ -543,6 +543,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__k b{font-size:30px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
 .pie__kl{font-size:11.5px;font-weight:700;color:var(--ink-3)}
 .pie__kn{font-size:11.5px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* 내 표 vs 상대 표 — 카드 맨 아랫줄 (2026-10-19) */
+.pie__kv{font-size:11.5px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pie__kv i{font-style:normal;font-weight:800;color:var(--ink);font-size:12.5px}
 .pie__k--high b{color:var(--rs-high)}
 .pie__k--pos b{color:var(--rs-pos)}
 .pie__k--goal b{color:var(--brand)}

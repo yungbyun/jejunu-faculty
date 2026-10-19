@@ -77,7 +77,9 @@ const maj = await page.evaluate(()=>{
 t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
 /* 「절반까지」 카드는 2026-09-25 에 없앴다 — 모자란 인원은 % 옆 괄호로 간다 */
 t('절반까지 카드는 없다', !maj.goal);
-t('모자란 인원이 % 옆 괄호에', maj.ks[0].includes(`(-${Math.ceil((maj.n-3)/2)-30}명)`), maj.ks[0]);
+/* 괄호는 「N-」(모자람) · 「N+」(넘음) 꼴이다 — 숫자 뒤에 부호를 붙여 넘고 모자람을 보인다 (2026-10-19) */
+t('모자란 인원이 % 옆 괄호에', maj.ks[0].includes(`(${Math.ceil((maj.n-3)/2)-30}-)`), maj.ks[0]);
+t('모자랄 때 앞에 「-」를 또 붙이지 않는다', !maj.ks[0].includes(`(-`), maj.ks[0]);
 t('절반이 몇 명인지 카드에 적힌다', maj.ks[0].includes(`절반 ${Math.ceil((maj.n-3)/2)}명`), maj.ks[0]);
 t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
 
@@ -89,7 +91,10 @@ const over = await page.evaluate(()=>{
   return { k: document.querySelector('.pie__k--pos').innerText.split(String.fromCharCode(10)).join(' '),
            want: state.rows.length - half };
 });
-t('절반을 넘으면 +N명', over.k.includes(`(+${over.want}명)`), over.k);
+t('절반을 넘으면 N+', over.k.includes(`(${over.want}+)`), over.k);
+t('넘침을 도움말에 말로도 적는다',
+  (await page.getAttribute('.pie__k--pos .pie__kg', 'title')).includes(`${over.want}명 넘습니다`),
+  await page.getAttribute('.pie__k--pos .pie__kg', 'title'));
 t('그때는 100%', over.k.includes('100%'), over.k);
 
 // 6) 만난 적이 있으면 이름 칩 안에 초록 불
@@ -273,6 +278,32 @@ await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) =
 t('강화 카드 이름', await page.evaluate(() =>
   (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+강화',
   await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
+
+/* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).
+ * 상대 표는 모수에서 내 표를 뺀 나머지 — 중·모·미지정까지 다 상대에게 간다고 본 가장 모진 셈이다. */
+const vsl = await page.evaluate(() => {
+  state.ratings.clear(); state.notes.clear();
+  sureSet = new Set(); localStorage.removeItem('jnu-sure');
+  const v = ['확','긍','중','모','부','비'];
+  state.rows.forEach((p, i) => setRating(rKey(p), v[i % 6]));
+  sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave();
+  render();
+  const txt = k => ((document.querySelector(k + ' .pie__kv') || {}).innerText || '').trim();
+  return { total: state.rows.filter(p => getRating(p) !== '비').length,
+           base: state.rows.filter(p => ['확','긍'].includes(getRating(p))).length,
+           add: state.rows.filter(p => isSure(p) && getRating(p) === '중').length,
+           pos: txt('.pie__k--pos'), push: txt('.pie__k--push'),
+           last: ['.pie__k--pos', '.pie__k--push']
+             .map(k => document.querySelector(k).lastElementChild.className).join(' / ') };
+});
+t('확+긍 카드에 내 표 vs 상대 표', vsl.pos === `내 ${vsl.base} vs 상대 ${vsl.total - vsl.base}`,
+  `${vsl.pos} (모수 ${vsl.total})`);
+t('강화 카드에도 같은 줄 — 강화만큼 늘어난다',
+  vsl.push === `내 ${vsl.base + vsl.add} vs 상대 ${vsl.total - vsl.base - vsl.add}`,
+  `${vsl.push} (+${vsl.add})`);
+t('두 표를 더하면 모수', vsl.add > 0 && vsl.total === vsl.base + (vsl.total - vsl.base), JSON.stringify(vsl));
+t('그 줄이 카드의 맨 아래', vsl.last === 'pie__kv / pie__kv', vsl.last);
+await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); render(); });
 
 /* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
 t('비 막대가 보라가 아니다', await page.evaluate(() => {

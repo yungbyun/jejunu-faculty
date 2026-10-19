@@ -1725,13 +1725,21 @@ function donut(profs) {
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
   /* 절반까지 몇 명인지를 따로 카드로 두지 않고 % 옆에 붙인다 (2026-09-25).
-   * 모자라면 -N명, 넘으면 +N명, 딱 맞으면 ±0명. 둘 다 '절반' 기준이다. */
+   * 모자라면 N-, 넘으면 N+, 딱 맞으면 ±0. 둘 다 '절반' 기준이다 (2026-10-19 글투 바뀜). */
   const gap = n => {
     const d = n - half;
     const cls = d < 0 ? 'pie__kg--short' : 'pie__kg--over';
-    const txt = d === 0 ? '±0명' : d < 0 ? `-${-d}명` : `+${d}명`;
-    return `<em class="pie__kg ${cls}" title="절반 ${half}명 기준">(${txt})</em>`;
+    /* 숫자 뒤에 부호를 붙여 「절반을 넘은 몫」이라는 뜻이 서게 한다 (2026-10-19, 사용자 지정).
+     * 넘으면 5+ (다섯 넘음), 모자라면 5- (다섯 모자람), 딱 맞으면 ±0. 뜻은 도움말에 말로 적어 둔다. */
+    const txt = d === 0 ? '±0' : d < 0 ? `${-d}-` : `${d}+`;
+    const say = d === 0 ? '과 같습니다' : d < 0 ? `보다 ${-d}명 모자랍니다` : `를 ${d}명 넘습니다`;
+    return `<em class="pie__kg ${cls}" title="절반 ${half}명${say}">(${txt})</em>`;
   };
+  /* 내 표와 상대 표를 맞세워 적는다 (2026-10-19, 사용자 지정).
+   * 상대 표는 모수에서 내 표를 뺀 나머지다 — 중·모·미지정까지 다 상대에게 간다고 보는,
+   * 가장 모질게 잡은 셈이다. 그래서 두 숫자를 더하면 늘 모수(total)가 된다. */
+  const vs = n => `<span class="pie__kv" title="내 표 ${n}명 vs 상대 표 ${total - n}명 — 상대 표는 모수 ${total}명에서 내 표를 뺀 나머지입니다(중·모·미지정까지 다 상대에게 간다고 본, 가장 모진 셈)">`
+    + `내 <i>${n}</i> vs 상대 <i>${total - n}</i></span>`;
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
   const R = 72, W = 24, CX = 100, CY = 112;
@@ -1768,10 +1776,12 @@ function donut(profs) {
       </svg>
       <div class="pie__kpi">
         <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
-          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span></div>
+          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span>
+          ${vs(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
           <span class="pie__kl">+강화</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명+${added}명(중 강화)</span></div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          <span class="pie__kn">${reach}명+${added}명(중 강화)</span>
+          ${vs(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
