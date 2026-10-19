@@ -1738,6 +1738,10 @@ function donut(profs) {
   /* 내 표와 상대 표를 맞세워 적는다 (2026-10-19, 사용자 지정).
    * 상대 표는 모수에서 내 표를 뺀 나머지다 — 중·모·미지정까지 다 상대에게 간다고 보는,
    * 가장 모질게 잡은 셈이다. 그래서 두 숫자를 더하면 늘 모수(total)가 된다. */
+  /* 아랫줄의 꼬리말(모수·절반, 「중 강화」)은 **좁은 화면에서 숨깁니다** (2026-10-20).
+   * 칸이 셋이 되어 폰에서는 자리가 모자랍니다. 숨겨도 잃는 것은 없습니다 —
+   * 모수는 맨 아랫줄 두 수를 더하면 나오고, 절반과의 거리는 % 옆 괄호가 말해 줍니다. */
+  const kn = (head, tail) => `<span class="pie__kn">${head}<span class="pie__kt">${tail}</span></span>`;
   const vs = n => `<span class="pie__kv" title="내 표 ${n}명 vs 상대 표 ${total - n}명 — 상대 표는 모수 ${total}명에서 내 표를 뺀 나머지입니다(중·모·미지정까지 다 상대에게 간다고 본, 가장 모진 셈)">`
     + `<i>${n}</i> vs <i>${total - n}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
@@ -1775,12 +1779,15 @@ function donut(profs) {
         <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
       <div class="pie__kpi">
+        <div class="pie__k pie__k--high"><span class="pie__kl">확실</span>
+          <b>${pct(sure)}%${gap(sure)}</b>${kn(`${sure}명`, ` / ${total}명(절반 ${half}명)`)}
+          ${vs(sure)}</div>
         <div class="pie__k pie__k--pos"><span class="pie__kl">확실+긍정</span>
-          <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span>
+          <b>${pct(base)}%${gap(base)}</b>${kn(`${base}명`, ` / ${total}명(절반 ${half}명)`)}
           ${vs(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
           <span class="pie__kl">+가능(강화)</span><b>${pct(reach)}%${gap(reach)}</b>
-          <span class="pie__kn">${reach}명+${added}명(중 강화)</span>
+          ${kn(`${reach}명+${added}명`, '(중 강화)')}
           ${vs(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>

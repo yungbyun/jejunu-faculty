@@ -69,7 +69,8 @@ const maj = await page.evaluate(()=>{
   state.rows.slice(0,3).forEach(p=>state.ratings.set(rKey(p),'비'));
   state.rows.slice(3,33).forEach(p=>state.ratings.set(rKey(p),'확'));
   render();
-  const ks=[...document.querySelectorAll('.pie__k')].map(k=>k.innerText.split(String.fromCharCode(10)).join(' '));
+  /* textContent 로 읽는다 — 폰에서는 꼬리말(모수·절반)이 숨어 innerText 에 안 잡힌다 (2026-10-20) */
+  const ks=[...document.querySelectorAll('.pie__k')].map(k=>k.textContent);
   const u=document.querySelector('.pie__u').textContent;
   return { ks, u, n: state.rows.length, pool: document.querySelector('.pie__pool').textContent,
            goal: !!document.querySelector('.pie__k--goal, .pie__k--over') };
@@ -78,9 +79,12 @@ t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
 /* 「절반까지」 카드는 2026-09-25 에 없앴다 — 모자란 인원은 % 옆 괄호로 간다 */
 t('절반까지 카드는 없다', !maj.goal);
 /* 괄호는 「N-」(모자람) · 「N+」(넘음) 꼴이다 — 숫자 뒤에 부호를 붙여 넘고 모자람을 보인다 (2026-10-19) */
-t('모자란 인원이 % 옆 괄호에', maj.ks[0].includes(`(${Math.ceil((maj.n-3)/2)-30}-)`), maj.ks[0]);
-t('모자랄 때 앞에 「-」를 또 붙이지 않는다', !maj.ks[0].includes(`(-`), maj.ks[0]);
-t('절반이 몇 명인지 카드에 적힌다', maj.ks[0].includes(`절반 ${Math.ceil((maj.n-3)/2)}명`), maj.ks[0]);
+t('모자란 인원이 % 옆 괄호에', maj.ks[1].includes(`(${Math.ceil((maj.n-3)/2)-30}-)`), maj.ks[1]);
+t('모자랄 때 앞에 「-」를 또 붙이지 않는다', !maj.ks[1].includes(`(-`), maj.ks[1]);
+t('절반이 몇 명인지 카드에 적힌다', maj.ks[1].includes(`절반 ${Math.ceil((maj.n-3)/2)}명`), maj.ks[1]);
+/* 맨 왼쪽은 「확실」 카드 — 확 하나만 센다 (2026-10-20, 사용자 지정) */
+t('맨 왼쪽은 확실 카드', maj.ks[0].startsWith('확실') && !maj.ks[0].startsWith('확실+'), maj.ks[0]);
+t('확실 카드도 같은 셈 — 여기선 확이 서른', maj.ks[0].includes('30명'), maj.ks[0]);
 t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
 
 const over = await page.evaluate(()=>{
@@ -88,7 +92,7 @@ const over = await page.evaluate(()=>{
   state.rows.forEach(p=>state.ratings.set(rKey(p),'확'));   // 전원 확 — 절반을 크게 넘는다
   render();
   const half = Math.ceil(state.rows.length/2);
-  return { k: document.querySelector('.pie__k--pos').innerText.split(String.fromCharCode(10)).join(' '),
+  return { k: document.querySelector('.pie__k--pos').textContent,
            want: state.rows.length - half };
 });
 t('절반을 넘으면 N+', over.k.includes(`(${over.want}+)`), over.k);
@@ -265,22 +269,23 @@ await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-su
 
 /* 두 줄의 생김새 — 꼬리말을 괄호로 묶는다 (2026-10-09) */
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('확+긍 줄은 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(
-  (await page.locator('.pie__k--pos .pie__kn').innerText()).trim()),
-  await page.locator('.pie__k--pos .pie__kn').innerText());
-t('강화 줄은 「N명+K명(중 강화)」', /^\d+명\+\d+명\(중 강화\)$/.test(
-  (await page.locator('.pie__k--push .pie__kn').innerText()).trim()),
-  await page.locator('.pie__k--push .pie__kn').innerText());
+const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').textContent.trim(), k);
+t('확실 줄도 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(await knTxt('.pie__k--high')),
+  await knTxt('.pie__k--high'));
+t('확+긍 줄은 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(await knTxt('.pie__k--pos')),
+  await knTxt('.pie__k--pos'));
+t('강화 줄은 「N명+K명(중 강화)」', /^\d+명\+\d+명\(중 강화\)$/.test(await knTxt('.pie__k--push')),
+  await knTxt('.pie__k--push'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름 — 「확실+긍정」과 「+가능(강화)」 (2026-10-20, 사용자 지정) */
-t('확+긍 카드 이름', await page.evaluate(() =>
-  (document.querySelector('.pie__k--pos .pie__kl') || {}).textContent) === '확실+긍정',
-  await page.evaluate(() => (document.querySelector('.pie__k--pos .pie__kl') || {}).textContent));
+/* 카드 이름 — 「확실」 · 「확실+긍정」 · 「+가능(강화)」 (2026-10-20, 사용자 지정) */
+t('강화가 없으면 카드는 둘', await page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
+  .map(e => e.textContent).join('|')) === '확실|확실+긍정',
+  await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent).join('|')));
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('강화 카드 이름', await page.evaluate(() =>
-  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+가능(강화)',
-  await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
+t('카드 이름 셋', await page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
+  .map(e => e.textContent).join('|')) === '확실|확실+긍정|+가능(강화)',
+  await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent).join('|')));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).
  * 상대 표는 모수에서 내 표를 뺀 나머지 — 중·모·미지정까지 다 상대에게 간다고 본 가장 모진 셈이다. */
@@ -308,6 +313,33 @@ t('강화 카드에도 같은 줄 — 강화만큼 늘어난다',
 t('두 표를 더하면 모수', vsl.add > 0 && vsl.total === vsl.base + (vsl.total - vsl.base), JSON.stringify(vsl));
 t('그 줄이 카드의 맨 아래', vsl.last === 'pie__kv / pie__kv', vsl.last);
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); render(); });
+
+/* 카드가 셋이어도 폰(390px)에서 한 줄에 서야 한다 (2026-10-20).
+ * 자리를 벌려 주는 것은 꼬리말(모수·절반, 「중 강화」)을 숨기는 일이다 — 그 뜻은
+ * % 옆 괄호와 맨 아랫줄에 이미 있고, 말풍선에는 그대로 다 적혀 있다. */
+const lay = w => page.evaluate(() => {
+  const ks = [...document.querySelectorAll('.pie__k')];
+  const box = document.querySelector('.pie__kpi').getBoundingClientRect();
+  return { n: ks.length,
+           rows: new Set(ks.map(k => Math.round(k.getBoundingClientRect().top))).size,
+           out: ks.filter(k => k.getBoundingClientRect().right > box.right + 1).length,
+           over: ks.filter(k => k.scrollWidth > k.clientWidth + 1).length,
+           tail: ks.filter(k => k.querySelector('.pie__kt').getClientRects().length).length };
+});
+await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); render(); });
+await page.setViewportSize({ width: 390, height: 1200 });   /* 이 시험은 1440px 에서 돈다 */
+await page.waitForTimeout(250);
+const phone = await lay();
+t('카드는 셋', phone.n === 3, `${phone.n}장`);
+t('폰에서도 한 줄에 선다', phone.rows === 1 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
+t('폰에서 글이 칸을 넘지 않는다', phone.over === 0, `${phone.over}장 넘침`);
+t('폰에서는 꼬리말을 숨긴다', phone.tail === 0, `${phone.tail}장에 보임`);
+await page.setViewportSize({ width: 900, height: 1200 });
+await page.waitForTimeout(250);
+const wide = await lay();
+t('넓은 화면에서는 꼬리말이 다시 보인다', wide.tail === 3 && wide.rows === 1, JSON.stringify(wide));
+await page.setViewportSize({ width: 1440, height: 900 });    /* 뒤의 시험을 위해 되돌린다 */
+await page.waitForTimeout(250);
 
 /* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
 t('비 막대가 보라가 아니다', await page.evaluate(() => {
