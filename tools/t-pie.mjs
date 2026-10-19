@@ -75,16 +75,20 @@ const maj = await page.evaluate(()=>{
   return { ks, u, n: state.rows.length, pool: document.querySelector('.pie__pool').textContent,
            goal: !!document.querySelector('.pie__k--goal, .pie__k--over') };
 });
-t('비 3명은 모수에서 빠짐', maj.u.includes(`/ ${maj.n-3}명`), maj.u);
+/* 도넛 아래는 「전체 N명(절반 K명)」 (2026-10-20. 전에는 「확(확실) · 29명 / 63명」) */
+t('비 3명은 모수에서 빠짐', maj.u.includes(`전체 ${maj.n-3}명`), maj.u);
+t('절반도 도넛 아래에 적는다', maj.u === `전체 ${maj.n-3}명(절반 ${Math.ceil((maj.n-3)/2)}명)`, maj.u);
 /* 「절반까지」 카드는 2026-09-25 에 없앴다 — 모자란 인원은 % 옆 괄호로 간다 */
 t('절반까지 카드는 없다', !maj.goal);
-/* 괄호는 「N-」(모자람) · 「N+」(넘음) 꼴이다 — 숫자 뒤에 부호를 붙여 넘고 모자람을 보인다 (2026-10-19) */
-t('모자란 인원이 % 옆 괄호에', maj.ks[1].includes(`(${Math.ceil((maj.n-3)/2)-30}-)`), maj.ks[1]);
-t('모자랄 때 앞에 「-」를 또 붙이지 않는다', !maj.ks[1].includes(`(-`), maj.ks[1]);
-t('절반이 몇 명인지 카드에 적힌다', maj.ks[1].includes(`절반 ${Math.ceil((maj.n-3)/2)}명`), maj.ks[1]);
+/* 절반과의 거리는 **카드 아랫줄에 말로** 적는다 — 「절반 33명까지 3-」 (2026-10-20) */
+t('모자란 인원이 아랫줄에', maj.ks[1].includes(`절반 ${Math.ceil((maj.n-3)/2)}명까지 ${Math.ceil((maj.n-3)/2)-30}-`), maj.ks[1]);
+t('모자랄 때 「초과」라 하지 않는다', !maj.ks[1].includes('초과'), maj.ks[1]);
+t('큰 숫자는 % 하나뿐', await page.evaluate(() =>
+  document.querySelector('.pie__k--pos b').textContent) === '45%',
+  await page.evaluate(() => document.querySelector('.pie__k--pos b').textContent));
 /* 맨 왼쪽은 「확실」 카드 — 확 하나만 센다 (2026-10-20, 사용자 지정) */
 t('맨 왼쪽은 확실 카드', maj.ks[0].startsWith('확실') && !maj.ks[0].startsWith('확실+'), maj.ks[0]);
-t('확실 카드도 같은 셈 — 여기선 확이 서른', maj.ks[0].includes('30명'), maj.ks[0]);
+t('확실 카드 이름에 인원이 붙는다 — 여기선 확이 서른', maj.ks[0].includes('확실 = 30'), maj.ks[0]);
 t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
 
 const over = await page.evaluate(()=>{
@@ -95,10 +99,10 @@ const over = await page.evaluate(()=>{
   return { k: document.querySelector('.pie__k--pos').textContent,
            want: state.rows.length - half };
 });
-t('절반을 넘으면 N+', over.k.includes(`(${over.want}+)`), over.k);
-t('넘침을 도움말에 말로도 적는다',
-  (await page.getAttribute('.pie__k--pos .pie__kg', 'title')).includes(`${over.want}명 넘습니다`),
-  await page.getAttribute('.pie__k--pos .pie__kg', 'title'));
+t('절반을 넘으면 「절반에서 N명 초과」', over.k.includes(`절반에서 ${over.want}명 초과`), over.k);
+t('넘침을 도움말에도 적는다',
+  (await page.getAttribute('.pie__k--pos .pie__kn', 'title')).includes(`${over.want}명 넘습니다`),
+  await page.getAttribute('.pie__k--pos .pie__kn', 'title'));
 t('그때는 100%', over.k.includes('100%'), over.k);
 
 // 6) 만난 적이 있으면 이름 칩 안에 초록 불
@@ -198,20 +202,22 @@ await setup(5);
 await page.waitForTimeout(500);
 const T = await truth();
 t('강화가 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
-t('확+긍에 중인 강화만 더한 값', await page.evaluate(() =>
-  document.querySelector('.pie__k--push .pie__kn').textContent.split('명')[0]) === String(T.base + T.add),
-  `화면 ${await page.evaluate(() => document.querySelector('.pie__k--push .pie__kn').textContent)} / 셈 ${T.base}+${T.add}`);
-t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()).startsWith(`${T.pct}%`),
+/* 인원은 카드 **이름**에 붙는다 — 「+강화(6) = 43」 (2026-10-20, 사용자 지정) */
+const klTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kl').textContent.trim(), k);
+t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsWith(`= ${T.base + T.add}`),
+  `화면 ${await klTxt('.pie__k--push')} / 셈 ${T.base}+${T.add}`);
+t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 적는다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes(`+${T.add}명(중 강화)`),
-  await page.locator('.pie__k--push .pie__kn').innerText());
+t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+강화(${T.add})`),
+  await klTxt('.pie__k--push'));
 t('안 더한 강화가 실제로 있다', T.out > 0, `${T.out}명`);
-t('줄에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await page.locator('.pie__k--push .pie__kn').innerText()),
-  await page.locator('.pie__k--push .pie__kn').innerText());
-t('강화 카드에는 모수(/N명)를 되풀이하지 않는다', !(await page.locator('.pie__k--push .pie__kn').innerText()).includes('/'),
-  await page.locator('.pie__k--push .pie__kn').innerText());
-t('모수는 옆 카드에 그대로 있다', (await page.locator('.pie__k--pos .pie__kn').innerText()).includes('/'),
-  await page.locator('.pie__k--pos .pie__kn').innerText());
+t('이름에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await klTxt('.pie__k--push')), await klTxt('.pie__k--push'));
+t('어느 카드도 모수(/N명)를 되풀이하지 않는다', await page.evaluate(() =>
+  ![...document.querySelectorAll('.pie__k')].some(k => k.textContent.includes('/'))),
+  await page.evaluate(() => [...document.querySelectorAll('.pie__k')].map(k => k.textContent).join(' | ')));
+t('모수는 도넛 아래에 한 번만', await page.evaluate(() =>
+  /^전체 \d+명\(절반 \d+명\)$/.test(document.querySelector('.pie__u').textContent)),
+  await page.evaluate(() => document.querySelector('.pie__u').textContent));
 t('도움말이 「중인 강화」 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중인 강화'),
   await page.getAttribute('.pie__k--push', 'title'));
 t('도움말이 안 더한 까닭도 밝힌다', await page.evaluate(() => {
@@ -229,8 +235,8 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중이 아니면 한 명도 안 더한다', (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중 강화)'),
-  await page.locator('.pie__k--push .pie__kn').innerText());
+t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+강화(0)'),
+  await klTxt('.pie__k--push'));
 t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
 t('부도 강화지만 안 더한다', T1.out > 0 && T1.add === 0, JSON.stringify(T1));
@@ -242,11 +248,10 @@ const T2 = await truth();
 t('전원을 강화로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 확+긍+중 전원', (await page.locator('.pie__k--push .pie__kn').innerText()).startsWith(`${T2.base + T2.add}명+`),
-  `${await page.locator('.pie__k--push .pie__kn').innerText()} / ${T2.base}+${T2.add}`);
+t('그때는 확+긍+중 전원', (await klTxt('.pie__k--push')).endsWith(`= ${T2.base + T2.add}`),
+  `${await klTxt('.pie__k--push')} / ${T2.base}+${T2.add}`);
 t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
-t('확+긍 카드는 그대로', (await page.locator('.pie__k--pos .pie__kn').innerText()).startsWith(`${T2.base}명 / ${T2.total}명`),
-  await page.locator('.pie__k--pos .pie__kn').innerText());
+t('확+긍 카드는 그대로', (await klTxt('.pie__k--pos')).endsWith(`= ${T2.base}`), await klTxt('.pie__k--pos'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
 
 /* 확·긍과 겹친 강화는 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
@@ -255,9 +260,8 @@ await page.evaluate(() => {
   state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => sures().add(rKey(p)));
   sureSave(); renderStats();
 });
-t('확·긍만 강화면 더해지는 사람이 없다',
-  (await page.locator('.pie__k--push .pie__kn').innerText()).includes('+0명(중 강화)'),
-  await page.locator('.pie__k--push .pie__kn').innerText());
+t('확·긍만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+강화(0)'),
+  await klTxt('.pie__k--push'));
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--pos b').innerText()));
@@ -267,25 +271,31 @@ t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
 }), await page.getAttribute('.pie__k--push', 'title'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 두 줄의 생김새 — 꼬리말을 괄호로 묶는다 (2026-10-09) */
+/* 세 카드의 아랫줄 생김새 — 「절반 K명까지 N-」 또는 「절반에서 N명 초과」 (2026-10-20) */
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').textContent.trim(), k);
-t('확실 줄도 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(await knTxt('.pie__k--high')),
-  await knTxt('.pie__k--high'));
-t('확+긍 줄은 「N명 / M명(절반 K명)」', /^\d+명 \/ \d+명\(절반 \d+명\)$/.test(await knTxt('.pie__k--pos')),
-  await knTxt('.pie__k--pos'));
-t('강화 줄은 「N명+K명(중 강화)」', /^\d+명\+\d+명\(중 강화\)$/.test(await knTxt('.pie__k--push')),
-  await knTxt('.pie__k--push'));
+const GAPRE = /^(절반 \d+명까지 \d+-|절반에서 \d+명 초과|절반 \d+명과 같음)$/;
+for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
+  t(`${k.split('--')[1]} 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
+t('세 카드 이름은 「이름 = 인원」', await page.evaluate(() =>
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) = \d+$/.test(e.textContent.trim()))),
+  await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름 — 「확실」 · 「확실+긍정」 · 「+가능(강화)」 (2026-10-20, 사용자 지정) */
-t('강화가 없으면 카드는 둘', await page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
-  .map(e => e.textContent).join('|')) === '확실|확실+긍정',
-  await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent).join('|')));
+/* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
+const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
+  .map(e => e.textContent.split(' = ')[0]).join('|'));
+t('강화가 없으면 카드는 둘', /^확실\|\+긍정\(\d+\)$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('카드 이름 셋', await page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
-  .map(e => e.textContent).join('|')) === '확실|확실+긍정|+가능(강화)',
-  await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent).join('|')));
+t('카드 이름 셋', /^확실\|\+긍정\(\d+\)\|\+강화\(\d+\)$/.test(await klHead()), await klHead());
+t('둘째 이름의 괄호는 긍정 인원', await page.evaluate(() =>
+  document.querySelector('.pie__k--pos .pie__kl').textContent.startsWith(
+    `+긍정(${state.rows.filter(p => getRating(p) === '긍').length})`)),
+  await klTxt('.pie__k--pos'));
+t('셋째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
+  document.querySelector('.pie__k--push .pie__kl').textContent.startsWith(
+    `+강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
+  await klTxt('.pie__k--push'));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).
  * 상대 표는 모수에서 내 표를 뺀 나머지 — 중·모·미지정까지 다 상대에게 간다고 본 가장 모진 셈이다. */
@@ -333,7 +343,12 @@ const phone = await lay();
 t('카드는 셋', phone.n === 3, `${phone.n}장`);
 t('폰에서도 한 줄에 선다', phone.rows === 1 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
 t('폰에서 글이 칸을 넘지 않는다', phone.over === 0, `${phone.over}장 넘침`);
-t('폰에서는 꼬리말을 숨긴다', phone.tail === 0, `${phone.tail}장에 보임`);
+t('390px 에서는 꼬리말이 다 보인다', phone.tail === 3, `${phone.tail}장에 보임`);
+/* 더 좁아지면(360px 따위) 꼬리말만 접는다 — 칸을 넘기느니 접는 것이 낫다 */
+await page.setViewportSize({ width: 360, height: 1200 });
+await page.waitForTimeout(250);
+const tiny = await lay();
+t('360px 에서는 꼬리말을 접는다', tiny.tail === 0 && tiny.rows === 1 && tiny.over === 0, JSON.stringify(tiny));
 await page.setViewportSize({ width: 900, height: 1200 });
 await page.waitForTimeout(250);
 const wide = await lay();
