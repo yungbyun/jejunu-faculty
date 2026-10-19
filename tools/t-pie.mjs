@@ -273,10 +273,13 @@ t('강화 줄은 「N명+K명(중 강화)」', /^\d+명\+\d+명\(중 강화\)$/.
   await page.locator('.pie__k--push .pie__kn').innerText());
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름은 「+강화」 한 마디로 (2026-10-17) */
+/* 카드 이름 — 「확실+긍정」과 「+가능(강화)」 (2026-10-20, 사용자 지정) */
+t('확+긍 카드 이름', await page.evaluate(() =>
+  (document.querySelector('.pie__k--pos .pie__kl') || {}).textContent) === '확실+긍정',
+  await page.evaluate(() => (document.querySelector('.pie__k--pos .pie__kl') || {}).textContent));
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 t('강화 카드 이름', await page.evaluate(() =>
-  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+강화',
+  (document.querySelector('.pie__k--push .pie__kl') || {}).textContent) === '+가능(강화)',
   await page.evaluate(() => (document.querySelector('.pie__k--push .pie__kl') || {}).textContent));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).

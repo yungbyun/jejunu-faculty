@@ -1775,11 +1775,11 @@ function donut(profs) {
         <text class="pie__u" x="100" y="122">확(확실) · ${sure}명 / ${total}명</text>
       </svg>
       <div class="pie__kpi">
-        <div class="pie__k pie__k--pos"><span class="pie__kl">확+긍(지지 기반)</span>
+        <div class="pie__k pie__k--pos"><span class="pie__kl">확실+긍정</span>
           <b>${pct(base)}%${gap(base)}</b><span class="pie__kn">${base}명 / ${total}명(절반 ${half}명)</span>
           ${vs(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
-          <span class="pie__kl">+강화</span><b>${pct(reach)}%${gap(reach)}</b>
+          <span class="pie__kl">+가능(강화)</span><b>${pct(reach)}%${gap(reach)}</b>
           <span class="pie__kn">${reach}명+${added}명(중 강화)</span>
           ${vs(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
