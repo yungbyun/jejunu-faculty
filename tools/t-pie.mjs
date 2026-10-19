@@ -296,10 +296,11 @@ const vsl = await page.evaluate(() => {
            last: ['.pie__k--pos', '.pie__k--push']
              .map(k => document.querySelector(k).lastElementChild.className).join(' / ') };
 });
-t('확+긍 카드에 내 표 vs 상대 표', vsl.pos === `내 ${vsl.base} vs 상대 ${vsl.total - vsl.base}`,
+t('확+긍 카드에 내 표 vs 상대 표', vsl.pos === `${vsl.base} vs ${vsl.total - vsl.base}`,
   `${vsl.pos} (모수 ${vsl.total})`);
+t('「내·상대」 글자는 적지 않는다 — 뜻은 말풍선에', !/내|상대/.test(vsl.pos + vsl.push), vsl.pos + ' / ' + vsl.push);
 t('강화 카드에도 같은 줄 — 강화만큼 늘어난다',
-  vsl.push === `내 ${vsl.base + vsl.add} vs 상대 ${vsl.total - vsl.base - vsl.add}`,
+  vsl.push === `${vsl.base + vsl.add} vs ${vsl.total - vsl.base - vsl.add}`,
   `${vsl.push} (+${vsl.add})`);
 t('두 표를 더하면 모수', vsl.add > 0 && vsl.total === vsl.base + (vsl.total - vsl.base), JSON.stringify(vsl));
 t('그 줄이 카드의 맨 아래', vsl.last === 'pie__kv / pie__kv', vsl.last);
