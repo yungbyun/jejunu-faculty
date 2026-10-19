@@ -1779,14 +1779,14 @@ function donut(profs) {
         <text class="pie__u" x="100" y="122">전체 ${total}명(절반 ${half}명)</text>
       </svg>
       <div class="pie__kpi">
-        <div class="pie__k pie__k--high"><span class="pie__kl">확실 = <i>${sure}</i></span>
+        <div class="pie__k pie__k--high"><span class="pie__kl">확실 <i>${sure}</i></span>
           <b>${pct(sure)}%</b>${gapLine(sure)}
           ${vs(sure)}</div>
-        <div class="pie__k pie__k--pos"><span class="pie__kl">+긍정(${pos}) = <i>${base}</i></span>
+        <div class="pie__k pie__k--pos"><span class="pie__kl">+긍정(${pos}) <i>${base}</i></span>
           <b>${pct(base)}%</b>${gapLine(base)}
           ${vs(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
-          <span class="pie__kl">+강화(${added}) = <i>${reach}</i></span><b>${pct(reach)}%</b>
+          <span class="pie__kl">+강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
           ${gapLine(reach)}
           ${vs(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>

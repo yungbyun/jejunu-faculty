@@ -88,7 +88,8 @@ t('큰 숫자는 % 하나뿐', await page.evaluate(() =>
   await page.evaluate(() => document.querySelector('.pie__k--pos b').textContent));
 /* 맨 왼쪽은 「확실」 카드 — 확 하나만 센다 (2026-10-20, 사용자 지정) */
 t('맨 왼쪽은 확실 카드', maj.ks[0].startsWith('확실') && !maj.ks[0].startsWith('확실+'), maj.ks[0]);
-t('확실 카드 이름에 인원이 붙는다 — 여기선 확이 서른', maj.ks[0].includes('확실 = 30'), maj.ks[0]);
+t('확실 카드 이름에 인원이 붙는다 — 여기선 확이 서른', maj.ks[0].includes('확실 30'), maj.ks[0]);
+t('이름에 「=」는 쓰지 않는다', !maj.ks.some(k => k.includes('=')), maj.ks.join(' | '));
 t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
 
 const over = await page.evaluate(()=>{
@@ -204,7 +205,7 @@ const T = await truth();
 t('강화가 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
 /* 인원은 카드 **이름**에 붙는다 — 「+강화(6) = 43」 (2026-10-20, 사용자 지정) */
 const klTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kl').textContent.trim(), k);
-t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsWith(`= ${T.base + T.add}`),
+t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsWith(` ${T.base + T.add}`),
   `화면 ${await klTxt('.pie__k--push')} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
@@ -248,10 +249,10 @@ const T2 = await truth();
 t('전원을 강화로 해도 100% 이하', await page.evaluate(() =>
   parseInt(document.querySelector('.pie__k--push b').textContent, 10)) <= 100,
   await page.locator('.pie__k--push b').innerText());
-t('그때는 확+긍+중 전원', (await klTxt('.pie__k--push')).endsWith(`= ${T2.base + T2.add}`),
+t('그때는 확+긍+중 전원', (await klTxt('.pie__k--push')).endsWith(` ${T2.base + T2.add}`),
   `${await klTxt('.pie__k--push')} / ${T2.base}+${T2.add}`);
 t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
-t('확+긍 카드는 그대로', (await klTxt('.pie__k--pos')).endsWith(`= ${T2.base}`), await klTxt('.pie__k--pos'));
+t('확+긍 카드는 그대로', (await klTxt('.pie__k--pos')).endsWith(` ${T2.base}`), await klTxt('.pie__k--pos'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
 
 /* 확·긍과 겹친 강화는 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
@@ -277,14 +278,14 @@ const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').te
 const GAPRE = /^(절반 \d+명까지 \d+-|절반에서 \d+명 초과|절반 \d+명과 같음)$/;
 for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
   t(`${k.split('--')[1]} 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
-t('세 카드 이름은 「이름 = 인원」', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) = \d+$/.test(e.textContent.trim()))),
+t('세 카드 이름은 「이름 인원」', await page.evaluate(() =>
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
 /* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
 const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
-  .map(e => e.textContent.split(' = ')[0]).join('|'));
+  .map(e => e.textContent.trim().replace(/ \d+$/, '')).join('|'));
 t('강화가 없으면 카드는 둘', /^확실\|\+긍정\(\d+\)$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 t('카드 이름 셋', /^확실\|\+긍정\(\d+\)\|\+강화\(\d+\)$/.test(await klHead()), await klHead());
