@@ -1736,8 +1736,13 @@ function donut(profs) {
     const body = d === 0 ? '딱 맞음'
       : d < 0 ? `${num('short', -d)}명 부족`
       : `${num('over', d)}명 초과`;
+    /* 괄호 안은 **윗줄 두 수의 차**입니다 (2026-10-20, 사용자 지정) — 29 vs 34 면 5명 차.
+     * 절반까지 모자란 몫의 갑절쯤 됩니다. 한 표가 넘어오면 내 쪽은 하나 늘고 상대 쪽은
+     * 하나 줄어, 차는 둘씩 좁혀지기 때문입니다. */
+    const dif = Math.abs(n - (total - n));
     const say = d === 0 ? '과 같습니다' : d < 0 ? `보다 ${-d}명 모자랍니다` : `를 ${d}명 넘습니다`;
-    return `<span class="pie__kn" title="${n}명은 절반 ${half}명${say}">${body}</span>`;
+    return `<span class="pie__kn" title="${n}명은 절반 ${half}명${say} — 상대 ${total - n}명과는 ${dif}명 차입니다">`
+      + `${body}<span class="pie__kd">(${dif}명 차)</span></span>`;
   };
   /* 내 표와 상대 표를 맞세워 적는다 (2026-10-19, 사용자 지정).
    * 상대 표는 모수에서 내 표를 뺀 나머지다 — 중·모·미지정까지 다 상대에게 간다고 보는,

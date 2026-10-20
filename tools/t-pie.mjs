@@ -277,9 +277,24 @@ await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-su
 /* 세 카드의 맨 아랫줄 생김새 — 「N명 부족」 · 「N명 초과」 · 「딱 맞음」 (2026-10-20) */
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').textContent.trim(), k);
-const GAPRE = /^(\d+명 부족|\d+명 초과|딱 맞음)$/;
+const GAPRE = /^(\d+명 부족|\d+명 초과|딱 맞음)\(\d+명 차\)$/;
 for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
   t(`${k.split('--')[1]} 맨 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
+/* 괄호 안은 윗줄 「내 표 vs 상대 표」 두 수의 차 (2026-10-20, 사용자 지정) */
+t('괄호 안은 윗줄 두 수의 차', await page.evaluate(() =>
+  [...document.querySelectorAll('.pie__k')].every(k => {
+    const [a, c] = k.querySelector('.pie__kv').textContent.split('vs').map(x => +x.trim());
+    return k.querySelector('.pie__kd').textContent === `(${Math.abs(a - c)}명 차)`;
+  })),
+  await page.evaluate(() => [...document.querySelectorAll('.pie__k')]
+    .map(k => k.querySelector('.pie__kv').textContent + ' → ' + k.querySelector('.pie__kd').textContent).join(' | ')));
+t('차는 모자란 몫의 갑절쯤', await page.evaluate(() =>
+  [...document.querySelectorAll('.pie__k')].every(k => {
+    const gap = +(k.querySelector('.pie__kg') || { textContent: '0' }).textContent;
+    const dif = +k.querySelector('.pie__kd').textContent.replace(/\D/g, '');
+    return Math.abs(dif - gap * 2) <= 1;
+  })),
+  await page.evaluate(() => [...document.querySelectorAll('.pie__kn')].map(e => e.textContent).join(' | ')));
 t('세 카드 이름은 「이름 인원」', await page.evaluate(() =>
   [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
