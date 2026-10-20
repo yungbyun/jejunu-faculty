@@ -2017,7 +2017,13 @@ function favSection() {
           const r = getRating(p);
           const { loc } = officeParts(p.office);
           const bold = memoBold(getMemo(p)).join(', ');
-          return `<div class="favw" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+          return `<div class="favw" data-fkey="${esc(rKey(p))}" style="--dept-color:${esc(d ? d.color : '#1f8a5b')}">
+            <span class="favgrip" role="button" tabindex="0" data-fgrip="${esc(rKey(p))}"
+              aria-label="${esc(p.name)} 차례 옮기기 — 끌거나 화살표를 누르십시오" title="끌어서 차례 바꾸기">
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><g fill="currentColor">
+              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/>
+              <circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+              </g></svg></span>
             <div class="favw__b">
             <div class="favw__r">
             <a class="favc" href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}">
@@ -2079,6 +2085,7 @@ function renderHome() {
 
   bindNotes($app);        // 관심 카드의 만남 카운터
   bindDeptDrag();
+  bindFavDrag();
   $app.querySelectorAll('.favx').forEach(b => b.addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     const p = state.rows.find(x => rKey(x) === b.dataset.key);
@@ -2087,6 +2094,69 @@ function renderHome() {
     renderHome();           // 명단·학과별 표시를 한 번에 다시 그린다
     flashStatus(`${p.name} 교수를 관심에서 해제했습니다`);
   }));
+}
+
+/* 관심 교수 차례 바꾸기 (2026-10-20) — 학과 차례(`bindDeptDrag`)와 같은 길이되, 이쪽은
+   **칸이 여럿인 격자**라서 끼울 자리를 가로세로로 함께 잽니다. 손가락 몸짓도 같이 받으려고
+   손잡이에 `touch-action:none` 을 주었고, 그 자리에서 시작한 쓸기는 쉬게 해 두었습니다. */
+function bindFavDrag() {
+  const list = $app.querySelector('.favsec__list');
+  if (!list) return;
+  const rows = () => [...list.querySelectorAll('.favw')];
+  const commit = () => {
+    favReorder(rows().map(e => e.dataset.fkey));
+    flashStatus('관심 교수 차례를 바꿨습니다');
+  };
+  /* 격자에서 끼울 자리 — 포인터보다 **아래 줄**이거나, 같은 줄에서 **오른쪽 반**에 있는 첫 칸 */
+  const spotAfter = (x, y) => rows().filter(e => !e.classList.contains('favw--drag'))
+    .find(el => {
+      const r = el.getBoundingClientRect();
+      return y < r.bottom && (y < r.top || x < r.left + r.width / 2);
+    });
+
+  list.querySelectorAll('[data-fgrip]').forEach(grip => {
+    grip.addEventListener('pointerdown', e => {
+      if (e.button != null && e.button !== 0) return;
+      const row = grip.closest('.favw');
+      if (!row) return;
+      e.preventDefault();
+      /* 잡기(setPointerCapture)를 쓰지 않는 까닭은 학과 쪽과 같다 — 줄을 옮기면 손잡이가
+         지워졌다 다시 꽂히며 잡기가 풀린다. 그래서 창에 건다. */
+      row.classList.add('favw--drag');
+      list.classList.add('favsec__list--drag');
+      let moved = false;
+      const move = ev => {
+        moved = true;
+        const after = spotAfter(ev.clientX, ev.clientY);
+        after ? list.insertBefore(row, after) : list.appendChild(row);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        row.classList.remove('favw--drag');
+        list.classList.remove('favsec__list--drag');
+        if (moved) commit();
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
+
+    /* 끌기 어려운 분을 위해 — 손잡이에 초점을 두고 화살표. 격자라도 **한 칸씩** 옮깁니다
+       (위·왼쪽은 앞으로, 아래·오른쪽은 뒤로). 다시 그리지 않으므로 초점이 그대로 남습니다. */
+    grip.addEventListener('keydown', e => {
+      const d = ['ArrowUp', 'ArrowLeft'].includes(e.key) ? -1
+        : ['ArrowDown', 'ArrowRight'].includes(e.key) ? 1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      const row = grip.closest('.favw'), all = rows();
+      const i = all.indexOf(row), j = i + d;
+      if (j < 0 || j >= all.length) return;
+      d < 0 ? list.insertBefore(row, all[j]) : list.insertBefore(all[j], row);
+      commit();
+    });
+  });
 }
 
 /* 학과 차례 바꾸기 — 손잡이를 끌면 그 줄이 따라오고, 놓으면 그 자리로 굳는다.
@@ -2350,6 +2420,14 @@ function favSave() {
   saveSetting(SET_FAV, settingValue(SET_FAV));
 }
 function toggleFav(p) { const f = favs(), k = rKey(p); f.has(k) ? f.delete(k) : f.add(k); favSave(); return f.has(k); }
+/* 차례를 바꾼다 (2026-10-20). 집합의 **담긴 차례**가 곧 화면의 차례이므로(`favSection`),
+ * 새 차례로 집합을 다시 짓는다. 넘어오지 않은 열쇠(화면에 안 뜬 분 — 자료에서 빠졌거나
+ * 거른 중이거나)는 **뒤에 그대로 붙여** 잃지 않는다. */
+function favReorder(keys) {
+  const seen = new Set(keys);
+  favSet = new Set([...keys, ...[...favs()].filter(k => !seen.has(k))]);
+  favSave();
+}
 
 /* ---------- 공략 (선거일까지 꼭 만날 사람) ----------
  * 선호도와도, 관심 교수와도 따로 둔다. 관심은 눈여겨보는 사람, 공략은 반드시 만날 사람이다.
@@ -5046,7 +5124,7 @@ function initPullRefresh() {
     if (top() > 0) { ptr.live = false; return; }
     /* 끌어 옮기는 손잡이(학과 차례)에서 시작하면 쉰다 — 맨 윗줄을 내리끌다 새로고침되면 큰일이다 */
     const t0 = e.target;
-    if (t0 && t0.closest && t0.closest('[data-grip],.counter,input,textarea,[contenteditable="true"]')) { ptr.live = false; return; }
+    if (t0 && t0.closest && t0.closest('[data-grip],[data-fgrip],.counter,input,textarea,[contenteditable="true"]')) { ptr.live = false; return; }
     ptr.y0 = e.touches[0].clientY; ptr.x0 = e.touches[0].clientX;
     ptr.live = true; ptr.on = false; ptr.d = 0;
   }, { passive: true });

@@ -149,6 +149,67 @@ await page.waitForSelector('#drawer .counter',{timeout:10000});
 t('상세 화면도 같은 값', await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent)==='1',
   await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent));
 
+/* ---------- 관심 교수 차례 바꾸기 (2026-10-20) ---------- */
+await page.evaluate(() => {
+  favSet = new Set();
+  state.rows.slice(0, 6).forEach(p => favs().add(rKey(p)));
+  favSave(); location.hash = '#/'; render();
+});
+await page.waitForSelector('.favsec__list [data-fgrip]', { timeout: 10000 });
+const fkeys = () => page.evaluate(() => [...document.querySelectorAll('.favw')].map(e => e.dataset.fkey).join(','));
+const fsaved = () => page.evaluate(() => [...favs()].join(','));
+const first = await fkeys();
+t('칸마다 손잡이가 있다', await page.locator('.favsec__list [data-fgrip]').count() === 6,
+  String(await page.locator('.favsec__list [data-fgrip]').count()));
+t('손잡이는 손가락 몸짓을 우리가 받는다', await page.evaluate(() =>
+  getComputedStyle(document.querySelector('[data-fgrip]')).touchAction) === 'none',
+  await page.evaluate(() => getComputedStyle(document.querySelector('[data-fgrip]')).touchAction));
+
+/* 화살표로 한 칸씩 */
+await page.locator('[data-fgrip]').first().focus();
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(250);
+const down1 = (await fkeys()).split(',');
+t('아래 화살표로 한 칸 뒤로', down1[0] === first.split(',')[1] && down1[1] === first.split(',')[0],
+  down1.slice(0, 2).join(' → '));
+t('바꾼 차례가 그대로 담긴다', await fsaved() === await fkeys(), await fsaved());
+t('초점이 손잡이에 남는다', await page.evaluate(() =>
+  document.activeElement && document.activeElement.dataset.fgrip !== undefined));
+await page.keyboard.press('ArrowUp');
+await page.waitForTimeout(250);
+t('위 화살표로 되돌아온다', await fkeys() === first, await fkeys());
+await page.keyboard.press('ArrowUp');
+await page.waitForTimeout(250);
+t('맨 앞에서 더 못 올라간다', await fkeys() === first, await fkeys());
+await page.locator('[data-fgrip]').last().focus();
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(250);
+t('맨 뒤에서 더 못 내려간다', await fkeys() === first, await fkeys());
+
+/* 끌어서 — 격자라 가로세로를 함께 잰다 */
+const g = await page.locator('[data-fgrip]').first().boundingBox();
+const to = await page.locator('.favw').nth(3).boundingBox();
+await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+await page.mouse.down();
+await page.mouse.move(to.x + to.width * 0.8, to.y + to.height / 2, { steps: 12 });
+await page.mouse.up();
+await page.waitForTimeout(350);
+const moved = (await fkeys()).split(',');
+t('끌어 놓으면 그 자리로 간다', moved[3] === first.split(',')[0], moved.indexOf(first.split(',')[0]) + '번째');
+t('끌어 바꾼 차례도 담긴다', await fsaved() === await fkeys(), await fsaved());
+t('아무도 잃지 않는다', moved.length === 6 && new Set(moved).size === 6, moved.length + '장');
+t('다시 그려도 그 차례', await page.evaluate(async () => {
+  render(); await new Promise(r => setTimeout(r, 200));
+  return [...document.querySelectorAll('.favw')].map(e => e.dataset.fkey).join(',') === [...favs()].join(',');
+}), await fkeys());
+
+/* 손잡이를 눌러도 상세로 새지 않는다 */
+await page.evaluate(() => { window.__h = location.hash; });
+await page.locator('[data-fgrip]').first().click();
+await page.waitForTimeout(250);
+t('손잡이를 눌러도 상세로 가지 않는다', await page.evaluate(() => location.hash === window.__h),
+  await page.evaluate(() => location.hash));
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);

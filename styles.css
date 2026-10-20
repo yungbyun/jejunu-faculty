@@ -489,6 +489,17 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favw__r{display:flex;align-items:stretch}
 .favw:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
 .favc{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;padding:7px 10px}
+/* 차례 바꾸는 손잡이 — X 단추와 짝을 맞춰 카드 왼쪽 끝에 한 칸 (2026-10-20) */
+.favgrip{flex:none;width:22px;border-right:1px solid var(--line);background:transparent;color:var(--ink-3);
+  cursor:grab;touch-action:none;display:grid;place-items:center;
+  -webkit-user-select:none;user-select:none;transition:background .15s,color .15s}
+.favgrip:hover{background:var(--surface-2);color:var(--ink)}
+.favgrip:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:-3px;color:var(--ink)}
+/* 끄는 동안 — 그 칸만 들어 올리고, 나머지는 손이 스쳐도 들썩이지 않게 한다 */
+.favw--drag{opacity:.92;border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18)}
+.favw--drag .favgrip{color:var(--brand);cursor:grabbing}
+.favsec__list--drag .favw:hover{transform:none;box-shadow:none;border-color:var(--line)}
+.favsec__list--drag .favw--drag:hover{border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18)}
 /* 관심 해제 버튼 — 카드 링크의 형제로 둔다(a 안에 button 을 넣으면 안 되므로) */
 .favx{flex:none;width:34px;padding:0;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink-3);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
 .favx:hover{background:color-mix(in srgb,#c0392b 10%,transparent);color:#c0392b}
