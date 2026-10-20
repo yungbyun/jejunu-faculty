@@ -1859,7 +1859,7 @@ function stChip(p, r) {
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 지원' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
@@ -2393,7 +2393,10 @@ function sureSave() {
 }
 function sureToggle(p) { const s = sures(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); sureSave(); return s.has(k); }
 
-/* ---------- VIP ----------
+/* ---------- 도움 (보이는 글자는 「도움」, 저장 열쇠는 vip) ----------
+ * **확실한 분 가운데 남에게도 나를 찍어 달라고 거들어 주는 분**이다 (2026-10-20 에 교수님이
+ * 뜻을 다시 밝히셨습니다. 2026-10-16~10-20 에는 「지원」, 그 앞에는 「VIP」였다).
+ * 저장 열쇠(`vip`)는 그대로 두었으니 쌓인 자료가 그대로 이어진다 — **보이는 글자만** 바뀐다.
  * 강화·공략과 나란히 쓰는 셋째 표시다. 저장하는 길도 같다(settings 탭의 vip 키).
  * 분석 목록에서는 색이 아니라 **테두리를 두 줄로** 그려 나타낸다 — 바탕(강화)과 깃발(공략)을
  * 이미 쓰고 있어, 겹쳐 달아도 서로 가리지 않는 표시가 필요했다. */
@@ -2414,9 +2417,9 @@ function vipSave() {
 function vipToggle(p) { const s = vips(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); vipSave(); return s.has(k); }
 
 /* ---------- VIP (2026-10-16) ----------
- * 「지원」이 **나를 밀어 주는 분**이라면, 이것은 **총장님이 거들어 달라고 청할 수 있는 분**이다.
- * 분석 목록에서는 바탕을 건드리지 않고 **테두리**로만 나타낸다 — 바탕은 강화·지원이 이미 쓴다.
- * 저장 열쇠는 pres(총장) 이다. 보이는 글자만 VIP 이고, 자료는 지원(vip)과 섞이지 않는다. */
+ * 「도움」이 **나를 밀어 주는 분**이라면, 이것은 **총장님이 거들어 달라고 청할 수 있는 분**이다.
+ * 분석 목록에서는 바탕을 건드리지 않고 **테두리**로만 나타낸다 — 바탕은 강화·도움이 이미 쓴다.
+ * 저장 열쇠는 pres(총장) 이다. 보이는 글자만 VIP 이고, 자료는 도움(vip)과 섞이지 않는다. */
 const PRES_KEY = 'jnu-pres';
 let presSet = null;
 function press() {
@@ -2945,7 +2948,7 @@ const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_E
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: '지원', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -4718,7 +4721,7 @@ function openDrawer(p, d) {
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
-            ${VIP_MARK}<span>지원</span></button>
+            ${VIP_MARK}<span>도움</span></button>
           <button type="button" class="presbtn${isPres(p) ? ' on' : ''}" data-presbtn="${esc(rKey(p))}" aria-pressed="${isPres(p)}">
             ${PRES_MARK}<span>VIP</span></button>
         </div>
@@ -4775,7 +4778,7 @@ function openDrawer(p, d) {
     const btn = e.currentTarget, on = vipToggle(p);
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
-    flashStatus(on ? `${p.name} 교수를 지원으로 표시했습니다` : `${p.name} 교수의 지원 표시를 풀었습니다`);
+    flashStatus(on ? `${p.name} 교수를 도움으로 표시했습니다` : `${p.name} 교수의 도움 표시를 풀었습니다`);
   });
   $panel.querySelector('[data-presbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = presToggle(p);
