@@ -137,7 +137,20 @@ a.bat                   git add -A / commit / push 한 번에
 **관심 교수 표시.** 카드의 체크 버튼으로 켜고 끕니다. 저장은 `settings` 탭의 `fav` 키
 (값은 `["<dept_id>/<slug>", ...]`)이고 **고른 순서를 그대로 유지**합니다 — 정렬하지 마십시오.
 `settingValue` 는 `fav` 만 정렬 없이 돌려주고, `applySettings` 의 비교도 `fav` 는 순서까지 따집니다.
-관련 함수: `favs / isFav / favCount / toggleFav / favBtn / bindFavs / favSection`.
+관련 함수: `favs / isFav / favCount / toggleFav / favBtn / bindFavs / favSection / favReorder`.
+
+**차례 바꾸기 (2026-10-20).** 칸 왼쪽 끝의 **손잡이**(`.favgrip`, `[data-fgrip]`)를 끌면 그 자리로
+굳습니다. 학과 차례(`bindDeptDrag`)와 같은 길이되 세 가지가 다릅니다.
+- **격자**(`.favsec__list` 는 `auto-fill minmax(245px,1fr)`)라 끼울 자리를 **가로세로로 함께**
+  잽니다 — 포인터보다 아랫줄이거나, 같은 줄에서 오른쪽 반에 있는 첫 칸 앞에 끼웁니다
+  (`spotAfter`). 세로만 재면 칸이 여럿인 화면에서 엉뚱한 데로 갑니다.
+- 화살표는 **위·왼쪽이 앞으로, 아래·오른쪽이 뒤로** 한 칸씩입니다. 다시 그리지 않으므로
+  초점이 손잡이에 그대로 남습니다.
+- 차례는 `favReorder()` 가 **집합을 새로 지어** 담습니다 — `favs()` 의 담긴 차례가 곧 화면의
+  차례이기 때문입니다. 화면에 안 뜬 열쇠는 **뒤에 붙여** 잃지 않습니다. `settingValue` 가
+  `fav` 를 정렬하지 않으므로 **시트에도 그 차례 그대로** 올라갑니다.
+- 손잡이에 `touch-action:none` 을 주고 쓸어 넘기기 감시(`[data-grip],[data-fgrip]`)에서도 뺐습니다
+  — 맨 윗줄에서 손잡이를 내리끌다 새로고침되면 안 되기 때문입니다.
 첫 화면 상단에 관심 교수 명단 패널(사진·이름·학과·직위·방 번호·선호도 칩·해제 ×)이 있고,
 학과 행의 작은 사진에는 금색 테두리, 학과 목록에는 `✓ N` 칩이 붙습니다.
 
