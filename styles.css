@@ -560,7 +560,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__pool{margin:0;text-align:center;font-size:12px;font-weight:600;color:var(--ink-2);max-width:440px}
 .pie__pool b{color:var(--ink-2)}
 .pie__k--push b{color:var(--push)}
-.pie__k--push{border-color:color-mix(in srgb,var(--push) 30%,var(--line))}
+/* 테두리는 **둘째 카드(확실+긍정)** 에 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다).
+   지지 기반이 어디까지인지가 눈이 먼저 가야 할 자리라서다. 테두리 빛깔은 그 카드의
+   숫자 빛깔(긍정)에 맞춘다. */
+.pie__k--pos{border-color:color-mix(in srgb,var(--rs-pos) 30%,var(--line))}
 .pie__k--over b{color:var(--rs-high)}
 .pie__k--goal,.pie__k--over{border-color:color-mix(in srgb,var(--brand) 30%,var(--line))}
 .pie__legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}

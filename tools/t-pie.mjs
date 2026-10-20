@@ -280,6 +280,18 @@ const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').te
 const GAPRE = /^(\d+명 부족|\d+명 초과|딱 맞음)\(\d+명 차\)$/;
 for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
   t(`${k.split('--')[1]} 맨 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
+/* 테두리는 둘째 카드 하나에만 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다) */
+t('테두리는 둘째 카드에만', await page.evaluate(() => {
+  const bc = q => getComputedStyle(document.querySelector(q)).borderColor;
+  const line = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+  const asRGB = c => { const d = document.createElement('div'); d.style.color = c;
+    document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; };
+  return bc('.pie__k--pos') !== bc('.pie__k--high')
+      && bc('.pie__k--high') === bc('.pie__k--push')
+      && bc('.pie__k--high') === asRGB(line);
+}), await page.evaluate(() => [...document.querySelectorAll('.pie__k')]
+  .map(k => k.className.split(' ')[1] + ' ' + getComputedStyle(k).borderColor).join(' | ')));
+
 /* 괄호 안은 윗줄 「내 표 vs 상대 표」 두 수의 차 (2026-10-20, 사용자 지정) */
 t('괄호 안은 윗줄 두 수의 차', await page.evaluate(() =>
   [...document.querySelectorAll('.pie__k')].every(k => {
