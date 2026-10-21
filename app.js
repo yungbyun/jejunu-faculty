@@ -2247,19 +2247,43 @@ function renderSearch(q) {
 }
 
 /* ---------- 화면: 학과 교수 목록 ---------- */
-/* 간단 표시 — 사진을 접고 이름·직위·고른 선호도만 보여 준다.
-   사람에 대한 결정이 아니라 '지금 어떻게 볼지' 라서 시트에 올리지 않고 이 기기에만 둔다
-   (카톡 복사 표시와 같은 사정). */
+/* 학과 페이지를 보는 세 가지 꼴 — 단추 하나로 돌아가며 바뀝니다 (2026-10-22).
+ *   간단히 보기  사진을 접고 이름·직위·선호도만 한 줄로
+ *   카드로 보기  사진이 있는 보통 카드
+ *   간단 카드    사진은 두되 **전공 태그 · 연구실/전화 줄 · 메모 표시를 접은** 카드
+ * 사람에 대한 결정이 아니라 '지금 어떻게 볼지' 라서 시트에 올리지 않고 이 기기에만 둡니다
+ * (카톡 복사 표시와 같은 사정). 열쇠는 전부터 쓰던 `jnu-simple` 그대로이고, 예전에 쌓인
+ * 값 '1' 은 「간단히 보기」로 읽습니다 — 쓰시던 분이 다시 고를 일이 없게. */
 const SIMPLE_KEY = 'jnu-simple';
-let simpleOn = null;
-function isSimple() {
-  if (simpleOn === null) { try { simpleOn = localStorage.getItem(SIMPLE_KEY) === '1'; } catch { simpleOn = false; } }
-  return simpleOn;
+const VIEW_NEXT = { simple: 'card', card: 'lite', lite: 'simple' };
+const VIEW_NAME = { simple: '간단히 보기', card: '카드로 보기', lite: '간단 카드로 보기' };
+const VIEW_TIP = {
+  simple: '사진을 접고 이름·직위·선호도만 봅니다',
+  card: '사진이 있는 카드로 봅니다',
+  lite: '태그·연락처·메모를 접은 카드로 봅니다',
+};
+let viewMode = null;
+function deptView() {
+  if (viewMode === null) {
+    let v = '';
+    try { v = localStorage.getItem(SIMPLE_KEY) || ''; } catch {}
+    viewMode = (v === '1' || v === 'simple') ? 'simple' : v === 'lite' ? 'lite' : 'card';
+  }
+  return viewMode;
 }
+const isSimple = () => deptView() === 'simple';
+const isLite = () => deptView() === 'lite';
+/* 다음 꼴로 넘어간다. 보통 카드일 때만 열쇠를 지운다 — 그것이 처음 꼴이라서 */
+function viewNext() {
+  viewMode = VIEW_NEXT[deptView()];
+  try { viewMode === 'card' ? localStorage.removeItem(SIMPLE_KEY) : localStorage.setItem(SIMPLE_KEY, viewMode); } catch {}
+  return viewMode;
+}
+/* 예전 이름 — 간단히 보기를 켜고 끈다(시험과 손버릇을 지키려고 남겨 둡니다) */
 function simpleToggle() {
-  simpleOn = !isSimple();
-  try { simpleOn ? localStorage.setItem(SIMPLE_KEY, '1') : localStorage.removeItem(SIMPLE_KEY); } catch {}
-  return simpleOn;
+  viewMode = isSimple() ? 'card' : 'simple';
+  try { isSimple() ? localStorage.setItem(SIMPLE_KEY, 'simple') : localStorage.removeItem(SIMPLE_KEY); } catch {}
+  return isSimple();
 }
 /* 한 줄: 이름 · 직위 · 고른 선호도. 안 고른 사람은 칸을 비워 둔다 */
 function simpleRow(p, d) {
@@ -2286,8 +2310,8 @@ function renderDept(d) {
         <div>
           <div class="eyebrow">${esc(d.en || 'Department')}</div>
           <h1>${esc(d.name)}</h1>
-          <div class="sub">${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a> · ` : ''}<button type="button" class="sublink" data-simple aria-pressed="${isSimple()}"
-              title="${isSimple() ? '사진이 있는 카드로 봅니다' : '사진을 접고 이름·직위·선호도만 봅니다'}">${isSimple() ? '카드로 보기' : '간단히 보기'}</button></div>
+          <div class="sub">${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">학과 홈페이지 ↗</a> · ` : ''}<button type="button" class="sublink" data-simple data-view="${deptView()}" aria-pressed="${isSimple()}"
+              title="${esc(VIEW_TIP[VIEW_NEXT[deptView()]])}">${esc(VIEW_NAME[VIEW_NEXT[deptView()]])}</button></div>
         </div>
         <div class="filters-wrap">
           <div class="filters" role="group" aria-label="직위 필터">
@@ -2301,12 +2325,12 @@ function renderDept(d) {
       </div>
       ${!list.length ? `<div class="empty"><strong>조건에 맞는 교수가 없습니다</strong></div>`
         : isSimple() ? `<ul class="simple-list">${list.map(p => simpleRow(p, d)).join('')}</ul>`
-        : `<div class="prof-grid">${list.map(p => profCard(p, d)).join('')}</div>`}
+        : `<div class="prof-grid${isLite() ? ' prof-grid--lite' : ''}">${list.map(p => profCard(p, d)).join('')}</div>`}
     </div>`;
   $app.querySelectorAll('.chip[data-rank]').forEach(b => b.addEventListener('click', () => { state.rankFilter = b.dataset.rank; renderDept(d); }));
   $app.querySelectorAll('.chip[data-rating]').forEach(b => b.addEventListener('click', () => { state.ratingFilter = b.dataset.rating; renderDept(d); }));
   $app.querySelector('.chip[data-favfilter]')?.addEventListener('click', () => { state.favOnly = !state.favOnly; renderDept(d); });
-  $app.querySelector('[data-simple]')?.addEventListener('click', () => { simpleToggle(); renderDept(d); });
+  $app.querySelector('[data-simple]')?.addEventListener('click', () => { viewNext(); renderDept(d); });
   bindCards();
 }
 

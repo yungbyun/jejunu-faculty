@@ -176,6 +176,12 @@ main{min-height:60vh;padding:40px 20px 72px}
 .chip .n{opacity:.6;margin-left:4px;font-size:12px}
 
 .prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+/* 간단 카드 (2026-10-22) — 사진·이름·직위·선호도만 남기고 **전공 태그 · 연구실/전화 줄 ·
+   메모 표시**를 접는다. 글은 그대로 두고 보이기만 끄므로(`display:none`) 메모를 고치면
+   같은 자리에 다시 꽂히고, 다른 꼴로 돌아갔을 때 그대로 보인다. */
+.prof-grid--lite .prof__tags,
+.prof-grid--lite .prof__office,
+.prof-grid--lite .prof__note{display:none}
 .prof{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s;display:flex;flex-direction:column;text-align:left;padding:0}
 .prof:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);border-color:var(--line-2)}
 .prof:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}

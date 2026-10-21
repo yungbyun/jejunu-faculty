@@ -51,9 +51,37 @@ t('링크처럼 보인다', await page.evaluate(() => {
   const cb = getComputedStyle(b), ca = a ? getComputedStyle(a) : cb;
   return cb.fontSize === ca.fontSize && cb.backgroundColor === 'rgba(0, 0, 0, 0)' && cb.borderTopWidth === '0px';
 }), await page.evaluate(() => getComputedStyle(document.querySelector('[data-simple]')).backgroundColor));
-t('꺼져 있을 땐 「간단히 보기」', (await page.locator('[data-simple]').innerText()).trim() === '간단히 보기',
+/* 꼴이 셋이라 단추는 **다음에 갈 꼴**의 이름을 답니다 (2026-10-22).
+ * 돌아가는 차례: 카드 → 간단 카드 → 간단히 → 카드. 단추 글은 간단 카드로 보기 →
+ * 간단히 보기 → 카드로 보기 로 돕니다. */
+t('카드일 땐 「간단 카드로 보기」', (await page.locator('[data-simple]').innerText()).trim() === '간단 카드로 보기',
   await page.locator('[data-simple]').innerText());
 t('처음엔 꺼져 있다', await page.evaluate(() => document.querySelector('[data-simple]').getAttribute('aria-pressed')) === 'false');
+
+/* ── 간단 카드 — 사진은 두고 태그·연락처·메모를 접는다 ── */
+await page.click('[data-simple]');
+await page.waitForSelector('.prof-grid--lite', { timeout: 10000 });
+const seen = s2 => page.evaluate(q => { const e = document.querySelector(q); return !!e && e.getClientRects().length > 0; }, s2);
+t('한 번 누르면 간단 카드', await page.locator('.prof-grid--lite').count() === 1 && await page.locator('.simple-list').count() === 0);
+t('간단 카드엔 메모 표시가 없다', !(await seen('.nb--memo')), String(await page.locator('.nb--memo').count()) + '개 있지만 숨김');
+t('전공 태그도 접는다', !(await seen('.prof__tags .tag')));
+t('연구실·전화 줄도 접는다', !(await seen('.prof__office')));
+t('사진은 그대로 있다', await seen('.prof__photo img'));
+t('이름·직위는 그대로', await seen('.prof__name') && await seen('.prof__rank'));
+t('선호도 칩도 그대로', await seen('.prof__foot .rate'));
+t('카드보다 낮다', await page.evaluate(() => {
+  const lite = document.querySelector('.prof').getBoundingClientRect().height;
+  viewMode = 'card'; renderDept(state.depts.find(x => x.id === route().dept));
+  const full = document.querySelector('.prof').getBoundingClientRect().height;
+  viewMode = 'lite'; renderDept(state.depts.find(x => x.id === route().dept));
+  return lite < full;
+}));
+t('글을 지우는 것이 아니라 가리는 것', await page.evaluate(() =>
+  document.querySelectorAll('.nb--memo').length > 0));
+t('간단 카드일 땐 「간단히 보기」', (await page.locator('[data-simple]').innerText()).trim() === '간단히 보기',
+  await page.locator('[data-simple]').innerText());
+t('간단 카드도 이 기기에 기억된다', await page.evaluate(() => localStorage.getItem('jnu-simple') === 'lite'),
+  await page.evaluate(() => localStorage.getItem('jnu-simple')));
 
 await page.click('[data-simple]');
 await page.waitForSelector('.simple-list', { timeout: 10000 });
@@ -185,7 +213,15 @@ await page.evaluate(() => { state.ratingFilter = '전체'; renderDept(state.dept
 await page.waitForTimeout(400);
 
 // 기억은 이 기기에만
-t('이 기기에 기억된다', await page.evaluate(() => localStorage.getItem('jnu-simple') === '1'));
+t('이 기기에 기억된다', await page.evaluate(() => localStorage.getItem('jnu-simple') === 'simple'),
+  await page.evaluate(() => localStorage.getItem('jnu-simple')));
+/* 예전에 쌓인 값 '1' 도 간단히 보기로 읽는다 — 쓰시던 분이 다시 고를 일이 없게 */
+t('옛 값 「1」도 간단히 보기로 읽는다', await page.evaluate(() => {
+  localStorage.setItem('jnu-simple', '1'); viewMode = null;
+  const was = deptView();
+  localStorage.setItem('jnu-simple', 'simple'); viewMode = null; deptView();
+  return was === 'simple';
+}));
 t('시트에는 올리지 않는다', await page.evaluate(() => !SET_KEYS.includes('simple')));
 await page.evaluate(() => { location.hash = '#/'; render(); location.hash = `#/dept/${route().dept || ''}`; });
 await page.evaluate(id => { location.hash = `#/dept/${id}`; render(); }, DEPT);
@@ -197,7 +233,7 @@ await page.waitForTimeout(500);
 t('다시 누르면 카드로 돌아온다', await page.locator('.prof-grid').count() === 1 && await page.locator('.simple-list').count() === 0);
 t('기억도 지워진다', await page.evaluate(() => !localStorage.getItem('jnu-simple')));
 
-await page.evaluate(() => { simpleOn = false; localStorage.removeItem('jnu-simple'); state.ratings.clear(); });
+await page.evaluate(() => { viewMode = 'card'; localStorage.removeItem('jnu-simple'); state.ratings.clear(); });
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);
