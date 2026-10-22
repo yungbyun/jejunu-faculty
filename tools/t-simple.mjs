@@ -106,7 +106,35 @@ t('선호도 칩 줄에 가리지 않는다', await page.evaluate(() => {
   return !rt || ph.top >= rt.getBoundingClientRect().bottom - 1;
 }));
 t('이름·직위는 그대로', await seen('.prof__name') && await seen('.prof__rank'));
-t('선호도 칩도 그대로', await seen('.prof__foot .rate'));
+/* 선호도는 칩 줄이 아니라 **사진 테두리색**으로 보인다 (2026-10-22, 사용자 지정) */
+t('선호도 칩 줄은 접는다', !(await seen('.prof .rate')),
+  String(await page.locator('.prof .rate').count()) + '개 있지만 숨김');
+t('선호도마다 테두리색이 다르다', await page.evaluate(() => {
+  const v = ['확','긍','중','모','부'];
+  state.ratings.clear();
+  state.depts.find(x => x.id === route().dept).profs.slice(0, 5)
+    .forEach((p, i) => setRating(rKey(p), v[i]));
+  renderDept(state.depts.find(x => x.id === route().dept));
+  const ring = e => getComputedStyle(e.querySelector('.prof__photo')).boxShadow.match(/rgba?\([^)]*\)/)[0];
+  const cs = [...document.querySelectorAll('.prof')].slice(0, 5).map(ring);
+  return new Set(cs).size === 5;
+}), await page.evaluate(() => [...document.querySelectorAll('.prof')].slice(0, 5)
+  .map(e => (e.dataset.rating || '—') + ':' + getComputedStyle(e.querySelector('.prof__photo')).boxShadow.match(/rgba?\([^)]*\)/)[0]).join(' ')));
+t('테두리색은 칸 테두리와 같은 색', await page.evaluate(() => {
+  const e = [...document.querySelectorAll('.prof')].find(x => x.dataset.rating === '확');
+  const ring = getComputedStyle(e.querySelector('.prof__photo')).boxShadow.match(/rgba?\([^)]*\)/)[0];
+  return ring === getComputedStyle(e).borderTopColor;
+}));
+t('안 고른 분은 옅은 선', await page.evaluate(() => {
+  const v = ['확','긍','중','모','부'];
+  const d = state.depts.find(x => x.id === route().dept);
+  state.ratings.clear(); renderDept(d);
+  const e = document.querySelector('.prof');
+  const ring = getComputedStyle(e.querySelector('.prof__photo')).boxShadow.match(/rgba?\([^)]*\)/)[0];
+  const same = ring === getComputedStyle(e).borderTopColor;
+  d.profs.slice(0, 5).forEach((p, i) => setRating(rKey(p), v[i])); renderDept(d);
+  return same;
+}));
 t('카드보다 낮다', await page.evaluate(() => {
   const lite = document.querySelector('.prof').getBoundingClientRect().height;
   viewMode = 'card'; renderDept(state.depts.find(x => x.id === route().dept));

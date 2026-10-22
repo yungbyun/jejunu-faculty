@@ -189,9 +189,24 @@ main{min-height:60vh;padding:40px 20px 72px}
    - 글도 가운데로 모아 동그라미 밑에 세운다.
    - 바짝 잘린 분들에게 쓰던 `--z`(contain + 위에서 키우기)는 여기서는 쓰지 않는다 —
      창이 동그라미라 그대로 두면 사진이 가운데에서 떠 버린다. 같은 `cover` 로 자른다.
-   - 커서를 올려도 키우지 않는다. 작은 동그라미에서는 들썩임으로만 보인다. */
+   - 커서를 올려도 키우지 않는다. 작은 동그라미에서는 들썩임으로만 보인다.
+   - **선호도는 칩 줄이 아니라 이 동그라미의 테두리색으로 보인다**(아래 `--rr`, 2026-10-22).
+     칩 줄을 접은 만큼 동그라미를 위로 끌어올려(46px → 12px) 칸이 한층 낮아진다. */
 .prof-grid--lite .prof__photo{aspect-ratio:auto;width:72px;height:72px;flex:none;
-  margin:46px auto 0;border-radius:50%}
+  margin:12px auto 0;border-radius:50%;box-shadow:0 0 0 3px var(--rr,var(--line))}
+/* 선호도 칩 줄은 접는다 — 고르는 일은 보통 카드나 상세에서 한다 */
+.prof-grid--lite .rate{display:none}
+/* 칸끼리 키를 맞추지 않는다 — 접고 나면 남는 것이 글뿐이라, 늘이면 아래가 허옇게 빈다 */
+.prof-grid--lite{align-items:start}
+.prof-grid--lite .prof__bottom{margin-top:0;padding-top:0}
+/* 테두리색은 칸 테두리에 쓰는 선호도 색과 같다(위 `.prof[data-rating]`). 안 고른 분은 옅은 선 */
+.prof-grid--lite .prof{--rr:var(--line)}
+.prof-grid--lite .prof[data-rating="확"]{--rr:#38831c}
+.prof-grid--lite .prof[data-rating="긍"]{--rr:#0d8a6a}
+.prof-grid--lite .prof[data-rating="중"]{--rr:#0a7ab0}
+.prof-grid--lite .prof[data-rating="모"]{--rr:#9ca3af}
+.prof-grid--lite .prof[data-rating="부"]{--rr:#c0392b}
+.prof-grid--lite .prof[data-rating="비"]{--rr:#7c5cbf}
 .prof-grid--lite .prof__photo img,
 .prof-grid--lite .prof__photo--z img{object-fit:cover;object-position:center 22%;transform:none}
 .prof-grid--lite .prof:hover .prof__photo img{transform:none}
@@ -200,7 +215,7 @@ main{min-height:60vh;padding:40px 20px 72px}
 /* 넓은 화면에서만 글을 동그라미 밑으로 모은다 — 폰은 사진이 왼쪽에 서는 가로 줄이라
    가운데로 모으면 이름이 떠 보인다 */
 @media (min-width:721px){
-  .prof-grid--lite .prof__body{padding-top:10px;align-items:center;text-align:center}
+  .prof-grid--lite .prof__body{padding:8px 14px 14px;align-items:center;text-align:center}
   .prof-grid--lite .prof__head{align-items:center}
   .prof-grid--lite .prof__sub{justify-content:center}
 }
@@ -1424,7 +1439,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   /* 폰에서도 사진은 **작은 동그라미**다 (2026-10-22). 줄 왼쪽에 56px 로 놓고 가운데 높이에
      맞춘다. 바닥 높이를 풀어 줄 높이가 글을 따라오게 한다 — 접은 줄만큼 칸이 낮아진다. */
   .prof-grid--lite .prof__photo{width:56px;height:56px;min-height:0;border-radius:50%;
-    align-self:center;margin:12px 0 12px 12px}
+    align-self:center;margin:10px 0 10px 12px}
   .prof-grid--lite .prof__photo img{object-position:center 22%}
   .prof-grid--lite .prof__body{padding-left:12px}
 }
