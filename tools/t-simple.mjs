@@ -86,6 +86,25 @@ t('얼굴께를 잡아 잘랐다 — 위쪽 가장자리가 아니다', await pa
 t('바짝 잘린 분도 같은 길로 자른다', await page.evaluate(() =>
   [...document.querySelectorAll('.prof__photo--z img')].every(e =>
     getComputedStyle(e).objectFit === 'cover')));
+/* 띠가 아니라 **작은 동그라미**다 (2026-10-22, 사용자 지정) */
+t('사진은 동그라미', await page.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.prof__photo'));
+  return parseFloat(cs.borderTopLeftRadius) >= parseFloat(cs.width) / 2 - 1;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.prof__photo')).borderTopLeftRadius));
+t('가로세로가 같다', await page.evaluate(() => {
+  const r = document.querySelector('.prof__photo').getBoundingClientRect();
+  return Math.abs(r.width - r.height) < 1;
+}), await page.evaluate(() => { const r = document.querySelector('.prof__photo').getBoundingClientRect();
+  return `${Math.round(r.width)}x${Math.round(r.height)}`; }));
+t('카드 너비를 다 쓰지 않는다', await page.evaluate(() => {
+  const c = document.querySelector('.prof').getBoundingClientRect();
+  return document.querySelector('.prof__photo').getBoundingClientRect().width < c.width * 0.5;
+}));
+t('선호도 칩 줄에 가리지 않는다', await page.evaluate(() => {
+  const ph = document.querySelector('.prof__photo').getBoundingClientRect();
+  const rt = document.querySelector('.prof .rate');
+  return !rt || ph.top >= rt.getBoundingClientRect().bottom - 1;
+}));
 t('이름·직위는 그대로', await seen('.prof__name') && await seen('.prof__rank'));
 t('선호도 칩도 그대로', await seen('.prof__foot .rate'));
 t('카드보다 낮다', await page.evaluate(() => {

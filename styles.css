@@ -183,14 +183,27 @@ main{min-height:60vh;padding:40px 20px 72px}
 .prof-grid--lite .prof__office,
 .prof-grid--lite .prof__note,
 .prof-grid--lite .prof__foot .counter{display:none}
-/* 사진은 **얼굴께만 남기고 낮게** 자른다 (2026-10-22). 띠가 짧아진 만큼 창을 얼굴 쪽으로
-   올려 잡는다. 바짝 잘린 분들에게 쓰던 `--z`(contain + 위에서 키우기)는 여기서는 쓰지
-   않는다 — 창이 낮아 아래가 잘려 이마만 남기 때문이다. */
-.prof-grid--lite .prof__photo{aspect-ratio:4/2.2}
+/* 사진은 **얼굴만 담은 작은 동그라미**다 (2026-10-22). 카드 너비를 다 쓰는 띠에서
+   72px 동그라미로 줄였다 — 관심 교수 칸(40px 동그라미)과 같은 결이다.
+   - 선호도 칩 줄(`.rate`)이 위 10~44px 를 덮으므로 동그라미를 그 아래로 내린다.
+   - 글도 가운데로 모아 동그라미 밑에 세운다.
+   - 바짝 잘린 분들에게 쓰던 `--z`(contain + 위에서 키우기)는 여기서는 쓰지 않는다 —
+     창이 동그라미라 그대로 두면 사진이 가운데에서 떠 버린다. 같은 `cover` 로 자른다.
+   - 커서를 올려도 키우지 않는다. 작은 동그라미에서는 들썩임으로만 보인다. */
+.prof-grid--lite .prof__photo{aspect-ratio:auto;width:72px;height:72px;flex:none;
+  margin:46px auto 0;border-radius:50%}
 .prof-grid--lite .prof__photo img,
-.prof-grid--lite .prof__photo--z img{object-fit:cover;object-position:center 32%;transform:none}
-.prof-grid--lite .prof:hover .prof__photo img{transform:scale(1.03)}
-.prof-grid--lite .avatar{font-size:30px}
+.prof-grid--lite .prof__photo--z img{object-fit:cover;object-position:center 22%;transform:none}
+.prof-grid--lite .prof:hover .prof__photo img{transform:none}
+.prof-grid--lite .prof__photo--z{background:var(--surface-2)}
+.prof-grid--lite .avatar{font-size:26px}
+/* 넓은 화면에서만 글을 동그라미 밑으로 모은다 — 폰은 사진이 왼쪽에 서는 가로 줄이라
+   가운데로 모으면 이름이 떠 보인다 */
+@media (min-width:721px){
+  .prof-grid--lite .prof__body{padding-top:10px;align-items:center;text-align:center}
+  .prof-grid--lite .prof__head{align-items:center}
+  .prof-grid--lite .prof__sub{justify-content:center}
+}
 .prof{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s;display:flex;flex-direction:column;text-align:left;padding:0}
 .prof:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);border-color:var(--line-2)}
 .prof:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}
@@ -1408,10 +1421,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .prof__foot .rate[data-save="saved"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#1f8a5b 55%,transparent)}
   .prof__foot .rate[data-save="error"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px #c0392b}
   .prof__foot .rate__b{flex:1 1 0;min-width:0;width:auto;height:auto;max-width:32px;aspect-ratio:1;font-size:12px}
-  /* 간단 카드는 폰에서도 사진을 **얼굴께만 좁게** 둔다 (2026-10-22). 가로 폭을 줄이고
-     바닥 높이를 풀어, 줄 높이가 글에 따라오게 한다 — 접은 줄만큼 칸이 낮아진다. */
-  .prof-grid--lite .prof__photo{width:76px;min-height:0}
-  .prof-grid--lite .prof__photo img{object-position:center 28%}
+  /* 폰에서도 사진은 **작은 동그라미**다 (2026-10-22). 줄 왼쪽에 56px 로 놓고 가운데 높이에
+     맞춘다. 바닥 높이를 풀어 줄 높이가 글을 따라오게 한다 — 접은 줄만큼 칸이 낮아진다. */
+  .prof-grid--lite .prof__photo{width:56px;height:56px;min-height:0;border-radius:50%;
+    align-self:center;margin:12px 0 12px 12px}
+  .prof-grid--lite .prof__photo img{object-position:center 22%}
+  .prof-grid--lite .prof__body{padding-left:12px}
 }
 @media (max-width:339px){
   .prof__photo{width:96px;min-height:128px}
