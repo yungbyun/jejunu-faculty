@@ -180,9 +180,11 @@ main{min-height:60vh;padding:40px 20px 72px}
    메모 표시**를 접는다. 글은 그대로 두고 보이기만 끄므로(`display:none`) 메모를 고치면
    같은 자리에 다시 꽂히고, 다른 꼴로 돌아갔을 때 그대로 보인다. */
 .prof-grid--lite .prof__tags,
-.prof-grid--lite .prof__office,
 .prof-grid--lite .prof__note,
 .prof-grid--lite .prof__foot .counter{display:none}
+/* 연구실 위치와 핸드폰 번호는 남긴다 (2026-10-22, 사용자 지정) — 찾아가고 연락하는 데
+   쓰는 두 가지다. 064 연구실 전화만 접는다(핸드폰 줄은 `.po__mobw` 안에 있어 남는다). */
+.prof-grid--lite .prof__office > .po__tel{display:none}
 /* 사진은 **얼굴만 담은 작은 동그라미**다 (2026-10-22). 카드 너비를 다 쓰는 띠에서
    72px 동그라미로 줄였다 — 관심 교수 칸(40px 동그라미)과 같은 결이다.
    - 선호도 칩 줄(`.rate`)이 위 10~44px 를 덮으므로 동그라미를 그 아래로 내린다.
@@ -196,6 +198,9 @@ main{min-height:60vh;padding:40px 20px 72px}
   margin:12px auto 0;border-radius:50%;box-shadow:0 0 0 3px var(--rr,var(--line))}
 /* 선호도 칩 줄은 접는다 — 고르는 일은 보통 카드나 상세에서 한다 */
 .prof-grid--lite .rate{display:none}
+/* 올해 부임을 알리는 병아리도 접는다 (2026-10-22) — 동그라미가 36px 배지보다 두 곱절
+   클 뿐이라 얼굴을 거의 다 가린다. 보통 카드·상세에는 그대로 있다. */
+.prof-grid--lite .prof__photo .newp{display:none}
 /* 칸끼리 키를 맞추지 않는다 — 접고 나면 남는 것이 글뿐이라, 늘이면 아래가 허옇게 빈다 */
 .prof-grid--lite{align-items:start}
 .prof-grid--lite .prof__bottom{margin-top:0;padding-top:0}
@@ -216,6 +221,7 @@ main{min-height:60vh;padding:40px 20px 72px}
    가운데로 모으면 이름이 떠 보인다 */
 @media (min-width:721px){
   .prof-grid--lite .prof__body{padding:8px 14px 14px;align-items:center;text-align:center}
+  .prof-grid--lite .prof__office{align-items:center}
   .prof-grid--lite .prof__head{align-items:center}
   .prof-grid--lite .prof__sub{justify-content:center}
 }

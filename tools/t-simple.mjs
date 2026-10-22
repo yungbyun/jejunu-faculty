@@ -65,7 +65,20 @@ const seen = s2 => page.evaluate(q => { const e = document.querySelector(q); ret
 t('한 번 누르면 간단 카드', await page.locator('.prof-grid--lite').count() === 1 && await page.locator('.simple-list').count() === 0);
 t('간단 카드엔 메모 표시가 없다', !(await seen('.nb--memo')), String(await page.locator('.nb--memo').count()) + '개 있지만 숨김');
 t('전공 태그도 접는다', !(await seen('.prof__tags .tag')));
-t('연구실·전화 줄도 접는다', !(await seen('.prof__office')));
+/* 연구실 위치와 핸드폰 번호는 남긴다 — 064 연구실 전화만 접는다 (2026-10-22, 사용자 지정) */
+t('연구실 위치는 남긴다', await seen('.po__room'));
+t('핸드폰 번호도 남긴다', await page.evaluate(() => {
+  const d = state.depts.find(x => x.id === route().dept);
+  d.profs.slice(0, 3).forEach((p, i) => { mobiles()[rKey(p)] = '010-0000-000' + i; });
+  renderDept(d);
+  const e = document.querySelector('.po__mob');
+  return !!e && e.getClientRects().length > 0 && /010/.test(e.textContent);
+}), await page.evaluate(() => (document.querySelector('.po__mob') || {}).textContent));
+t('064 연구실 전화는 접는다', !(await seen('.prof__office > .po__tel')),
+  String(await page.locator('.prof__office > .po__tel').count()) + '개 있지만 숨김');
+t('문자 길은 그대로', await page.evaluate(() =>
+  (document.querySelector('.po__mob') || {}).getAttribute('href').startsWith('sms:+82')),
+  await page.evaluate(() => (document.querySelector('.po__mob') || {}).getAttribute('href')));
 t('사진은 그대로 있다', await seen('.prof__photo img'));
 /* 사진은 얼굴께만 낮게 자르고, 만남 카운터는 접는다 (2026-10-22, 사용자 지정) */
 t('만남 카운터는 접는다', !(await seen('.prof__foot .counter')),
@@ -107,6 +120,15 @@ t('선호도 칩 줄에 가리지 않는다', await page.evaluate(() => {
 }));
 t('이름·직위는 그대로', await seen('.prof__name') && await seen('.prof__rank'));
 /* 선호도는 칩 줄이 아니라 **사진 테두리색**으로 보인다 (2026-10-22, 사용자 지정) */
+t('병아리 배지도 접는다', !(await seen('.prof__photo .newp')),
+  String(await page.locator('.prof__photo .newp').count()) + '개 있지만 숨김');
+t('보통 카드에서는 병아리가 그대로', await page.evaluate(() => {
+  viewMode = 'card'; renderDept(state.depts.find(x => x.id === route().dept));
+  const e = document.querySelector('.prof__photo .newp');
+  const on = !!e && e.getClientRects().length > 0;
+  viewMode = 'lite'; renderDept(state.depts.find(x => x.id === route().dept));
+  return on;
+}));
 t('선호도 칩 줄은 접는다', !(await seen('.prof .rate')),
   String(await page.locator('.prof .rate').count()) + '개 있지만 숨김');
 t('선호도마다 테두리색이 다르다', await page.evaluate(() => {
