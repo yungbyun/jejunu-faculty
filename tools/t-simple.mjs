@@ -67,6 +67,25 @@ t('간단 카드엔 메모 표시가 없다', !(await seen('.nb--memo')), String
 t('전공 태그도 접는다', !(await seen('.prof__tags .tag')));
 t('연구실·전화 줄도 접는다', !(await seen('.prof__office')));
 t('사진은 그대로 있다', await seen('.prof__photo img'));
+/* 사진은 얼굴께만 낮게 자르고, 만남 카운터는 접는다 (2026-10-22, 사용자 지정) */
+t('만남 카운터는 접는다', !(await seen('.prof__foot .counter')),
+  String(await page.locator('.prof__foot .counter').count()) + '개 있지만 숨김');
+t('사진이 보통 카드보다 낮다', await page.evaluate(() => {
+  const h = () => document.querySelector('.prof__photo').getBoundingClientRect().height;
+  const lite = h();
+  viewMode = 'card'; renderDept(state.depts.find(x => x.id === route().dept));
+  const full = h();
+  viewMode = 'lite'; renderDept(state.depts.find(x => x.id === route().dept));
+  return lite < full * 0.8;
+}));
+t('얼굴께를 잡아 잘랐다 — 위쪽 가장자리가 아니다', await page.evaluate(() => {
+  const op = getComputedStyle(document.querySelector('.prof__photo img')).objectPosition;
+  const y = parseFloat(op.split(' ')[1]);
+  return y >= 20 && y <= 45;
+}), await page.evaluate(() => getComputedStyle(document.querySelector('.prof__photo img')).objectPosition));
+t('바짝 잘린 분도 같은 길로 자른다', await page.evaluate(() =>
+  [...document.querySelectorAll('.prof__photo--z img')].every(e =>
+    getComputedStyle(e).objectFit === 'cover')));
 t('이름·직위는 그대로', await seen('.prof__name') && await seen('.prof__rank'));
 t('선호도 칩도 그대로', await seen('.prof__foot .rate'));
 t('카드보다 낮다', await page.evaluate(() => {

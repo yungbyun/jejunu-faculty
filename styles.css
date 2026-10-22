@@ -181,7 +181,16 @@ main{min-height:60vh;padding:40px 20px 72px}
    같은 자리에 다시 꽂히고, 다른 꼴로 돌아갔을 때 그대로 보인다. */
 .prof-grid--lite .prof__tags,
 .prof-grid--lite .prof__office,
-.prof-grid--lite .prof__note{display:none}
+.prof-grid--lite .prof__note,
+.prof-grid--lite .prof__foot .counter{display:none}
+/* 사진은 **얼굴께만 남기고 낮게** 자른다 (2026-10-22). 띠가 짧아진 만큼 창을 얼굴 쪽으로
+   올려 잡는다. 바짝 잘린 분들에게 쓰던 `--z`(contain + 위에서 키우기)는 여기서는 쓰지
+   않는다 — 창이 낮아 아래가 잘려 이마만 남기 때문이다. */
+.prof-grid--lite .prof__photo{aspect-ratio:4/2.2}
+.prof-grid--lite .prof__photo img,
+.prof-grid--lite .prof__photo--z img{object-fit:cover;object-position:center 32%;transform:none}
+.prof-grid--lite .prof:hover .prof__photo img{transform:scale(1.03)}
+.prof-grid--lite .avatar{font-size:30px}
 .prof{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s;display:flex;flex-direction:column;text-align:left;padding:0}
 .prof:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover);border-color:var(--line-2)}
 .prof:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}
@@ -1399,6 +1408,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .prof__foot .rate[data-save="saved"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,#1f8a5b 55%,transparent)}
   .prof__foot .rate[data-save="error"] .rate__b[aria-pressed="true"]{box-shadow:0 0 0 3px #c0392b}
   .prof__foot .rate__b{flex:1 1 0;min-width:0;width:auto;height:auto;max-width:32px;aspect-ratio:1;font-size:12px}
+  /* 간단 카드는 폰에서도 사진을 **얼굴께만 좁게** 둔다 (2026-10-22). 가로 폭을 줄이고
+     바닥 높이를 풀어, 줄 높이가 글에 따라오게 한다 — 접은 줄만큼 칸이 낮아진다. */
+  .prof-grid--lite .prof__photo{width:76px;min-height:0}
+  .prof-grid--lite .prof__photo img{object-position:center 28%}
 }
 @media (max-width:339px){
   .prof__photo{width:96px;min-height:128px}
