@@ -205,13 +205,13 @@ await setup(5);
 await page.waitForTimeout(500);
 const T = await truth();
 t('강화가 있으면 카드가 생긴다', await page.locator('.pie__k--push').count() === 1);
-/* 인원은 카드 **이름**에 붙는다 — 「+강화(6) = 43」 (2026-10-20, 사용자 지정) */
+/* 인원은 카드 **이름**에 붙는다 — 「+중-강화(6) = 43」 (2026-10-20, 사용자 지정) */
 const klTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kl').textContent.trim(), k);
 t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsWith(` ${T.base + T.add}`),
   `화면 ${await klTxt('.pie__k--push')} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+강화(${T.add})`),
+t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+중-강화(${T.add})`),
   await klTxt('.pie__k--push'));
 t('안 더한 강화가 실제로 있다', T.out > 0, `${T.out}명`);
 t('이름에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await klTxt('.pie__k--push')), await klTxt('.pie__k--push'));
@@ -238,7 +238,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+강화(0)'),
+t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+중-강화(0)'),
   await klTxt('.pie__k--push'));
 t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
   `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
@@ -263,7 +263,7 @@ await page.evaluate(() => {
   state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => sures().add(rKey(p)));
   sureSave(); renderStats();
 });
-t('확·긍만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+강화(0)'),
+t('확·긍만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+중-강화(0)'),
   await klTxt('.pie__k--push'));
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
@@ -308,23 +308,23 @@ t('차는 모자란 몫의 갑절쯤', await page.evaluate(() =>
   })),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kn')].map(e => e.textContent).join(' | ')));
 t('세 카드 이름은 「이름 인원」', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+중-강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
+/* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+중-강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
 const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
   .map(e => e.textContent.trim().replace(/ \d+$/, '')).join('|'));
 t('강화가 없으면 카드는 둘', /^확실\|\+긍정\(\d+\)$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('카드 이름 셋', /^확실\|\+긍정\(\d+\)\|\+강화\(\d+\)$/.test(await klHead()), await klHead());
+t('카드 이름 셋', /^확실\|\+긍정\(\d+\)\|\+중-강화\(\d+\)$/.test(await klHead()), await klHead());
 t('둘째 이름의 괄호는 긍정 인원', await page.evaluate(() =>
   document.querySelector('.pie__k--pos .pie__kl').textContent.startsWith(
     `+긍정(${state.rows.filter(p => getRating(p) === '긍').length})`)),
   await klTxt('.pie__k--pos'));
 t('셋째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
   document.querySelector('.pie__k--push .pie__kl').textContent.startsWith(
-    `+강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
+    `+중-강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
   await klTxt('.pie__k--push'));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).

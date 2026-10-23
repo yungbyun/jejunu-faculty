@@ -1791,7 +1791,7 @@ function donut(profs) {
           <b>${pct(base)}%</b>
           ${vs(base)}${gapLine(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
-          <span class="pie__kl">+강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
+          <span class="pie__kl">+중-강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
           ${vs(reach)}${gapLine(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
