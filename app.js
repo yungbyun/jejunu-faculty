@@ -2220,13 +2220,17 @@ function bindFavDrag() {
         if (t !== to) { to = t; shift(); }
       };
       /* 화면 가장자리에 다다르면 **저절로 굴러 준다** (2026-10-24) — 학과 목록과 같은 길이다 */
-      const EDGE = 72, MAXV = 16;
+      /* 빠르기: 가장자리 84px 안에 들면 구르고, 끝에 가까울수록 빨라진다.
+         한 틀에 8~34px — 60틀이면 1초에 480~2040px 쯤이다 (2026-10-24 에 교수님이 더
+         올리라고 하셔서 16 → 34 로 올렸습니다. 들자마자 8px 은 나가야 답답하지 않습니다). */
+      const EDGE = 84, MINV = 8, MAXV = 34;
       const roll = () => {
         raf = requestAnimationFrame(roll);
         const h = window.innerHeight;
+        const speed = r => Math.ceil(MINV + (MAXV - MINV) * Math.min(1, r));
         let v = 0;
-        if (lastY < EDGE) v = -Math.ceil((EDGE - lastY) / EDGE * MAXV);
-        else if (lastY > h - EDGE) v = Math.ceil((lastY - (h - EDGE)) / EDGE * MAXV);
+        if (lastY < EDGE) v = -speed((EDGE - lastY) / EDGE);
+        else if (lastY > h - EDGE) v = speed((lastY - (h - EDGE)) / EDGE);
         if (!v) return;
         const was = window.scrollY;
         window.scrollBy({ top: v, left: 0, behavior: 'instant' });
@@ -2369,13 +2373,17 @@ function bindDeptDrag() {
          `html{scroll-behavior:smooth}` 가 걸려 있는데 `behavior:'auto'` 는 **그 CSS 를 따르므로**
          부드럽게 굴러 버린다 — 그러면 `scrollY` 가 바로 안 바뀌어 자리를 다시 맞출 때를
          놓친다. 그래서 `'instant'` 로 못 박고, 끄는 동안 CSS 도 잠깐 꺼 둔다. */
-      const EDGE = 72, MAXV = 16;
+      /* 빠르기: 가장자리 84px 안에 들면 구르고, 끝에 가까울수록 빨라진다.
+         한 틀에 8~34px — 60틀이면 1초에 480~2040px 쯤이다 (2026-10-24 에 교수님이 더
+         올리라고 하셔서 16 → 34 로 올렸습니다. 들자마자 8px 은 나가야 답답하지 않습니다). */
+      const EDGE = 84, MINV = 8, MAXV = 34;
       const roll = () => {
         raf = requestAnimationFrame(roll);
         const h = window.innerHeight;
+        const speed = r => Math.ceil(MINV + (MAXV - MINV) * Math.min(1, r));
         let v = 0;
-        if (lastY < EDGE) v = -Math.ceil((EDGE - lastY) / EDGE * MAXV);
-        else if (lastY > h - EDGE) v = Math.ceil((lastY - (h - EDGE)) / EDGE * MAXV);
+        if (lastY < EDGE) v = -speed((EDGE - lastY) / EDGE);
+        else if (lastY > h - EDGE) v = speed((lastY - (h - EDGE)) / EDGE);
         if (!v) return;
         const was = window.scrollY;
         window.scrollBy({ top: v, left: 0, behavior: 'instant' });
