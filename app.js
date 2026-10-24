@@ -259,6 +259,12 @@ function setStatus(src) {
 }
 
 /* ---------- 라우팅 ---------- */
+/* **어디에서 이 화면으로 왔는지** 적어 둡니다 (2026-10-24). 상세의 X 가 「이전으로」 가려면
+ * 알아야 합니다 — 분석에서 들어왔으면 분석으로, 관심 명단에서 들어왔으면 그리로.
+ * `render()` 끝에서 화면을 맨 위로 올리므로, **떠나는 화면에서 보던 자리(scrollY)** 도 같이
+ * 적어 두었다가 되돌아갈 때 그 자리로 내려 줍니다. */
+let navFrom = '', navNow = location.hash, navFromY = 0;
+let pendBack = null;        // 뒤로 간 뒤 되돌려 놓을 자리 { hash, y }
 function route() {
   const h = location.hash.replace(/^#\/?/, '');
   const parts = h.split('/').filter(Boolean);
@@ -4909,7 +4915,7 @@ function openDrawer(p, d) {
     if (sbox) sbox.innerHTML = summaryHtml(p, d);
   });
   /* body 를 overflow:hidden 으로 접으면 보던 자리가 0 으로 날아간다. 적어 두었다 닫을 때 되돌린다. */
-  drawerBack = { y: window.scrollY, dept: d.id };
+  drawerBack = { y: window.scrollY, dept: d.id, from: navFrom, fromY: navFromY };
   $drawer.hidden = false;
   document.body.style.overflow = 'hidden';
   $panel.querySelector('[data-close]').focus();
@@ -4918,10 +4924,24 @@ function openDrawer(p, d) {
 function closeDrawer(navigate = true) {
   if ($drawer.hidden) return;
   flushMemo(); // 쓰다 만 메모를 바로 저장
+  const back = drawerBack;
+  drawerBack = null;
   $drawer.hidden = true;
   document.body.style.overflow = '';
   const r = route();
   if (navigate && r.view === 'dept') {
+    /* **들어오기 전 화면으로 되돌아갑니다** (2026-10-24, 교수님 지적).
+     * 분석·관심 명단·검색·관계 그림 어디에서 들어왔든 X 를 누르면 그 자리로 갑니다.
+     * 그 전에는 늘 `replaceState` 로 **학과 화면**에 떨어뜨려, 분석에서 들어온 교수님이
+     * 엉뚱한 데로 갔습니다. 주소를 바꾸는 길이 아니라 **한 발 뒤로**(`history.back()`)
+     * 가는 길이라, 돌아간 화면은 hashchange → render() 로 새로 그려집니다
+     * (상세에서 고친 메모·표시가 그대로 보입니다). */
+    if (back && back.from) {
+      pendBack = { hash: back.from, y: back.fromY || 0 };
+      history.back();
+      return;
+    }
+    /* 주소로 바로 들어오신 경우(앞 기록이 없을 때)에만 학과 화면으로 떨어뜨립니다 */
     history.replaceState(null, '', `#/dept/${encodeURIComponent(r.dept)}`);
     /* replaceState 는 hashchange 를 울리지 않는다 → 뒤에 있던 학과 화면이 옛 내용 그대로 남는다.
        상세에서 메모·만난 횟수·표시를 고치고 닫으면 그게 안 보이므로 여기서 다시 그린다. */
@@ -4930,13 +4950,12 @@ function closeDrawer(navigate = true) {
   }
   /* 열기 전에 보던 자리로. 되돌아온 학과가 같을 때만이고, scroll-behavior:smooth 를 잠깐 꺼서
      출렁이지 않게 한다. */
-  if (drawerBack && r.view === 'dept' && r.dept === drawerBack.dept) {
+  if (back && r.view === 'dept' && r.dept === back.dept) {
     const html = document.documentElement, keep = html.style.scrollBehavior;
     html.style.scrollBehavior = 'auto';
-    window.scrollTo(0, drawerBack.y);
+    window.scrollTo(0, back.y);
     html.style.scrollBehavior = keep;
   }
-  drawerBack = null;
 }
 $drawer.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeDrawer(true); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(true); });
@@ -5180,7 +5199,23 @@ function initPullRefresh() {
 /* ---------- 시작 ---------- */
 startVersionWatch();
 initPullRefresh();
-window.addEventListener('hashchange', () => { state.rankFilter = '전체'; state.favOnly = false; if (!state._keepRating) state.ratingFilter = '전체'; state._keepRating = false; render(); });
+window.addEventListener('hashchange', () => {
+  navFrom = navNow; navFromY = window.scrollY; navNow = location.hash;   // 떠나는 화면과 그때 보던 자리
+  state.rankFilter = '전체'; state.favOnly = false;
+  if (!state._keepRating) state.ratingFilter = '전체';
+  state._keepRating = false;
+  render();
+  /* 상세의 X 로 한 발 뒤로 왔다면, 그때 보던 자리로 내려 준다 (render() 가 맨 위로 올린 뒤에) */
+  if (pendBack) {
+    if (location.hash === pendBack.hash && pendBack.y) {
+      const html = document.documentElement, keep = html.style.scrollBehavior;
+      html.style.scrollBehavior = 'auto';
+      window.scrollTo(0, pendBack.y);
+      html.style.scrollBehavior = keep;
+    }
+    pendBack = null;
+  }
+});
 if (!authEnabled()) {
   enterApp(null);
 } else {
