@@ -2268,6 +2268,29 @@ function bindDeptDrag() {
     flashStatus('학과 차례를 바꿨습니다');
   };
 
+  /* 관심 교수 쪽(`bindFavDrag`)과 같은 길로 **미끄러지게** 움직입니다 (2026-10-24).
+   * 끄는 동안 DOM 을 건드리지 않고, 끌리는 줄은 손가락을 따라오며, 비켜 줄 줄들만 밀립니다.
+   * 다른 점은 **한 줄짜리 세로 목록**이라 위아래만 재면 된다는 것뿐입니다. */
+  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const EASE = 'cubic-bezier(.2,.7,.3,1)', MS = 190;
+  /* 자리가 바뀐 줄들이 옛 자리에서 제자리로 돌아오는 그림(FLIP). 화살표로 옮길 때 씁니다 —
+     그쪽은 `renderHome()` 으로 **다시 그리므로**, 줄을 `data-did` 로 찾아 이어 줍니다. */
+  const flip = mutate => {
+    if (!smooth) { mutate(); return; }
+    const was = new Map([...list.querySelectorAll('.drow-w')].map(e => [e.dataset.did, e.getBoundingClientRect()]));
+    mutate();
+    const now = $app.querySelector('.dept-list');
+    if (!now) return;
+    [...now.querySelectorAll('.drow-w')].forEach(e => {
+      const a = was.get(e.dataset.did); if (!a) return;
+      const b = e.getBoundingClientRect();
+      const dy = a.top - b.top;
+      if (!dy) return;
+      e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }],
+        { duration: MS, easing: EASE });
+    });
+  };
+
   list.querySelectorAll('[data-grip]').forEach(grip => {
     grip.addEventListener('pointerdown', e => {
       if (e.button != null && e.button !== 0) return;
@@ -2276,25 +2299,56 @@ function bindDeptDrag() {
       e.preventDefault();
       /* setPointerCapture 를 쓰면 안 된다 — 줄을 DOM 에서 옮기는 순간 손잡이가 지워졌다 다시
          꽂히면서 잡기가 풀려, 그 뒤로는 움직임도 놓기도 안 온다. 그래서 창에 건다. */
+      const all = [...list.querySelectorAll('.drow-w')];
+      const slots = all.map(el => el.getBoundingClientRect());   // 끄는 동안 자리는 그대로 둔다
+      const from = all.indexOf(row);
+      if (from < 0) return;
+      const gy = e.clientY - slots[from].top;                    // 줄 안에서 잡은 자리
+      let to = from, moved = false;
       row.classList.add('drow-w--drag');
       list.classList.add('dept-list--drag');
-      let moved = false;
+
+      /* 가운데보다 위로 올라온 첫 줄 앞. 끌던 줄을 뺀 뒤의 자리라 그 앞이면 하나 당긴다 */
+      const spot = y => {
+        const i = slots.findIndex(r => y < r.top + r.height / 2);
+        if (i < 0) return all.length - 1;
+        return i > from ? i - 1 : i;
+      };
+      const shift = () => all.forEach((el, j) => {
+        if (el === row) return;
+        let k = j;
+        if (from < to && j > from && j <= to) k = j - 1;
+        else if (from > to && j >= to && j < from) k = j + 1;
+        const dy = slots[k].top - slots[j].top;
+        el.style.transform = dy ? `translateY(${dy}px)` : '';
+      });
 
       const move = ev => {
         moved = true;
-        const y = ev.clientY;
-        /* 끌고 있는 줄을 뺀 나머지 중, 가운데보다 위로 올라온 첫 줄 앞에 끼운다 */
-        const after = [...list.querySelectorAll('.drow-w:not(.drow-w--drag)')]
-          .find(el => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2; });
-        after ? list.insertBefore(row, after) : list.appendChild(row);
+        row.style.transform = `translateY(${ev.clientY - gy - slots[from].top}px)`;
+        const t = spot(ev.clientY);
+        if (t !== to) { to = t; shift(); }
+      };
+      const done = () => {
+        all.forEach(el => { el.style.transform = ''; el.style.transition = ''; });
+        row.classList.remove('drow-w--drag');
+        list.classList.remove('dept-list--drag');
+        if (moved && to !== from) {
+          const next = all.filter(el => el !== row);
+          next.splice(to, 0, row);
+          next.forEach(el => list.appendChild(el));
+          commit();
+        }
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
-        row.classList.remove('drow-w--drag');
-        list.classList.remove('dept-list--drag');
-        if (moved) commit();
+        if (!moved || !smooth) { done(); return; }
+        const dy = slots[to].top - slots[from].top;
+        row.style.transition = `transform ${MS}ms ${EASE}`;
+        row.style.transform = `translateY(${dy}px)`;
+        setTimeout(done, MS + 20);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
@@ -2310,9 +2364,11 @@ function bindDeptDrag() {
       const rows = [...list.querySelectorAll('.drow-w')];
       const i = rows.indexOf(row), j = i + d;
       if (j < 0 || j >= rows.length) return;
-      d < 0 ? list.insertBefore(row, rows[j]) : list.insertBefore(rows[j], row);
-      commit();
-      renderHome();
+      flip(() => {
+        d < 0 ? list.insertBefore(row, rows[j]) : list.insertBefore(rows[j], row);
+        commit();
+        renderHome();
+      });
       $app.querySelector(`[data-grip="${CSS.escape(grip.dataset.grip)}"]`)?.focus();
     });
   });

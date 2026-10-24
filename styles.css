@@ -110,8 +110,10 @@ main{min-height:60vh;padding:40px 20px 72px}
   color:var(--ink-3);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
 .drow__grip:hover{color:var(--ink);background:var(--surface-2)}
 .drow__grip:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);color:var(--ink)}
-/* 끄는 동안 — 그 줄만 들어 올리고 나머지는 가만히 둔다 */
-.drow-w--drag{opacity:.92;cursor:grabbing}
+/* 끄는 동안 — 그 줄만 들어 올리고 나머지는 가만히 둔다. 끌리는 줄은 손가락을 그대로
+   따라와야 하므로 전환을 걸지 않고, 비켜 주는 줄들만 미끄러진다 (2026-10-24) */
+.drow-w--drag{opacity:.92;cursor:grabbing;z-index:5;transition:none;will-change:transform}
+.dept-list--drag .drow-w:not(.drow-w--drag){transition:transform .19s cubic-bezier(.2,.7,.3,1)}
 .drow-w--drag .drow{background:var(--surface);box-shadow:0 10px 26px rgba(0,0,0,.18);
   border-radius:14px;transform:none}
 .drow-w--drag .drow__grip{color:var(--brand);cursor:grabbing}

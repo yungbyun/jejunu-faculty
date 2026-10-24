@@ -111,6 +111,62 @@ t('모르는 학과가 섞여 있어도 버틴다', await page.evaluate(() => {
   return now.length === ids.length && now[0] === ids[1] && ids.every(id => now.includes(id));
 }));
 
+/* ---------- 끌 때 미끄러지듯 움직인다 (2026-10-24) ----------
+ * 전에는 손이 움직일 때마다 DOM 을 옮겨 줄이 툭툭 튀었다. 지금은 DOM 을 건드리지 않고,
+ * 끌리는 줄은 손가락을 따라오고 비켜 줄 줄들만 미끄러진다. */
+await page.evaluate(() => { dorderList = []; localStorage.removeItem('jnu-deptorder'); location.hash = '#/'; render(); });
+await page.waitForSelector('[data-grip]', { timeout: 10000 });
+{
+  const ids = () => page.evaluate(() => [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join());
+  const before = await ids();
+  const g = await page.locator('[data-grip]').first().boundingBox();
+  const t3 = await page.locator('.drow-w').nth(3).boundingBox();
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width / 2, t3.y + t3.height * 0.6, { steps: 10 });
+  await page.waitForTimeout(140);
+  const mid = await page.evaluate(() => {
+    const d = document.querySelector('.drow-w--drag');
+    const o = [...document.querySelectorAll('.drow-w')].find(e => e !== d && e.style.transform);
+    const cs = e => getComputedStyle(e);
+    return { order: [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join(),
+             dragT: d ? d.style.transform : '', dragDur: d ? cs(d).transitionDuration : '',
+             otherT: o ? o.style.transform : '', otherDur: o ? cs(o).transitionDuration : '',
+             lifted: d ? cs(d).zIndex : '' };
+  });
+  t('끄는 동안 DOM 차례는 그대로', mid.order === before, mid.order === before ? '그대로' : '바뀜');
+  t('끌리는 줄이 손가락을 따라온다', /translateY\(/.test(mid.dragT), mid.dragT);
+  t('끌리는 줄에는 전환을 걸지 않는다', parseFloat(mid.dragDur) === 0, mid.dragDur);
+  t('끌리는 줄을 들어 올린다', Number(mid.lifted) >= 2, mid.lifted);
+  t('비켜 주는 줄이 위로 밀린다', /translateY\(/.test(mid.otherT), mid.otherT);
+  t('비켜 주는 줄은 미끄러진다', parseFloat(mid.otherDur) > 0, mid.otherDur);
+  await page.mouse.up();
+  await page.waitForTimeout(420);
+  const now = (await ids()).split(',');
+  t('손을 떼면 그 자리로 간다', now[3] === before.split(',')[0], now.indexOf(before.split(',')[0]) + '번째');
+  t('떼고 나면 임시로 민 자리는 걷힌다', await page.evaluate(() =>
+    [...document.querySelectorAll('.drow-w')].every(e => !e.style.transform && !e.style.transition)));
+  t('끌기 표시도 걷힌다', await page.evaluate(() =>
+    !document.querySelector('.drow-w--drag') && !document.querySelector('.dept-list--drag')));
+  t('보이는 차례와 담긴 차례가 같다', await page.evaluate(() =>
+    [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join() === dorder().join()),
+    await page.evaluate(() => dorder().slice(0, 4).join()));
+  t('아무 학과도 잃지 않는다', now.length === before.split(',').length && new Set(now).size === now.length,
+    `${now.length}개`);
+}
+/* 화살표로 옮길 때도 미끄러진다(FLIP) — 그쪽은 다시 그리므로 data-did 로 이어 준다 */
+await page.locator('[data-grip]').first().focus();
+t('화살표로 옮기면 그림이 돈다', await page.evaluate(async () => {
+  document.querySelector('[data-grip]').dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  const n = [...document.querySelectorAll('.drow-w')]
+    .reduce((s2, e) => s2 + (e.getAnimations ? e.getAnimations().length : 0), 0);
+  await new Promise(r => setTimeout(r, 250));
+  return n > 0;
+}));
+t('그 뒤에도 차례가 맞다', await page.evaluate(() =>
+  [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join() === dorder().join()));
+
 await page.evaluate(() => { dorderList = []; localStorage.removeItem('jnu-deptorder'); });
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
