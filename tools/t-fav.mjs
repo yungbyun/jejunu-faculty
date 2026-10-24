@@ -57,12 +57,32 @@ t('굵게 한 말만, 콤마로', await page.evaluate(()=>document.querySelector
   await page.evaluate(()=>document.querySelector('.favw .favc__m').textContent));
 t('굵은 데가 없으면 줄도 없다', await page.locator('.favc__m').count()===1,
   String(await page.locator('.favc__m').count()));
-t('X 단추가 메모 높이까지 내려온다', await page.evaluate(() => {
-  const w = document.querySelector('.favw'), x = w.querySelector('.favx');
-  return Math.abs(x.getBoundingClientRect().height - w.getBoundingClientRect().height) <= 3;
+/* X 는 **사진 줄 높이까지만** 선다 (2026-10-24) — 메모 높이까지 내려오면 누르는 자리가
+   너무 넓어, 메모를 읽다가 잘못 눌러 관심이 풀렸다 */
+t('X 단추는 사진 줄 높이까지만', await page.evaluate(() => {
+  const w = document.querySelector('.favw'), r = w.querySelector('.favw__r'), x = w.querySelector('.favx');
+  const R = e => e.getBoundingClientRect();
+  return Math.abs(R(x).height - R(r).height) <= 3 && R(x).height < R(w).height - 10;
 }), await page.evaluate(() => {
-  const w = document.querySelector('.favw');
-  return `카드 ${Math.round(w.getBoundingClientRect().height)} / X ${Math.round(w.querySelector('.favx').getBoundingClientRect().height)}`;
+  const w = document.querySelector('.favw'), R = e => e.getBoundingClientRect();
+  return `카드 ${Math.round(R(w).height)} / 윗줄 ${Math.round(R(w.querySelector('.favw__r')).height)} / X ${Math.round(R(w.querySelector('.favx')).height)}`;
+}));
+t('X 는 윗줄 안에 있다', await page.evaluate(() =>
+  !!document.querySelector('.favw__r > .favx')));
+t('메모 줄은 카드 너비를 끝까지 쓴다', await page.evaluate(() => {
+  const w = document.querySelector('.favw'), m = w.querySelector('.favc__m'), x = w.querySelector('.favx');
+  const R = e => e.getBoundingClientRect();
+  return R(m).right >= R(x).right - 1;
+}), await page.evaluate(() => {
+  const w = document.querySelector('.favw'), R = e => e.getBoundingClientRect();
+  return `메모 끝 ${Math.round(R(w.querySelector('.favc__m')).right)} / X 끝 ${Math.round(R(w.querySelector('.favx')).right)}`;
+}));
+t('메모 자리를 눌러도 관심이 풀리지 않는다', await page.evaluate(() => {
+  const w = document.querySelector('.favw'), m = w.querySelector('.favc__m');
+  const r = m.getBoundingClientRect();
+  /* 메모 줄의 오른쪽 끝(예전에 X 가 내려오던 자리)에 무엇이 있는지 */
+  const el = document.elementFromPoint(r.right - 6, r.top + r.height / 2);
+  return !el || !el.closest('.favx');
 }));
 t('메모에 바탕색을 깔지 않는다', await page.evaluate(() => {
   const bg = getComputedStyle(document.querySelector('.favc__m')).backgroundColor;

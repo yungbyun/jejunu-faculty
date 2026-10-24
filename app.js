@@ -2057,12 +2057,14 @@ function favSection() {
             <span class="favc__t"><span class="favc__nm"><b>${esc(p.name)}</b>${r ? `<i class="rs rs--${rcls(r)} rs--mini">${esc(r)}</i>` : ''}</span><small>${esc(p.dept_name)} · ${esc(p.rank)}</small>${loc ? `<small class="favc__loc"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>${esc(shortLoc(loc))}</small>` : ''}</span>
             </a>
             ${meetCounter(p)}
-            </div>
-            ${bold ? `<div class="favc__m">${esc(bold)}</div>` : ''}
-            </div>
+            <!-- X 는 **윗줄 안**에 둔다 (2026-10-24) — 메모 높이까지 내려오면 누르는 자리가
+                 너무 넓어, 메모를 읽다가 잘못 눌러 관심이 풀리는 일이 생긴다 -->
             <button type="button" class="favx" data-key="${esc(rKey(p))}" title="관심 해제" aria-label="${esc(p.name)} 관심 교수 해제">
               <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
+            </div>
+            ${bold ? `<div class="favc__m">${esc(bold)}</div>` : ''}
+            </div>
           </div>`;
         }).join('')}
       </div>

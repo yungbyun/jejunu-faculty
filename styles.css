@@ -542,7 +542,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favsec__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
 .favsec__list--nomemo .favc__m{display:none}
 .favw{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
-/* 왼쪽 묶음(윗줄 + 메모)과 X 단추 두 칸으로 나눈다 — X 가 메모 높이까지 내려온다 */
+/* 왼쪽 손잡이와 묶음(윗줄 + 메모) 두 칸이다. X 는 묶음 **윗줄 안**에 있어 사진 칸 높이까지만
+   내려오고(2026-10-24), 그만큼 메모 줄이 카드 너비를 끝까지 쓴다 */
 .favw__b{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 .favw__r{display:flex;align-items:stretch}
 .favw:hover{transform:translateY(-2px);border-color:var(--dept-color);box-shadow:var(--shadow)}
@@ -558,7 +559,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favw--drag .favgrip{color:var(--brand);cursor:grabbing}
 .favsec__list--drag .favw:hover{transform:none;box-shadow:none;border-color:var(--line)}
 .favsec__list--drag .favw--drag:hover{border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18)}
-/* 관심 해제 버튼 — 카드 링크의 형제로 둔다(a 안에 button 을 넣으면 안 되므로) */
+/* 관심 해제 버튼 — 카드 링크의 형제로 둔다(a 안에 button 을 넣으면 안 되므로).
+   `.favw__r` 안에 있어 **사진 줄 높이**만큼만 선다 */
 .favx{flex:none;width:34px;padding:0;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink-3);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
 .favx:hover{background:color-mix(in srgb,#c0392b 10%,transparent);color:#c0392b}
 .favx:focus-visible{outline:3px solid color-mix(in srgb,#c0392b 40%,transparent);outline-offset:-3px}
