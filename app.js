@@ -2180,11 +2180,19 @@ function bindFavDrag() {
       /* 잡기(setPointerCapture)를 쓰지 않는 까닭은 학과 쪽과 같다 — 줄을 옮기면 손잡이가
          지워졌다 다시 꽂히며 잡기가 풀린다. 그래서 창에 건다. */
       const all = rows();
-      const slots = all.map(el => el.getBoundingClientRect());   // 끄는 동안 자리는 그대로 둔다
+      /* 자리는 **문서 기준**으로 재어 둔다 (2026-10-24) — 끄는 동안 화면이 저절로 구르므로
+         화면 기준(clientY)으로 재면 다 어긋난다. 손가락 자리도 `pageX/pageY` 로 본다. */
+      const slots = all.map(el => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left + window.scrollX, top: r.top + window.scrollY, width: r.width, height: r.height,
+                 get right() { return this.left + this.width; }, get bottom() { return this.top + this.height; } };
+      });
       const from = all.indexOf(row);
       if (from < 0) return;
-      const gx = e.clientX - slots[from].left, gy = e.clientY - slots[from].top;   // 칸 안에서 잡은 자리
-      let to = from, moved = false;
+      const gx = e.pageX - slots[from].left, gy = e.pageY - slots[from].top;   // 칸 안에서 잡은 자리
+      let to = from, moved = false, lastX = e.clientX, lastY = e.clientY, raf = 0;
+      const html = document.documentElement, keepSB = html.style.scrollBehavior;
+      html.style.scrollBehavior = 'auto';      // 저절로 구를 때 출렁이지 않게
       row.classList.add('favw--drag');
       list.classList.add('favsec__list--drag');
 
@@ -2204,15 +2212,35 @@ function bindFavDrag() {
         const dx = slots[k].left - slots[j].left, dy = slots[k].top - slots[j].top;
         el.style.transform = (dx || dy) ? `translate(${dx}px,${dy}px)` : '';
       });
+      /* 손가락은 그대로여도 화면이 구르면 문서 기준 자리가 달라진다 — 그래서 따로 뺐다 */
+      const apply = () => {
+        const px = lastX + window.scrollX, py = lastY + window.scrollY;
+        row.style.transform = `translate(${px - gx - slots[from].left}px,${py - gy - slots[from].top}px)`;
+        const t = spot(px, py);
+        if (t !== to) { to = t; shift(); }
+      };
+      /* 화면 가장자리에 다다르면 **저절로 굴러 준다** (2026-10-24) — 학과 목록과 같은 길이다 */
+      const EDGE = 72, MAXV = 16;
+      const roll = () => {
+        raf = requestAnimationFrame(roll);
+        const h = window.innerHeight;
+        let v = 0;
+        if (lastY < EDGE) v = -Math.ceil((EDGE - lastY) / EDGE * MAXV);
+        else if (lastY > h - EDGE) v = Math.ceil((lastY - (h - EDGE)) / EDGE * MAXV);
+        if (!v) return;
+        const was = window.scrollY;
+        window.scrollBy({ top: v, left: 0, behavior: 'instant' });
+        if (window.scrollY !== was) apply();
+      };
 
       const move = ev => {
         moved = true;
-        row.style.transform = `translate(${ev.clientX - gx - slots[from].left}px,${ev.clientY - gy - slots[from].top}px)`;
-        const t = spot(ev.clientX, ev.clientY);
-        if (t !== to) { to = t; shift(); }
+        lastX = ev.clientX; lastY = ev.clientY;
+        apply();
       };
       const done = () => {
         all.forEach(el => { el.style.transform = ''; el.style.transition = ''; });
+        html.style.scrollBehavior = keepSB;
         row.classList.remove('favw--drag');
         list.classList.remove('favsec__list--drag');
         if (moved && to !== from) {
@@ -2224,6 +2252,7 @@ function bindFavDrag() {
         }
       };
       const up = () => {
+        cancelAnimationFrame(raf);
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
@@ -2237,6 +2266,7 @@ function bindFavDrag() {
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
       window.addEventListener('pointercancel', up);
+      raf = requestAnimationFrame(roll);
     });
 
     /* 끌기 어려운 분을 위해 — 손잡이에 초점을 두고 화살표. 격자라도 **한 칸씩** 옮깁니다
@@ -2300,17 +2330,21 @@ function bindDeptDrag() {
       /* setPointerCapture 를 쓰면 안 된다 — 줄을 DOM 에서 옮기는 순간 손잡이가 지워졌다 다시
          꽂히면서 잡기가 풀려, 그 뒤로는 움직임도 놓기도 안 온다. 그래서 창에 건다. */
       const all = [...list.querySelectorAll('.drow-w')];
-      const slots = all.map(el => el.getBoundingClientRect());   // 끄는 동안 자리는 그대로 둔다
+      /* 자리는 **문서 기준**으로 재어 둔다 (2026-10-24) — 끄는 동안 화면이 저절로 구르므로
+         화면 기준(clientY)으로 재면 다 어긋난다. 손가락 자리도 `pageY` 로 본다. */
+      const slots = all.map(el => { const r = el.getBoundingClientRect(); return { top: r.top + window.scrollY, h: r.height }; });
       const from = all.indexOf(row);
       if (from < 0) return;
-      const gy = e.clientY - slots[from].top;                    // 줄 안에서 잡은 자리
-      let to = from, moved = false;
+      const gy = e.pageY - slots[from].top;                      // 줄 안에서 잡은 자리
+      let to = from, moved = false, lastY = e.clientY, raf = 0;
+      const html = document.documentElement, keepSB = html.style.scrollBehavior;
+      html.style.scrollBehavior = 'auto';      // 저절로 구를 때 출렁이지 않게
       row.classList.add('drow-w--drag');
       list.classList.add('dept-list--drag');
 
       /* 가운데보다 위로 올라온 첫 줄 앞. 끌던 줄을 뺀 뒤의 자리라 그 앞이면 하나 당긴다 */
-      const spot = y => {
-        const i = slots.findIndex(r => y < r.top + r.height / 2);
+      const spot = py => {
+        const i = slots.findIndex(s2 => py < s2.top + s2.h / 2);
         if (i < 0) return all.length - 1;
         return i > from ? i - 1 : i;
       };
@@ -2322,15 +2356,40 @@ function bindDeptDrag() {
         const dy = slots[k].top - slots[j].top;
         el.style.transform = dy ? `translateY(${dy}px)` : '';
       });
+      /* 손가락은 그대로여도 화면이 구르면 문서 기준 자리가 달라진다 — 그래서 따로 뺐다 */
+      const apply = () => {
+        const py = lastY + window.scrollY;
+        row.style.transform = `translateY(${py - gy - slots[from].top}px)`;
+        const t = spot(py);
+        if (t !== to) { to = t; shift(); }
+      };
+      /* 화면 가장자리에 다다르면 **저절로 굴러 준다** (2026-10-24, 교수님 지적).
+         폰처럼 화면이 좁으면 맨 아래 학과를 맨 위로 올릴 때 화면이 따라 올라가야 한다.
+         손잡이에 `touch-action:none` 을 주어 브라우저가 대신 굴려 주지 않으므로 우리가 한다.
+         `html{scroll-behavior:smooth}` 가 걸려 있는데 `behavior:'auto'` 는 **그 CSS 를 따르므로**
+         부드럽게 굴러 버린다 — 그러면 `scrollY` 가 바로 안 바뀌어 자리를 다시 맞출 때를
+         놓친다. 그래서 `'instant'` 로 못 박고, 끄는 동안 CSS 도 잠깐 꺼 둔다. */
+      const EDGE = 72, MAXV = 16;
+      const roll = () => {
+        raf = requestAnimationFrame(roll);
+        const h = window.innerHeight;
+        let v = 0;
+        if (lastY < EDGE) v = -Math.ceil((EDGE - lastY) / EDGE * MAXV);
+        else if (lastY > h - EDGE) v = Math.ceil((lastY - (h - EDGE)) / EDGE * MAXV);
+        if (!v) return;
+        const was = window.scrollY;
+        window.scrollBy({ top: v, left: 0, behavior: 'instant' });
+        if (window.scrollY !== was) apply();
+      };
 
       const move = ev => {
         moved = true;
-        row.style.transform = `translateY(${ev.clientY - gy - slots[from].top}px)`;
-        const t = spot(ev.clientY);
-        if (t !== to) { to = t; shift(); }
+        lastY = ev.clientY;
+        apply();
       };
       const done = () => {
         all.forEach(el => { el.style.transform = ''; el.style.transition = ''; });
+        html.style.scrollBehavior = keepSB;
         row.classList.remove('drow-w--drag');
         list.classList.remove('dept-list--drag');
         if (moved && to !== from) {
@@ -2341,6 +2400,7 @@ function bindDeptDrag() {
         }
       };
       const up = () => {
+        cancelAnimationFrame(raf);
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
@@ -2353,6 +2413,7 @@ function bindDeptDrag() {
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
       window.addEventListener('pointercancel', up);
+      raf = requestAnimationFrame(roll);
     });
 
     /* 손으로 끌기 어려운 분을 위해 — 손잡이에 초점을 두고 위아래 화살표 */

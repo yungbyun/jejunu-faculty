@@ -167,6 +167,77 @@ t('화살표로 옮기면 그림이 돈다', await page.evaluate(async () => {
 t('그 뒤에도 차례가 맞다', await page.evaluate(() =>
   [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join() === dorder().join()));
 
+/* ---------- 폰에서 끌면 화면이 저절로 구른다 (2026-10-24) ----------
+ * 화면이 좁으면 맨 아래 학과를 맨 위로 올릴 때 손가락이 화면 밖으로 나갈 수 없다.
+ * 손잡이에 `touch-action:none` 을 주어 브라우저가 대신 굴려 주지 않으므로 우리가 굴린다.
+ * 함정: `scrollBy({behavior:'auto'})` 는 CSS 의 `scroll-behavior:smooth` 를 따라가 버려
+ * `scrollY` 가 바로 안 바뀐다 — 그래서 `'instant'` 로 못 박고 CSS 도 잠깐 꺼 둔다. */
+{
+  const ph = await (await b.newContext({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true })).newPage();
+  const perr = []; ph.on('pageerror', e => perr.push(String(e)));
+  await ph.goto('http://127.0.0.1:8080/', { waitUntil: 'load' });
+  await ph.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
+  await ph.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
+  await ph.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
+  await ph.evaluate(() => { dorderList = []; localStorage.removeItem('jnu-deptorder'); location.hash = '#/'; render(); });
+  await ph.waitForSelector('[data-grip]', { timeout: 10000 });
+  const ids = () => ph.evaluate(() => [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join());
+  const before = (await ids()).split(',');
+  const tail = before[before.length - 1];
+
+  /* 맨 아래 학과까지 내려가 손잡이를 잡고, 화면 위 가장자리에 머문다 */
+  await ph.evaluate(() => { [...document.querySelectorAll('.drow-w')].pop().scrollIntoView({ block: 'center', behavior: 'instant' }); });
+  await ph.waitForTimeout(300);
+  const y0 = await ph.evaluate(() => Math.round(window.scrollY));
+  t('폰에서 목록이 한 화면을 넘는다', y0 > 200, `${y0}px 내려와 있다`);
+  const g2 = await ph.locator('[data-grip]').last().boundingBox();
+  await ph.mouse.move(g2.x + g2.width / 2, g2.y + g2.height / 2);
+  await ph.mouse.down();
+  await ph.mouse.move(g2.x + g2.width / 2, 24, { steps: 6 });
+  const y1 = await ph.evaluate(() => Math.round(window.scrollY));
+  await ph.waitForTimeout(400);
+  const y2 = await ph.evaluate(() => Math.round(window.scrollY));
+  t('가장자리에 머물면 저절로 올라간다', y2 < y1 - 50, `${y1} → ${y2}`);
+  t('구르는 동안에도 줄이 손가락을 따라온다', await ph.evaluate(() => {
+    const d = document.querySelector('.drow-w--drag');
+    const r = d.getBoundingClientRect();
+    return r.top < 120;       // 손가락(24) 가까이 붙어 있다
+  }), await ph.evaluate(() => `줄 화면 y ${Math.round(document.querySelector('.drow-w--drag').getBoundingClientRect().top)}`));
+  for (let i = 0; i < 40; i++) { await ph.waitForTimeout(100); if (await ph.evaluate(() => window.scrollY) === 0) break; }
+  t('맨 위까지 굴러간다', await ph.evaluate(() => Math.round(window.scrollY)) === 0,
+    String(await ph.evaluate(() => Math.round(window.scrollY))));
+  await ph.mouse.up();
+  await ph.waitForTimeout(450);
+  const after = (await ids()).split(',');
+  t('맨 아래 학과를 맨 위로 올릴 수 있다', after[0] === tail, `${tail} → ${after.indexOf(tail)}번째`);
+  t('아무 학과도 잃지 않는다', after.length === before.length && new Set(after).size === after.length);
+  t('저절로 구른 뒤에도 차례가 맞다', await ph.evaluate(() =>
+    [...document.querySelectorAll('.drow-w')].map(e => e.dataset.did).join() === dorder().join()));
+  t('부드럽게 구르기 설정을 되돌린다', await ph.evaluate(() => document.documentElement.style.scrollBehavior === ''),
+    await ph.evaluate(() => `"${document.documentElement.style.scrollBehavior}"`));
+
+  /* 아래쪽 가장자리로도 굴러야 한다 */
+  await ph.evaluate(() => { dorderList = []; localStorage.removeItem('jnu-deptorder'); render(); window.scrollTo(0, 0); });
+  await ph.waitForTimeout(250);
+  const head = (await ids()).split(',')[0];
+  const g3 = await ph.locator('[data-grip]').first().boundingBox();
+  await ph.mouse.move(g3.x + g3.width / 2, g3.y + g3.height / 2);
+  await ph.mouse.down();
+  await ph.mouse.move(g3.x + g3.width / 2, 756, { steps: 6 });
+  for (let i = 0; i < 50; i++) {
+    await ph.waitForTimeout(100);
+    if (await ph.evaluate(() => Math.round(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 2)) break;
+  }
+  t('아래 가장자리로도 굴러간다', await ph.evaluate(() => window.scrollY) > 500,
+    String(await ph.evaluate(() => Math.round(window.scrollY))));
+  await ph.mouse.up();
+  await ph.waitForTimeout(450);
+  const down = (await ids()).split(',');
+  t('맨 위 학과를 맨 아래로 내릴 수 있다', down[down.length - 1] === head, `${head} → ${down.indexOf(head)}번째`);
+  t('폰에서도 콘솔 오류 없음', perr.length === 0, perr.join(' | '));
+  await ph.close();
+}
+
 await page.evaluate(() => { dorderList = []; localStorage.removeItem('jnu-deptorder'); });
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
