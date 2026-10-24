@@ -255,7 +255,59 @@ await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(250);
 t('맨 뒤에서 더 못 내려간다', await fkeys() === first, await fkeys());
 
-/* 끌어서 — 격자라 가로세로를 함께 잰다 */
+/* 끄는 동안 **미끄러지듯** 움직여야 한다 (2026-10-24).
+ * 전에는 손이 움직일 때마다 DOM 을 옮겨 칸이 툭툭 튀었다. 지금은 DOM 을 건드리지 않고
+ * 끌리는 칸은 손가락을 따라오고, 비켜 줄 칸들만 한 칸씩 미끄러진다. */
+{
+  const before = await fkeys();
+  const g0 = await page.locator('[data-fgrip]').first().boundingBox();
+  const t3 = await page.locator('.favw').nth(3).boundingBox();
+  await page.mouse.move(g0.x + g0.width / 2, g0.y + g0.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(t3.x + t3.width * 0.8, t3.y + t3.height / 2, { steps: 8 });
+  await page.waitForTimeout(120);
+  const mid = await page.evaluate(() => {
+    const d = document.querySelector('.favw--drag');
+    const o = [...document.querySelectorAll('.favw')].find(e => e !== d && e.style.transform);
+    const cs = e => getComputedStyle(e);
+    return {
+      order: [...document.querySelectorAll('.favw')].map(e => e.dataset.fkey).join(),
+      dragT: d ? d.style.transform : '', dragDur: d ? cs(d).transitionDuration : '',
+      otherT: o ? o.style.transform : '', otherDur: o ? cs(o).transitionDuration : '',
+      lifted: d ? cs(d).zIndex : '',
+    };
+  });
+  t('끄는 동안 DOM 차례는 그대로', mid.order === before, mid.order === before ? '그대로' : '바뀜');
+  t('끌리는 칸이 손가락을 따라온다', /translate\(/.test(mid.dragT), mid.dragT);
+  t('끌리는 칸에는 전환을 걸지 않는다', parseFloat(mid.dragDur) === 0, mid.dragDur);
+  t('끌리는 칸을 들어 올린다', Number(mid.lifted) >= 2, mid.lifted);
+  t('비켜 주는 칸이 옆으로 밀린다', /translate\(/.test(mid.otherT), mid.otherT);
+  t('비켜 주는 칸은 미끄러진다', parseFloat(mid.otherDur) > 0, mid.otherDur);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  t('손을 떼면 차례가 바뀐다', (await fkeys()) !== before, await fkeys());
+  t('떼고 나면 임시로 민 자리는 걷힌다', await page.evaluate(() =>
+    [...document.querySelectorAll('.favw')].every(e => !e.style.transform && !e.style.transition)));
+  t('끌기 표시도 걷힌다', await page.evaluate(() =>
+    !document.querySelector('.favw--drag') && !document.querySelector('.favsec__list--drag')));
+  t('보이는 차례와 담긴 차례가 같다', await fkeys() === await fsaved(), await fsaved());
+}
+
+/* 화살표로 옮길 때도 미끄러진다(FLIP) */
+await page.locator('[data-fgrip]').first().focus();
+t('화살표로 옮기면 그림이 돈다', await page.evaluate(async () => {
+  const el = document.querySelectorAll('.favw')[1];
+  document.querySelector('[data-fgrip]').dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  const n = el.getAnimations ? el.getAnimations().length : 0;
+  await new Promise(r => setTimeout(r, 250));
+  return n > 0;
+}));
+await page.waitForTimeout(250);
+t('그 뒤에도 차례가 맞다', await fkeys() === await fsaved(), await fsaved());
+
+/* 끌어서 — 격자라 가로세로를 함께 잰다. 앞에서 차례를 이미 흔들었으므로 지금 차례를 다시 잰다 */
+const head = (await fkeys()).split(',')[0];
 const g = await page.locator('[data-fgrip]').first().boundingBox();
 const to = await page.locator('.favw').nth(3).boundingBox();
 await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
@@ -264,7 +316,7 @@ await page.mouse.move(to.x + to.width * 0.8, to.y + to.height / 2, { steps: 12 }
 await page.mouse.up();
 await page.waitForTimeout(350);
 const moved = (await fkeys()).split(',');
-t('끌어 놓으면 그 자리로 간다', moved[3] === first.split(',')[0], moved.indexOf(first.split(',')[0]) + '번째');
+t('끌어 놓으면 그 자리로 간다', moved[3] === head, moved.indexOf(head) + '번째');
 t('끌어 바꾼 차례도 담긴다', await fsaved() === await fkeys(), await fsaved());
 t('아무도 잃지 않는다', moved.length === 6 && new Set(moved).size === 6, moved.length + '장');
 t('다시 그려도 그 차례', await page.evaluate(async () => {

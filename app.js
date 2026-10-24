@@ -2138,18 +2138,40 @@ function bindFavDrag() {
   const list = $app.querySelector('.favsec__list');
   if (!list) return;
   const rows = () => [...list.querySelectorAll('.favw')];
+  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const EASE = 'cubic-bezier(.2,.7,.3,1)', MS = 190;
   const commit = () => {
     favReorder(rows().map(e => e.dataset.fkey));
     flashStatus('관심 교수 차례를 바꿨습니다');
   };
-  /* 격자에서 끼울 자리 — 포인터보다 **아래 줄**이거나, 같은 줄에서 **오른쪽 반**에 있는 첫 칸 */
-  const spotAfter = (x, y) => rows().filter(e => !e.classList.contains('favw--drag'))
-    .find(el => {
-      const r = el.getBoundingClientRect();
-      return y < r.bottom && (y < r.top || x < r.left + r.width / 2);
+
+  /* 자리가 바뀐 칸들이 **미끄러져** 가게 한다 — FLIP 수법이다 (2026-10-24).
+   * 바꾸기 전 자리를 재어 두고(First), 바꾼 뒤 자리를 재어(Last), 옛 자리로 되돌린 모습에서
+   * 제자리로 돌아오는 그림을 그린다(Invert·Play). DOM 을 옮기는 일 자체는 그대로다.
+   * 화살표로 한 칸씩 옮길 때 쓴다(끌 때는 아래의 자리 밀기가 대신한다). */
+  const flip = mutate => {
+    if (!smooth) { mutate(); return; }
+    const was = new Map(rows().map(e => [e, e.getBoundingClientRect()]));
+    mutate();
+    rows().forEach(e => {
+      const a = was.get(e); if (!a) return;
+      const b = e.getBoundingClientRect();
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (!dx && !dy) return;
+      e.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }],
+        { duration: MS, easing: EASE });
     });
+  };
 
   list.querySelectorAll('[data-fgrip]').forEach(grip => {
+    /* 끄는 동안 **DOM 은 건드리지 않습니다** (2026-10-24 에 이렇게 바꿨습니다).
+     * 전에는 손이 움직일 때마다 줄을 DOM 에서 옮겼는데, 그러면 칸이 한 칸씩 **툭툭 튀고**
+     * 재는 자리도 같이 흔들려 어디에 놓일지 알기 어려웠습니다. 지금은
+     *   - 자리(slots)를 누를 때 한 번만 재어 두고,
+     *   - 끌리는 칸은 **손가락을 그대로 따라오게** 하고(inline transform),
+     *   - 비켜 줄 칸들만 **한 칸씩 미끄러뜨려**(transform + transition) 자리를 내어 주고,
+     *   - 손을 떼면 끌던 칸을 그 자리로 미끄러뜨린 **뒤에** DOM 을 고칩니다.
+     * 그래서 눈에 보이는 그림과 DOM 이 마지막에 딱 한 번만 맞춰집니다. */
     grip.addEventListener('pointerdown', e => {
       if (e.button != null && e.button !== 0) return;
       const row = grip.closest('.favw');
@@ -2157,21 +2179,60 @@ function bindFavDrag() {
       e.preventDefault();
       /* 잡기(setPointerCapture)를 쓰지 않는 까닭은 학과 쪽과 같다 — 줄을 옮기면 손잡이가
          지워졌다 다시 꽂히며 잡기가 풀린다. 그래서 창에 건다. */
+      const all = rows();
+      const slots = all.map(el => el.getBoundingClientRect());   // 끄는 동안 자리는 그대로 둔다
+      const from = all.indexOf(row);
+      if (from < 0) return;
+      const gx = e.clientX - slots[from].left, gy = e.clientY - slots[from].top;   // 칸 안에서 잡은 자리
+      let to = from, moved = false;
       row.classList.add('favw--drag');
       list.classList.add('favsec__list--drag');
-      let moved = false;
+
+      /* 격자에서 놓일 자리 — 포인터보다 **아래 줄**이거나, 같은 줄에서 **오른쪽 반**에 있는
+         첫 칸 앞. 끌던 칸을 뺀 뒤의 자리라 그 앞이면 하나 당긴다. */
+      const spot = (x, y) => {
+        const i = slots.findIndex(r => y < r.bottom && (y < r.top || x < r.left + r.width / 2));
+        if (i < 0) return all.length - 1;
+        return i > from ? i - 1 : i;
+      };
+      /* 비켜 줄 칸들을 한 칸씩 민다 */
+      const shift = () => all.forEach((el, j) => {
+        if (el === row) return;
+        let k = j;
+        if (from < to && j > from && j <= to) k = j - 1;
+        else if (from > to && j >= to && j < from) k = j + 1;
+        const dx = slots[k].left - slots[j].left, dy = slots[k].top - slots[j].top;
+        el.style.transform = (dx || dy) ? `translate(${dx}px,${dy}px)` : '';
+      });
+
       const move = ev => {
         moved = true;
-        const after = spotAfter(ev.clientX, ev.clientY);
-        after ? list.insertBefore(row, after) : list.appendChild(row);
+        row.style.transform = `translate(${ev.clientX - gx - slots[from].left}px,${ev.clientY - gy - slots[from].top}px)`;
+        const t = spot(ev.clientX, ev.clientY);
+        if (t !== to) { to = t; shift(); }
+      };
+      const done = () => {
+        all.forEach(el => { el.style.transform = ''; el.style.transition = ''; });
+        row.classList.remove('favw--drag');
+        list.classList.remove('favsec__list--drag');
+        if (moved && to !== from) {
+          /* 보이는 차례 그대로 DOM 을 고친다 — 그림은 바뀌지 않는다 */
+          const next = all.filter(el => el !== row);
+          next.splice(to, 0, row);
+          next.forEach(el => list.appendChild(el));
+          commit();
+        }
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
-        row.classList.remove('favw--drag');
-        list.classList.remove('favsec__list--drag');
-        if (moved) commit();
+        if (!moved || !smooth) { done(); return; }
+        /* 끌던 칸을 놓일 자리로 미끄러뜨린 뒤에 DOM 을 고친다 */
+        const dx = slots[to].left - slots[from].left, dy = slots[to].top - slots[from].top;
+        row.style.transition = `transform ${MS}ms ${EASE}`;
+        row.style.transform = `translate(${dx}px,${dy}px)`;
+        setTimeout(done, MS + 20);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
@@ -2188,7 +2249,7 @@ function bindFavDrag() {
       const row = grip.closest('.favw'), all = rows();
       const i = all.indexOf(row), j = i + d;
       if (j < 0 || j >= all.length) return;
-      d < 0 ? list.insertBefore(row, all[j]) : list.insertBefore(all[j], row);
+      flip(() => { d < 0 ? list.insertBefore(row, all[j]) : list.insertBefore(all[j], row); });
       commit();
     });
   });

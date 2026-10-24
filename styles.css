@@ -554,8 +554,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   -webkit-user-select:none;user-select:none;transition:background .15s,color .15s}
 .favgrip:hover{background:var(--surface-2);color:var(--ink)}
 .favgrip:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:-3px;color:var(--ink)}
-/* 끄는 동안 — 그 칸만 들어 올리고, 나머지는 손이 스쳐도 들썩이지 않게 한다 */
-.favw--drag{opacity:.92;border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18)}
+/* 끄는 동안 — 그 칸만 들어 올리고, 나머지는 손이 스쳐도 들썩이지 않게 한다.
+   끌리는 칸은 **손가락을 그대로** 따라와야 하므로 `.favw` 의 transform 전환을 끈다
+   (안 끄면 0.15초씩 늦게 따라와 끈적인다). 비켜 주는 칸들만 미끄러진다. */
+.favw--drag{opacity:.92;border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18);
+  position:relative;z-index:5;transition:none;will-change:transform}
+.favsec__list--drag .favw:not(.favw--drag){transition:transform .19s cubic-bezier(.2,.7,.3,1)}
 .favw--drag .favgrip{color:var(--brand);cursor:grabbing}
 .favsec__list--drag .favw:hover{transform:none;box-shadow:none;border-color:var(--line)}
 .favsec__list--drag .favw--drag:hover{border-color:var(--dept-color);box-shadow:0 10px 26px rgba(0,0,0,.18)}
