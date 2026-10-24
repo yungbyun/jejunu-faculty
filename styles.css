@@ -531,7 +531,16 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .favsec__head h2{display:flex;align-items:center;gap:6px;margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px}
 .favsec__head h2 svg{color:#e0a10c}
 .favsec__head h2 b{font-size:17px;color:#a1740a}
+/* 메모 줄 접기 단추 — 머리줄 오른쪽 끝에 작게 (2026-10-24) */
+.favmemo{margin-left:2px;flex:none;width:26px;height:26px;padding:0;display:grid;place-items:center;
+  border:1px solid color-mix(in srgb,#e0a10c 35%,var(--line));border-radius:8px;background:transparent;
+  color:var(--ink-3);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.favmemo:hover{background:color-mix(in srgb,#e0a10c 12%,transparent);color:var(--ink)}
+.favmemo:focus-visible{outline:3px solid color-mix(in srgb,#e0a10c 45%,transparent);outline-offset:1px}
+.favmemo[aria-pressed="true"]{background:color-mix(in srgb,#e0a10c 18%,transparent);
+  border-color:color-mix(in srgb,#e0a10c 55%,var(--line));color:#a1740a}
 .favsec__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:8px}
+.favsec__list--nomemo .favc__m{display:none}
 .favw{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
 /* 왼쪽 묶음(윗줄 + 메모)과 X 단추 두 칸으로 나눈다 — X 가 메모 높이까지 내려온다 */
 .favw__b{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}

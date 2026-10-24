@@ -2006,6 +2006,21 @@ function renderSkeleton(r) {
 }
 
 /* ---------- 화면: 홈(학과 목록 / 검색 결과) ---------- */
+/* 관심 교수 메모 줄을 보일지 감출지 (2026-10-24). 사람에 대한 결정이 아니라 '지금 어떻게
+ * 볼지' 라서 시트에 올리지 않고 이 기기에만 둡니다 — 간단히 보기와 같은 사정입니다.
+ * 처음에는 **보입니다**(전부터 그랬습니다). 감춰 두었을 때만 열쇠를 적습니다. */
+const FAVMEMO_KEY = 'jnu-favmemo';
+let favMemoOff = null;
+function favMemoOn() {
+  if (favMemoOff === null) { try { favMemoOff = localStorage.getItem(FAVMEMO_KEY) === '0'; } catch { favMemoOff = false; } }
+  return !favMemoOff;
+}
+function favMemoToggle() {
+  favMemoOff = favMemoOn();
+  try { favMemoOff ? localStorage.setItem(FAVMEMO_KEY, '0') : localStorage.removeItem(FAVMEMO_KEY); } catch {}
+  return favMemoOn();
+}
+
 /* 첫 화면의 관심 교수 명단 — 사진·이름·학과·선호도를 한 줄 카드로. 누르면 상세로 간다. */
 function favSection() {
   const list = state.rows.filter(isFav);
@@ -2016,8 +2031,11 @@ function favSection() {
     <section class="favsec">
       <div class="favsec__head">
         <h2><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 6.5L9.2 17.3 4 12.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>관심 교수 <b>${list.length}</b>명</span></h2>
+        <button type="button" class="favmemo" data-favmemo aria-pressed="${favMemoOn()}"
+          title="${favMemoOn() ? '메모 감추기' : '메모 보이기'}"
+          aria-label="관심 교수 메모 ${favMemoOn() ? '감추기' : '보이기'}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M5 3.8h14v16.4l-3.2-2.2-3.4 2.2-3.4-2.2L5 20.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.6 8.6h6.8M8.6 12.2h4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       </div>
-      <div class="favsec__list">
+      <div class="favsec__list${favMemoOn() ? '' : ' favsec__list--nomemo'}">
         ${list.map(p => {
           const d = state.depts.find(x => x.id === p.dept_id);
           const r = getRating(p);
@@ -2092,6 +2110,15 @@ function renderHome() {
   bindNotes($app);        // 관심 카드의 만남 카운터
   bindDeptDrag();
   bindFavDrag();
+  /* 메모 줄 접기 — 글씨만 숨기면 되므로 **다시 그리지 않습니다**(사진이 깜빡이지 않게) */
+  $app.querySelector('[data-favmemo]')?.addEventListener('click', e => {
+    const on = favMemoToggle(), b = e.currentTarget;
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', `관심 교수 메모 ${on ? '감추기' : '보이기'}`);
+    b.title = on ? '메모 감추기' : '메모 보이기';
+    $app.querySelector('.favsec__list')?.classList.toggle('favsec__list--nomemo', !on);
+    flashStatus(on ? '관심 교수 메모를 보입니다' : '관심 교수 메모를 감췄습니다');
+  });
   $app.querySelectorAll('.favx').forEach(b => b.addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     const p = state.rows.find(x => rKey(x) === b.dataset.key);

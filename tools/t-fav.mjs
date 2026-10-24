@@ -149,6 +149,55 @@ await page.waitForSelector('#drawer .counter',{timeout:10000});
 t('상세 화면도 같은 값', await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent)==='1',
   await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent));
 
+/* ---------- 메모 줄 접기 단추 (2026-10-24) ---------- */
+await page.evaluate(() => {
+  localStorage.removeItem('jnu-favmemo'); favMemoOff = null;
+  favSet = new Set();
+  state.rows.slice(0, 4).forEach(p => { favs().add(rKey(p));
+    state.notes.set(rKey(p), { met: 0, memo: '**학과장 출신** 통화함' }); });
+  favSave(); location.hash = '#/'; render();
+});
+await page.waitForSelector('[data-favmemo]', { timeout: 10000 });
+const memoSeen = () => page.evaluate(() => {
+  const e = document.querySelector('.favc__m');
+  return !!e && e.getClientRects().length > 0;
+});
+const pressed = () => page.getAttribute('[data-favmemo]', 'aria-pressed');
+t('머리줄에 메모 단추가 하나', await page.locator('[data-favmemo]').count() === 1);
+t('제목 바로 오른쪽에 있다', await page.evaluate(() => {
+  const h = document.querySelector('.favsec__head h2').getBoundingClientRect();
+  const b = document.querySelector('[data-favmemo]').getBoundingClientRect();
+  return b.left >= h.right - 1 && b.left - h.right < 40;
+}), await page.evaluate(() => {
+  const h = document.querySelector('.favsec__head h2').getBoundingClientRect();
+  const b = document.querySelector('[data-favmemo]').getBoundingClientRect();
+  return `제목 끝 ${Math.round(h.right)} / 단추 ${Math.round(b.left)}`;
+}));
+t('조그맣다 — 30px 아래', await page.evaluate(() => {
+  const r = document.querySelector('[data-favmemo]').getBoundingClientRect();
+  return r.width <= 30 && r.height <= 30;
+}), await page.evaluate(() => { const r = document.querySelector('[data-favmemo]').getBoundingClientRect();
+  return `${Math.round(r.width)}x${Math.round(r.height)}`; }));
+t('처음엔 메모가 보인다', await memoSeen() && await pressed() === 'true', await pressed());
+const h0 = await page.evaluate(() => Math.round(document.querySelector('.favw').getBoundingClientRect().height));
+await page.click('[data-favmemo]');
+await page.waitForTimeout(300);
+t('누르면 메모가 감춰진다', !(await memoSeen()) && await pressed() === 'false', await pressed());
+t('그만큼 칸이 낮아진다', await page.evaluate(() =>
+  Math.round(document.querySelector('.favw').getBoundingClientRect().height)) < h0,
+  `${h0} → ${await page.evaluate(() => Math.round(document.querySelector('.favw').getBoundingClientRect().height))}`);
+t('글을 지우는 것이 아니라 가리는 것', await page.evaluate(() => document.querySelectorAll('.favc__m').length > 0),
+  String(await page.locator('.favc__m').count()) + '개');
+t('도움말도 바뀐다', await page.getAttribute('[data-favmemo]', 'title') === '메모 보이기',
+  await page.getAttribute('[data-favmemo]', 'title'));
+t('이 기기에 기억된다', await page.evaluate(() => localStorage.getItem('jnu-favmemo') === '0'),
+  await page.evaluate(() => localStorage.getItem('jnu-favmemo')));
+t('시트에는 올리지 않는다', await page.evaluate(() => !SET_KEYS.includes('favmemo')));
+await page.click('[data-favmemo]');
+await page.waitForTimeout(300);
+t('다시 누르면 돌아온다', await memoSeen() && await pressed() === 'true', await pressed());
+t('기억도 지워진다', await page.evaluate(() => !localStorage.getItem('jnu-favmemo')));
+
 /* ---------- 관심 교수 차례 바꾸기 (2026-10-20) ---------- */
 await page.evaluate(() => {
   favSet = new Set();
