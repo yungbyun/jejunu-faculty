@@ -94,6 +94,55 @@ for (const [w,h,tag] of [[1440,1000,'PC'],[390,844,'폰']]) {
   await page.close(); await p2.close();
 }
 
+/* ---------- 검색은 여섯 자리만 훑는다 (2026-10-24) ----------
+ * 이름 · 영문명 · 직위 · 전공 키워드 · 연구실 · 학과. 소개 글과 논문 제목은 글이 길어
+ * 흔한 글자가 거의 다 걸리므로 뺐다 — 「양」 한 글자로 19명이 걸리던 일 때문이다. */
+{
+  const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await page.goto('http://127.0.0.1:8080/', { waitUntil: 'load' });
+  await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
+  await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
+  await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
+  const hits = q => page.evaluate(qq => state.rows.filter(p => matches(p, qq)).length, q);
+
+  t('「양」은 아홉 — 이름 셋 + 해양과학대학 다섯 + 양식 키워드 하나', await hits('양') === 9,
+    String(await hits('양')));
+  t('이름으로 찾는다', await hits('양진아') === 1, String(await hits('양진아')));
+  t('전공 키워드로 찾는다', await hits('인공지능') > 0, String(await hits('인공지능')));
+  t('연구실 호실로 찾는다', await hits('7219') === 1, String(await hits('7219')));
+  t('학과로 찾는다', await hits('기계시스템') > 0, String(await hits('기계시스템')));
+  t('직위로 찾는다', await hits('교수') === 69, String(await hits('교수')));
+
+  /* 소개 글에만 있는 말은 안 걸려야 한다 */
+  const only = await page.evaluate(() => {
+    const six = p => [p.name, p.name_en, p.rank, p.tags.join(' '), p.office, p.dept_name].join(' ').toLowerCase();
+    const all = state.rows.map(six).join(' ');
+    for (const p of state.rows) {
+      for (const w of String(p.summary || '').split(/[^가-힣A-Za-z]+/)) {
+        if (w.length >= 4 && !all.includes(w.toLowerCase())) return { w, who: p.name };
+      }
+    }
+    return null;
+  });
+  t('소개 글에만 있는 말은 안 걸린다', !!only && await hits(only.w) === 0,
+    only ? `「${only.w}」(${only.who} 소개) → ${await hits(only.w)}명` : '그런 말을 못 찾음');
+
+  /* 논문 제목에만 있는 말도 마찬가지 */
+  const onlyP = await page.evaluate(() => {
+    const six = p => [p.name, p.name_en, p.rank, p.tags.join(' '), p.office, p.dept_name].join(' ').toLowerCase();
+    const all = state.rows.map(six).join(' ');
+    for (const p of state.rows) {
+      for (const w of (p.papers || []).map(x => x.t).join(' ').split(/[^가-힣A-Za-z]+/)) {
+        if (w.length >= 5 && !all.includes(w.toLowerCase())) return { w, who: p.name };
+      }
+    }
+    return null;
+  });
+  t('논문 제목에만 있는 말도 안 걸린다', !onlyP || await hits(onlyP.w) === 0,
+    onlyP ? `「${onlyP.w}」(${onlyP.who} 논문) → ${await hits(onlyP.w)}명` : '그런 말이 없음');
+  await page.close();
+}
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 await b.close(); process.exit(bad?1:0);

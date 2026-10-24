@@ -2325,8 +2325,14 @@ function bindDeptDrag() {
   });
 }
 
+/* 찾는 자리는 **이름 · 영문명 · 직위 · 전공 키워드 · 연구실 · 학과** 여섯입니다
+ * (2026-10-24 에 교수님이 정하셨습니다. 그 전에는 **소개 글과 논문 제목**까지 훑었습니다).
+ * 「양」 한 글자로 19명이 걸리던 일 때문입니다 — 이름에 든 분은 셋인데 「해양·태양광·토양·
+ * 인력양성」 같은 소개 글 속 글자가 열하나를 더 끌어왔습니다. 소개와 논문은 글이 길어
+ * 흔한 글자가 거의 다 걸리므로, 찾는 자리에서 뺐습니다.
+ * 빈 화면의 안내(「교수명, 전공 키워드, 연구실 위치로」)와도 이제 들어맞습니다. */
 function matches(p, q) {
-  const hay = [p.name, p.name_en, p.rank, p.tags.join(' '), p.summary, p.office, p.dept_name, p.papers.map(x => x.t).join(' ')].join(' ').toLowerCase();
+  const hay = [p.name, p.name_en, p.rank, p.tags.join(' '), p.office, p.dept_name].join(' ').toLowerCase();
   return q.split(/\s+/).every(w => hay.includes(w));
 }
 
