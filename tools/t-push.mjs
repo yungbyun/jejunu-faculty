@@ -138,7 +138,7 @@ const look = async sel => {
   return { off, offHover, on, onHover };
 };
 const clear = c => c.replace(/\s/g, '');
-for (const [name, sel] of [['강화', '[data-surebtn]'], ['공략', '[data-pushbtn]'], ['도움', '[data-vipbtn]']]) {
+for (const [name, sel] of [['강화', '[data-surebtn]'], ['약화', '[data-weakbtn]'], ['공략', '[data-pushbtn]'], ['도움', '[data-vipbtn]']]) {
   const L = await look(sel);
   t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg),
     `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
@@ -153,14 +153,73 @@ for (const [name, sel] of [['강화', '[data-surebtn]'], ['공략', '[data-pushb
 /* 5-2) 강화 — 선호도 위에 한 칸 얹는 표시(확이면 더 확실, 긍이면 더 긍정).
    2026-10-14 에 「확실」에서 이름을 바꿨다 — 선호도 「확(확실)」과 글자가 겹쳤다. */
 /* 2026-10-16 — 넷이 되었다. 「도움」은 나를 밀어 주는 분, 「VIP」는 총장님이 청할 수 있는 분 */
-t('단추 차례는 강화·공략·도움·VIP', await page.evaluate(() => {
+t('단추 차례는 강화·약화·공략·도움·VIP', await page.evaluate(() => {
   const b = [...document.querySelectorAll('.d-marks button')];
-  return b.length === 4 && b[0].hasAttribute('data-surebtn') && b[1].hasAttribute('data-pushbtn')
-    && b[2].hasAttribute('data-vipbtn') && b[3].hasAttribute('data-presbtn');
+  return b.length === 5 && b[0].hasAttribute('data-surebtn') && b[1].hasAttribute('data-weakbtn')
+    && b[2].hasAttribute('data-pushbtn') && b[3].hasAttribute('data-vipbtn') && b[4].hasAttribute('data-presbtn');
 }), await page.evaluate(() => [...document.querySelectorAll('.d-marks button')].map(b => b.dataset.surebtn !== undefined ? 'sure' : b.dataset.pushbtn !== undefined ? 'push' : b.dataset.vipbtn !== undefined ? 'vip' : 'pres').join())); 
-t('단추 글자는 강화·공략·도움·VIP', await page.evaluate(() =>
-  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '강화,공략,도움,VIP',
+t('단추 글자는 강화·약화·공략·도움·VIP', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '강화,약화,공략,도움,VIP',
   await page.evaluate(() => [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()));
+/* 다섯이 폰에서 **한 줄**에 들어가야 한다 (2026-10-25, 교수님 요청) */
+for (const w of [390, 360]) {
+  await page.setViewportSize({ width: w, height: 900 });
+  await page.waitForTimeout(200);
+  const lay = await page.evaluate(() => {
+    const bs = [...document.querySelectorAll('.d-marks button')];
+    const box = document.querySelector('.d-marks').getBoundingClientRect();
+    return { rows: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size,
+             over: bs.filter(e => e.scrollWidth > e.clientWidth + 1).length,
+             out: bs.filter(e => e.getBoundingClientRect().right > box.right + 1).length };
+  });
+  t(`${w}px 에서 단추 다섯이 한 줄`, lay.rows === 1 && lay.out === 0, JSON.stringify(lay));
+  t(`${w}px 에서 글자가 안 잘린다`, lay.over === 0, `${lay.over}개 넘침`);
+}
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.waitForTimeout(200);
+
+/* 강화와 약화는 짝이라 **함께 설 수 없다** (2026-10-25) */
+await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); renderDept(state.depts[0]); });
+await page.click('[data-surebtn]'); await page.waitForTimeout(300);
+await page.click('[data-weakbtn]'); await page.waitForTimeout(300);
+t('약화를 켜면 강화가 풀린다', await page.evaluate(() => {
+  const p = state.rows[0];
+  return isWeak(p) && !isSure(p)
+    && document.querySelector('[data-surebtn]').getAttribute('aria-pressed') === 'false'
+    && document.querySelector('[data-weakbtn]').getAttribute('aria-pressed') === 'true';
+}));
+await page.click('[data-surebtn]'); await page.waitForTimeout(300);
+t('강화를 켜면 약화가 풀린다', await page.evaluate(() => {
+  const p = state.rows[0];
+  return isSure(p) && !isWeak(p)
+    && document.querySelector('[data-weakbtn]').getAttribute('aria-pressed') === 'false';
+}));
+/* 무게는 2026-10-25 에 교수님이 정하신 값 — 확 .90(약화 .85) · 긍 .70(강화 .80, 약화 .70)
+   · 중 .40(강화 .60, 약화 .30) · 모 .20 · 부 0 */
+const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
+  const p = state.rows[0], was = getRating(p);
+  setRating(rKey(p), rr); sureSet = new Set(); weakSet = new Set();
+  if (mm === 'sure') sures().add(rKey(p));
+  if (mm === 'weak') weaks().add(rKey(p));
+  const w = weightOf(p);
+  sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
+  return w;
+}, [r, mark]);
+t('확에 약화를 찍으면 .90 → .85', await wOf('확', '') === .9 && await wOf('확', 'weak') === .85,
+  `${await wOf('확', '')} → ${await wOf('확', 'weak')}`);
+t('중에 약화를 찍으면 .40 → .30', await wOf('중', '') === .4 && await wOf('중', 'weak') === .3,
+  `${await wOf('중', '')} → ${await wOf('중', 'weak')}`);
+/* 긍의 약화는 교수님이 **그냥 긍과 같은 .70** 으로 정하셨다 — 표시로만 남고 셈은 안 바뀐다 */
+t('긍에 약화를 찍으면 .70 그대로', await wOf('긍', 'weak') === .7, String(await wOf('긍', 'weak')));
+t('긍에 강화를 찍으면 .70 → .80', await wOf('긍', 'sure') === .8, String(await wOf('긍', 'sure')));
+t('부에 약화를 찍어도 0 그대로', await wOf('부', 'weak') === 0, String(await wOf('부', 'weak')));
+t('모에 약화를 찍어도 .20 그대로', await wOf('모', 'weak') === .2, String(await wOf('모', 'weak')));
+t('settings 의 weak 키로도 등록', await page.evaluate(() =>
+  SET_KEYS.includes('weak') && SET_LABEL['weak'] === '약화'));
+await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); });
+
 await page.click('[data-surebtn]');
 await page.waitForTimeout(400);
 t('강화가 켜진다', await page.evaluate(() => sures().size === 1 &&
@@ -268,10 +327,10 @@ await page.evaluate(() => {
 });
 
 // 5-3) VIP — 분석 목록에서 그 선호도 색으로 꽉 채운다(2026-10-14, 전에는 두 줄 테두리)
-t('도움이 셋째, VIP 가 넷째', await page.evaluate(() => {
+t('도움이 넷째, VIP 가 다섯째', await page.evaluate(() => {
   const b = [...document.querySelectorAll('.d-marks button')];
-  return b.length === 4 && b[2].querySelector('span').textContent.trim() === '도움'
-    && b[3].querySelector('span').textContent.trim() === 'VIP';
+  return b.length === 5 && b[3].querySelector('span').textContent.trim() === '도움'
+    && b[4].querySelector('span').textContent.trim() === 'VIP';
 }));
 await page.evaluate(() => {
   vipSet = new Set(); pushSet = new Set(); sureSet = new Set();

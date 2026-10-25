@@ -406,8 +406,8 @@ await page.waitForTimeout(250);
     const 중 = rows.filter(p => getRating(p) === '중').slice(0, 2);
     [...긍, ...중].forEach(p => sures().add(rKey(p)));
     sureSave(); renderStats();
-    const want = 4 * .95 + 2 * .80 + 2 * .75 + 2 * .60 + 2 * .40 + 3 * .20 + 0 + 0;
-    const varr = 4 * .95 * .05 + 2 * .8 * .2 + 2 * .75 * .25 + 2 * .6 * .4 + 2 * .4 * .6 + 3 * .2 * .8;
+    const want = 4 * .90 + 2 * .80 + 2 * .70 + 2 * .60 + 2 * .40 + 3 * .20 + 0 + 0;
+    const varr = 4 * .90 * .10 + 2 * .8 * .2 + 2 * .70 * .30 + 2 * .6 * .4 + 2 * .4 * .6 + 3 * .2 * .8;
     const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
     const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
     return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
@@ -433,7 +433,7 @@ await page.waitForTimeout(250);
     sures().add(rKey(p)); sureSave(); renderStats();
     return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
   });
-  t('긍에 강화를 더하면 .05 만큼 오른다', up2 === 0.05, String(up2));
+  t('긍에 강화를 더하면 .1 만큼 오른다', up2 === 0.1, String(up2));
   t('확에 찍은 강화는 값을 안 올린다', await page.evaluate(() => {
     const p = state.rows.find(x => getRating(x) === '확');
     const was = weightOf(p); sures().add(rKey(p)); sureSave();
@@ -443,7 +443,7 @@ await page.waitForTimeout(250);
     const a = state.rows.find(x => getRating(x) === '모'), b2 = state.rows.find(x => getRating(x) === '부');
     const wa = weightOf(a), wb = weightOf(b2);
     sures().add(rKey(a)); sures().add(rKey(b2)); sureSave();
-    return weightOf(a) === wa && weightOf(b2) === wb && wa === .2 && wb === 0;
+    return weightOf(a) === wa && weightOf(b2) === wb && wa === .2 && wb === 0;   // 모 .2 · 부 0
   }));
   const weightSumHere = await page.evaluate(() =>
     Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);

@@ -1715,14 +1715,24 @@ const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
  * - **강화는 긍·중에서만** 올린다. 확은 이미 꼭대기이고, 모·부·미지정에 찍힌 강화는 뜻이
  *   맞지 않아 무시한다(실수로 찍혀도 셈이 흔들리지 않게).
  * 무게를 바꾸실 때는 아래 두 줄만 고치면 된다. */
-const W_RATE = { '확': .95, '긍': .75, '중': .40, '모': .20, '부': 0 };
+const W_RATE = { '확': .90, '긍': .70, '중': .40, '모': .20, '부': 0 };
 const W_SURE = { '긍': .80, '중': .60 };   // 강화가 붙었을 때의 값
-const W_SAY = Object.entries(W_RATE)
-  .map(([r, w]) => `${r} ${w}${W_SURE[r] != null ? `(강화 ${W_SURE[r]})` : ''}`).join(' · ');
+/* 약화가 붙었을 때의 값 (2026-10-25, 교수님 지정) — 확 .85 · 긍 .70 · 중 .30.
+ * **긍은 .70 으로 그냥 긍(.70)과 같습니다** — 교수님이 그렇게 정하셨고, 그래서 긍에 약화를
+ * 찍어도 셈은 달라지지 않습니다(표시로만 남습니다). 숫자를 가르려면 이 줄의 긍만 내리면 됩니다.
+ * 모·부는 약화 자리가 없어 찍어도 그대로입니다. */
+const W_WEAK = { '확': .85, '긍': .70, '중': .30 };
+const W_SAY = Object.entries(W_RATE).map(([r, w]) => {
+  const x = [W_SURE[r] != null ? `강화 ${W_SURE[r]}` : '', W_WEAK[r] != null ? `약화 ${W_WEAK[r]}` : '']
+    .filter(Boolean).join(', ');
+  return `${r} ${w}${x ? `(${x})` : ''}`;
+}).join(' · ');
 function weightOf(p) {
   const r = getRating(p);
   if (!r || W_RATE[r] == null) return 0;         // 미지정·비참여는 0
-  return isSure(p) && W_SURE[r] != null ? W_SURE[r] : W_RATE[r];
+  if (isSure(p) && W_SURE[r] != null) return W_SURE[r];
+  if (isWeak(p) && W_WEAK[r] != null) return W_WEAK[r];
+  return W_RATE[r];
 }
 const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
 /* 갈래별로 몇 명이 얼마씩 보탰는지 — 기대 카드를 누르면 펴지는 풀이에 쓴다 (2026-10-25).
@@ -1730,11 +1740,14 @@ const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
  * 차례는 **굳은 쪽부터**로 못 박았다 (2026-10-25, 교수님 지정) — 보탬이 큰 차례로 두면
  * 인원에 따라 줄이 들쭉날쭉 자리를 바꿔 눈이 따라가기 어렵다. 이 차례는 무게가 큰 차례이기도
  * 하다. 미지정은 셈에 안 들어가니 맨 끝이다. */
-const W_ORDER = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부', '미지정'];
+const W_ORDER = ['확', '확-약화', '긍+강화', '긍', '긍-약화', '중+강화', '중', '중-약화',
+  '모', '부', '미지정'];
 function weightRows(profs) {
   const key = p => {
     const r = getRating(p) || '미지정';
-    return isSure(p) && W_SURE[r] != null ? `${r}+강화` : r;
+    if (isSure(p) && W_SURE[r] != null) return `${r}+강화`;
+    if (isWeak(p) && W_WEAK[r] != null) return `${r}-약화`;
+    return r;
   };
   const m = new Map();
   profs.forEach(p => {
@@ -1836,9 +1849,8 @@ function donut(profs) {
         <tbody>${body}</tbody>
         <tfoot><tr><th scope="row">합계</th><td>${total}명</td><td></td><td><b>${f1(exp)}</b> <em>± ${f1(sd)}</em></td></tr></tfoot>
       </table>
-      <p class="expl__p">갈래마다 <b>나를 찍을 확률</b>을 주어 더한 값입니다. 띠 하나가 모수 ${total}명이고,
-        색칠한 데가 기대 표 수, 금이 절반 ${half}명 자리입니다. 끝의 옅은 띠는 <b>흔들림 폭</b>(± ${f1(sd)})이라
-        그 띠가 금을 물고 있으면 아슬아슬하다는 뜻입니다.${na ? ` 비참여 ${na}명은 셈에서도 모수에서도 뺐습니다.` : ''}</p>
+      <p class="expl__p">모수 ${total}명이고, 색칠한 데가 기대 표 수, 금이 절반 ${half}명 자리.
+        끝의 옅은 띠는 <b>흔들림 폭</b>(± ${f1(sd)}).${na ? ` 비참여 ${na}명은 셈에서도 모수에서도 뺌.` : ''}</p>
     </div>`;
   };
 
@@ -1973,12 +1985,12 @@ const STP = { pick: false, only: false };
 
 /* 이름 칩 하나. 고르기 모드에서는 링크가 아니라 단추가 되어 눌러도 상세로 가지 않는다 */
 function stChip(p, r) {
-  const met = getMet(p), pu = isPush(p), su = isSure(p), vi = isVip(p), pr = isPres(p), k = rKey(p);
-  const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
+  const met = getMet(p), pu = isPush(p), su = isSure(p), wk = isWeak(p), vi = isVip(p), pr = isPres(p), k = rKey(p);
+  const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${wk ? ' weak' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
@@ -2848,7 +2860,35 @@ function sureSave() {
   try { const s = sures(); s.size ? localStorage.setItem(SURE_KEY, JSON.stringify([...s])) : localStorage.removeItem(SURE_KEY); } catch {}
   saveSetting(SET_SU, settingValue(SET_SU));
 }
-function sureToggle(p) { const s = sures(), k = rKey(p); s.has(k) ? s.delete(k) : s.add(k); sureSave(); return s.has(k); }
+function sureToggle(p) {
+  const s = sures(), k = rKey(p);
+  s.has(k) ? s.delete(k) : (s.add(k), weaks().delete(k), weakSave());   // 둘은 같이 설 수 없다
+  sureSave(); return s.has(k);
+}
+
+/* ---------- 약화 (그 선호도가 덜 굳은 사람) ----------
+ * 강화의 짝이다 (2026-10-25, 교수님 요청) — 확이지만 좀 흔들리거나, 긍이지만 미지근한 분.
+ * **강화와 함께 설 수 없다**: 한쪽을 켜면 다른 쪽은 저절로 풀린다.
+ * 저장은 강화·공략과 같은 길(settings 탭의 weak 키)이라 서버는 고칠 것이 없다. */
+const WEAK_KEY = 'jnu-weak';
+let weakSet = null;
+function weaks() {
+  if (!weakSet) {
+    weakSet = new Set();
+    try { const v = JSON.parse(localStorage.getItem(WEAK_KEY) || '[]'); if (Array.isArray(v)) weakSet = new Set(v); } catch {}
+  }
+  return weakSet;
+}
+const isWeak = p => weaks().has(rKey(p));
+function weakSave() {
+  try { const s = weaks(); s.size ? localStorage.setItem(WEAK_KEY, JSON.stringify([...s])) : localStorage.removeItem(WEAK_KEY); } catch {}
+  saveSetting(SET_WK, settingValue(SET_WK));
+}
+function weakToggle(p) {
+  const s = weaks(), k = rKey(p);
+  s.has(k) ? s.delete(k) : (s.add(k), sures().delete(k), sureSave());
+  weakSave(); return s.has(k);
+}
 
 /* ---------- 도움 (보이는 글자는 「도움」, 저장 열쇠는 vip) ----------
  * **확실한 분 가운데 남에게도 나를 찍어 달라고 거들어 주는 분**이다 (2026-10-20 에 교수님이
@@ -2930,6 +2970,9 @@ const VIP_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="t
    체크(✓)는 「확인·완료」로 읽혀, 「공략해야 할 사람」처럼 할 일로 오해될 수 있었다. */
 const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
   + '<path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* 약화 표식 — 강화의 짝이라 아래 화살표 */
+const WEAK_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
+  + '<path d="M12 4v15M5.5 12.5L12 19l6.5-6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 /* VIP 표식 — 총장님이 청하는 자리라 왕관 */
 const PRES_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">'
   + '<path d="M4 18h16l1.2-9-5.2 3.4L12 5 8 12.4 2.8 9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
@@ -3397,15 +3440,15 @@ async function syncRatings({ initial = false } = {}) {
 /* ---------- 개인 설정 동기화 (퀴즈 학과·교수 선택) ----------
  * 선호도와 같은 경로로 시트의 settings 탭에 저장되고, 다른 기기에서 바꾸면 다음 동기화 때 그대로 따라옵니다. */
 const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mailcnt', SET_MB = 'mobile', SET_NS = 'nosend', SET_MS = 'msend';
-const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SET_PR = 'pres';
+const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SET_PR = 'pres', SET_WK = 'weak';
 const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_DO, SET_VI, SET_PR, SET_ME];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -3418,6 +3461,7 @@ function settingValue(key) {
   if (key === SET_NS) return [...noSend()];
   if (key === SET_PU) return [...pushes()].sort();   // 고른 순서는 뜻이 없다
   if (key === SET_SU) return [...sures()].sort();
+  if (key === SET_WK) return [...weaks()].sort();
   if (key === SET_VI) return [...vips()].sort();
   if (key === SET_PR) return [...press()].sort();
   if (key === SET_DO) return [...dorder()];   // 정렬하지 않는다: 차례가 곧 값이다
@@ -3439,6 +3483,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_NS) { noSendSet = new Set(v); v.length ? localStorage.setItem(NOSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(NOSEND_KEY); }
     if (key === SET_PU) { pushSet = new Set(v); v.length ? localStorage.setItem(PUSH_KEY, JSON.stringify(v)) : localStorage.removeItem(PUSH_KEY); }
     if (key === SET_SU) { sureSet = new Set(v); v.length ? localStorage.setItem(SURE_KEY, JSON.stringify(v)) : localStorage.removeItem(SURE_KEY); }
+    if (key === SET_WK) { weakSet = new Set(v); v.length ? localStorage.setItem(WEAK_KEY, JSON.stringify(v)) : localStorage.removeItem(WEAK_KEY); }
     if (key === SET_VI) { vipSet = new Set(v); v.length ? localStorage.setItem(VIP_KEY, JSON.stringify(v)) : localStorage.removeItem(VIP_KEY); }
     if (key === SET_PR) { presSet = new Set(v); v.length ? localStorage.setItem(PRES_KEY, JSON.stringify(v)) : localStorage.removeItem(PRES_KEY); }
     if (key === SET_DO) { dorderList = v.map(String); v.length ? localStorage.setItem(DORDER_KEY, JSON.stringify(v)) : localStorage.removeItem(DORDER_KEY); dorderApply(); }
@@ -3451,7 +3496,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -5175,6 +5220,8 @@ function openDrawer(p, d) {
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
           <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}">
             ${SURE_MARK}<span>강화</span></button>
+          <button type="button" class="weakbtn${isWeak(p) ? ' on' : ''}" data-weakbtn="${esc(rKey(p))}" aria-pressed="${isWeak(p)}">
+            ${WEAK_MARK}<span>약화</span></button>
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
@@ -5243,11 +5290,21 @@ function openDrawer(p, d) {
     btn.setAttribute('aria-pressed', String(on));
     flashStatus(on ? `${p.name} 교수를 VIP 로 표시했습니다` : `${p.name} 교수의 VIP 표시를 풀었습니다`);
   });
-  $panel.querySelector('[data-surebtn]')?.addEventListener('click', e => {
-    const btn = e.currentTarget, on = sureToggle(p);
-    btn.classList.toggle('on', on);
-    btn.setAttribute('aria-pressed', String(on));
+  /* 강화와 약화는 짝이라 한쪽을 켜면 다른 쪽이 풀린다 — 화면도 같이 따라가야 한다 */
+  const markSync = () => {
+    const a = $panel.querySelector('[data-surebtn]'), b = $panel.querySelector('[data-weakbtn]');
+    if (a) { a.classList.toggle('on', isSure(p)); a.setAttribute('aria-pressed', String(isSure(p))); }
+    if (b) { b.classList.toggle('on', isWeak(p)); b.setAttribute('aria-pressed', String(isWeak(p))); }
+  };
+  $panel.querySelector('[data-surebtn]')?.addEventListener('click', () => {
+    const on = sureToggle(p);
+    markSync();
     flashStatus(on ? `${p.name} 교수를 강화로 표시했습니다` : `${p.name} 교수의 강화 표시를 풀었습니다`);
+  });
+  $panel.querySelector('[data-weakbtn]')?.addEventListener('click', () => {
+    const on = weakToggle(p);
+    markSync();
+    flashStatus(on ? `${p.name} 교수를 약화로 표시했습니다` : `${p.name} 교수의 약화 표시를 풀었습니다`);
   });
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = pushToggle(p);
