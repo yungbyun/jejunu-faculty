@@ -137,6 +137,9 @@ const look = async sel => {
   await page.locator(sel).click(); await page.waitForTimeout(300);
   return { off, offHover, on, onHover };
 };
+/* 2026-10-25 — 확실·부정에서는 강화·약화가 잠긴다. 눌러 보는 시험은 **중간**에서 한다 */
+await page.evaluate(() => { setRating(rKey(state.rows[0]), '중'); });
+await page.waitForTimeout(250);
 const clear = c => c.replace(/\s/g, '');
 for (const [name, sel] of [['강화', '[data-surebtn]'], ['약화', '[data-weakbtn]'], ['공략', '[data-pushbtn]'], ['도움', '[data-vipbtn]']]) {
   const L = await look(sel);
@@ -180,6 +183,7 @@ await page.waitForTimeout(200);
 
 /* 강화와 약화는 짝이라 **함께 설 수 없다** (2026-10-25) */
 await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  setRating(rKey(state.rows[0]), '중');
   localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); renderDept(state.depts[0]); });
 await page.click('[data-surebtn]'); await page.waitForTimeout(300);
 await page.click('[data-weakbtn]'); await page.waitForTimeout(300);
@@ -195,8 +199,9 @@ t('강화를 켜면 약화가 풀린다', await page.evaluate(() => {
   return isSure(p) && !isWeak(p)
     && document.querySelector('[data-weakbtn]').getAttribute('aria-pressed') === 'false';
 }));
-/* 무게 (2026-10-25 저녁에 맞춘 값) — 양 끝이 1.00 과 0 이고 0.5 를 가운데 둔 대칭이다.
-   확 1.00/.90/.75 · 중 .65/.50/.35 · 부 .25/.10/.00 (강화/보통/약화) */
+/* 무게 (2026-10-25 저녁에 맞춘 값) — 확실은 위 두 칸이 .95 로 같고 부정은 아래 두 칸이 0 으로
+   같다. 묶고 나면 한 칸이 모두 .15 다: .95 .95 .80 .65 .50 .35 .20 0 0
+   확 .95/.95/.80 · 중 .65/.50/.35 · 부 .20/.00/.00 (강화/보통/약화) */
 const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
   const p = state.rows[0], was = getRating(p);
   setRating(rKey(p), rr); sureSet = new Set(); weakSet = new Set();
@@ -206,26 +211,36 @@ const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
   sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
   return w;
 }, [r, mark]);
-t('확에 약화를 찍으면 .90 → .75', await wOf('확', '') === .90 && await wOf('확', 'weak') === .75,
+t('확에 약화를 찍으면 .95 → .80', await wOf('확', '') === .95 && await wOf('확', 'weak') === .80,
   `${await wOf('확', '')} → ${await wOf('확', 'weak')}`);
 t('중에 약화를 찍으면 .50 → .35', await wOf('중', '') === .5 && await wOf('중', 'weak') === .35,
   `${await wOf('중', '')} → ${await wOf('중', 'weak')}`);
 /* 긍의 약화는 교수님이 **그냥 긍과 같은 .70** 으로 정하셨다 — 표시로만 남고 셈은 안 바뀐다 */
 t('중에 강화를 찍으면 .50 → .65', await wOf('중', 'sure') === .65, String(await wOf('중', 'sure')));
-t('부에 강화를 찍으면 .10 → .25', await wOf('부', 'sure') === .25, String(await wOf('부', 'sure')));
+t('부에 강화를 찍으면 0 → .20', await wOf('부', 'sure') === .20, String(await wOf('부', 'sure')));
 t('중은 ±15 그대로', await wOf('중', 'sure') === .65 && await wOf('중', 'weak') === .35,
   `${await wOf('중', 'sure')} / ${await wOf('중', 'weak')}`);
 /* 2026-10-25 — 아홉 칸이 되면서 확실에도 강화 자리가 생겼다(천장이 가까워 +3 뿐) */
-t('확에 강화를 찍으면 .90 → 1 — 꼭대기', await wOf('확', 'sure') === 1, String(await wOf('확', 'sure')));
-t('부에 약화를 찍으면 .10 → 0 — 바닥', await wOf('부', '') === .10 && await wOf('부', 'weak') === 0,
+t('확에 강화를 찍어도 .95 그대로 — 위 두 칸이 같다', await wOf('확', 'sure') === .95, String(await wOf('확', 'sure')));
+t('부에 약화를 찍어도 0 그대로 — 아래 두 칸이 같다', await wOf('부', '') === 0 && await wOf('부', 'weak') === 0,
   `${await wOf('부', '')} → ${await wOf('부', 'weak')}`);
-/* 0.5 를 가운데 두고 네 쌍이 모두 합 1.00 — 대칭이다 (2026-10-25) */
-t('무게가 0.5 를 가운데 두고 대칭', await page.evaluate(() =>
-  [[W_SURE['확'], W_WEAK['부']], [W_RATE['확'], W_RATE['부']],
-   [W_WEAK['확'], W_SURE['부']], [W_SURE['중'], W_WEAK['중']]]
+/* 가운데 두 쌍은 거울이다(.80↔.20 · .65↔.35). 양 끝은 묶여 있어 거울이 아니다 */
+t('가운데 두 쌍이 거울', await page.evaluate(() =>
+  [[W_WEAK['확'], W_SURE['부']], [W_SURE['중'], W_WEAK['중']]]
     .every(([a, b]) => Math.abs(a + b - 1) < 1e-9)),
-  await page.evaluate(() => `${W_SURE['확']}↔${W_WEAK['부']} ${W_RATE['확']}↔${W_RATE['부']} ${W_WEAK['확']}↔${W_SURE['부']} ${W_SURE['중']}↔${W_WEAK['중']}`));
-t('아홉 칸이 모두 다르다', await page.evaluate(async () => {
+  await page.evaluate(() => `${W_WEAK['확']}↔${W_SURE['부']} ${W_SURE['중']}↔${W_WEAK['중']}`));
+/* 묶고 나면 한 칸이 모두 .15 (맨 아래만 .20) */
+t('한 칸이 모두 .15', await page.evaluate(() => {
+  const seq = [W_SURE['확'], W_RATE['확'], W_WEAK['확'], W_SURE['중'], W_RATE['중'],
+    W_WEAK['중'], W_SURE['부'], W_RATE['부'], W_WEAK['부']];
+  const gaps = seq.slice(1).map((v, i) => Math.round((seq[i] - v) * 100) / 100);
+  return JSON.stringify(gaps) === JSON.stringify([0, .15, .15, .15, .15, .15, .2, 0]);
+}), await page.evaluate(() => {
+  const seq = [W_SURE['확'], W_RATE['확'], W_WEAK['확'], W_SURE['중'], W_RATE['중'],
+    W_WEAK['중'], W_SURE['부'], W_RATE['부'], W_WEAK['부']];
+  return seq.join(' ');
+}));
+t('아홉 칸이 줄곧 낮아진다 — 묶인 두 쌍 빼고 일곱 값', await page.evaluate(async () => {
   const ws = [], sv = [...sures()], wv = [...weaks()];
   for (const r of ['확', '중', '부']) for (const m of ['sure', '', 'weak']) {
     const p = state.rows[0], was = getRating(p);
@@ -236,7 +251,7 @@ t('아홉 칸이 모두 다르다', await page.evaluate(async () => {
     sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
   }
   sureSet = new Set(sv); weakSet = new Set(wv);
-  return new Set(ws).size === 9 && ws.every((v, i) => i === 0 || ws[i - 1] > v);
+  return new Set(ws).size === 7 && ws.every((v, i) => i === 0 || ws[i - 1] >= v);
 }));
 t('settings 의 weak 키로도 등록', await page.evaluate(() =>
   SET_KEYS.includes('weak') && SET_LABEL['weak'] === '약화'));
@@ -353,6 +368,7 @@ await page.evaluate(() => { document.documentElement.removeAttribute('data-theme
 await page.waitForSelector('.d-marks', { timeout: 10000 });
 await page.waitForTimeout(250);
 await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  setRating(rKey(state.rows[0]), '중');
   localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); });
 
 await page.click('[data-surebtn]');

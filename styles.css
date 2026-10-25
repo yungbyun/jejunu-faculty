@@ -835,6 +835,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;
   font-weight:700;cursor:pointer}
 .weakbtn:hover{border-color:var(--ink-3)}
+/* 숫자를 못 바꾸는 표시는 잠근다 — 켜져 있던 것은 켜진 채로 흐려진다 (2026-10-25) */
+.surebtn:disabled,.weakbtn:disabled{opacity:.4;cursor:not-allowed}
+.surebtn:disabled:hover,.weakbtn:disabled:hover{border-color:var(--line-2)}
 .weakbtn.on{background:color-mix(in srgb,var(--rc,#5f6672) 10%,var(--surface-2));
   border:1px dashed color-mix(in srgb,var(--rc,#5f6672) 60%,var(--line-2));color:var(--ink)}
 .weakbtn.on:hover{filter:brightness(1.06)}

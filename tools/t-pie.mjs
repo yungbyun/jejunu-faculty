@@ -127,6 +127,35 @@ const lit = await page.evaluate(()=>{
 t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / ${lit.want}`);
 t('불은 이름 오른쪽 끝에', lit.okPos);
 t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
+
+/* 이름에 올리면 학과명과 「표 줄 확률」이 함께 보여야 한다 (2026-10-25, 교수님 지정) */
+const tip = await page.evaluate(() => {
+  const sv = [...sures()], wv = [...weaks()];
+  sureSet = new Set(); weakSet = new Set();
+  const pick = r => state.rows.find(x => getRating(x) === r);
+  const g = r => { const q = pick(r); return q ? stChip(q, r).match(/title="([^"]*)"/)[1] : ''; };
+  const 중 = pick('중'), out = {};
+  out.확 = g('확'); out.중 = g('중'); out.부 = g('부');
+  out.학과 = pick('확') ? pick('확').dept_name : '';
+  const z = state.rows[1], zwas = getRating(z);          // 비참여가 없는 자료일 수 있다
+  setRating(rKey(z), '비'); out.비 = stChip(z, '비').match(/title="([^"]*)"/)[1];
+  setRating(rKey(z), zwas || '');
+  if (중) { weaks().add(rKey(중)); out.중약 = g('중'); weaks().delete(rKey(중));
+            sures().add(rKey(중)); out.중강 = g('중'); sures().delete(rKey(중)); }
+  const q = state.rows[0], was = getRating(q);
+  setRating(rKey(q), ''); out.없음 = stChip(q, '').match(/title="([^"]*)"/)[1];
+  setRating(rKey(q), was || '');
+  sureSet = new Set(sv); weakSet = new Set(wv);
+  return out;
+});
+t('도움말이 학과명으로 열린다', !!tip.학과 && tip.확.startsWith(tip.학과 + ' · '), `${tip.학과} | ${tip.확}`);
+t('확실은 95%', tip.확.includes('표 줄 확률 95%'), tip.확);
+t('중간은 50%', tip.중.includes('표 줄 확률 50%'), tip.중);
+t('중간+강화는 65%', !tip.중강 || tip.중강.includes('표 줄 확률 65%'), tip.중강);
+t('중간-약화는 35%', !tip.중약 || tip.중약.includes('표 줄 확률 35%'), tip.중약);
+t('부정은 0%', tip.부.includes('표 줄 확률 0%'), tip.부);
+t('비참여는 셈에서 뺀다고 적는다', tip.비.includes('비참여') && tip.비.includes('뺌'), tip.비);
+t('미지정은 0 으로 센다고 적는다', tip.없음.includes('미지정'), tip.없음);
 t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
 const dots = await page.evaluate(()=>{
   state.ratings.clear(); state.notes.clear();
@@ -521,10 +550,10 @@ await page.waitForTimeout(250);
     rows.filter(p => getRating(p) === '확').slice(0, 1).forEach(p => weaks().add(rKey(p)));
     rows.filter(p => getRating(p) === '부').slice(0, 2).forEach(p => sures().add(rKey(p)));
     sureSave(); weakSave(); renderStats();
-    /* 확 3×.90 + 확−약 1×.75 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.25 + 부 3×.10 */
-    const want = 3 * .90 + .75 + 2 * .65 + 3 * .50 + .35 + 2 * .25 + 3 * .10;
-    const varr = 3 * .90 * .10 + .75 * .25 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65
-      + 2 * .25 * .75 + 3 * .10 * .90;
+    /* 확 3×.95 + 확−약 1×.80 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.20 + 부 3×0 */
+    const want = 3 * .95 + .80 + 2 * .65 + 3 * .50 + .35 + 2 * .20;
+    const varr = 3 * .95 * .05 + .80 * .20 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65
+      + 2 * .20 * .80;
     const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
     const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
     return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
@@ -550,8 +579,8 @@ await page.waitForTimeout(250);
     sures().add(rKey(p)); sureSave(); renderStats();
     return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
   });
-  t('부에 강화를 더하면 .15 만큼 오른다', up2 === 0.15, String(up2));
-  t('아홉 칸이 모두 다르다', await page.evaluate(() => {
+  t('부에 강화를 더하면 .20 만큼 오른다', up2 === 0.20, String(up2));
+  t('아홉 칸이 줄곧 낮아진다 — 묶인 두 쌍 빼고 일곱 값', await page.evaluate(() => {
     const ws = [], sv = [...sures()], wv = [...weaks()];   // 다른 시험이 쓰는 표시를 지키려고 적어 둔다
     for (const r of ['확', '중', '부']) for (const m of ['s', '', 'w']) {
       const p = state.rows[0], was = getRating(p);
@@ -562,15 +591,15 @@ await page.waitForTimeout(250);
       sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
     }
     sureSet = new Set(sv); weakSet = new Set(wv);          // 적어 둔 표시를 되돌린다
-    return new Set(ws).size === 9 && ws.every((v, i) => i === 0 || ws[i - 1] > v);
+    return new Set(ws).size === 7 && ws.every((v, i) => i === 0 || ws[i - 1] >= v);
   }));
-  t('확에 강화를 찍으면 .10 만큼 올라 꼭대기(1)가 된다', await page.evaluate(() => {
+  t('확에 강화를 찍어도 .95 그대로 — 위 두 칸이 같다', await page.evaluate(() => {
     const a = state.rows.find(x => getRating(x) === '확' && !isWeak(x) && !isSure(x));
     const wa = weightOf(a);
     sures().add(rKey(a)); sureSave();
     const nw = weightOf(a);
     sures().delete(rKey(a)); sureSave();
-    return wa === .90 && nw === 1;
+    return wa === .95 && nw === .95;
   }));
   const weightSumHere = await page.evaluate(() =>
     Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);

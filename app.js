@@ -1731,22 +1731,23 @@ function shade(hex, d) {
 /* 세 기둥 × (강화·보통·약화) = **아홉 칸 사다리** (2026-10-25, 교수님 지정).
  *
  *            강화(+)   보통    약화(−)
- *   확실      1.00     .90      .75
+ *   확실       .95     .95      .80
  *   중간       .65     .50      .35
- *   부정       .25     .10      .00
+ *   부정       .20     .00      .00
  *
- * **양 끝을 1.00 과 0 으로 못 박았다** (2026-10-25 저녁, 교수님 지정) — 「확실한데 강화」는
- * 틀림없다는 뜻이고 「부정인데 약화」는 확고한 반대라는 뜻이다. **후보가 둘**이므로 중립은
- * 반반(.50)이 맞고, 「내 표 vs 상대 표」도 모수에서 내 표를 뺀 값이 그대로 옳다.
- * 0.5 를 가운데 두고 **네 쌍이 모두 합 1.00** 으로 짝을 이룬다 — 1.00↔0 · .90↔.10 ·
- * .75↔.25 · .65↔.35. 둘이 겨루는 자리라 내 가능성과 상대 가능성이 거울이어야 하기 때문이다.
- * **중간 묶음(±15)은 그대로 두고 확실·부정 묶음만 넓혔다** — 전에는 확실에 강화가 +.03 뿐이라
- * 열 분을 찍어도 0.3표였다. 표시가 숫자에서 일하지 않으면 찍을 까닭이 없다.
- * 다만 1.00 과 0 은 **흔들림 폭에 한 톨도 보태지 않는다**(p(1−p)=0). 「확실+강화」를 후하게
- * 찍으면 ± 가 실제보다 좁아지므로 아껴 찍는 것이 좋다. */
-const W_RATE = { '확': .90, '중': .50, '부': .10 };
-const W_SURE = { '확': 1.00, '중': .65, '부': .25 };   // 강화 — 위로
-const W_WEAK = { '확': .75, '중': .35, '부': .00 };    // 약화 — 아래로
+ * **확실은 위 두 칸이 .95 로 같고, 부정은 아래 두 칸이 0 으로 같다** (2026-10-25 저녁,
+ * 교수님 지정). 그래서 **확실에서 강화는, 부정에서 약화는 숫자로는 아무 일도 하지 않는다** —
+ * 그 자리에서는 분류·우선순위 표시로만 남는다(명단 차례와 도넛 색 가름에는 그대로 쓰인다).
+ * **후보가 둘**이므로 중립은 반반(.50)이 맞고, 「내 표 vs 상대 표」도 모수에서 내 표를 뺀
+ * 값이 그대로 옳다.
+ * 묶고 나니 **한 칸이 모두 .15** 로 고르게 떨어진다: .95 · .95 · .80 · .65 · .50 · .35 · .20 · 0 · 0.
+ * 가운데 두 쌍은 거울이다(.80↔.20 · .65↔.35). **양 끝은 거울이 아니다**(.95↔0, 합 .95) —
+ * 내 지지자는 최대 95% 인데 상대 지지자는 100% 로 치는 셈이라 **보수적인 쪽으로 기울어** 있다.
+ * .95 와 0 은 흔들림 폭에 거의/전혀 보태지 않는다(p(1−p)). 부정 묶음이 통째로 0 이라
+ * ± 는 사실상 확실·중간 묶음에서만 나온다. */
+const W_RATE = { '확': .95, '중': .50, '부': .00 };
+const W_SURE = { '확': .95, '중': .65, '부': .20 };   // 강화 — 위로(확실은 꼭대기라 그대로)
+const W_WEAK = { '확': .80, '중': .35, '부': .00 };   // 약화 — 아래로(부정은 바닥이라 그대로)
 const W_SAY = Object.entries(W_RATE).map(([r, w]) => {
   const x = [W_SURE[r] != null ? `강화 ${W_SURE[r]}` : '', W_WEAK[r] != null ? `약화 ${W_WEAK[r]}` : '']
     .filter(Boolean).join(', ');
@@ -2081,13 +2082,23 @@ const stRank = p => isVip(p) ? 0 : isSure(p) ? 1 : isWeak(p) ? 3 : 2;
 const stSort = list => [...list].sort((a, b) =>
   stRank(a) - stRank(b) || String(a.name).localeCompare(String(b.name), 'ko'));
 
+/* 이름에 마우스를 올렸을 때 보여 줄 「표 줄 확률」 한 토막 (2026-10-25, 교수님 지정).
+ * 무게는 `weightOf()` 가 쥐고 있으므로 **그 값을 그대로 읽는다** — 여기에 숫자를 따로 적어
+ * 두면 무게표를 고칠 때 둘이 어긋난다. 비참여는 모수에서도 빠지므로 백분율이 뜻이 없다. */
+function weightTip(p) {
+  const r = getRating(p);
+  if (r === '비') return '비참여 · 셈에서 뺌';
+  if (!r) return '미지정 · 0 으로 셈';
+  return `표 줄 확률 ${Math.round(weightOf(p) * 100)}%`;
+}
+
 function stChip(p, r) {
   const met = getMet(p), pu = isPush(p), su = isSure(p), wk = isWeak(p), vi = isVip(p), pr = isPres(p), k = rKey(p);
   const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${wk ? ' weak' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)} · ${weightTip(p)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
@@ -3086,6 +3097,23 @@ const VIP_MARK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="t
    체크(✓)는 「확인·완료」로 읽혀, 「공략해야 할 사람」처럼 할 일로 오해될 수 있었다. */
 const SURE_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
   + '<path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* 그 선호도에서 **숫자를 못 바꾸는 표시**인가 (2026-10-25, 교수님 지정).
+ * 확실은 위 두 칸이 .95 로 같아 **강화가 할 일이 없고**, 부정은 아래 두 칸이 0 으로 같아
+ * **약화가 할 일이 없다**. 그런 단추는 상세에서 잠가 둔다 — 눌러도 숫자가 안 움직이는데
+ * 눌리면 교수님이 헛일을 하신 셈이 된다.
+ * **무게표에서 저절로 따라오게** 해 두었으니(값이 같으면 잠김), 나중에 무게를 바꾸시면
+ * 잠기고 풀리는 것도 같이 바뀐다 — 손으로 갈래 이름을 적어 두지 않는다. */
+function markIdle(p, kind) {
+  const r = getRating(p);
+  if (!r || W_RATE[r] == null) return false;            // 미지정·비참여는 건드리지 않는다
+  const tbl = kind === 'sure' ? W_SURE : W_WEAK;
+  const w = tbl[r] == null ? W_RATE[r] : tbl[r];
+  return w === W_RATE[r];
+}
+const markWhy = (p, kind) => markIdle(p, kind)
+  ? `${CONFIG.RATINGS.NAMES[getRating(p)] || getRating(p)}에서는 ${kind === 'sure' ? '강화' : '약화'}가 숫자를 바꾸지 않습니다`
+  : `${kind === 'sure' ? '강화' : '약화'}로 표시`;
+
 /* 약화 표식 — 강화의 짝이라 아래 화살표 */
 const WEAK_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
   + '<path d="M12 4v15M5.5 12.5L12 19l6.5-6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -3903,11 +3931,20 @@ function refreshRatingUI(key, val) {
   });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"] .prof__note`).forEach(el => { el.innerHTML = noteBadge(entryOf(key)); });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
-  /* 선호도를 바꾸면 강화·VIP 단추에 깔린 색도 따라간다(--rc) */
+  /* 선호도를 바꾸면 강화·VIP 단추에 깔린 색도 따라간다(--rc).
+     숫자를 못 바꾸는 표시는 그 자리에서 잠그고 푼다 — 다시 그리지 않으므로 여기서 손본다. */
   document.querySelectorAll(`.d-marks`).forEach(m => {
     if (!m.querySelector(`[data-surebtn="${CSS.escape(key)}"]`)) return;
     const rc = RCOLOR[val] || '';
     rc ? m.style.setProperty('--rc', rc) : m.style.removeProperty('--rc');
+    const p = state.rows.find(x => rKey(x) === key);
+    if (!p) return;
+    [['sure', '[data-surebtn]'], ['weak', '[data-weakbtn]']].forEach(([kind, sel]) => {
+      const b = m.querySelector(sel);
+      if (!b) return;
+      b.disabled = markIdle(p, kind);
+      b.title = markWhy(p, kind);
+    });
   });
   const r = route();
   if (r.view === 'dept') {
@@ -5339,9 +5376,9 @@ function openDrawer(p, d) {
       <div class="d-section"><h3>선호도 추가정보</h3>
         <div class="d-marks"${RCOLOR[getRating(p)] ? ` style="--rc:${esc(RCOLOR[getRating(p)])}"` : ''}>
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
-          <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}">
+          <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}"${markIdle(p, 'sure') ? ' disabled' : ''} title="${esc(markWhy(p, 'sure'))}">
             ${SURE_MARK}<span>강화</span></button>
-          <button type="button" class="weakbtn${isWeak(p) ? ' on' : ''}" data-weakbtn="${esc(rKey(p))}" aria-pressed="${isWeak(p)}">
+          <button type="button" class="weakbtn${isWeak(p) ? ' on' : ''}" data-weakbtn="${esc(rKey(p))}" aria-pressed="${isWeak(p)}"${markIdle(p, 'weak') ? ' disabled' : ''} title="${esc(markWhy(p, 'weak'))}">
             ${WEAK_MARK}<span>약화</span></button>
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
