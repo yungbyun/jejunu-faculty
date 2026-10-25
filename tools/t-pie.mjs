@@ -24,7 +24,7 @@ async function clickSeg(page, r) {
 }
 
 const ok=[]; const t=(n,v,x='')=>ok.push([n,v,x]);
-await page.evaluate(()=>{ const v=['확','긍','중','모','부','비']; state.rows.forEach((p,i)=>state.ratings.set(rKey(p), v[i%v.length])); location.hash='#/stats'; render(); });
+await page.evaluate(()=>{ const v=CONFIG.RATINGS.LABELS; state.rows.forEach((p,i)=>state.ratings.set(rKey(p), v[i%v.length])); location.hash='#/stats'; render(); });
 await page.waitForSelector('.pie__hit',{timeout:10000});
 
 // 1) 숫자가 제 조각에 얹혀 있다
@@ -35,24 +35,25 @@ t('숫자가 실제 인원과 같음', nums.every(x=>String(real[x.r])===x.n), J
 t('비(평가제외)는 도넛에 없음', !nums.some(x=>x.r==='비'));
 
 // 2) 숫자가 조각 안에 있다 — 도넛 띠(반지름 60~84) 위에 놓였는지
-t('숫자가 띠 위에 놓임', await page.evaluate(()=>[...document.querySelectorAll('.pie__sn')].every(tx=>{
-  const x=+tx.getAttribute('x'), y=+tx.getAttribute('y');
-  const d=Math.hypot(x-100, y-112);
-  return d>60 && d<84 && y<=112.5;
-})));
+t('띠 안의 숫자는 띠 위에 놓임', await page.evaluate(()=>
+  [...document.querySelectorAll('.pie__sn:not(.pie__sn--out)')].every(tx=>{
+    const x=+tx.getAttribute('x'), y=+tx.getAttribute('y');
+    const d=Math.hypot(x-100, y-112);
+    return d>60 && d<84 && y<=112.5;
+  })));
 
 // 3) 누르면 그 선호도의 명단으로 내려간다
 await page.evaluate(()=>window.scrollTo(0,0));
 const before = await page.evaluate(()=>window.scrollY);
-await clickSeg(page, '모');
+await clickSeg(page, '부');
 await page.waitForTimeout(1200);
 const after = await page.evaluate(()=>window.scrollY);
 t('아래로 내려감', after > before, `${before} → ${after}`);
 t('그 줄이 화면 안에', await page.evaluate(()=>{
-  const r=document.querySelector('[data-rslist="모"]').getBoundingClientRect();
+  const r=document.querySelector('[data-rslist="부"]').getBoundingClientRect();
   return r.top > -10 && r.top < window.innerHeight;
 }));
-t('그 줄이 번쩍임', await page.evaluate(()=>document.querySelector('[data-rslist="모"]').classList.contains('st-list--hit')));
+t('그 줄이 번쩍임', await page.evaluate(()=>document.querySelector('[data-rslist="부"]').classList.contains('st-list--hit')));
 t('다른 줄은 가만히', await page.evaluate(()=>!document.querySelector('[data-rslist="확"]').classList.contains('st-list--hit')));
 
 // 4) 키보드로도 된다
@@ -82,37 +83,37 @@ t('절반도 도넛 아래에 적는다', maj.u === `전체 ${maj.n-3}명(절반
 t('절반까지 카드는 없다', !maj.goal);
 /* 절반과의 거리는 **카드 맨 아랫줄에** 적는다 — 「3명 부족」 (2026-10-20, 사용자 지정).
  * 「절반」이라는 말은 화면에 적지 않는다 — 도넛 아래와 말풍선에 있다. */
-t('모자란 인원이 맨 아랫줄에', maj.ks[1].includes(`${Math.ceil((maj.n-3)/2)-30}명 부족`), maj.ks[1]);
-t('모자랄 때 「초과」라 하지 않는다', !maj.ks[1].includes('초과'), maj.ks[1]);
+t('모자란 인원이 맨 아랫줄에', maj.ks[0].includes(`${Math.ceil((maj.n-3)/2)-30}명 부족`), maj.ks[0]);
+t('모자랄 때 「초과」라 하지 않는다', !maj.ks[0].includes('초과'), maj.ks[0]);
 t('카드에는 「절반」이라 적지 않는다', !maj.ks.some(k => k.includes('절반')), maj.ks.join(' | '));
 t('큰 숫자는 % 하나뿐', await page.evaluate(() =>
-  document.querySelector('.pie__k--pos b').textContent) === '45%',
-  await page.evaluate(() => document.querySelector('.pie__k--pos b').textContent));
+  document.querySelector('.pie__k--high b').textContent) === '45%',
+  await page.evaluate(() => document.querySelector('.pie__k--high b').textContent));
 /* 맨 왼쪽은 「확실」 카드 — 확 하나만 센다 (2026-10-20, 사용자 지정) */
-t('맨 왼쪽은 확실 카드', maj.ks[0].startsWith('확실') && !maj.ks[0].startsWith('확실+'), maj.ks[0]);
+t('맨 왼쪽은 확실 카드', maj.ks[0].startsWith('확실'), maj.ks[0]);
 t('확실 카드 이름에 인원이 붙는다 — 여기선 확이 서른', maj.ks[0].includes('확실 30'), maj.ks[0]);
 t('이름에 「=」는 쓰지 않는다', !maj.ks.some(k => k.includes('=')), maj.ks.join(' | '));
-t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중·모'), maj.pool);
+t('어디서 끌어올지 아래 줄에', maj.pool.includes('미지정') && maj.pool.includes('중간'), maj.pool);
 
 const over = await page.evaluate(()=>{
   state.ratings.clear();
   state.rows.forEach(p=>state.ratings.set(rKey(p),'확'));   // 전원 확 — 절반을 크게 넘는다
   render();
   const half = Math.ceil(state.rows.length/2);
-  return { k: document.querySelector('.pie__k--pos').textContent,
+  return { k: document.querySelector('.pie__k--high').textContent,
            want: state.rows.length - half };
 });
 t('절반을 넘으면 「N명 초과」', over.k.includes(`${over.want}명 초과`), over.k);
 t('넘침을 도움말에도 적는다',
-  (await page.getAttribute('.pie__k--pos .pie__kn', 'title')).includes(`${over.want}명 넘습니다`),
-  await page.getAttribute('.pie__k--pos .pie__kn', 'title'));
+  (await page.getAttribute('.pie__k--high .pie__kn', 'title')).includes(`${over.want}명 넘습니다`),
+  await page.getAttribute('.pie__k--high .pie__kn', 'title'));
 t('그때는 100%', over.k.includes('100%'), over.k);
 
 // 6) 만난 적이 있으면 이름 칩 안에 초록 불
 const lit = await page.evaluate(()=>{
   state.ratings.clear(); state.notes.clear();
-  const v=['확','긍','중','모','부'];
-  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%5]); if(i%3===0) state.notes.set(rKey(p),{met:2,memo:''}); });
+  const v=['확','중','부'];
+  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%v.length]); if(i%3===0) state.notes.set(rKey(p),{met:2,memo:''}); });
   render();
   const want = state.rows.filter(p=>getMet(p)>0).length;
   const got = document.querySelectorAll('.st-list .metlit').length;
@@ -129,8 +130,8 @@ t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
 t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
 const dots = await page.evaluate(()=>{
   state.ratings.clear(); state.notes.clear();
-  const v=['확','긍','중','모','부'];
-  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%5]); state.notes.set(rKey(p),{met:i%9,memo:''}); });
+  const v=['확','중','부'];
+  state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%v.length]); state.notes.set(rKey(p),{met:i%9,memo:''}); });
   render();
   const rows = [...document.querySelectorAll('.st-list li a')].map(el=>{
     const p = state.rows.find(x=>el.getAttribute('href').endsWith(encodeURIComponent(x.slug)));
@@ -160,7 +161,7 @@ t('점끼리 붙지 않는다', await page.evaluate(() => {
   return bs.length < 2 || bs.slice(1).every((r, i) => r.left - bs[i].right >= 2);
 }));
 const cols = await page.evaluate(()=>{
-  const v=['확','긍','중','모','부','비']; state.ratings.clear(); state.notes.clear();
+  const v=CONFIG.RATINGS.LABELS; state.ratings.clear(); state.notes.clear();
   state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%6]); state.notes.set(rKey(p),{met:1,memo:''}); });
   render();
   const hex = x => '#'+x.match(/\d+/g).slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join('');
@@ -169,7 +170,7 @@ const cols = await page.evaluate(()=>{
     return { r, got: lit?hex(getComputedStyle(lit).backgroundColor):'', want: RCOLOR[r] };
   });
 });
-t('불 색이 그 선호도 대표색', cols.length===6 && cols.every(c=>c.got===c.want),
+t('불 색이 그 선호도 대표색', cols.length===4 && cols.every(c=>c.got===c.want),
   cols.map(c=>`${c.r} ${c.got}${c.got===c.want?'':'≠'+c.want}`).join(' '));
 
 // 7) 확+긍에 **중인 강화**를 더한 값 (2026-10-17, 전에는 중·모인 공략이었다)
@@ -177,9 +178,9 @@ const setup = (pushEvery) => page.evaluate(n => {
   sureSet = new Set(); localStorage.removeItem('jnu-sure');
   pushSet = new Set(); localStorage.removeItem('jnu-push');
   state.ratings.clear(); state.notes.clear();
-  const v = ['확','긍','중','모','부','비'];
+  const v = CONFIG.RATINGS.LABELS;
   state.rows.forEach((p,i)=>{
-    if (i % 9 !== 8) setRating(rKey(p), v[i%6]);     // 아홉에 하나는 미지정으로 남긴다
+    if (i % 9 !== 8) setRating(rKey(p), v[i%v.length]);   // 아홉에 하나는 미지정으로 남긴다
     if (n && i % n === 0) sures().add(rKey(p));
   });
   render();
@@ -187,12 +188,12 @@ const setup = (pushEvery) => page.evaluate(n => {
 /* 화면과 따로, 집합으로 다시 세어 맞춰 본다 */
 const truth = () => page.evaluate(() => {
   const inPool = p => getRating(p) !== '비';
-  const base = new Set(state.rows.filter(p => ['확','긍'].includes(getRating(p))).map(rKey));
+  const base = new Set(state.rows.filter(p => getRating(p) === '확').map(rKey));
   const pu = new Set(state.rows.filter(p => isSure(p) && getRating(p) === '중').map(rKey));
   const total = state.rows.filter(inPool).length;
-  const union = new Set([...base, ...pu]);          // 중인 강화는 확·긍과 겹칠 수 없다
+  const union = new Set([...base, ...pu]);          // 중인 강화는 확실과 겹칠 수 없다
   return { total, base: base.size, add: pu.size, union: union.size,
-           dup: state.rows.filter(p => isSure(p) && ['확','긍'].includes(getRating(p))).length,
+           dup: state.rows.filter(p => isSure(p) && getRating(p) === '확').length,
            out: state.rows.filter(p => isSure(p) && getRating(p) !== '중').length,
            pct: Math.round(union.size/total*100) };
 });
@@ -211,7 +212,7 @@ t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsW
   `화면 ${await klTxt('.pie__k--push')} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+중-강화(${T.add})`),
+t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+중간강화(${T.add})`),
   await klTxt('.pie__k--push'));
 t('안 더한 강화가 실제로 있다', T.out > 0, `${T.out}명`);
 t('이름에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await klTxt('.pie__k--push')), await klTxt('.pie__k--push'));
@@ -221,12 +222,12 @@ t('어느 카드도 모수(/N명)를 되풀이하지 않는다', await page.eval
 t('모수는 도넛 아래에 한 번만', await page.evaluate(() =>
   /^전체 \d+명\(절반 \d+명\)$/.test(document.querySelector('.pie__u').textContent)),
   await page.evaluate(() => document.querySelector('.pie__u').textContent));
-t('도움말이 「중인 강화」 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중인 강화'),
+t('도움말이 「중간인 강화」 기준임을 밝힌다', (await page.getAttribute('.pie__k--push', 'title')).includes('중간인 강화'),
   await page.getAttribute('.pie__k--push', 'title'));
 t('도움말이 안 더한 까닭도 밝힌다', await page.evaluate(() => {
   const txt = document.querySelector('.pie__k--push').title;
   const n = r => state.rows.filter(p => isSure(p) && (getRating(p)||'미지정') === r).length;
-  const want = [['부', n('부')], ['비참여', n('비')], ['미지정', n('미지정')]].filter(x => x[1]);
+  const want = [['부정', n('부')], ['비참여', n('비')], ['미지정', n('미지정')]].filter(x => x[1]);
   return want.every(([r, c]) => txt.includes(`${r} ${c}명`));
 }), await page.getAttribute('.pie__k--push', 'title'));
 
@@ -238,10 +239,10 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+중-강화(0)'),
+t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+중간강화(0)'),
   await klTxt('.pie__k--push'));
-t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
-  `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--pos b').innerText()}`);
+t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--high b').innerText()),
+  `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--high b').innerText()}`);
 t('부도 강화지만 안 더한다', T1.out > 0 && T1.add === 0, JSON.stringify(T1));
 
 // 모두 강화로 몰아도 확+긍+중을 넘지 않는다
@@ -254,23 +255,23 @@ t('전원을 강화로 해도 100% 이하', await page.evaluate(() =>
 t('그때는 확+긍+중 전원', (await klTxt('.pie__k--push')).endsWith(` ${T2.base + T2.add}`),
   `${await klTxt('.pie__k--push')} / ${T2.base}+${T2.add}`);
 t('부·비·미지정은 그래도 빠져 있다', T2.base + T2.add < T2.total, `${T2.base + T2.add} < ${T2.total}`);
-t('확+긍 카드는 그대로', (await klTxt('.pie__k--pos')).endsWith(` ${T2.base}`), await klTxt('.pie__k--pos'));
+t('확+긍 카드는 그대로', (await klTxt('.pie__k--high')).endsWith(` ${T2.base}`), await klTxt('.pie__k--high'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); });
 
 /* 확·긍과 겹친 강화는 더하지 않는다 — 그 사실을 화면에도 적어 둔다 (2026-10-09) */
 await page.evaluate(() => {
   sureSet = new Set();
-  state.rows.filter(p => ['확','긍'].includes(getRating(p))).forEach(p => sures().add(rKey(p)));
+  state.rows.filter(p => getRating(p) === '확').forEach(p => sures().add(rKey(p)));
   sureSave(); renderStats();
 });
-t('확·긍만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+중-강화(0)'),
+t('확실만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+중간강화(0)'),
   await klTxt('.pie__k--push'));
 t('확+긍 숫자도 그대로',
-  (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--pos b').innerText()),
-  (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--pos b').innerText()));
+  (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--high b').innerText()),
+  (await page.locator('.pie__k--push b').innerText()) + ' / ' + (await page.locator('.pie__k--high b').innerText()));
 t('겹친 인원은 말풍선에만 적는다', await page.evaluate(() => {
-  const n = state.rows.filter(p => isSure(p) && ['확','긍'].includes(getRating(p))).length;
-  return document.querySelector('.pie__k--push').title.includes(`확·긍(이미 셈) ${n}명`);
+  const n = state.rows.filter(p => isSure(p) && getRating(p) === '확').length;
+  return document.querySelector('.pie__k--push').title.includes(`확실(이미 셈) ${n}명`);
 }), await page.getAttribute('.pie__k--push', 'title'));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
@@ -278,15 +279,15 @@ await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-su
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
 const knTxt = k => page.evaluate(q => document.querySelector(q + ' .pie__kn').textContent.trim(), k);
 const GAPRE = /^(\d+명 부족|\d+명 초과|딱 맞음)\(\d+명 차\)$/;
-for (const k of ['.pie__k--high', '.pie__k--pos', '.pie__k--push'])
+for (const k of ['.pie__k--high', '.pie__k--push'])
   t(`${k.split('--')[1]} 맨 아랫줄 생김새`, GAPRE.test(await knTxt(k)), await knTxt(k));
-/* 테두리는 둘째 카드 하나에만 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다) */
-t('테두리는 둘째 카드에만', await page.evaluate(() => {
+/* 테두리·바탕은 **기대 칸**에만 두른다 (2026-10-25. 갈래가 셋으로 줄며 「+긍정」 칸이 없어졌다) */
+t('기대 칸만 테를 두른다', await page.evaluate(() => {
   const bc = q => getComputedStyle(document.querySelector(q)).borderColor;
   const line = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
   const asRGB = c => { const d = document.createElement('div'); d.style.color = c;
     document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; };
-  return bc('.pie__k--pos') !== bc('.pie__k--high')
+  return bc('.pie__k--score') !== bc('.pie__k--high')
       && bc('.pie__k--high') === bc('.pie__k--push')
       && bc('.pie__k--high') === asRGB(line);
 }), await page.evaluate(() => [...document.querySelectorAll('.pie__k')]
@@ -308,23 +309,19 @@ t('차는 모자란 몫의 갑절쯤', await page.evaluate(() =>
   })),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kn')].map(e => e.textContent).join(' | ')));
 t('카드 이름은 「이름 인원」', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+중-강화\(\d+\)|기대) [\d.]+$/.test(e.textContent.trim()))),
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+중간강화\(\d+\)|기대) [\d.]+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+중-강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
+/* 카드 이름 — 「확실」 · 「+중간강화(N)」 · 「기대」 (2026-10-25. 갈래가 셋으로 줄었다) */
 const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
   .map(e => e.textContent.trim().replace(/ [\d.]+$/, '')).join('|'));
-t('강화가 없으면 카드는 셋', /^확실\|\+긍정\(\d+\)\|기대$/.test(await klHead()), await klHead());
+t('강화가 없으면 카드는 둘', /^확실\|기대$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('카드 이름 넷', /^확실\|\+긍정\(\d+\)\|\+중-강화\(\d+\)\|기대$/.test(await klHead()), await klHead());
-t('둘째 이름의 괄호는 긍정 인원', await page.evaluate(() =>
-  document.querySelector('.pie__k--pos .pie__kl').textContent.startsWith(
-    `+긍정(${state.rows.filter(p => getRating(p) === '긍').length})`)),
-  await klTxt('.pie__k--pos'));
-t('셋째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
+t('카드 이름 셋', /^확실\|\+중간강화\(\d+\)\|기대$/.test(await klHead()), await klHead());
+t('둘째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
   document.querySelector('.pie__k--push .pie__kl').textContent.startsWith(
-    `+중-강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
+    `+중간강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
   await klTxt('.pie__k--push'));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).
@@ -332,16 +329,16 @@ t('셋째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
 const vsl = await page.evaluate(() => {
   state.ratings.clear(); state.notes.clear();
   sureSet = new Set(); localStorage.removeItem('jnu-sure');
-  const v = ['확','긍','중','모','부','비'];
+  const v = CONFIG.RATINGS.LABELS;
   state.rows.forEach((p, i) => setRating(rKey(p), v[i % 6]));
   sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave();
   render();
   const txt = k => ((document.querySelector(k + ' .pie__kv') || {}).innerText || '').trim();
   return { total: state.rows.filter(p => getRating(p) !== '비').length,
-           base: state.rows.filter(p => ['확','긍'].includes(getRating(p))).length,
+           base: state.rows.filter(p => getRating(p) === '확').length,
            add: state.rows.filter(p => isSure(p) && getRating(p) === '중').length,
-           pos: txt('.pie__k--pos'), push: txt('.pie__k--push'),
-           order: ['.pie__k--pos', '.pie__k--push']
+           pos: txt('.pie__k--high'), push: txt('.pie__k--push'),
+           order: ['.pie__k--high', '.pie__k--push']
              .map(k => [...document.querySelector(k).children]
                .map(c => c.className.split(' ')[0] || c.tagName.toLowerCase()).join('>'))
              .join(' / ') };
@@ -376,16 +373,16 @@ await page.waitForTimeout(250);
 const phone = await lay();
 /* 2026-10-25 에 「기대」 칸이 더해져 넷이 되었다. 폰에서는 넷을 한 줄에 밀어 넣으면
    글이 깨지므로 **둘씩 두 줄**로 세운다(`.pie__kpi--4`). */
-t('카드는 넷', phone.n === 4, `${phone.n}장`);
-t('폰에서는 둘씩 두 줄', phone.rows === 2 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
+t('카드는 셋', phone.n === 3, `${phone.n}장`);
+t('폰에서도 한 줄에 선다', phone.rows === 1 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
 t('폰에서 글이 칸을 넘지 않는다', phone.over === 0, `${phone.over}장 넘침`);
-t('390px 에서 줄이 흐트러지지 않는다', phone.lines === '1111/1111/1111/1111', phone.lines);
+t('390px 에서 줄이 흐트러지지 않는다', phone.lines === '1111/1111/1111', phone.lines);
 /* 더 좁은 폰(320px)에서도 넘치지 않아야 한다 */
 await page.setViewportSize({ width: 320, height: 1200 });
 await page.waitForTimeout(250);
 const tiny = await lay();
-t('320px 에서도 안 넘친다',
-  tiny.rows === 2 && tiny.out === 0 && tiny.over === 0 && tiny.lines === '1111/1111/1111/1111',
+t('320px 에서도 한 줄에 서고 안 넘친다',
+  tiny.rows === 1 && tiny.out === 0 && tiny.over === 0 && tiny.lines === '1111/1111/1111',
   JSON.stringify(tiny));
 await page.setViewportSize({ width: 900, height: 1200 });
 await page.waitForTimeout(250);
@@ -398,39 +395,39 @@ await page.waitForTimeout(250);
 {
   const D = await page.evaluate(() => {
     state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
-    const rows = state.rows, plan = [['확', 6], ['긍', 6], ['중', 6], ['모', 3], ['부', 2], ['비', 2]];
+    const rows = state.rows, plan = [['확', 6], ['중', 8], ['부', 5], ['비', 2]];
     let i = 0;
     for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
-    rows.filter(p => getRating(p) === '긍').slice(0, 2).forEach(p => sures().add(rKey(p)));
-    rows.filter(p => getRating(p) === '긍').slice(2, 3).forEach(p => weaks().add(rKey(p)));
-    rows.filter(p => getRating(p) === '중').slice(0, 2).forEach(p => sures().add(rKey(p)));
-    rows.filter(p => getRating(p) === '중').slice(2, 4).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(0, 3).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(3, 4).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '부').slice(0, 2).forEach(p => sures().add(rKey(p)));
     rows.filter(p => getRating(p) === '확').slice(0, 2).forEach(p => weaks().add(rKey(p)));
     sureSave(); weakSave(); renderStats();
     const g = [...document.querySelectorAll('.pie__hit')];
     return { names: g.map(e => e.querySelector('title').textContent.split('명')[0].trim()),
              rs: g.map(e => e.dataset.rs),
              cols: g.map(e => e.querySelector('circle').getAttribute('stroke')),
-             lens: g.map(e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'))) };
+             lens: g.map(e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'))),
+             labels: [...CONFIG.RATINGS.LABELS, '미지정'] };
   });
-  t('갈래 안이 강화 → 그냥 → 약화 차례', D.names.join('|').includes('긍+강화 2|긍 3|긍-약화 1'), D.names.join('|'));
-  t('중도 셋으로 갈린다', D.names.join('|').includes('중+강화 2|중 2|중-약화 2'), D.names.join('|'));
+  t('갈래 안이 강화 → 그냥 → 약화 차례', D.names.join('|').includes('중+강화 3|중 4|중-약화 1'), D.names.join('|'));
+  t('부도 강화와 그냥 둘로', D.names.join('|').includes('부+강화 2|부 3'), D.names.join('|'));
   t('확은 그냥과 약화 둘로', D.names.join('|').startsWith('확 4|확-약화 2'), D.names.join('|'));
-  t('모·부는 그대로 하나씩', D.names.filter(x => /^(모|부) /.test(x)).length === 2, D.names.join('|'));
+  t('갈래마다 강화·약화로 갈린다', D.names.length >= 7, D.names.join('|'));
   t('빛깔이 갈래마다 한 톤씩 다르다', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__hit')];
     const by = r => g.filter(e => e.dataset.rs === r).map(e => e.querySelector('circle').getAttribute('stroke'));
-    const 긍 = by('긍');
-    return 긍.length === 3 && new Set(긍).size === 3;
+    const 중 = by('중');
+    return 중.length === 3 && new Set(중).size === 3;
   }), D.cols.join(' '));
   t('강화는 진하고 약화는 옅다', await page.evaluate(() => {
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0); };
-    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '긍')
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '중')
       .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
     return g[0] < g[1] && g[1] < g[2];     // 강화 < 그냥 < 약화 (밝기)
   }));
-  t('누를 자리는 갈래 그대로', D.rs.every(r => ['확','긍','중','모','부','미지정'].includes(r)), D.rs.join('|'));
+  t('누를 자리는 갈래 그대로', D.rs.every(r => D.labels.includes(r)), D.rs.join('|'));
   /* 갈래 **안**에는 틈을 두지 않는다 — 틈이 있으면 다른 갈래처럼 보인다 (2026-10-25, 교수님 지적).
      갈래끼리의 틈보다 반드시 좁아야 한다. */
   t('갈래 안은 틈 없이 이어 붙는다', await page.evaluate(() => {
@@ -458,7 +455,7 @@ await page.waitForTimeout(250);
   t('좁은 조각은 바깥에 적는다', await page.evaluate(() => {
     const rows = state.rows, p = rows.find(x => getRating(x) === '부');
     /* 부를 한 명만 남겨 아주 좁은 조각을 만든다 */
-    rows.filter(x => getRating(x) === '부').slice(1).forEach(x => setRating(rKey(x), '모'));
+    rows.filter(x => getRating(x) === '부').slice(1).forEach(x => setRating(rKey(x), '중'));
     renderStats();
     const g = [...document.querySelectorAll('.pie__hit')].find(e => e.dataset.rs === '부');
     return !!g && g.querySelector('text').classList.contains('pie__sn--out');
@@ -468,13 +465,13 @@ await page.waitForTimeout(250);
     && document.querySelectorAll('.pie__lead').length > 0));
   /* 모두 매긴 자료에서 — 좁은 조각이 몇 되지 않을 때는 하나도 안 포개져야 한다 */
   t('바깥 숫자끼리 포개지지 않는다', await page.evaluate(() => {
-    const rows = state.rows, plan = [['확', 29], ['긍', 11], ['중', 12], ['모', 2], ['부', 1], ['비', 6]];
+    const rows = state.rows, plan = [['확', 29], ['중', 23], ['부', 3], ['비', 6]];
     state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
     let i = 0;
     for (const [rr, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), rr);
-    rows.filter(p => getRating(p) === '긍').slice(0, 5).forEach(p => sures().add(rKey(p)));
     rows.filter(p => getRating(p) === '중').slice(0, 6).forEach(p => sures().add(rKey(p)));
     rows.filter(p => getRating(p) === '중').slice(6, 7).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '부').slice(0, 1).forEach(p => sures().add(rKey(p)));
     renderStats();
     const r = [...document.querySelectorAll('.pie__sn--out')].map(e => e.getBoundingClientRect());
     if (r.length < 2) return false;      // 이 자료에서는 좁은 조각이 둘 이상 나와야 뜻이 있다
@@ -494,7 +491,7 @@ await page.waitForTimeout(250);
   t('빛깔 턱은 살짝만 — 같은 갈래로 보여야 한다', await page.evaluate(() => {
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
-    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '긍')
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '중')
       .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
     const d = Math.max(...g) - Math.min(...g);
     return d > 6 && d < 70;          // 눈에는 보이되 다른 색으로는 안 보일 만큼
@@ -516,15 +513,17 @@ await page.waitForTimeout(250);
 {
   const E = await page.evaluate(() => {
     state.ratings.clear(); sureSet = new Set();
-    const rows = state.rows, plan = [['확', 4], ['긍', 4], ['중', 4], ['모', 3], ['부', 2], ['비', 2]];
+    const rows = state.rows, plan = [['확', 4], ['중', 6], ['부', 5], ['비', 2]];
     let i = 0;
     for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
-    const 긍 = rows.filter(p => getRating(p) === '긍').slice(0, 2);
-    const 중 = rows.filter(p => getRating(p) === '중').slice(0, 2);
-    [...긍, ...중].forEach(p => sures().add(rKey(p)));
-    sureSave(); renderStats();
-    const want = 4 * .90 + 2 * .80 + 2 * .70 + 2 * .60 + 2 * .40 + 3 * .20 + 0 + 0;
-    const varr = 4 * .90 * .10 + 2 * .8 * .2 + 2 * .70 * .30 + 2 * .6 * .4 + 2 * .4 * .6 + 3 * .2 * .8;
+    rows.filter(p => getRating(p) === '중').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(2, 3).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '확').slice(0, 1).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '부').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    sureSave(); weakSave(); renderStats();
+    /* 확 3×.95 + 확−약 1×.85 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.15 + 부 3×0 */
+    const want = 3 * .95 + .85 + 2 * .65 + 3 * .50 + .35 + 2 * .15;
+    const varr = 3 * .95 * .05 + .85 * .15 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65 + 2 * .15 * .85;
     const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
     const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
     return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
@@ -538,29 +537,29 @@ await page.waitForTimeout(250);
   /* 무게가 바뀌면 숫자도 바뀐다 — 강화가 값을 올리는지 */
   const up = await page.evaluate(() => {
     const was = weightSum(state.rows.filter(p => getRating(p) !== '비'));
-    const p = state.rows.find(x => getRating(x) === '중' && !isSure(x));
+    const p = state.rows.find(x => getRating(x) === '중' && !isSure(x) && !isWeak(x));
     sures().add(rKey(p)); sureSave(); renderStats();
     const now = weightSum(state.rows.filter(q => getRating(q) !== '비'));
     return Math.round((now - was) * 100) / 100;
   });
-  t('중에 강화를 더하면 .2 만큼 오른다', up === 0.2, String(up));
+  t('중에 강화를 더하면 .15 만큼 오른다', up === 0.15, String(up));
   const up2 = await page.evaluate(() => {
     const was = weightSum(state.rows.filter(p => getRating(p) !== '비'));
-    const p = state.rows.find(x => getRating(x) === '긍' && !isSure(x));
+    const p = state.rows.find(x => getRating(x) === '부' && !isSure(x) && !isWeak(x));
     sures().add(rKey(p)); sureSave(); renderStats();
     return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
   });
-  t('긍에 강화를 더하면 .1 만큼 오른다', up2 === 0.1, String(up2));
+  t('부에 강화를 더하면 .15 만큼 오른다', up2 === 0.15, String(up2));
   t('확에 찍은 강화는 값을 안 올린다', await page.evaluate(() => {
     const p = state.rows.find(x => getRating(x) === '확');
     const was = weightOf(p); sures().add(rKey(p)); sureSave();
     return weightOf(p) === was;
   }));
-  t('모·부에 찍힌 강화도 무시한다', await page.evaluate(() => {
-    const a = state.rows.find(x => getRating(x) === '모'), b2 = state.rows.find(x => getRating(x) === '부');
-    const wa = weightOf(a), wb = weightOf(b2);
-    sures().add(rKey(a)); sures().add(rKey(b2)); sureSave();
-    return weightOf(a) === wa && weightOf(b2) === wb && wa === .2 && wb === 0;   // 모 .2 · 부 0
+  t('확에 찍힌 강화는 무시한다', await page.evaluate(() => {
+    const a = state.rows.find(x => getRating(x) === '확' && !isWeak(x));
+    const wa = weightOf(a);
+    sures().add(rKey(a)); sureSave();
+    return weightOf(a) === wa && wa === .95;        // 확실은 꼭대기라 강화가 안 먹는다
   }));
   const weightSumHere = await page.evaluate(() =>
     Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);
@@ -603,12 +602,12 @@ await page.waitForTimeout(250);
     X.rows.map(r => `${r.k} ${r.n}×${r.w}=${r.s}`).join(' / '));
   t('강화는 따로 줄을 세운다', X.rows.some(r => /\+강화$/.test(r.k)), X.rows.map(r => r.k).join('|'));
   t('굳은 쪽부터 차례로 적는다', await page.evaluate(() => {
-    const want = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부', '미지정'];
+    const want = ['확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부', '미지정'];
     const got = [...document.querySelectorAll('#explBox .expl__t tbody th')].map(e => e.textContent.trim());
     return got.join('|') === want.filter(k => got.includes(k)).join('|');
   }), X.rows.map(r => r.k).join('|'));
   t('띠도 같은 차례로 쌓는다', await page.evaluate(() => {
-    const want = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부'];
+    const want = ['확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부'];
     const got = [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]);
     return got.join('|') === want.filter(k => got.includes(k)).join('|');
   }), await page.evaluate(() => [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]).join('|')));
@@ -644,10 +643,10 @@ await page.waitForTimeout(250);
 {
   const L = await page.evaluate(() => {
     state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
-    const rows = state.rows, plan = [['확', 8], ['긍', 6], ['중', 6], ['모', 4], ['부', 2], ['비', 2]];
+    const rows = state.rows, plan = [['확', 8], ['중', 10], ['부', 6], ['비', 2]];
     let i = 0;
     for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
-    rows.filter(p => getRating(p) === '긍').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(0, 2).forEach(p => sures().add(rKey(p)));
     rows.filter(p => getRating(p) === '확').slice(0, 2).forEach(p => weaks().add(rKey(p)));
     sureSave(); weakSave(); renderStats();
     const li = [...document.querySelectorAll('.pie__li')];
@@ -687,10 +686,11 @@ t('비 막대가 옅은 회색', await page.evaluate(() => {
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   return max - min <= 20 && min >= 170;      // 색기 없이, 밝게
 }), await page.evaluate(() => getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor));
-t('모(회색)보다 옅다', await page.evaluate(() => {
+/* 2026-10-25 에 「모름」 갈래가 없어져 중(파랑)과 견준다 */
+t('중(파랑)보다 옅다', await page.evaluate(() => {
   const g = s => (getComputedStyle(document.querySelector(s)).backgroundColor.match(/\d+/g) || []).map(Number)[0];
-  return g('.sbar__seg--na') > g('.sbar__seg--low') + 40;
-}), await page.evaluate(() => [...document.querySelectorAll('.sbar__seg--na,.sbar__seg--low')].slice(0,2)
+  return g('.sbar__seg--na') > g('.sbar__seg--mid') + 40;
+}), await page.evaluate(() => [...document.querySelectorAll('.sbar__seg--na,.sbar__seg--mid')].slice(0,2)
   .map(e => getComputedStyle(e).backgroundColor).join(' / ')));
 t('옅은 바탕이라 숫자는 어둡게', await page.evaluate(() => {
   const d = document.createElement('canvas'); d.width = d.height = 1;
@@ -711,7 +711,7 @@ t('범례 네모도 같은 회색', await page.evaluate(() => {
 
 /* 맨 위 뜻풀이 — 한 글자는 빼고 뜻만, '비'는 「비참여」 (2026-10-09) */
 t('뜻만 적는다', await page.evaluate(() => [...document.querySelectorAll('.legend--names .legend__i')]
-  .map(e => e.textContent.trim()).join('|')) === '확실|긍정|보통|모름|부정|비참여',
+  .map(e => e.textContent.trim()).join('|')) === '확실|중간|부정|비참여',
   await page.evaluate(() => [...document.querySelectorAll('.legend--names .legend__i')].map(e => e.textContent.trim()).join('|')));
 t('한 글자를 앞에 달지 않는다', await page.evaluate(() =>
   !document.querySelector('.legend--names b')));

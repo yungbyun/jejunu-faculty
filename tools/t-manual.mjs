@@ -33,12 +33,13 @@ t('요일이 함께 보임', /[일월화수목금토]/.test(await page.evaluate(
 
 // 선호도별로 묶여 있다
 await page.evaluate(() => {
-  const v = ['확', '긍', '중', '모', '부', '비'];
-  state.rows.forEach((p, i) => setRating(rKey(p), v[i % 6]));
+  const v = CONFIG.RATINGS.LABELS;        // 갈래가 바뀌어도 따라간다 (2026-10-25: 넷)
+  state.rows.forEach((p, i) => setRating(rKey(p), v[i % v.length]));
   renderManual();
 });
 await page.waitForTimeout(700);
-t('선호도별로 묶임', await page.locator('.ms-g').count() >= 6, String(await page.locator('.ms-g').count()));
+t('선호도별로 묶임', await page.locator('.ms-g').count() >= await page.evaluate(() => CONFIG.RATINGS.LABELS.length),
+  String(await page.locator('.ms-g').count()));
 t('교수 전원이 칩으로', await page.evaluate(() => document.querySelectorAll('[data-mstoggle]').length === state.rows.length),
   String(await page.evaluate(() => document.querySelectorAll('[data-mstoggle]').length)));
 t('이름에 올리면 학과·직급과 순서가 뜬다', await page.evaluate(() => {

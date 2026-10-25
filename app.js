@@ -32,11 +32,14 @@ const CONFIG = {
   // ---- 선호도 저장 (Apps Script 웹 앱 URL. 비워 두면 브라우저에만 저장) ----
   RATINGS: {
     API_URL: 'https://script.google.com/macros/s/AKfycbxZ8o3y0cEJEC_GrrS_Pyor-CRtwEs3KTrtyfLrKG0qi6n2HA1DTgZ75Q0S3YIwii9-/exec',
-    // 선호도 값과 뜻. 비(평가제외)는 연구년 등으로 이번 평가에서 빠지는 경우
-    LABELS: ['확', '긍', '중', '모', '부', '비'],
-    NAMES: { '확': '확실', '긍': '긍정', '중': '보통', '모': '모름', '부': '부정', '비': '비참여' },
-    // 예전에 저장된 값(상/하)은 자동으로 새 값으로 읽음
-    LEGACY: { '상': '확', '하': '모' },
+    /* 선호도 값과 뜻. 비(평가제외)는 연구년 등으로 이번 평가에서 빠지는 경우.
+     * 2026-10-25 에 **여섯에서 셋으로** 줄였습니다(교수님 지정). 찍을 가능성을
+     * 확실 95 — 중간 50 — 부정 0 세 기둥으로 잡고, 그 사이는 **강화·약화**가 메웁니다.
+     * 사라진 둘은 자리를 옮겼습니다: **긍정 → 중간+강화**, **모름 → 부정+강화**. */
+    LABELS: ['확', '중', '부', '비'],
+    NAMES: { '확': '확실', '중': '중간', '부': '부정', '비': '비참여' },
+    // 예전에 저장된 값은 자동으로 새 값으로 읽음 (상/하는 2026-09, 긍/모는 2026-10-25)
+    LEGACY: { '상': '확', '하': '부', '긍': '중', '모': '부' },
     // 다른 기기에서 바꾼 선호도를 다시 읽는 주기(초). 화면이 보일 때만 동작
     SYNC_SEC: 60,
   },
@@ -1687,7 +1690,7 @@ function bindOutreach() {
 }
 
 /* ---------- 화면: 분석 (선호도 시각화) ---------- */
-const SCORE = { '확': 4, '긍': 3, '중': 2, '모': 1, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
+const SCORE = { '확': 4, '중': 2, '부': -1 }; // 비(평가제외)는 점수 없음 → 평균·키워드 분석에서 제외
 const hasScore = p => SCORE[getRating(p)] != null;
 const RLABELS = () => [...CONFIG.RATINGS.LABELS, '미지정'];
 const rcls = r => r === '미지정' ? 'none' : rClass(r);
@@ -1698,7 +1701,7 @@ let EXP_OPEN = false;    // 기대 카드의 풀이가 펴져 있는가 (2026-10
 /* 풀이가 있다는 표 — 물음표가 아니라 「펴짐/접힘」을 보이는 작은 쐐기다 */
 const EXPL_MARK = '<svg class="expl__v" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
   + '<path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
+const RCOLOR = { '확': '#38831c', '중': '#0a7ab0', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 /* 같은 빛깔을 **한 톤 진하게/옅게** 만든다 (2026-10-25) — 도넛에서 강화·약화를 가르는 데 쓴다.
  * 더하는 값이 음수면 검정 쪽으로, 양수면 흰 쪽으로 섞는다. 갈래 색은 그대로 알아보게 폭을 좁게 둔다.
@@ -1725,13 +1728,14 @@ function shade(hex, d) {
  * - **강화는 긍·중에서만** 올린다. 확은 이미 꼭대기이고, 모·부·미지정에 찍힌 강화는 뜻이
  *   맞지 않아 무시한다(실수로 찍혀도 셈이 흔들리지 않게).
  * 무게를 바꾸실 때는 아래 두 줄만 고치면 된다. */
-const W_RATE = { '확': .90, '긍': .70, '중': .40, '모': .20, '부': 0 };
-const W_SURE = { '긍': .80, '중': .60 };   // 강화가 붙었을 때의 값
-/* 약화가 붙었을 때의 값 (2026-10-25, 교수님 지정) — 확 .85 · 긍 .70 · 중 .30.
- * **긍은 .70 으로 그냥 긍(.70)과 같습니다** — 교수님이 그렇게 정하셨고, 그래서 긍에 약화를
- * 찍어도 셈은 달라지지 않습니다(표시로만 남습니다). 숫자를 가르려면 이 줄의 긍만 내리면 됩니다.
- * 모·부는 약화 자리가 없어 찍어도 그대로입니다. */
-const W_WEAK = { '확': .85, '긍': .70, '중': .30 };
+/* 세 기둥과, 강화·약화가 메우는 **일곱 칸 사다리** (2026-10-25, 교수님과 맞춘 값).
+ *   확실 .95 — 확실−약화 .85 — 중간+강화 .65 — 중간 .50 — 중간−약화 .35 — 부정+강화 .15 — 부정 0
+ * 규칙은 하나입니다: **강화·약화는 ±15%p**, 끝 칸에서는 안쪽으로만 움직입니다.
+ * 확실을 1.0 이 아니라 .95 로 둔 까닭은 그대로입니다 — 1.0 은 「절대 안 흔들림」이라는 뜻이
+ * 되어 흔들림 폭(`weightSd`)에 한 톨도 보태지 않아, 가장 큰 덩이가 통째로 변수에서 빠집니다. */
+const W_RATE = { '확': .95, '중': .50, '부': 0 };
+const W_SURE = { '중': .65, '부': .15 };   // 강화(위로) — 확실은 꼭대기라 자리가 없다
+const W_WEAK = { '확': .85, '중': .35 };   // 약화(아래로) — 부정은 바닥이라 자리가 없다
 const W_SAY = Object.entries(W_RATE).map(([r, w]) => {
   const x = [W_SURE[r] != null ? `강화 ${W_SURE[r]}` : '', W_WEAK[r] != null ? `약화 ${W_WEAK[r]}` : '']
     .filter(Boolean).join(', ');
@@ -1750,8 +1754,7 @@ const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
  * 차례는 **굳은 쪽부터**로 못 박았다 (2026-10-25, 교수님 지정) — 보탬이 큰 차례로 두면
  * 인원에 따라 줄이 들쭉날쭉 자리를 바꿔 눈이 따라가기 어렵다. 이 차례는 무게가 큰 차례이기도
  * 하다. 미지정은 셈에 안 들어가니 맨 끝이다. */
-const W_ORDER = ['확', '확-약화', '긍+강화', '긍', '긍-약화', '중+강화', '중', '중-약화',
-  '모', '부', '미지정'];
+const W_ORDER = ['확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부', '미지정'];
 function weightRows(profs) {
   const key = p => {
     const r = getRating(p) || '미지정';
@@ -1778,19 +1781,18 @@ function donut(profs) {
   const items = PIE_LABELS().map(r => ({ r, n: c[r] })).filter(x => x.n > 0);
   const total = items.reduce((a, b) => a + b.n, 0);
   if (!total) return '';
-  const sure = c['확'] || 0, pos = c['긍'] || 0, base = sure + pos;
+  /* 갈래가 셋이 된 뒤로 「확+긍」이 없어져 **확실 하나**가 지지 기반이다 (2026-10-25) */
+  const sure = c['확'] || 0, base = sure;
   const pct = n => Math.round(n / total * 100);
   const f1 = n => Number.isInteger(n) ? n : Math.round(n * 10) / 10;   // 환산 점수는 소수가 나온다
   /* 기준선은 모수의 절반(올림)이다. 66명이면 33명 — 이것은 '절반' 이지 '과반' 이 아니다.
    * 과반(절반을 넘음)은 34명부터이고, 33 대 33 이면 동수라 이기지 못한다. 그래도 눈에 익은
    * 숫자가 절반이어서 기준을 절반에 두고, 말도 절반이라고 쓴다.
-   * 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중·모다. 부(부정)는 세지
-   * 않는다 — 돌려세우는 것은 다른 일이다. */
-  /* 확+긍에 **중인 강화**를 더한 값 (2026-10-17, 사용자 지정. 전에는 중·모인 공략이었다).
-   * 「중(보통)인데 강화」는 **중립이지만 내 쪽으로 굳은 분**이라 지지로 셀 만합니다.
-   * - 확·긍인 강화는 이미 확+긍에 들어 있다 — 또 더하면 두 번 세는 것이다.
-   * - 모(모름)는 아직 어느 쪽인지 모르는 분이라 빼 둔다.
-   * - 부(부정)는 돌려세우는 것이 다른 일이라 세지 않는다(절반 계산에서도 줄곧 뺐다).
+   * 모수는 평가제외(비)를 뺀 인원이고, 더 끌어올 수 있는 사람은 중간이다. */
+  /* 확실에 **중간인데 강화**를 더한 값. 「중간인데 강화」는 **중립이지만 내 쪽으로 기운 분**
+   * (가능성 .65)이라 지지로 셀 만합니다.
+   * - 확실인 강화는 이미 확실에 들어 있다 — 또 더하면 두 번 세는 것이다.
+   * - 부정인 강화(.15)는 아직 상대 쪽이라 세지 않는다.
    * - 비(평가제외)는 모수(total)에서 빠진 사람이라 더하면 분자만 늘어 100%를 넘을 수 있다. */
   const PU_IN = ['중'];
   const puAdd = profs.filter(p => isSure(p) && PU_IN.includes(getRating(p)));
@@ -1798,16 +1800,15 @@ function donut(profs) {
   const reach = base + added;
   /* 왜 안 더했는지도 적어 둔다 — 숫자를 못 믿겠을 때 눌러(마우스를 올려) 확인하시라고 */
   const puCnt = r => profs.filter(p => isSure(p) && (getRating(p) || '미지정') === r).length;
-  const puDup = puCnt('확') + puCnt('긍');
   const puWhy = PU_IN.map(r => [r, puAdd.filter(p => getRating(p) === r).length])
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}`).join(' · ');
-  const puOut = [['확·긍(이미 셈)', puDup], ['모', puCnt('모')], ['부', puCnt('부')],
+  const puOut = [['확실(이미 셈)', puCnt('확')], ['부정', puCnt('부')],
     ['비참여', puCnt('비')], ['미지정', puCnt('미지정')]]
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}명`).join(' · ');
   /* 기대 표 수 — 비참여는 셈에서 뺀다(모수에서도 빠져 있다) */
   const voters = profs.filter(p => getRating(p) !== '비');
   const exp = weightSum(voters), sd = weightSd(voters);
-  const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
+  const midlow = c['중'] || 0, none = c['미지정'] || 0;
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
   /* 절반까지 몇 명인지를 따로 카드로 두지 않고 % 옆에 붙인다 (2026-09-25).
@@ -1885,7 +1886,7 @@ function donut(profs) {
   const vs = n => `<span class="pie__kv" title="내 표 ${f1(n)}명 vs 상대 표 ${f1(total - n)}명 — 상대 표는 모수 ${total}명에서 내 표를 뺀 나머지입니다(중·모·미지정까지 다 상대에게 간다고 본, 가장 모진 셈)">`
     + `<i>${f1(n)}</i> vs <i>${f1(total - n)}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
-  const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
+  const pool = none ? `중간 ${midlow}명 · 미지정 ${none}명 중에서` : `중간 ${midlow}명 중에서`;
   const R = 72, W = 24, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
@@ -1971,22 +1972,19 @@ function donut(profs) {
   return `
     <div class="pie">
       <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 중인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} , 찍을 확률로 환산한 기대 표 수는 ${f1(exp)}명으로 ${pct(exp)}%, 흔들림 폭은 ${f1(sd)}명. (평가제외 빼고 합계 ${total}명)">
+        aria-label="선호도 분포 — 확실 ${sure}명으로 ${pct(sure)}%${added ? `, 중간인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} , 찍을 확률로 환산한 기대 표 수는 ${f1(exp)}명으로 ${pct(exp)}%, 흔들림 폭은 ${f1(sd)}명. (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
         <text class="pie__n" x="100" y="100">${pct(sure)}%</text>
         <text class="pie__u" x="100" y="122">전체 ${total}명(절반 ${half}명)</text>
       </svg>
-      <div class="pie__kpi${profs.some(isSure) ? ' pie__kpi--4' : ''}">
+      <div class="pie__kpi">
         <div class="pie__k pie__k--high"><span class="pie__kl">확실 <i>${sure}</i></span>
           <b>${pct(sure)}%</b>
           ${vs(sure)}${gapLine(sure)}</div>
-        <div class="pie__k pie__k--pos"><span class="pie__kl">+긍정(${pos}) <i>${base}</i></span>
-          <b>${pct(base)}%</b>
-          ${vs(base)}${gapLine(base)}</div>
-        ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
-          <span class="pie__kl">+중-강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
+        ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확실 ${sure}명에 중간인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
+          <span class="pie__kl">+중간강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
           ${vs(reach)}${gapLine(reach)}</div>` : ''}
         <div class="pie__k pie__k--score" role="button" tabindex="0" data-expopen
           aria-expanded="${EXP_OPEN}" aria-controls="explBox"
@@ -2867,9 +2865,28 @@ function ratingSummary(d) {
   if (!parts.length && !fav) return '';
   return `<div class="drow__rates">${parts.map(([r, n]) => `<span class="rs rs--${rClass(r)}">${esc(r)} ${n}</span>`).join('')}${fav}</div>`;
 }
-const rClass = r => ({ '확': 'high', '긍': 'pos', '중': 'mid', '모': 'low', '부': 'neg', '비': 'na' }[r] || '');
+const rClass = r => ({ '확': 'high', '중': 'mid', '부': 'neg', '비': 'na' }[r] || '');
 /* 저장된 값을 현재 라벨로 정규화 (예전 값 상→확, 하→모; 모르는 값은 버림) */
 const normRating = v => { v = String(v || ''); return CONFIG.RATINGS.LEGACY[v] || (CONFIG.RATINGS.LABELS.includes(v) ? v : ''); };
+/* ---------- 옛 갈래를 사다리로 옮기기 (2026-10-25) ----------
+ * 갈래를 여섯에서 셋으로 줄이면서 **긍정 → 중간+강화**, **모름 → 부정+강화** 로 옮깁니다.
+ * 값은 `LEGACY` 가 알아서 바꿔 주지만 **강화 표시는 따로 찍어야** 합니다. 그래서 읽어 들일 때
+ * 옮겨진 분을 적어 두었다가(`ladderPend`) 다 읽고 나서 한꺼번에 찍습니다(`applyLadder`).
+ * **시트의 값도 새 값으로 올려 둡니다** — 안 올리면 다음에 읽을 때 또 옛 값이 와서, 교수님이
+ * 강화를 푸셔도 되살아납니다. 한 번 옮기고 나면 옛 값이 없으므로 그 뒤로는 아무 일도 안 합니다. */
+const LADDER_UP = { '긍': '중', '모': '부' };
+let ladderPend = new Set();
+const normRatingK = (k, v) => { if (LADDER_UP[String(v || '')]) ladderPend.add(k); return normRating(v); };
+function applyLadder(push) {
+  if (!ladderPend.size) return 0;
+  const keys = [...ladderPend];
+  ladderPend = new Set();
+  let n = 0;
+  keys.forEach(k => { if (!sures().has(k)) n++; sures().add(k); weaks().delete(k); });
+  if (n) { sureSave(); weakSave(); }
+  if (push) keys.forEach(k => { const v = state.ratings.get(k); if (v) saveEntry(k, { rating: v }); });
+  return n;
+}
 
 /* ---------- 관심 교수 ----------
  * 카드 왼쪽 위의 동그란 버튼으로 켜고 끕니다. 퀴즈 설정과 같은 길(settings 탭)로 저장되므로
@@ -3415,17 +3432,18 @@ function applyEntry(key, e) {
 function loadRatingsCache() {
   try {
     const m = JSON.parse(localStorage.getItem(ratingsCacheKey()) || '{}');
-    state.ratings = new Map(Object.entries(m).map(([k, v]) => [k, normRating(v)]).filter(([, v]) => v));
+    state.ratings = new Map(Object.entries(m).map(([k, v]) => [k, normRatingK(k, v)]).filter(([, v]) => v));
     // 로그인 기능이 켜지기 전(계정 구분 없이) 이 기기에 저장된 선호도가 있으면 현재 계정으로 합친다
     if (state.session) {
       const legacy = JSON.parse(localStorage.getItem('jnu-ratings:local') || 'null');
       if (legacy && typeof legacy === 'object') {
         let n = 0;
-        for (const [k, v] of Object.entries(legacy)) { const nv = normRating(v); if (nv && !state.ratings.has(k)) { state.ratings.set(k, nv); n++; } }
+        for (const [k, v] of Object.entries(legacy)) { const nv = normRatingK(k, v); if (nv && !state.ratings.has(k)) { state.ratings.set(k, nv); n++; } }
         localStorage.removeItem('jnu-ratings:local');
         if (n) saveRatingsCache();
       }
     }
+    applyLadder(false);      // 이 기기에 쌓인 값부터 옮긴다 (시트는 아래 맞춤에서)
   } catch { state.ratings = new Map(); }
   try {
     const m = JSON.parse(localStorage.getItem(notesCacheKey()) || '{}');
@@ -3493,7 +3511,9 @@ async function syncRatings({ initial = false } = {}) {
     applySettings(r.settings);
     applyAiEdits(r.airewrites);
     const server = new Map();
-    r.ratings.forEach(x => { const e = { rating: normRating(x.rating), met: normMet(x.met), memo: normMemo(x.memo) }; if (!entryEmpty(e)) server.set(`${x.dept_id}/${x.slug}`, e); });
+    r.ratings.forEach(x => { const k2 = `${x.dept_id}/${x.slug}`;
+      const e = { rating: normRatingK(k2, x.rating), met: normMet(x.met), memo: normMemo(x.memo) };
+      if (!entryEmpty(e)) server.set(k2, e); });
     const locked = k => sync.pending.has(k) || sync.dirty.has(k) || sync.queue.has(k);
     // 3) 이 기기에만 있는 기록(시트 연동 전에 적은 것 등)은 시트로 올림
     const keys = new Set([...state.ratings.keys(), ...state.notes.keys()]);
@@ -3502,8 +3522,10 @@ async function syncRatings({ initial = false } = {}) {
     const changed = [];
     for (const [k, e] of server) if (!locked(k) && !entryEq(entryOf(k), e)) { applyEntry(k, e); changed.push(k); }
     for (const k of keys) if (!server.has(k) && !locked(k) && !localOnly.some(([lk]) => lk === k)) { applyEntry(k, { rating: '', met: 0, memo: '' }); changed.push(k); }
+    const moved = applyLadder(true);     // 옛 갈래를 강화로 찍고 시트 값도 새 값으로
     saveRatingsCache();
     sync.last = Date.now();
+    if (moved) flashStatus(`옛 갈래 ${moved}명을 새 사다리로 옮겼습니다 — 긍정은 중간+강화, 모름은 부정+강화`);
     if (initial) render();
     else if (changed.length) { const v = route().view; if (v === 'dept') changed.forEach(k => refreshRatingUI(k, state.ratings.get(k) || '')); else if (v !== 'quiz') render(); flashStatus(`다른 기기의 기록 ${changed.length}건을 반영했습니다`); }
     let n = 0;
@@ -4103,7 +4125,7 @@ function relBridges(target, g) {
     if (!m) return;
     const p = state.rows.find(x => rKey(x) === o);
     const r = p ? getRating(p) : '';
-    const score = (isVip(p) ? 4 : 0) + (isSure(p) ? 2 : 0) + ({ '확': 3, '긍': 2, '중': 1 }[r] || 0)
+    const score = (isVip(p) ? 4 : 0) + (isSure(p) ? 2 : 0) + ({ '확': 3, '중': 1 }[r] || 0)
       + (m.pol > 0 ? 2 : 0) + (e.pol > 0 ? 1 : 0) + (e.kind === 'memo' ? 1 : 0);
     out.push({ key: o, name: p ? p.name : o, mine: m, theirs: e, score });
   });

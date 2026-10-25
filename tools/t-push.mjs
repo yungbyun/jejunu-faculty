@@ -16,8 +16,8 @@ const reset = () => page.evaluate(() => {
   vipSet = new Set(); localStorage.removeItem('jnu-vip');
   favSet = new Set(); localStorage.removeItem('jnu-fav');
   state.ratings.clear(); state.notes.clear();
-  const v = ['확', '긍', '중', '모', '부', '비'];
-  state.rows.forEach((p, i) => state.ratings.set(rKey(p), v[i % 6]));
+  const v = CONFIG.RATINGS.LABELS;
+  state.rows.forEach((p, i) => state.ratings.set(rKey(p), v[i % v.length]));
   location.hash = '#/stats'; render();
 });
 await reset();
@@ -206,17 +206,55 @@ const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
   sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
   return w;
 }, [r, mark]);
-t('확에 약화를 찍으면 .90 → .85', await wOf('확', '') === .9 && await wOf('확', 'weak') === .85,
+t('확에 약화를 찍으면 .95 → .85', await wOf('확', '') === .95 && await wOf('확', 'weak') === .85,
   `${await wOf('확', '')} → ${await wOf('확', 'weak')}`);
-t('중에 약화를 찍으면 .40 → .30', await wOf('중', '') === .4 && await wOf('중', 'weak') === .3,
+t('중에 약화를 찍으면 .50 → .35', await wOf('중', '') === .5 && await wOf('중', 'weak') === .35,
   `${await wOf('중', '')} → ${await wOf('중', 'weak')}`);
 /* 긍의 약화는 교수님이 **그냥 긍과 같은 .70** 으로 정하셨다 — 표시로만 남고 셈은 안 바뀐다 */
-t('긍에 약화를 찍으면 .70 그대로', await wOf('긍', 'weak') === .7, String(await wOf('긍', 'weak')));
-t('긍에 강화를 찍으면 .70 → .80', await wOf('긍', 'sure') === .8, String(await wOf('긍', 'sure')));
+t('중에 강화를 찍으면 .50 → .65', await wOf('중', 'sure') === .65, String(await wOf('중', 'sure')));
+t('부에 강화를 찍으면 0 → .15', await wOf('부', 'sure') === .15, String(await wOf('부', 'sure')));
 t('부에 약화를 찍어도 0 그대로', await wOf('부', 'weak') === 0, String(await wOf('부', 'weak')));
-t('모에 약화를 찍어도 .20 그대로', await wOf('모', 'weak') === .2, String(await wOf('모', 'weak')));
+t('확에 강화를 찍어도 .95 그대로 — 꼭대기다', await wOf('확', 'sure') === .95, String(await wOf('확', 'sure')));
 t('settings 의 weak 키로도 등록', await page.evaluate(() =>
   SET_KEYS.includes('weak') && SET_LABEL['weak'] === '약화'));
+/* ---------- 옛 갈래를 사다리로 옮기기 (2026-10-25) ----------
+ * 갈래가 여섯에서 셋으로 줄면서 **긍정 → 중간+강화**, **모름 → 부정+강화** 로 옮긴다.
+ * 쌓아 둔 자료가 걸린 일이라 꼼꼼히 본다. */
+t('갈래는 넷뿐이다', await page.evaluate(() => CONFIG.RATINGS.LABELS.join()) === '확,중,부,비',
+  await page.evaluate(() => CONFIG.RATINGS.LABELS.join()));
+t('옛 값 긍정은 중간으로 읽는다', await page.evaluate(() => normRating('긍')) === '중');
+t('옛 값 모름은 부정으로 읽는다', await page.evaluate(() => normRating('모')) === '부');
+t('더 옛 값(상·하)도 그대로 읽는다', await page.evaluate(() =>
+  normRating('상') === '확' && normRating('하') === '부'));
+t('옮겨진 분은 강화로 찍힌다', await page.evaluate(() => {
+  sureSet = new Set(); weakSet = new Set(); ladderPend = new Set();
+  const a2 = rKey(state.rows[0]), b2 = rKey(state.rows[1]);
+  const v1 = normRatingK(a2, '긍'), v2 = normRatingK(b2, '모');
+  const n = applyLadder(false);
+  return v1 === '중' && v2 === '부' && n === 2 && sures().has(a2) && sures().has(b2);
+}));
+t('옮기면서 약화 표시는 지운다', await page.evaluate(() => {
+  sureSet = new Set(); weakSet = new Set(); ladderPend = new Set();
+  const k2 = rKey(state.rows[2]);
+  weaks().add(k2);
+  normRatingK(k2, '긍'); applyLadder(false);
+  return sures().has(k2) && !weaks().has(k2);
+}));
+t('두 번 돌려도 그대로 — 되풀이해도 안전하다', await page.evaluate(() => {
+  sureSet = new Set(); weakSet = new Set(); ladderPend = new Set();
+  const k2 = rKey(state.rows[3]);
+  normRatingK(k2, '긍'); applyLadder(false);
+  const n1 = sures().size;
+  normRatingK(k2, '긍'); const n2 = applyLadder(false);
+  return n1 === 1 && sures().size === 1 && n2 === 0;
+}));
+t('새 값에는 손대지 않는다', await page.evaluate(() => {
+  ladderPend = new Set();
+  ['확', '중', '부', '비'].forEach((r, i) => normRatingK(rKey(state.rows[i]), r));
+  return ladderPend.size === 0;
+}));
+await page.evaluate(() => { sureSet = new Set(); weakSet = new Set(); ladderPend = new Set();
+  localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); });
 /* 분석 칩 — 약화는 바탕을 **기본보다 더 비운다** (2026-10-25, 교수님 지정).
    밝은 화면에서는 거의 흰빛, 어두운 화면에서는 바탕 쪽으로 가라앉는다. */
 for (const theme of ['light', 'dark']) {
@@ -224,7 +262,7 @@ for (const theme of ['light', 'dark']) {
     document.documentElement.setAttribute('data-theme', th);
     state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
     const rows = state.rows;
-    rows.slice(0, 9).forEach(p => setRating(rKey(p), '긍'));
+    rows.slice(0, 9).forEach(p => setRating(rKey(p), '중'));
     rows.slice(0, 3).forEach(p => sures().add(rKey(p)));
     rows.slice(3, 6).forEach(p => weaks().add(rKey(p)));
     sureSave(); weakSave();
@@ -270,9 +308,9 @@ t('강화 글자도 그대로', (await page.locator('[data-surebtn] span').inner
 t('단추에 그 선호도 색이 실린다', await page.evaluate(() => {
   const p = state.rows[0], get = () => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc').trim();
   setRating(rKey(p), '부'); const a = get();
-  setRating(rKey(p), '긍'); const b = get();
+  setRating(rKey(p), '중'); const b = get();
   setRating(rKey(p), ''); const c = get();
-  return a === RCOLOR['부'] && b === RCOLOR['긍'] && c === '';
+  return a === RCOLOR['부'] && b === RCOLOR['중'] && c === '';
 }), await page.evaluate(() => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc')));
 t('선호도가 없으면 무채색으로, 글자는 읽힌다', await page.evaluate(() => {
   const btn = document.querySelector('[data-vipbtn]');
@@ -455,7 +493,7 @@ await page.evaluate(() => {
 for (const theme of ['light', 'dark']) {
   const got = await page.evaluate(th => {
     document.documentElement.setAttribute('data-theme', th);
-    const R = ['확', '긍', '중', '모', '부', '비'];
+    const R = CONFIG.RATINGS.LABELS;
     sureSet = new Set(); pushSet = new Set(); vipSet = new Set();
     state.rows.forEach((p, i) => applyEntry(rKey(p), { rating: R[i % 6] }));
     R.forEach(r => {

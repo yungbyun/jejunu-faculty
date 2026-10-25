@@ -19,8 +19,13 @@ t('건축학과 4명', await page.evaluate(()=>state.rows.filter(p=>p.dept_name=
 const info = await page.evaluate(()=>{ const p=state.rows.find(x=>x.name==='좌정우'); state.ratings.delete(rKey(p)); return {k:rKey(p), h:`#/dept/${p.dept_id}/prof/${p.slug}`}; });
 await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('.rate--wide',{timeout:10000});
-t('선호도 단추 6개', await page.locator('.rate--wide .rate__b').count()===6, String(await page.locator('.rate--wide .rate__b').count()));
-t('확·긍·중·모·부·비 순서', await page.evaluate(()=>[...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join(''))==='확긍중모부비');
+t('선호도 단추는 설정한 갈래 수만큼', await page.locator('.rate--wide .rate__b').count()
+  === await page.evaluate(()=>CONFIG.RATINGS.LABELS.length), String(await page.locator('.rate--wide .rate__b').count()));
+/* 2026-10-25 에 갈래가 넷으로 줄었다(확·중·부·비). 설정을 그대로 따라가는지 본다 */
+t('설정한 갈래 차례 그대로', await page.evaluate(()=>
+  [...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join('')
+  === CONFIG.RATINGS.LABELS.join('')),
+  await page.evaluate(()=>[...document.querySelectorAll('.rate--wide .rate__b')].map(b=>b.dataset.val).join('')));
 t('글자만 (이름 없음)', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').textContent.trim())==='확');
 t('뜻은 도움말로', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b').getAttribute('title'))==='확실');
 
@@ -38,14 +43,14 @@ t('− 로 줄어듦', await page.evaluate(k=>getNote(k).met===1, dk));
 t('화면 숫자도 같이', await page.evaluate(()=>document.querySelector('#drawer .counter__n').textContent)==='1');
 
 // 2) 고르면 저장된다
-await page.locator('.rate--wide .rate__b[data-val="긍"]').click();
+await page.locator('.rate--wide .rate__b[data-val="중"]').click();
 await page.waitForTimeout(400);
-t('고르면 저장됨', await page.evaluate(k=>getRatingByKey(k)==='긍', info.k));
-t('고른 것이 눌린 상태', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b[data-val="긍"]').getAttribute('aria-pressed'))==='true');
+t('고르면 저장됨', await page.evaluate(k=>getRatingByKey(k)==='중', info.k));
+t('고른 것이 눌린 상태', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b[data-val="중"]').getAttribute('aria-pressed'))==='true');
 t('다른 것은 안 눌림', await page.evaluate(()=>document.querySelector('.rate--wide .rate__b[data-val="확"]').getAttribute('aria-pressed'))==='false');
 
 // 3) 다시 누르면 해제
-await page.locator('.rate--wide .rate__b[data-val="긍"]').click();
+await page.locator('.rate--wide .rate__b[data-val="중"]').click();
 await page.waitForTimeout(400);
 t('다시 누르면 해제', await page.evaluate(k=>!getRatingByKey(k), info.k));
 
@@ -81,7 +86,7 @@ t('폰에서 누를 때 회색 네모 없음', await page.evaluate(()=>{
 }), await page.evaluate(()=>getComputedStyle(document.querySelector('.rate--wide .rate__b')).webkitTapHighlightColor));
 t('고른 단추에 덧고리 없음', await page.evaluate(()=>
   getComputedStyle(document.querySelector('.rate--wide .rate__b[aria-pressed="true"]')).boxShadow === 'none'));
-// 학과 카드의 선호도 여섯 개는 어떤 폭에서도 한 줄
+// 학과 카드의 선호도 단추는 어떤 폭에서도 한 줄 (2026-10-25: 여섯 → 넷)
 for (const w of [300, 320, 360, 390]) {
   await page.setViewportSize({ width: w, height: 900 });
   await page.evaluate(()=>{ location.hash='#/dept/comdol'; render(); });
@@ -89,9 +94,9 @@ for (const w of [300, 320, 360, 390]) {
   const r = await page.evaluate(()=>{
     const bs=[...document.querySelectorAll('.prof .rate')[0].querySelectorAll('.rate__b')];
     const ys=new Set(bs.map(b=>Math.round(b.getBoundingClientRect().y)));
-    return { n:bs.length, 줄:ys.size, 끝:Math.round(bs[bs.length-1].getBoundingClientRect().right), vw:innerWidth };
+    return { n:bs.length, want:CONFIG.RATINGS.LABELS.length, 줄:ys.size, 끝:Math.round(bs[bs.length-1].getBoundingClientRect().right), vw:innerWidth };
   });
-  t(`카드 선호도 ${w}px 에서 한 줄`, r.n===6 && r.줄===1 && r.끝<=r.vw, `${r.n}개 ${r.줄}줄 끝=${r.끝}/${r.vw}`);
+  t(`카드 선호도 ${w}px 에서 한 줄`, r.n===r.want && r.줄===1 && r.끝<=r.vw, `${r.n}개 ${r.줄}줄 끝=${r.끝}/${r.vw}`);
 }
 await page.setViewportSize({ width: 1440, height: 1000 });
 await page.waitForTimeout(200);
