@@ -1697,6 +1697,34 @@ const rcls = r => r === '미지정' ? 'none' : rClass(r);
 const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 
+/* ---------- 기대 표 수 (옛 이름 「환산 점수」) ----------
+ * 머릿수만 세면 '확실 한 명'과 '보통 한 명'이 같은 무게가 된다. 사람마다 **나를 찍을 확률**을
+ * 주고 더한 값이다. 2026-10-24 에 처음 넣었고(확 1 · 긍 .7/강 .9 · 중 .5/강 .7 · 모·부 0),
+ * 2026-10-25 에 교수님과 다시 맞추었다:
+ *   확 .95 · 긍 .75(강화 .80) · 중 .40(강화 .60) · 모 .20 · 부 0 · 미지정 0
+ *   비참여는 셈에서도 모수에서도 아예 빠진다(투표를 안 하실 분).
+ * - **모 .20** — 만나 보고도 모르겠는 분은 다섯에 하나쯤 내 쪽일 수 있다는 뜻.
+ * - **미지정 0** — 「모름」은 만나 보고 내린 판단이지만 「미지정」은 아직 판단조차 안 한 것이다.
+ *   만나지도 않은 분을 2할 지지로 세면 숫자가 저절로 부푼다.
+ * - **확 1.0 이 아니라 .95** — 1.0 은 「절대 안 흔들림」이라는 뜻이라 흔들림 폭(`weightSd`)에
+ *   한 톨도 보태지 않는다. 약속하신 분도 출장·건강·변심으로 빠질 수 있다.
+ * - **강화는 긍·중에서만** 올린다. 확은 이미 꼭대기이고, 모·부·미지정에 찍힌 강화는 뜻이
+ *   맞지 않아 무시한다(실수로 찍혀도 셈이 흔들리지 않게).
+ * 무게를 바꾸실 때는 아래 두 줄만 고치면 된다. */
+const W_RATE = { '확': .95, '긍': .75, '중': .40, '모': .20, '부': 0 };
+const W_SURE = { '긍': .80, '중': .60 };   // 강화가 붙었을 때의 값
+const W_SAY = Object.entries(W_RATE)
+  .map(([r, w]) => `${r} ${w}${W_SURE[r] != null ? `(강화 ${W_SURE[r]})` : ''}`).join(' · ');
+function weightOf(p) {
+  const r = getRating(p);
+  if (!r || W_RATE[r] == null) return 0;         // 미지정·비참여는 0
+  return isSure(p) && W_SURE[r] != null ? W_SURE[r] : W_RATE[r];
+}
+const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
+/* 흔들림 폭. 저마다 따로 움직인다고 보면 분산은 Σp(1−p) 다(베르누이의 합).
+ * 뿌리를 씌워 ± 로 적는다 — 기대값 하나보다 「얼마나 안심해도 되는지」가 보인다. */
+const weightSd = profs => Math.sqrt(profs.reduce((a, p) => { const w = weightOf(p); return a + w * (1 - w); }, 0));
+
 function donut(profs) {
   const c = dist(profs);
   const items = PIE_LABELS().map(r => ({ r, n: c[r] })).filter(x => x.n > 0);
@@ -1704,6 +1732,7 @@ function donut(profs) {
   if (!total) return '';
   const sure = c['확'] || 0, pos = c['긍'] || 0, base = sure + pos;
   const pct = n => Math.round(n / total * 100);
+  const f1 = n => Number.isInteger(n) ? n : Math.round(n * 10) / 10;   // 환산 점수는 소수가 나온다
   /* 기준선은 모수의 절반(올림)이다. 66명이면 33명 — 이것은 '절반' 이지 '과반' 이 아니다.
    * 과반(절반을 넘음)은 34명부터이고, 33 대 33 이면 동수라 이기지 못한다. 그래도 눈에 익은
    * 숫자가 절반이어서 기준을 절반에 두고, 말도 절반이라고 쓴다.
@@ -1727,6 +1756,9 @@ function donut(profs) {
   const puOut = [['확·긍(이미 셈)', puDup], ['모', puCnt('모')], ['부', puCnt('부')],
     ['비참여', puCnt('비')], ['미지정', puCnt('미지정')]]
     .filter(x => x[1]).map(([r, n]) => `${r} ${n}명`).join(' · ');
+  /* 기대 표 수 — 비참여는 셈에서 뺀다(모수에서도 빠져 있다) */
+  const voters = profs.filter(p => getRating(p) !== '비');
+  const exp = weightSum(voters), sd = weightSd(voters);
   const midlow = (c['중'] || 0) + (c['모'] || 0), none = c['미지정'] || 0;
   const half = Math.ceil(total / 2);   // 66명이면 33명 (홀수면 올림 — 65명도 33명)
   const need = half - base;
@@ -1740,21 +1772,36 @@ function donut(profs) {
     const d = n - half;
     const num = (cls, txt) => `<em class="pie__kg pie__kg--${cls}">${txt}</em>`;
     const body = d === 0 ? '딱 맞음'
-      : d < 0 ? `${num('short', -d)}명 부족`
-      : `${num('over', d)}명 초과`;
+      : d < 0 ? `${num('short', f1(-d))}명 부족`
+      : `${num('over', f1(d))}명 초과`;
     /* 괄호 안은 **윗줄 두 수의 차**입니다 (2026-10-20, 사용자 지정) — 29 vs 34 면 5명 차.
      * 절반까지 모자란 몫의 갑절쯤 됩니다. 한 표가 넘어오면 내 쪽은 하나 늘고 상대 쪽은
      * 하나 줄어, 차는 둘씩 좁혀지기 때문입니다. */
-    const dif = Math.abs(n - (total - n));
-    const say = d === 0 ? '과 같습니다' : d < 0 ? `보다 ${-d}명 모자랍니다` : `를 ${d}명 넘습니다`;
-    return `<span class="pie__kn" title="${n}명은 절반 ${half}명${say} — 상대 ${total - n}명과는 ${dif}명 차입니다">`
+    const dif = f1(Math.abs(n - (total - n)));
+    const say = d === 0 ? '과 같습니다' : d < 0 ? `보다 ${f1(-d)}명 모자랍니다` : `를 ${f1(d)}명 넘습니다`;
+    return `<span class="pie__kn" title="${f1(n)}명은 절반 ${half}명${say} — 상대 ${f1(total - n)}명과는 ${dif}명 차입니다">`
       + `${body}<span class="pie__kd">(${dif}명 차)</span></span>`;
   };
+  /* 기대 카드의 맨 아랫줄 — 절반과의 거리와 **흔들림 폭(±)**. 폭과 견주어 얼마나 든든한지도
+     말풍선에 말로 적는다. 숫자 하나보다 「얼마나 안심해도 되는지」가 보인다. */
+  const expLine = () => {
+    const d = exp - half, k = sd > .05 ? Math.abs(d) / sd : 9;
+    const body = Math.abs(d) < .05 ? '딱 맞음'
+      : d < 0 ? `<em class="pie__kg pie__kg--short">${f1(-d)}</em>명 부족`
+      : `<em class="pie__kg pie__kg--over">${f1(d)}</em>명 초과`;
+    const feel = Math.abs(d) < .05 ? '동수입니다'
+      : k >= 2 ? (d > 0 ? '흔들림을 넉넉히 넘어 든든합니다' : '흔들림으로 메우기 어렵습니다')
+      : k >= 1 ? '흔들림 폭 안팎이라 아슬아슬합니다'
+      : '흔들림 폭 안이라 아직 알 수 없습니다';
+    return `<span class="pie__kn" title="기대 ${f1(exp)}명은 절반 ${half}명을 ${d < 0 ? `${f1(-d)}명 밑돕니다` : `${f1(d)}명 넘습니다`} — 흔들림 폭(±${f1(sd)})의 ${f1(k)}배라 ${feel}">`
+      + `${body}<span class="pie__kd">(± ${f1(sd)})</span></span>`;
+  };
+
   /* 내 표와 상대 표를 맞세워 적는다 (2026-10-19, 사용자 지정).
    * 상대 표는 모수에서 내 표를 뺀 나머지다 — 중·모·미지정까지 다 상대에게 간다고 보는,
    * 가장 모질게 잡은 셈이다. 그래서 두 숫자를 더하면 늘 모수(total)가 된다. */
-  const vs = n => `<span class="pie__kv" title="내 표 ${n}명 vs 상대 표 ${total - n}명 — 상대 표는 모수 ${total}명에서 내 표를 뺀 나머지입니다(중·모·미지정까지 다 상대에게 간다고 본, 가장 모진 셈)">`
-    + `<i>${n}</i> vs <i>${total - n}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
+  const vs = n => `<span class="pie__kv" title="내 표 ${f1(n)}명 vs 상대 표 ${f1(total - n)}명 — 상대 표는 모수 ${total}명에서 내 표를 뺀 나머지입니다(중·모·미지정까지 다 상대에게 간다고 본, 가장 모진 셈)">`
+    + `<i>${f1(n)}</i> vs <i>${f1(total - n)}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중·모 ${midlow}명 · 미지정 ${none}명 중에서` : `중·모 ${midlow}명 중에서`;
   const R = 72, W = 24, CX = 100, CY = 112;
@@ -1782,14 +1829,14 @@ function donut(profs) {
   return `
     <div class="pie">
       <svg class="pie__svg" viewBox="0 0 200 138" role="img"
-        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 중인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} (평가제외 빼고 합계 ${total}명)">
+        aria-label="선호도 분포 — 확 ${sure}명으로 ${pct(sure)}%, 확과 긍을 합하면 ${base}명으로 ${pct(base)}%${added ? `, 중인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} , 찍을 확률로 환산한 기대 표 수는 ${f1(exp)}명으로 ${pct(exp)}%, 흔들림 폭은 ${f1(sd)}명. (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
         ${arcs}
         <text class="pie__n" x="100" y="100">${pct(sure)}%</text>
         <text class="pie__u" x="100" y="122">전체 ${total}명(절반 ${half}명)</text>
       </svg>
-      <div class="pie__kpi">
+      <div class="pie__kpi${profs.some(isSure) ? ' pie__kpi--4' : ''}">
         <div class="pie__k pie__k--high"><span class="pie__kl">확실 <i>${sure}</i></span>
           <b>${pct(sure)}%</b>
           ${vs(sure)}${gapLine(sure)}</div>
@@ -1798,7 +1845,10 @@ function donut(profs) {
           ${vs(base)}${gapLine(base)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
           <span class="pie__kl">+중-강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
-          ${vs(reach)}${gapLine(reach)}</div>` : ''}   <!-- 모수(/N명)는 옆 카드에 이미 있어 뺐다 -->
+          ${vs(reach)}${gapLine(reach)}</div>` : ''}
+        <div class="pie__k pie__k--score" title="사람마다 「나를 찍을 확률」을 주어 더한 값입니다 — ${W_SAY}. 비참여는 셈에서도 모수에서도 빠지고, 아직 안 매긴 ${none}명은 0 으로 둡니다. ± 는 흔들림 폭입니다.">
+          <span class="pie__kl">기대 <i>${f1(exp)}</i></span><b>${pct(exp)}%</b>
+          ${vs(Math.round(exp))}${expLine()}</div>
       </div>
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">

@@ -637,6 +637,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__pool{margin:0;text-align:center;font-size:12px;font-weight:600;color:var(--ink-2);max-width:440px}
 .pie__pool b{color:var(--ink-2)}
 .pie__k--push b{color:var(--push)}
+/* 칸이 넷이면 좁은 화면에서는 둘씩 두 줄로 세운다 — 넷을 한 줄에 밀어 넣으면 글이 깨진다 */
+.pie__kpi--4{max-width:560px}
+@media (max-width:620px){ .pie__kpi--4 .pie__k{flex:1 1 42%} }
+/* 넷째 카드 — 환산 점수(굳기를 반영해 더한 값). 머릿수가 아니라 점수라 빛깔을 달리한다 */
+.pie__k--score b{color:var(--brand)}
+.pie__k--score{border-color:color-mix(in srgb,var(--brand) 22%,var(--line))}
 /* 테두리는 **둘째 카드(확실+긍정)** 에 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다).
    지지 기반이 어디까지인지가 눈이 먼저 가야 할 자리라서다. 테두리 빛깔은 그 카드의
    숫자 빛깔(긍정)에 맞춘다. */

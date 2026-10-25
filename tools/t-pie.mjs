@@ -294,30 +294,30 @@ t('테두리는 둘째 카드에만', await page.evaluate(() => {
 
 /* 괄호 안은 윗줄 「내 표 vs 상대 표」 두 수의 차 (2026-10-20, 사용자 지정) */
 t('괄호 안은 윗줄 두 수의 차', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__k')].every(k => {
+  [...document.querySelectorAll('.pie__k:not(.pie__k--score)')].every(k => {
     const [a, c] = k.querySelector('.pie__kv').textContent.split('vs').map(x => +x.trim());
     return k.querySelector('.pie__kd').textContent === `(${Math.abs(a - c)}명 차)`;
   })),
   await page.evaluate(() => [...document.querySelectorAll('.pie__k')]
     .map(k => k.querySelector('.pie__kv').textContent + ' → ' + k.querySelector('.pie__kd').textContent).join(' | ')));
 t('차는 모자란 몫의 갑절쯤', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__k')].every(k => {
+  [...document.querySelectorAll('.pie__k:not(.pie__k--score)')].every(k => {
     const gap = +(k.querySelector('.pie__kg') || { textContent: '0' }).textContent;
     const dif = +k.querySelector('.pie__kd').textContent.replace(/\D/g, '');
     return Math.abs(dif - gap * 2) <= 1;
   })),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kn')].map(e => e.textContent).join(' | ')));
-t('세 카드 이름은 「이름 인원」', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+중-강화\(\d+\)) \d+$/.test(e.textContent.trim()))),
+t('카드 이름은 「이름 인원」', await page.evaluate(() =>
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+긍정\(\d+\)|\+중-강화\(\d+\)|기대) [\d.]+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
 /* 카드 이름 — 「확실」 · 「+긍정(N)」 · 「+중-강화(N)」, 뒤에 「= 인원」 (2026-10-20, 사용자 지정) */
 const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
-  .map(e => e.textContent.trim().replace(/ \d+$/, '')).join('|'));
-t('강화가 없으면 카드는 둘', /^확실\|\+긍정\(\d+\)$/.test(await klHead()), await klHead());
+  .map(e => e.textContent.trim().replace(/ [\d.]+$/, '')).join('|'));
+t('강화가 없으면 카드는 셋', /^확실\|\+긍정\(\d+\)\|기대$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('카드 이름 셋', /^확실\|\+긍정\(\d+\)\|\+중-강화\(\d+\)$/.test(await klHead()), await klHead());
+t('카드 이름 넷', /^확실\|\+긍정\(\d+\)\|\+중-강화\(\d+\)\|기대$/.test(await klHead()), await klHead());
 t('둘째 이름의 괄호는 긍정 인원', await page.evaluate(() =>
   document.querySelector('.pie__k--pos .pie__kl').textContent.startsWith(
     `+긍정(${state.rows.filter(p => getRating(p) === '긍').length})`)),
@@ -374,23 +374,88 @@ await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) =
 await page.setViewportSize({ width: 390, height: 1200 });   /* 이 시험은 1440px 에서 돈다 */
 await page.waitForTimeout(250);
 const phone = await lay();
-t('카드는 셋', phone.n === 3, `${phone.n}장`);
-t('폰에서도 한 줄에 선다', phone.rows === 1 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
+/* 2026-10-25 에 「기대」 칸이 더해져 넷이 되었다. 폰에서는 넷을 한 줄에 밀어 넣으면
+   글이 깨지므로 **둘씩 두 줄**로 세운다(`.pie__kpi--4`). */
+t('카드는 넷', phone.n === 4, `${phone.n}장`);
+t('폰에서는 둘씩 두 줄', phone.rows === 2 && phone.out === 0, `${phone.rows}줄 · ${phone.out}장 밖`);
 t('폰에서 글이 칸을 넘지 않는다', phone.over === 0, `${phone.over}장 넘침`);
-t('390px 에서 줄이 흐트러지지 않는다', phone.lines === '1111/1111/1111', phone.lines);
+t('390px 에서 줄이 흐트러지지 않는다', phone.lines === '1111/1111/1111/1111', phone.lines);
 /* 더 좁은 폰(320px)에서도 넘치지 않아야 한다 */
 await page.setViewportSize({ width: 320, height: 1200 });
 await page.waitForTimeout(250);
 const tiny = await lay();
-t('320px 에서도 한 줄에 서고 안 넘친다',
-  tiny.rows === 1 && tiny.out === 0 && tiny.over === 0 && tiny.lines === '1111/1111/1111',
+t('320px 에서도 안 넘친다',
+  tiny.rows === 2 && tiny.out === 0 && tiny.over === 0 && tiny.lines === '1111/1111/1111/1111',
   JSON.stringify(tiny));
 await page.setViewportSize({ width: 900, height: 1200 });
 await page.waitForTimeout(250);
 const wide = await lay();
-t('넓은 화면에서도 한 줄', wide.rows === 1 && wide.over === 0, JSON.stringify(wide));
+t('넓은 화면에서는 넷이 한 줄', wide.rows === 1 && wide.over === 0, JSON.stringify(wide));
 await page.setViewportSize({ width: 1440, height: 900 });    /* 뒤의 시험을 위해 되돌린다 */
 await page.waitForTimeout(250);
+
+/* ---------- 기대 표 수 (2026-10-25, 교수님과 맞춘 무게) ----------
+ * 확 .95 · 긍 .75(강화 .80) · 중 .40(강화 .60) · 모 .20 · 부 0 · 미지정 0 · 비참여는 빠짐 */
+{
+  const E = await page.evaluate(() => {
+    state.ratings.clear(); sureSet = new Set();
+    const rows = state.rows, plan = [['확', 4], ['긍', 4], ['중', 4], ['모', 3], ['부', 2], ['비', 2]];
+    let i = 0;
+    for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
+    const 긍 = rows.filter(p => getRating(p) === '긍').slice(0, 2);
+    const 중 = rows.filter(p => getRating(p) === '중').slice(0, 2);
+    [...긍, ...중].forEach(p => sures().add(rKey(p)));
+    sureSave(); renderStats();
+    const want = 4 * .95 + 2 * .80 + 2 * .75 + 2 * .60 + 2 * .40 + 3 * .20 + 0 + 0;
+    const varr = 4 * .95 * .05 + 2 * .8 * .2 + 2 * .75 * .25 + 2 * .6 * .4 + 2 * .4 * .6 + 3 * .2 * .8;
+    const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
+    const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
+    return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
+             kl, kn, none: state.rows.filter(p => !getRating(p)).length };
+  });
+  t('기대 표 수가 무게대로 나온다', E.kl === `기대 ${E.want}`, `${E.kl} / 셈 ${E.want}`);
+  t('흔들림 폭(±)을 함께 적는다', E.kn.includes(`(± ${E.sd})`), `${E.kn} / 셈 ± ${E.sd}`);
+  t('아랫줄에 「N명 차」는 안 적는다 — 그 자리가 ± 다', !/명 차/.test(E.kn), E.kn);
+  t('아직 안 매긴 분이 섞여 있다', E.none > 0, `${E.none}명`);
+
+  /* 무게가 바뀌면 숫자도 바뀐다 — 강화가 값을 올리는지 */
+  const up = await page.evaluate(() => {
+    const was = weightSum(state.rows.filter(p => getRating(p) !== '비'));
+    const p = state.rows.find(x => getRating(x) === '중' && !isSure(x));
+    sures().add(rKey(p)); sureSave(); renderStats();
+    const now = weightSum(state.rows.filter(q => getRating(q) !== '비'));
+    return Math.round((now - was) * 100) / 100;
+  });
+  t('중에 강화를 더하면 .2 만큼 오른다', up === 0.2, String(up));
+  const up2 = await page.evaluate(() => {
+    const was = weightSum(state.rows.filter(p => getRating(p) !== '비'));
+    const p = state.rows.find(x => getRating(x) === '긍' && !isSure(x));
+    sures().add(rKey(p)); sureSave(); renderStats();
+    return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
+  });
+  t('긍에 강화를 더하면 .05 만큼 오른다', up2 === 0.05, String(up2));
+  t('확에 찍은 강화는 값을 안 올린다', await page.evaluate(() => {
+    const p = state.rows.find(x => getRating(x) === '확');
+    const was = weightOf(p); sures().add(rKey(p)); sureSave();
+    return weightOf(p) === was;
+  }));
+  t('모·부에 찍힌 강화도 무시한다', await page.evaluate(() => {
+    const a = state.rows.find(x => getRating(x) === '모'), b2 = state.rows.find(x => getRating(x) === '부');
+    const wa = weightOf(a), wb = weightOf(b2);
+    sures().add(rKey(a)); sures().add(rKey(b2)); sureSave();
+    return weightOf(a) === wa && weightOf(b2) === wb && wa === .2 && wb === 0;
+  }));
+  t('미지정은 0 이다', await page.evaluate(() => {
+    const p = state.rows.find(x => !getRating(x));
+    return !p || weightOf(p) === 0;
+  }));
+  t('비참여도 0 이고 모수에서도 빠진다', await page.evaluate(() => {
+    const p = state.rows.find(x => getRating(x) === '비');
+    return weightOf(p) === 0 && !document.querySelector('.pie__u').textContent.includes(`전체 ${state.rows.length}명`);
+  }));
+  /* 선호도는 그대로 둔다 — 뒤의 막대·범례 시험이 비참여가 있는 자료를 쓴다 */
+  await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
+}
 
 /* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
 t('비 막대가 보라가 아니다', await page.evaluate(() => {
