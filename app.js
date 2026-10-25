@@ -1700,6 +1700,16 @@ const EXPL_MARK = '<svg class="expl__v" viewBox="0 0 24 24" width="11" height="1
   + '<path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
+/* 같은 빛깔을 **한 톤 진하게/옅게** 만든다 (2026-10-25) — 도넛에서 강화·약화를 가르는 데 쓴다.
+ * 더하는 값이 음수면 검정 쪽으로, 양수면 흰 쪽으로 섞는다. 갈래 색은 그대로 알아보게 폭을 좁게 둔다.
+ * `color-mix()` 를 SVG `stroke` 에 그냥 쓰면 브라우저에 따라 안 먹어, 숫자로 섞어 16진수를 만든다. */
+function shade(hex, d) {
+  const m = String(hex || '').replace('#', '');
+  if (m.length !== 6) return hex;
+  const to = d < 0 ? 0 : 255, t = Math.min(1, Math.abs(d) / 100);
+  const x = i => Math.round(parseInt(m.slice(i, i + 2), 16) * (1 - t) + to * t);
+  return '#' + [0, 2, 4].map(i => x(i).toString(16).padStart(2, '0')).join('');
+}
 
 /* ---------- 기대 표 수 (옛 이름 「환산 점수」) ----------
  * 머릿수만 세면 '확실 한 명'과 '보통 한 명'이 같은 무게가 된다. 사람마다 **나를 찍을 확률**을
@@ -1885,17 +1895,38 @@ function donut(profs) {
     const t = (a + b / 2) / R;
     return [CX - R * Math.cos(t), CY - R * Math.sin(t)];
   };
+  /* 조각을 **강화·약화까지 갈라** 그린다 (2026-10-25, 교수님 요청).
+   * 한 갈래 안에서 차례는 **강화 → 그냥 → 약화**이고, 빛깔은 같은 색을 한 톤 진하게/옅게만
+   * 한다. 갈래 차례도 전체 길이도 그대로라 멀리서 보면 전과 같은 도넛이다.
+   * 갈래 안의 틈은 좁게(0.8), 갈래끼리는 넓게(1.5) 두어 **어디까지가 한 갈래인지** 보인다.
+   * 누를 자리(`data-rs`)는 갈래 그대로라, 어느 조각을 눌러도 그 갈래 명단으로 간다. */
+  const SUB_D = { '+강화': -22, '': 0, '-약화': 30 };
+  const subsOf = r => {
+    const list = profs.filter(p => (getRating(p) || '미지정') === r);
+    const su = list.filter(p => isSure(p) && W_SURE[r] != null);
+    const wk = list.filter(p => isWeak(p) && W_WEAK[r] != null);
+    const plain = list.length - su.length - wk.length;
+    return [['+강화', su.length], ['', plain], ['-약화', wk.length]]
+      .filter(([, n]) => n > 0).map(([tag, n]) => ({ tag, n }));
+  };
   const arcs = items.map(({ r, n }) => {
-    const len = n / total * HALF, seg = Math.max(0, len - (items.length > 1 ? 1.5 : 0));
-    const [tx, ty] = midXY(off, len);
-    const a = `<g class="pie__hit" data-rs="${esc(r)}" role="button" tabindex="0"
-      aria-label="${esc(r)} ${n}명 — 아래 선호도별 교수 목록으로">
-      <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${RCOLOR[r]}" stroke-width="${W}"
+    const subs = subsOf(r);
+    const a = subs.map(({ tag, n: sn }, i) => {
+      const len = sn / total * HALF;
+      const gap = i === subs.length - 1 ? (items.length > 1 ? 1.5 : 0) : 0.8;
+      const seg = Math.max(0, len - gap);
+      const [tx, ty] = midXY(off, len);
+      const name = `${r}${tag}`;
+      const g = `<g class="pie__hit" data-rs="${esc(r)}" role="button" tabindex="0"
+      aria-label="${esc(name)} ${sn}명 — 아래 선호도별 교수 목록으로">
+      <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${shade(RCOLOR[r], SUB_D[tag])}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
-        transform="rotate(180 ${CX} ${CY})"><title>${esc(r)} ${n}명 (${Math.round(n / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${len >= 13 ? `<text class="pie__sn" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}">${n}</text>` : ''}
+        transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
+      ${len >= 13 ? `<text class="pie__sn" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}">${sn}</text>` : ''}
     </g>`;
-    off += len;
+      off += len;
+      return g;
+    }).join('');
     return a;
   }).join('');
   return `

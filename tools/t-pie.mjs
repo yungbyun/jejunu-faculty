@@ -394,6 +394,55 @@ t('넓은 화면에서는 넷이 한 줄', wide.rows === 1 && wide.over === 0, J
 await page.setViewportSize({ width: 1440, height: 900 });    /* 뒤의 시험을 위해 되돌린다 */
 await page.waitForTimeout(250);
 
+/* ---------- 도넛이 강화·약화까지 가른다 (2026-10-25, 교수님 요청) ---------- */
+{
+  const D = await page.evaluate(() => {
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
+    const rows = state.rows, plan = [['확', 6], ['긍', 6], ['중', 6], ['모', 3], ['부', 2], ['비', 2]];
+    let i = 0;
+    for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
+    rows.filter(p => getRating(p) === '긍').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '긍').slice(2, 3).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(2, 4).forEach(p => weaks().add(rKey(p)));
+    rows.filter(p => getRating(p) === '확').slice(0, 2).forEach(p => weaks().add(rKey(p)));
+    sureSave(); weakSave(); renderStats();
+    const g = [...document.querySelectorAll('.pie__hit')];
+    return { names: g.map(e => e.querySelector('title').textContent.split('명')[0].trim()),
+             rs: g.map(e => e.dataset.rs),
+             cols: g.map(e => e.querySelector('circle').getAttribute('stroke')),
+             lens: g.map(e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'))) };
+  });
+  t('갈래 안이 강화 → 그냥 → 약화 차례', D.names.join('|').includes('긍+강화 2|긍 3|긍-약화 1'), D.names.join('|'));
+  t('중도 셋으로 갈린다', D.names.join('|').includes('중+강화 2|중 2|중-약화 2'), D.names.join('|'));
+  t('확은 그냥과 약화 둘로', D.names.join('|').startsWith('확 4|확-약화 2'), D.names.join('|'));
+  t('모·부는 그대로 하나씩', D.names.filter(x => /^(모|부) /.test(x)).length === 2, D.names.join('|'));
+  t('빛깔이 갈래마다 한 톤씩 다르다', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')];
+    const by = r => g.filter(e => e.dataset.rs === r).map(e => e.querySelector('circle').getAttribute('stroke'));
+    const 긍 = by('긍');
+    return 긍.length === 3 && new Set(긍).size === 3;
+  }), D.cols.join(' '));
+  t('강화는 진하고 약화는 옅다', await page.evaluate(() => {
+    const lum = h => { const m = h.replace('#', '');
+      return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0); };
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '긍')
+      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+    return g[0] < g[1] && g[1] < g[2];     // 강화 < 그냥 < 약화 (밝기)
+  }));
+  t('누를 자리는 갈래 그대로', D.rs.every(r => ['확','긍','중','모','부','미지정'].includes(r)), D.rs.join('|'));
+  t('조각 길이의 합이 그대로', await page.evaluate(() => {
+    const total = state.rows.filter(p => getRating(p) !== '비').length;
+    const HALF = Math.PI * 72;
+    const sum = [...document.querySelectorAll('.pie__hit circle')]
+      .reduce((a, c) => a + parseFloat(c.getAttribute('stroke-dasharray')), 0);
+    /* 틈(갈래 안 0.8 · 갈래끼리 1.5)만큼 짧으므로 조금 모자란 것이 맞다 */
+    return sum < HALF && sum > HALF - 20;
+  }));
+  await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+    localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); renderStats(); });
+}
+
 /* ---------- 기대 표 수 (2026-10-25, 교수님과 맞춘 무게) ----------
  * 확 .95 · 긍 .75(강화 .80) · 중 .40(강화 .60) · 모 .20 · 부 0 · 미지정 0 · 비참여는 빠짐 */
 {
