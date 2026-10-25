@@ -244,7 +244,7 @@ t('확+긍에 중인 강화만 더한 값', (await klTxt('.pie__k--push')).endsW
   `화면 ${await klTxt('.pie__k--push')} / 셈 ${T.base}+${T.add}`);
 t('%도 같은 기준', (await page.locator('.pie__k--push b').innerText()) === `${T.pct}%`,
   `${await page.locator('.pie__k--push b').innerText()} / ${T.pct}%`);
-t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+중간강화(${T.add})`),
+t('더해진 인원을 이름에 적는다', (await klTxt('.pie__k--push')).startsWith(`+중-강(${T.add})`),
   await klTxt('.pie__k--push'));
 t('안 더한 강화가 실제로 있다', T.out > 0, `${T.out}명`);
 t('이름에는 더해진 숫자만 적는다', !/나머지|겹친/.test(await klTxt('.pie__k--push')), await klTxt('.pie__k--push'));
@@ -271,7 +271,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const T1 = await truth();
-t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+중간강화(0)'),
+t('중이 아니면 한 명도 안 더한다', (await klTxt('.pie__k--push')).startsWith('+중-강(0)'),
   await klTxt('.pie__k--push'));
 t('그때 %는 확+긍과 같다', (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--high b').innerText()),
   `${await page.locator('.pie__k--push b').innerText()} / ${await page.locator('.pie__k--high b').innerText()}`);
@@ -296,7 +296,7 @@ await page.evaluate(() => {
   state.rows.filter(p => getRating(p) === '확').forEach(p => sures().add(rKey(p)));
   sureSave(); renderStats();
 });
-t('확실만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+중간강화(0)'),
+t('확실만 강화면 더해지는 사람이 없다', (await klTxt('.pie__k--push')).startsWith('+중-강(0)'),
   await klTxt('.pie__k--push'));
 t('확+긍 숫자도 그대로',
   (await page.locator('.pie__k--push b').innerText()) === (await page.locator('.pie__k--high b').innerText()),
@@ -341,19 +341,19 @@ t('차는 모자란 몫의 갑절쯤', await page.evaluate(() =>
   })),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kn')].map(e => e.textContent).join(' | ')));
 t('카드 이름은 「이름 인원」', await page.evaluate(() =>
-  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+중간강화\(\d+\)|기대) [\d.]+$/.test(e.textContent.trim()))),
+  [...document.querySelectorAll('.pie__kl')].every(e => /^(확실|\+중-강\(\d+\)|기대) [\d.]+$/.test(e.textContent.trim()))),
   await page.evaluate(() => [...document.querySelectorAll('.pie__kl')].map(e => e.textContent.trim()).join('|')));
 await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 
-/* 카드 이름 — 「확실」 · 「+중간강화(N)」 · 「기대」 (2026-10-25. 갈래가 셋으로 줄었다) */
+/* 카드 이름 — 「확실」 · 「+중-강(N)」 · 「기대」 (2026-10-25. 갈래가 셋으로 줄었다) */
 const klHead = () => page.evaluate(() => [...document.querySelectorAll('.pie__kl')]
   .map(e => e.textContent.trim().replace(/ [\d.]+$/, '')).join('|'));
 t('강화가 없으면 카드는 둘', /^확실\|기대$/.test(await klHead()), await klHead());
 await page.evaluate(() => { sures().add(rKey(state.rows.find(p => getRating(p) === '중'))); sureSave(); renderStats(); });
-t('카드 이름 셋', /^확실\|\+중간강화\(\d+\)\|기대$/.test(await klHead()), await klHead());
+t('카드 이름 셋', /^확실\|\+중-강\(\d+\)\|기대$/.test(await klHead()), await klHead());
 t('둘째 이름의 괄호는 더해진 인원', await page.evaluate(() =>
   document.querySelector('.pie__k--push .pie__kl').textContent.startsWith(
-    `+중간강화(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
+    `+중-강(${state.rows.filter(p => isSure(p) && getRating(p) === '중').length})`)),
   await klTxt('.pie__k--push'));
 
 /* 카드 맨 아랫줄에 「내 표 vs 상대 표」 (2026-10-19, 사용자 지정).

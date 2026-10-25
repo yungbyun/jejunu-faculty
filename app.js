@@ -1999,7 +1999,7 @@ function donut(profs) {
           <b>${pct(sure)}%</b>
           ${vs(sure)}${gapLine(sure)}</div>
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확실 ${sure}명에 중간인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
-          <span class="pie__kl">+중간강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
+          <span class="pie__kl">+중-강(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
           ${vs(reach)}${gapLine(reach)}</div>` : ''}
         <div class="pie__k pie__k--score" role="button" tabindex="0" data-expopen
           aria-expanded="${EXP_OPEN}" aria-controls="explBox"
