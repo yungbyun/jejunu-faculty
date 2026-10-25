@@ -521,10 +521,10 @@ await page.waitForTimeout(250);
     rows.filter(p => getRating(p) === '확').slice(0, 1).forEach(p => weaks().add(rKey(p)));
     rows.filter(p => getRating(p) === '부').slice(0, 2).forEach(p => sures().add(rKey(p)));
     sureSave(); weakSave(); renderStats();
-    /* 확 3×.95 + 확−약 1×.85 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.15 + 부 3×.05 */
-    const want = 3 * .95 + .85 + 2 * .65 + 3 * .50 + .35 + 2 * .15 + 3 * .05;
-    const varr = 3 * .95 * .05 + .85 * .15 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65
-      + 2 * .15 * .85 + 3 * .05 * .95;
+    /* 확 3×.90 + 확−약 1×.75 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.25 + 부 3×.10 */
+    const want = 3 * .90 + .75 + 2 * .65 + 3 * .50 + .35 + 2 * .25 + 3 * .10;
+    const varr = 3 * .90 * .10 + .75 * .25 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65
+      + 2 * .25 * .75 + 3 * .10 * .90;
     const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
     const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
     return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
@@ -550,7 +550,7 @@ await page.waitForTimeout(250);
     sures().add(rKey(p)); sureSave(); renderStats();
     return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
   });
-  t('부에 강화를 더하면 .1 만큼 오른다 — 바닥이 .05 라서', up2 === 0.1, String(up2));
+  t('부에 강화를 더하면 .15 만큼 오른다', up2 === 0.15, String(up2));
   t('아홉 칸이 모두 다르다', await page.evaluate(() => {
     const ws = [], sv = [...sures()], wv = [...weaks()];   // 다른 시험이 쓰는 표시를 지키려고 적어 둔다
     for (const r of ['확', '중', '부']) for (const m of ['s', '', 'w']) {
@@ -564,13 +564,13 @@ await page.waitForTimeout(250);
     sureSet = new Set(sv); weakSet = new Set(wv);          // 적어 둔 표시를 되돌린다
     return new Set(ws).size === 9 && ws.every((v, i) => i === 0 || ws[i - 1] > v);
   }));
-  t('확에 강화를 찍으면 .03 만큼 오른다 — 천장이 가깝다', await page.evaluate(() => {
+  t('확에 강화를 찍으면 .10 만큼 올라 꼭대기(1)가 된다', await page.evaluate(() => {
     const a = state.rows.find(x => getRating(x) === '확' && !isWeak(x) && !isSure(x));
     const wa = weightOf(a);
     sures().add(rKey(a)); sureSave();
     const nw = weightOf(a);
     sures().delete(rKey(a)); sureSave();
-    return wa === .95 && Math.abs(nw - .98) < 1e-9;
+    return wa === .90 && nw === 1;
   }));
   const weightSumHere = await page.evaluate(() =>
     Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);

@@ -195,8 +195,8 @@ t('강화를 켜면 약화가 풀린다', await page.evaluate(() => {
   return isSure(p) && !isWeak(p)
     && document.querySelector('[data-weakbtn]').getAttribute('aria-pressed') === 'false';
 }));
-/* 무게는 2026-10-25 에 교수님이 정하신 값 — 확 .90(약화 .85) · 긍 .70(강화 .80, 약화 .70)
-   · 중 .40(강화 .60, 약화 .30) · 모 .20 · 부 0 */
+/* 무게 (2026-10-25 저녁에 맞춘 값) — 양 끝이 1.00 과 0 이고 0.5 를 가운데 둔 대칭이다.
+   확 1.00/.90/.75 · 중 .65/.50/.35 · 부 .25/.10/.00 (강화/보통/약화) */
 const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
   const p = state.rows[0], was = getRating(p);
   setRating(rKey(p), rr); sureSet = new Set(); weakSet = new Set();
@@ -206,17 +206,18 @@ const wOf = (r, mark) => page.evaluate(([rr, mm]) => {
   sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
   return w;
 }, [r, mark]);
-t('확에 약화를 찍으면 .95 → .85', await wOf('확', '') === .95 && await wOf('확', 'weak') === .85,
+t('확에 약화를 찍으면 .90 → .75', await wOf('확', '') === .90 && await wOf('확', 'weak') === .75,
   `${await wOf('확', '')} → ${await wOf('확', 'weak')}`);
 t('중에 약화를 찍으면 .50 → .35', await wOf('중', '') === .5 && await wOf('중', 'weak') === .35,
   `${await wOf('중', '')} → ${await wOf('중', 'weak')}`);
 /* 긍의 약화는 교수님이 **그냥 긍과 같은 .70** 으로 정하셨다 — 표시로만 남고 셈은 안 바뀐다 */
 t('중에 강화를 찍으면 .50 → .65', await wOf('중', 'sure') === .65, String(await wOf('중', 'sure')));
-t('부에 강화를 찍으면 0 → .15', await wOf('부', 'sure') === .15, String(await wOf('부', 'sure')));
-t('부에 약화를 찍으면 바닥인 .02', await wOf('부', 'weak') === .02, String(await wOf('부', 'weak')));
+t('부에 강화를 찍으면 .10 → .25', await wOf('부', 'sure') === .25, String(await wOf('부', 'sure')));
+t('중은 ±15 그대로', await wOf('중', 'sure') === .65 && await wOf('중', 'weak') === .35,
+  `${await wOf('중', 'sure')} / ${await wOf('중', 'weak')}`);
 /* 2026-10-25 — 아홉 칸이 되면서 확실에도 강화 자리가 생겼다(천장이 가까워 +3 뿐) */
-t('확에 강화를 찍으면 .95 → .98', await wOf('확', 'sure') === .98, String(await wOf('확', 'sure')));
-t('부에 약화를 찍으면 .05 → .02', await wOf('부', '') === .05 && await wOf('부', 'weak') === .02,
+t('확에 강화를 찍으면 .90 → 1 — 꼭대기', await wOf('확', 'sure') === 1, String(await wOf('확', 'sure')));
+t('부에 약화를 찍으면 .10 → 0 — 바닥', await wOf('부', '') === .10 && await wOf('부', 'weak') === 0,
   `${await wOf('부', '')} → ${await wOf('부', 'weak')}`);
 /* 0.5 를 가운데 두고 네 쌍이 모두 합 1.00 — 대칭이다 (2026-10-25) */
 t('무게가 0.5 를 가운데 두고 대칭', await page.evaluate(() =>
