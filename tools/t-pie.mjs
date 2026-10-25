@@ -640,6 +640,43 @@ await page.waitForTimeout(250);
   await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 }
 
+/* ---------- 범례에 「무게를 먹인 값」을 나란히 (2026-10-25, 교수님 요청) ---------- */
+{
+  const L = await page.evaluate(() => {
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
+    const rows = state.rows, plan = [['확', 8], ['긍', 6], ['중', 6], ['모', 4], ['부', 2], ['비', 2]];
+    let i = 0;
+    for (const [r, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), r);
+    rows.filter(p => getRating(p) === '긍').slice(0, 2).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '확').slice(0, 2).forEach(p => weaks().add(rKey(p)));
+    sureSave(); weakSave(); renderStats();
+    const li = [...document.querySelectorAll('.pie__li')];
+    const want = r => rows.filter(p => (getRating(p) || '미지정') === r).reduce((a, p) => a + weightOf(p), 0);
+    return {
+      txt: li.map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+      got: li.map(e => (e.querySelector('.pie__lw') || {}).textContent),
+      want: li.map(e => {
+        const r = e.textContent.trim().split(' ')[0];
+        return `(→${want(r).toFixed(1)})`;
+      }),
+      one: li.every(e => /\(→\d+\.\d\)$/.test((e.querySelector('.pie__lw') || {}).textContent || '')),
+    };
+  });
+  t('갈래마다 무게 먹인 값을 적는다', L.got.length > 0 && L.got.every(Boolean), L.txt.join(' | '));
+  t('그 값이 무게대로다', L.got.join() === L.want.join(), `${L.got.join()} / 셈 ${L.want.join()}`);
+  t('늘 소수 첫째 자리까지', L.one, L.got.join());
+  t('머릿수는 그대로 둔다', L.txt.every(x => /^\S+ \d+\(→/.test(x)), L.txt.join(' | '));
+  t('강화·약화가 섞이면 갈래 합이 달라진다', await page.evaluate(() => {
+    const li = [...document.querySelectorAll('.pie__li')];
+    const 확 = li.find(e => e.textContent.trim().startsWith('확'));
+    const n = +확.querySelector('b').textContent;
+    const w = parseFloat(확.querySelector('.pie__lw').textContent.replace(/[^\d.]/g, ''));
+    return Math.abs(w - n * 0.9) > 0.01;      // 약화 둘이 섞여 있어 n×0.9 와 다르다
+  }));
+  await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+    localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); renderStats(); });
+}
+
 /* 비참여는 보라가 아니라 옅은 회색 — 겨룸에서 빠진 분이라서 (2026-10-09) */
 t('비 막대가 보라가 아니다', await page.evaluate(() => {
   const [r, g, b] = (getComputedStyle(document.querySelector('.sbar__seg--na')).backgroundColor.match(/\d+/g) || []).map(Number);

@@ -1997,7 +1997,15 @@ function donut(profs) {
       ${explain()}
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
-        ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
+        ${items.map(({ r, n }) => {
+          /* 머릿수 옆에 **무게를 먹인 값**을 나란히 적는다 (2026-10-25, 교수님 요청).
+             강화·약화가 섞여 있으면 사람마다 무게가 달라, 갈래마다 따로 더해야 한다. */
+          const wn = profs.filter(p => (getRating(p) || '미지정') === r).reduce((a2, p) => a2 + weightOf(p), 0);
+          /* 여기서는 **늘 소수 첫째 자리까지** 적는다(교수님 지정) — `f1()` 은 딱 떨어지면
+             정수로 돌려주어 25 와 8.1 이 나란히 서면 자릿수가 어긋나 보인다. */
+          const w1 = wn.toFixed(1);
+          return `<span class="pie__li" title="${esc(r)} ${n}명에 무게를 먹이면 ${w1}명 몫입니다 (${W_SAY})"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b><em class="pie__lw">(→${w1})</em> <em>${Math.round(n / total * 100)}%</em></span>`;
+        }).join('')}
       </div>
     </div>`;
 }

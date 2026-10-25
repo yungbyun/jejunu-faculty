@@ -693,6 +693,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__li{display:inline-flex;align-items:center;gap:5px;font-size:13.5px;font-weight:600}
 .pie__li b{font-size:15px;font-variant-numeric:tabular-nums}
 .pie__li em{font-style:normal;font-weight:500;font-size:12.5px;color:var(--ink-3)}
+/* 무게를 먹인 값 — 머릿수 바로 뒤에 붙여 「29 → 26.6」 처럼 읽히게 (2026-10-25) */
+.pie__li .pie__lw{font-weight:700;color:var(--ink-2);margin-left:1px;font-variant-numeric:tabular-nums}
 @media (max-width:720px){
   .pie{gap:12px}
   .pie__svg{width:250px;height:173px}
