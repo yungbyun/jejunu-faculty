@@ -213,11 +213,17 @@ t('중에 약화를 찍으면 .50 → .35', await wOf('중', '') === .5 && await
 /* 긍의 약화는 교수님이 **그냥 긍과 같은 .70** 으로 정하셨다 — 표시로만 남고 셈은 안 바뀐다 */
 t('중에 강화를 찍으면 .50 → .65', await wOf('중', 'sure') === .65, String(await wOf('중', 'sure')));
 t('부에 강화를 찍으면 0 → .15', await wOf('부', 'sure') === .15, String(await wOf('부', 'sure')));
-t('부에 약화를 찍으면 바닥인 0', await wOf('부', 'weak') === 0, String(await wOf('부', 'weak')));
+t('부에 약화를 찍으면 바닥인 .02', await wOf('부', 'weak') === .02, String(await wOf('부', 'weak')));
 /* 2026-10-25 — 아홉 칸이 되면서 확실에도 강화 자리가 생겼다(천장이 가까워 +3 뿐) */
 t('확에 강화를 찍으면 .95 → .98', await wOf('확', 'sure') === .98, String(await wOf('확', 'sure')));
-t('부에 약화를 찍으면 .05 → 0', await wOf('부', '') === .05 && await wOf('부', 'weak') === 0,
+t('부에 약화를 찍으면 .05 → .02', await wOf('부', '') === .05 && await wOf('부', 'weak') === .02,
   `${await wOf('부', '')} → ${await wOf('부', 'weak')}`);
+/* 0.5 를 가운데 두고 네 쌍이 모두 합 1.00 — 대칭이다 (2026-10-25) */
+t('무게가 0.5 를 가운데 두고 대칭', await page.evaluate(() =>
+  [[W_SURE['확'], W_WEAK['부']], [W_RATE['확'], W_RATE['부']],
+   [W_WEAK['확'], W_SURE['부']], [W_SURE['중'], W_WEAK['중']]]
+    .every(([a, b]) => Math.abs(a + b - 1) < 1e-9)),
+  await page.evaluate(() => `${W_SURE['확']}↔${W_WEAK['부']} ${W_RATE['확']}↔${W_RATE['부']} ${W_WEAK['확']}↔${W_SURE['부']} ${W_SURE['중']}↔${W_WEAK['중']}`));
 t('아홉 칸이 모두 다르다', await page.evaluate(async () => {
   const ws = [], sv = [...sures()], wv = [...weaks()];
   for (const r of ['확', '중', '부']) for (const m of ['sure', '', 'weak']) {
