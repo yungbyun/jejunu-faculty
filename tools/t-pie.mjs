@@ -126,9 +126,10 @@ const lit = await page.evaluate(()=>{
 });
 t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / ${lit.want}`);
 t('불은 이름 오른쪽 끝에', lit.okPos);
-t('도움말에 만남 횟수', lit.title.includes('만남'), lit.title);
+/* 2026-10-25 — 만남 횟수는 **말풍선에서 뺐습니다**(교수님 지정). 이름 옆 점으로 이미 보입니다 */
+t('도움말에 만남 횟수를 적지 않는다', !lit.title.includes('만남'), lit.title);
 
-/* 이름에 올리면 학과명과 「표 줄 확률」이 함께 보여야 한다 (2026-10-25, 교수님 지정) */
+/* 이름에 올리면 학과명과 「확률」이 함께 보여야 한다 (2026-10-25, 교수님 지정) */
 const tip = await page.evaluate(() => {
   const sv = [...sures()], wv = [...weaks()];
   sureSet = new Set(); weakSet = new Set();
@@ -149,13 +150,15 @@ const tip = await page.evaluate(() => {
   return out;
 });
 t('도움말이 학과명으로 열린다', !!tip.학과 && tip.확.startsWith(tip.학과 + ' · '), `${tip.학과} | ${tip.확}`);
-t('확실은 95%', tip.확.includes('표 줄 확률 95%'), tip.확);
-t('중간은 50%', tip.중.includes('표 줄 확률 50%'), tip.중);
-t('중간+강화는 65%', !tip.중강 || tip.중강.includes('표 줄 확률 65%'), tip.중강);
-t('중간-약화는 35%', !tip.중약 || tip.중약.includes('표 줄 확률 35%'), tip.중약);
-t('부정은 0%', tip.부.includes('표 줄 확률 0%'), tip.부);
+t('확실은 95%', tip.확.includes('확률 95%'), tip.확);
+t('중간은 50%', tip.중.includes('확률 50%'), tip.중);
+t('중간+강화는 65%', !tip.중강 || tip.중강.includes('확률 65%'), tip.중강);
+t('중간-약화는 35%', !tip.중약 || tip.중약.includes('확률 35%'), tip.중약);
+t('부정은 0%', tip.부.includes('확률 0%'), tip.부);
 t('비참여는 셈에서 뺀다고 적는다', tip.비.includes('비참여') && tip.비.includes('뺌'), tip.비);
 t('미지정은 0 으로 센다고 적는다', tip.없음.includes('미지정'), tip.없음);
+t('말풍선에 만남 횟수가 없다', !Object.values(tip).some(v => String(v).includes('만남')),
+  Object.values(tip).join(' | '));
 t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
 const dots = await page.evaluate(()=>{
   state.ratings.clear(); state.notes.clear();

@@ -2082,14 +2082,14 @@ const stRank = p => isVip(p) ? 0 : isSure(p) ? 1 : isWeak(p) ? 3 : 2;
 const stSort = list => [...list].sort((a, b) =>
   stRank(a) - stRank(b) || String(a.name).localeCompare(String(b.name), 'ko'));
 
-/* 이름에 마우스를 올렸을 때 보여 줄 「표 줄 확률」 한 토막 (2026-10-25, 교수님 지정).
+/* 이름에 마우스를 올렸을 때 보여 줄 「확률」 한 토막 (2026-10-25, 교수님 지정).
  * 무게는 `weightOf()` 가 쥐고 있으므로 **그 값을 그대로 읽는다** — 여기에 숫자를 따로 적어
  * 두면 무게표를 고칠 때 둘이 어긋난다. 비참여는 모수에서도 빠지므로 백분율이 뜻이 없다. */
 function weightTip(p) {
   const r = getRating(p);
   if (r === '비') return '비참여 · 셈에서 뺌';
   if (!r) return '미지정 · 0 으로 셈';
-  return `표 줄 확률 ${Math.round(weightOf(p) * 100)}%`;
+  return `확률 ${Math.round(weightOf(p) * 100)}%`;
 }
 
 function stChip(p, r) {
@@ -2098,7 +2098,7 @@ function stChip(p, r) {
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
   const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)} · ${weightTip(p)}${met ? ` · 만남 ${met}회` : ''}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)} · ${weightTip(p)}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
