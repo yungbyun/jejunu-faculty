@@ -644,8 +644,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__k--score b{color:var(--brand)}
 /* 눌러서 풀이를 펴는 칸 (2026-10-25) */
 .pie__k--score{cursor:pointer}
-.pie__k--score:hover{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
-.pie__k--score:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}
+/* 바탕에 빛깔이 깔리면 옅은 글씨가 묻는다 — 이 칸만 한 단계 진하게 */
+.pie__k--score .pie__kl,.pie__k--score .pie__kn,.pie__k--score .pie__kd{color:var(--ink-2)}
+.pie__k--score:hover{border-color:color-mix(in srgb,#e0a10c 58%,var(--line));
+  background:color-mix(in srgb,#e0a10c 16%,var(--surface))}
+.pie__k--score:focus-visible{outline:3px solid color-mix(in srgb,#e0a10c 55%,transparent);outline-offset:2px}
 .expl__v{margin-left:3px;vertical-align:-1px;transition:transform .18s var(--ease)}
 .pie__k--score[aria-expanded="true"] .expl__v{transform:rotate(180deg)}
 /* 풀이 칸 — 띠 하나가 모수 전체, 색칠한 데가 기대 표 수, 금이 절반 자리 */
@@ -671,7 +674,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .expl__t .sw{margin-right:5px;vertical-align:-1px}
 .expl__t--0{color:var(--ink-3)}
 .expl__p{margin:8px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-2);word-break:keep-all}
-.pie__k--score{border-color:color-mix(in srgb,var(--brand) 22%,var(--line))}
+/* 눌러 볼 수 있는 칸이라 **옅은 다른 빛깔**로 한 겹 띄워 둔다 (2026-10-25, 교수님 지정).
+   `--brand`(남색)로 옅게 깔면 그냥 회색으로 보여, 관심 교수 칸과 같은 **따뜻한 금빛**을 썼다. */
+.pie__k--score{border-color:color-mix(in srgb,#e0a10c 38%,var(--line));
+  background:color-mix(in srgb,#e0a10c 10%,var(--surface))}
 /* 테두리는 **둘째 카드(확실+긍정)** 에 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다).
    지지 기반이 어디까지인지가 눈이 먼저 가야 할 자리라서다. 테두리 빛깔은 그 카드의
    숫자 빛깔(긍정)에 맞춘다. */

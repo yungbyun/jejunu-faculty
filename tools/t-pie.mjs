@@ -485,8 +485,20 @@ await page.waitForTimeout(250);
   t('갈래마다 인원 × 무게 = 보탬', X.rows.every(r => Math.abs(r.n * r.w - r.s) < .06),
     X.rows.map(r => `${r.k} ${r.n}×${r.w}=${r.s}`).join(' / '));
   t('강화는 따로 줄을 세운다', X.rows.some(r => /\+강화$/.test(r.k)), X.rows.map(r => r.k).join('|'));
-  t('보탬이 큰 차례로 적는다', X.rows.every((r, i) => i === 0 || X.rows[i - 1].s >= r.s),
-    X.rows.map(r => r.s).join(' '));
+  t('굳은 쪽부터 차례로 적는다', await page.evaluate(() => {
+    const want = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부', '미지정'];
+    const got = [...document.querySelectorAll('#explBox .expl__t tbody th')].map(e => e.textContent.trim());
+    return got.join('|') === want.filter(k => got.includes(k)).join('|');
+  }), X.rows.map(r => r.k).join('|'));
+  t('띠도 같은 차례로 쌓는다', await page.evaluate(() => {
+    const want = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부'];
+    const got = [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]);
+    return got.join('|') === want.filter(k => got.includes(k)).join('|');
+  }), await page.evaluate(() => [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]).join('|')));
+  t('기대 칸은 옅은 바탕으로 띄워 둔다', await page.evaluate(() => {
+    const bg = e => getComputedStyle(e).backgroundColor;
+    return bg(document.querySelector('.pie__k--score')) !== bg(document.querySelector('.pie__k--high'));
+  }), await page.evaluate(() => getComputedStyle(document.querySelector('.pie__k--score')).backgroundColor));
   t('합계가 기대 표 수와 같다', Math.abs(+X.foot - weightSumHere) < .06,
     `${X.foot} / 셈 ${weightSumHere}`);
   t('비참여는 표에 없다', !X.rows.some(r => r.k === '비'), X.rows.map(r => r.k).join('|'));

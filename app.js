@@ -1726,7 +1726,11 @@ function weightOf(p) {
 }
 const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
 /* 갈래별로 몇 명이 얼마씩 보탰는지 — 기대 카드를 누르면 펴지는 풀이에 쓴다 (2026-10-25).
- * 강화가 값을 올리는 갈래(긍·중)는 「긍+강화」처럼 따로 줄을 세운다. 보탬이 큰 차례로 적는다. */
+ * 강화가 값을 올리는 갈래(긍·중)는 「긍+강화」처럼 따로 줄을 세운다.
+ * 차례는 **굳은 쪽부터**로 못 박았다 (2026-10-25, 교수님 지정) — 보탬이 큰 차례로 두면
+ * 인원에 따라 줄이 들쭉날쭉 자리를 바꿔 눈이 따라가기 어렵다. 이 차례는 무게가 큰 차례이기도
+ * 하다. 미지정은 셈에 안 들어가니 맨 끝이다. */
+const W_ORDER = ['확', '긍+강화', '긍', '중+강화', '중', '모', '부', '미지정'];
 function weightRows(profs) {
   const key = p => {
     const r = getRating(p) || '미지정';
@@ -1739,7 +1743,8 @@ function weightRows(profs) {
     const e = m.get(k) || { k, r: (getRating(p) || '미지정'), w, n: 0 };
     e.n++; m.set(k, e);
   });
-  return [...m.values()].map(e => ({ ...e, sum: e.n * e.w })).sort((a, b) => b.sum - a.sum || b.n - a.n);
+  const at = k => { const i = W_ORDER.indexOf(k); return i < 0 ? W_ORDER.length : i; };
+  return [...m.values()].map(e => ({ ...e, sum: e.n * e.w })).sort((a, b) => at(a.k) - at(b.k));
 }
 /* 흔들림 폭. 저마다 따로 움직인다고 보면 분산은 Σp(1−p) 다(베르누이의 합).
  * 뿌리를 씌워 ± 로 적는다 — 기대값 하나보다 「얼마나 안심해도 되는지」가 보인다. */
