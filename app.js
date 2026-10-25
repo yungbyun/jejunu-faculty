@@ -1921,10 +1921,23 @@ function donut(profs) {
      그 전에는 좁은 조각의 숫자를 띠 **바깥**에 실마리 선과 함께 적었는데, 자리를 비켜
      앉히다 보면 어느 조각의 숫자인지 알기 어려웠고 띠에 묻히기도 했다. 색 위에 얹으면
      **무슨 색의 숫자인지가 곧 어느 갈래인지**라, 겹쳐도 읽어 낼 수 있다. */
+  let lastT2 = -9, zig = 0;                        // 바싹 붙은 작은 원을 엇갈려 앉히려고
   const num = (off2, len, n) => {
     const [x, y] = midXY(off2, len);
-    const sm = len < 13 ? ' pie__sn--sm' : '';     // 좁은 조각은 글씨만 작게
-    return `<text class="pie__sn${sm}" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+    if (len >= 13) return `<text class="pie__sn" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+    /* 좁은 조각의 숫자는 **작은 원에 담는다** (2026-10-26, 교수님 지정). 조각이 가늘어
+       글자가 이웃 조각까지 걸치는데, 원이 울타리 노릇을 해 **어느 숫자인지 한 덩이로**
+       보인다. 원은 글자 수에 맞춰 넓힌다 — 두 자리면 조금 더 크게.
+       가는 조각이 잇달으면 원끼리 포개져 **뒤에 그린 원이 앞 숫자를 덮는다**. 그래서 바싹
+       붙은 것들은 띠의 **안쪽·바깥쪽으로 번갈아** 앉힌다 — 띠가 24 나 되어 ±6 은 넉넉히
+       들어가고, 두 줄로 엇갈리면 서로를 가리지 않는다. */
+    const t2 = (off2 + len / 2) / R;
+    zig = (lastT2 > -9 && (t2 - lastT2) * R < 13) ? (zig > 0 ? -6 : 6) : 0;
+    lastT2 = t2;
+    const [bx, by] = midXY(off2, len, R + zig);
+    const r2 = (6.4 + (String(n).length - 1) * 1.7).toFixed(1);
+    return `<circle class="pie__snb" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${r2}"/>`
+      + `<text class="pie__sn pie__sn--sm" x="${bx.toFixed(1)}" y="${by.toFixed(1)}">${n}</text>`;
   };
   /* 조각을 **강화·약화까지 갈라** 그린다 (2026-10-25, 교수님 요청).
    * 한 갈래 안에서 차례는 **강화 → 그냥 → 약화**이고, 빛깔은 같은 색을 한 톤 진하게/옅게만

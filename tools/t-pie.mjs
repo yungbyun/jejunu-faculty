@@ -438,8 +438,8 @@ await page.waitForTimeout(250);
     const g = [...document.querySelectorAll('.pie__hit')];
     return { names: g.map(e => e.querySelector('title').textContent.split('명')[0].trim()),
              rs: g.map(e => e.dataset.rs),
-             cols: g.map(e => e.querySelector('circle').getAttribute('stroke')),
-             lens: g.map(e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'))),
+             cols: g.map(e => e.querySelector('.pie__seg').getAttribute('stroke')),
+             lens: g.map(e => parseFloat(e.querySelector('.pie__seg').getAttribute('stroke-dasharray'))),
              labels: [...CONFIG.RATINGS.LABELS, '미지정'] };
   });
   t('갈래 안이 강화 → 그냥 → 약화 차례', D.names.join('|').includes('중+강화 3|중 4|중-약화 1'), D.names.join('|'));
@@ -448,7 +448,7 @@ await page.waitForTimeout(250);
   t('갈래마다 강화·약화로 갈린다', D.names.length >= 7, D.names.join('|'));
   t('빛깔이 갈래마다 한 톤씩 다르다', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__hit')];
-    const by = r => g.filter(e => e.dataset.rs === r).map(e => e.querySelector('circle').getAttribute('stroke'));
+    const by = r => g.filter(e => e.dataset.rs === r).map(e => e.querySelector('.pie__seg').getAttribute('stroke'));
     const 중 = by('중');
     return 중.length === 3 && new Set(중).size === 3;
   }), D.cols.join(' '));
@@ -456,7 +456,7 @@ await page.waitForTimeout(250);
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0); };
     const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '중')
-      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+      .map(e => lum(e.querySelector('.pie__seg').getAttribute('stroke')));
     return g[0] < g[1] && g[1] < g[2];     // 강화 < 그냥 < 약화 (밝기)
   }));
   t('누를 자리는 갈래 그대로', D.rs.every(r => D.labels.includes(r)), D.rs.join('|'));
@@ -464,8 +464,8 @@ await page.waitForTimeout(250);
      갈래끼리의 틈보다 반드시 좁아야 한다. */
   t('갈래 안은 틈 없이 이어 붙는다', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__hit')];
-    const L = e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'));
-    const OFF = e => -parseFloat(e.querySelector('circle').getAttribute('stroke-dashoffset'));
+    const L = e => parseFloat(e.querySelector('.pie__seg').getAttribute('stroke-dasharray'));
+    const OFF = e => -parseFloat(e.querySelector('.pie__seg').getAttribute('stroke-dashoffset'));
     const inner = [], outer = [];
     for (let i = 1; i < g.length; i++) {
       const gapv = OFF(g[i]) - (OFF(g[i - 1]) + L(g[i - 1]));
@@ -474,8 +474,8 @@ await page.waitForTimeout(250);
     return inner.length > 0 && inner.every(v => v < 0.05) && outer.every(v => v > 1.5);
   }), await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__hit')];
-    const L = e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'));
-    const OFF = e => -parseFloat(e.querySelector('circle').getAttribute('stroke-dashoffset'));
+    const L = e => parseFloat(e.querySelector('.pie__seg').getAttribute('stroke-dasharray'));
+    const OFF = e => -parseFloat(e.querySelector('.pie__seg').getAttribute('stroke-dashoffset'));
     return g.slice(1).map((e, i) => `${g[i].dataset.rs}${e.dataset.rs === g[i].dataset.rs ? '=' : '|'}${(OFF(e) - OFF(g[i]) - L(g[i])).toFixed(1)}`).join(' ');
   }));
   /* 조각마다 인원을 적는다 — 좁으면 띠 바깥에 (2026-10-25, 교수님 요청) */
@@ -494,9 +494,25 @@ await page.waitForTimeout(250);
     const tx = g && g.querySelector('text');
     if (!tx) return false;
     const x = +tx.getAttribute('x'), y = +tx.getAttribute('y');
-    return tx.classList.contains('pie__sn--sm') && Math.abs(Math.hypot(x - 100, y - 112) - 72) < 2;
+    return tx.classList.contains('pie__sn--sm') && Math.abs(Math.hypot(x - 100, y - 112) - 72) < 12;
   }));
   t('실마리 선은 쓰지 않는다', await page.evaluate(() => document.querySelectorAll('.pie__lead').length === 0));
+  /* 작은 숫자는 **원에 담는다** (2026-10-26, 교수님 지정) — 가는 조각 위에서도 한 덩이로 읽힌다 */
+  t('작은 숫자마다 원이 하나씩', await page.evaluate(() =>
+    document.querySelectorAll('.pie__snb').length === document.querySelectorAll('.pie__sn--sm').length
+    && document.querySelectorAll('.pie__snb').length > 0));
+  t('원이 숫자를 덮지 않는다 — 원이 먼저 그려진다', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.querySelector('.pie__snb'));
+    const kids = [...g.children].map(e => e.tagName.toLowerCase() + '.' + (e.getAttribute('class') || ''));
+    return kids.indexOf('circle.pie__snb') < kids.findIndex(k => k.startsWith('text.'));
+  }));
+  t('원이 숫자를 품을 만큼 크다', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.querySelector('.pie__snb'));
+    const c = g.querySelector('.pie__snb').getBoundingClientRect();
+    const t2 = g.querySelector('text').getBoundingClientRect();
+    return c.width >= t2.width + 2 && c.height >= t2.height - 1
+      && Math.abs((c.left + c.right) / 2 - (t2.left + t2.right) / 2) < 1.5;
+  }));
   t('작은 글씨가 큰 글씨보다 작다', await page.evaluate(() => {
     const px = e => parseFloat(getComputedStyle(e).fontSize);
     const sm = document.querySelector('.pie__sn--sm'), bg = document.querySelector('.pie__sn:not(.pie__sn--sm)');
@@ -546,16 +562,30 @@ await page.waitForTimeout(250);
     NS.filter(o => !o.onBand).map(o => `${o.lab} r=${o.rad.toFixed(1)}`).join(' ') || '없음');
   t('좁은 조각만 작은 글씨', NS.filter(o => o.sm).length > 0 && NS.filter(o => !o.sm).length > 0,
     NS.map(o => `${o.lab}${o.sm ? '(작)' : ''}`).join(' '));
+  /* 가는 조각이 잇달으면 원을 띠의 안쪽·바깥쪽으로 엇갈려 앉힌다 — 안 그러면 뒤에 그린
+     원이 앞 숫자를 덮는다 (2026-10-26) */
+  t('바싹 붙은 원은 두 줄로 엇갈린다', await page.evaluate(() => {
+    const r = [...document.querySelectorAll('.pie__snb')]
+      .map(e => Math.hypot(+e.getAttribute('cx') - 100, +e.getAttribute('cy') - 112));
+    return r.length >= 4 && new Set(r.map(v => Math.round(v))).size >= 2;
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__snb')]
+    .map(e => Math.hypot(+e.getAttribute('cx') - 100, +e.getAttribute('cy') - 112).toFixed(0)).join(' ')));
+  t('원도 띠 안에 머문다', await page.evaluate(() =>
+    [...document.querySelectorAll('.pie__snb')].every(e => {
+      const d = Math.hypot(+e.getAttribute('cx') - 100, +e.getAttribute('cy') - 112);
+      const r2 = +e.getAttribute('r');
+      return d - r2 >= 60 - 1 && d + r2 <= 84 + 1;
+    })));
   /* 부정에서 강화는 **더 모진 쪽**이라 진하고, 약화는 **덜 모진 쪽**이라 옅어야 한다
      (2026-10-26, 교수님 지정 — 「부-약화가 부정보다 덜 진하게」) */
   t('부정은 강화가 진하고 약화가 옅다', await page.evaluate(() => {
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
     const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '부')
-      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+      .map(e => lum(e.querySelector('.pie__seg').getAttribute('stroke')));
     return g.length === 3 && g[0] < g[1] - 8 && g[1] < g[2] - 25;
   }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
-    .filter(e => e.dataset.rs === '부').map(e => e.querySelector('circle').getAttribute('stroke')).join(' ')));
+    .filter(e => e.dataset.rs === '부').map(e => e.querySelector('.pie__seg').getAttribute('stroke')).join(' ')));
   t('잘게 갈려도 틀을 안 넘는다', await page.evaluate(() => {
     const sv = document.querySelector('.pie__svg').getBoundingClientRect();
     return [...document.querySelectorAll('.pie__sn')].every(e => {
@@ -568,14 +598,14 @@ await page.waitForTimeout(250);
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
     const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '중')
-      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+      .map(e => lum(e.querySelector('.pie__seg').getAttribute('stroke')));
     const d = Math.max(...g) - Math.min(...g);
     return d > 6 && d < 70;          // 눈에는 보이되 다른 색으로는 안 보일 만큼
   }));
   t('조각 길이의 합이 그대로', await page.evaluate(() => {
     const total = state.rows.filter(p => getRating(p) !== '비').length;
     const HALF = Math.PI * 72;
-    const sum = [...document.querySelectorAll('.pie__hit circle')]
+    const sum = [...document.querySelectorAll('.pie__seg')]
       .reduce((a, c) => a + parseFloat(c.getAttribute('stroke-dasharray')), 0);
     /* 틈(갈래 안 0.8 · 갈래끼리 1.5)만큼 짧으므로 조금 모자란 것이 맞다 */
     return sum < HALF && sum > HALF - 20;

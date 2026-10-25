@@ -605,9 +605,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   paint-order:stroke;stroke:rgba(15,19,25,.5);stroke-width:3px;stroke-linejoin:round;
   pointer-events:none;letter-spacing:-.3px}
 /* 좁은 조각의 인원도 **제 색 위**에 적는다 (2026-10-26) — 글씨만 작게 줄인다.
-   옆 조각을 조금 침범해도 괜찮다(교수님 지정). 흰 글자·어두운 테는 그대로라 어느 색
-   위에서나 읽힌다. 테는 글씨에 맞춰 얇게 둔다 — 3px 그대로면 작은 글씨가 뭉개진다. */
-.pie__sn--sm{font-size:9.5px;stroke-width:2.2px;letter-spacing:-.2px}
+   옆 조각을 조금 침범해도 괜찮다(교수님 지정). 글자를 **작은 원에 담아**(`.pie__snb`)
+   어느 숫자가 한 덩이인지 보이게 한다. 원이 바탕을 대 주므로 글자에 테는 두지 않는다. */
+.pie__sn--sm{font-size:9.5px;stroke:none;letter-spacing:-.2px}
+.pie__snb{fill:rgba(15,19,25,.68);stroke:rgba(255,255,255,.6);stroke-width:.9;pointer-events:none}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
 .pie__hit:focus-visible .pie__seg{stroke-width:30}
