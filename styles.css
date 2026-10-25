@@ -604,11 +604,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__sn{text-anchor:middle;dominant-baseline:central;font-size:13px;font-weight:800;fill:#fff;
   paint-order:stroke;stroke:rgba(15,19,25,.5);stroke-width:3px;stroke-linejoin:round;
   pointer-events:none;letter-spacing:-.3px}
-/* 좁은 조각의 인원은 띠 **바깥**에 적는다 (2026-10-25) — 안에 넣으면 옆 조각을 덮는다.
-   바탕 위에 놓이므로 흰 글자·검은 테가 아니라 본문색 그대로 쓴다. */
-.pie__sn--out{font-size:10.5px;font-weight:700;fill:var(--ink-2);stroke:none;letter-spacing:-.2px}
-/* 좁은 조각과 그 숫자를 잇는 실마리 선 — 어느 조각의 숫자인지 알아보게 */
-.pie__lead{stroke:var(--ink-3);stroke-width:.8;opacity:.75;pointer-events:none}
+/* 좁은 조각의 인원도 **제 색 위**에 적는다 (2026-10-26) — 글씨만 작게 줄인다.
+   옆 조각을 조금 침범해도 괜찮다(교수님 지정). 흰 글자·어두운 테는 그대로라 어느 색
+   위에서나 읽힌다. 테는 글씨에 맞춰 얇게 둔다 — 3px 그대로면 작은 글씨가 뭉개진다. */
+.pie__sn--sm{font-size:9.5px;stroke-width:2.2px;letter-spacing:-.2px}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
 .pie__hit:focus-visible .pie__seg{stroke-width:30}

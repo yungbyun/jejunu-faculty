@@ -36,7 +36,7 @@ t('비(평가제외)는 도넛에 없음', !nums.some(x=>x.r==='비'));
 
 // 2) 숫자가 조각 안에 있다 — 도넛 띠(반지름 60~84) 위에 놓였는지
 t('띠 안의 숫자는 띠 위에 놓임', await page.evaluate(()=>
-  [...document.querySelectorAll('.pie__sn:not(.pie__sn--out)')].every(tx=>{
+  [...document.querySelectorAll('.pie__sn')].every(tx=>{
     const x=+tx.getAttribute('x'), y=+tx.getAttribute('y');
     const d=Math.hypot(x-100, y-112);
     return d>60 && d<84 && y<=112.5;
@@ -484,42 +484,86 @@ await page.waitForTimeout(250);
     return g.length > 0 && g.every(e => e.querySelectorAll('text').length === 1);
   }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
     .map(e => (e.querySelector('title').textContent.split(' —')[0]) + '→' + (e.querySelector('text') || {}).textContent).join(' ')));
-  t('좁은 조각은 바깥에 적는다', await page.evaluate(() => {
-    const rows = state.rows, p = rows.find(x => getRating(x) === '부');
-    /* 부를 한 명만 남겨 아주 좁은 조각을 만든다 */
+  /* 2026-10-26 — 좁은 조각의 숫자도 **제 색 위**에 적는다(교수님 지정). 글씨만 작아진다.
+     띠 바깥에 적고 실마리 선을 긋던 방식은 그만두었다. */
+  t('좁은 조각은 글씨만 작게, 자리는 제 색 위', await page.evaluate(() => {
+    const rows = state.rows;
     rows.filter(x => getRating(x) === '부').slice(1).forEach(x => setRating(rKey(x), '중'));
-    renderStats();
+    renderStats();                                   // 부를 한 명만 남겨 아주 좁은 조각을 만든다
     const g = [...document.querySelectorAll('.pie__hit')].find(e => e.dataset.rs === '부');
-    return !!g && g.querySelector('text').classList.contains('pie__sn--out');
+    const tx = g && g.querySelector('text');
+    if (!tx) return false;
+    const x = +tx.getAttribute('x'), y = +tx.getAttribute('y');
+    return tx.classList.contains('pie__sn--sm') && Math.abs(Math.hypot(x - 100, y - 112) - 72) < 2;
   }));
-  t('바깥 숫자에는 실마리 선이 붙는다', await page.evaluate(() =>
-    document.querySelectorAll('.pie__lead').length === document.querySelectorAll('.pie__sn--out').length
-    && document.querySelectorAll('.pie__lead').length > 0));
-  /* 모두 매긴 자료에서 — 좁은 조각이 몇 되지 않을 때는 하나도 안 포개져야 한다 */
-  t('바깥 숫자끼리 포개지지 않는다', await page.evaluate(() => {
-    const rows = state.rows, plan = [['확', 29], ['중', 23], ['부', 3], ['비', 6]];
-    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
-    let i = 0;
-    for (const [rr, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), rr);
-    rows.filter(p => getRating(p) === '중').slice(0, 6).forEach(p => sures().add(rKey(p)));
-    rows.filter(p => getRating(p) === '중').slice(6, 7).forEach(p => weaks().add(rKey(p)));
-    rows.filter(p => getRating(p) === '부').slice(0, 1).forEach(p => sures().add(rKey(p)));
-    renderStats();
-    const r = [...document.querySelectorAll('.pie__sn--out')].map(e => e.getBoundingClientRect());
-    if (r.length < 2) return false;      // 이 자료에서는 좁은 조각이 둘 이상 나와야 뜻이 있다
-    for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
-      const a2 = r[i], b2 = r[j];
-      if (!(a2.right < b2.left - .5 || b2.right < a2.left - .5 || a2.bottom < b2.top - .5 || b2.bottom < a2.top - .5)) return false;
-    }
-    return true;
+  t('실마리 선은 쓰지 않는다', await page.evaluate(() => document.querySelectorAll('.pie__lead').length === 0));
+  t('작은 글씨가 큰 글씨보다 작다', await page.evaluate(() => {
+    const px = e => parseFloat(getComputedStyle(e).fontSize);
+    const sm = document.querySelector('.pie__sn--sm'), bg = document.querySelector('.pie__sn:not(.pie__sn--sm)');
+    return !!sm && !!bg && px(sm) < px(bg);
+  }), await page.evaluate(() => {
+    const px = e => e ? getComputedStyle(e).fontSize : '없음';
+    return `${px(document.querySelector('.pie__sn--sm'))} vs ${px(document.querySelector('.pie__sn:not(.pie__sn--sm)'))}`;
   }));
-  t('바깥 숫자가 그림 틀을 넘지 않는다', await page.evaluate(() => {
+  t('숫자가 그림 틀을 넘지 않는다', await page.evaluate(() => {
     const sv = document.querySelector('.pie__svg').getBoundingClientRect();
-    return [...document.querySelectorAll('.pie__sn--out')].every(e => {
+    return [...document.querySelectorAll('.pie__sn')].every(e => {
       const r = e.getBoundingClientRect();
       return r.left >= sv.left - 1 && r.right <= sv.right + 1 && r.top >= sv.top - 1 && r.bottom <= sv.bottom + 1;
     });
   }));
+  /* 2026-10-26 — 교수님이 「중간의 약화 숫자가 왜 없지」라고 짚어 주셨다. 숫자는 그려지고
+     있었으나 자리를 찾다가 띠에 묻혀 있었다. 이제 **모든 숫자가 제 조각 한가운데**에
+     얹히므로 빠지는 것이 없다. 겹쳐도 괜찮다 — 색이 곧 갈래라 읽어 낼 수 있다. */
+  const nums = () => page.evaluate(() => {
+    const R = 72, W = 24, CX = 100, CY = 112;
+    return [...document.querySelectorAll('.pie__hit')].map(e => {
+      const t2 = e.querySelector('text');
+      const x = +t2.getAttribute('x'), y = +t2.getAttribute('y');
+      return { lab: e.getAttribute('aria-label').split(' — ')[0], n: +t2.textContent,
+        sm: t2.classList.contains('pie__sn--sm'), rad: Math.hypot(x - CX, y - CY),
+        onBand: Math.abs(Math.hypot(x - CX, y - CY) - R) < W / 2 };
+    });
+  });
+  /* 강화·약화까지 잘게 갈린 자료 — 좁은 조각이 여섯이나 된다 */
+  await page.evaluate(() => {
+    const rows = state.rows;
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
+    let i = 0;
+    const give = (r, n, m) => { for (let k = 0; k < n; k++) { const p = rows[i++]; if (!p) return;
+      setRating(rKey(p), r); if (m === 's') sures().add(rKey(p)); if (m === 'w') weaks().add(rKey(p)); } };
+    give('확', 20); give('확', 2, 'w'); give('중', 3, 's'); give('중', 2); give('중', 1, 'w');
+    give('부', 2, 's'); give('부', 1); give('부', 1, 'w'); give('비', 4);
+    renderStats();
+  });
+  const NS = await nums();
+  t('강화·약화 조각에도 숫자가 빠짐없이 붙는다', NS.length === 9 && NS.every(o => o.n > 0),
+    NS.map(o => `${o.lab}=${o.n}`).join(' '));
+  t('숫자를 다 더하면 모수가 된다', NS.reduce((a, o) => a + o.n, 0) ===
+    await page.evaluate(() => state.rows.filter(p => getRating(p) !== '비').length),
+    String(NS.reduce((a, o) => a + o.n, 0)));
+  t('숫자는 모두 제 조각 위에 얹힌다', NS.every(o => o.onBand),
+    NS.filter(o => !o.onBand).map(o => `${o.lab} r=${o.rad.toFixed(1)}`).join(' ') || '없음');
+  t('좁은 조각만 작은 글씨', NS.filter(o => o.sm).length > 0 && NS.filter(o => !o.sm).length > 0,
+    NS.map(o => `${o.lab}${o.sm ? '(작)' : ''}`).join(' '));
+  /* 부정에서 강화는 **더 모진 쪽**이라 진하고, 약화는 **덜 모진 쪽**이라 옅어야 한다
+     (2026-10-26, 교수님 지정 — 「부-약화가 부정보다 덜 진하게」) */
+  t('부정은 강화가 진하고 약화가 옅다', await page.evaluate(() => {
+    const lum = h => { const m = h.replace('#', '');
+      return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '부')
+      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+    return g.length === 3 && g[0] < g[1] - 8 && g[1] < g[2] - 25;
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+    .filter(e => e.dataset.rs === '부').map(e => e.querySelector('circle').getAttribute('stroke')).join(' ')));
+  t('잘게 갈려도 틀을 안 넘는다', await page.evaluate(() => {
+    const sv = document.querySelector('.pie__svg').getBoundingClientRect();
+    return [...document.querySelectorAll('.pie__sn')].every(e => {
+      const r = e.getBoundingClientRect();
+      return r.left >= sv.left - 1 && r.right <= sv.right + 1 && r.top >= sv.top - 1 && r.bottom <= sv.bottom + 1;
+    });
+  }));
+
   t('빛깔 턱은 살짝만 — 같은 갈래로 보여야 한다', await page.evaluate(() => {
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
