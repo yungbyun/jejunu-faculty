@@ -217,6 +217,39 @@ t('부에 약화를 찍어도 0 그대로', await wOf('부', 'weak') === 0, Stri
 t('확에 강화를 찍어도 .95 그대로 — 꼭대기다', await wOf('확', 'sure') === .95, String(await wOf('확', 'sure')));
 t('settings 의 weak 키로도 등록', await page.evaluate(() =>
   SET_KEYS.includes('weak') && SET_LABEL['weak'] === '약화'));
+/* ---------- 선호도 안의 차례 (2026-10-25, 교수님 지정) ----------
+ * **도움 → 강화 → 보통 → 약화**, 같은 자리면 **이름 오름차순**. */
+{
+  const O = await page.evaluate(() => {
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set(); vipSet = new Set();
+    const rows = state.rows.slice(0, 12);
+    rows.forEach(p => setRating(rKey(p), '중'));
+    rows.slice(0, 3).forEach(p => vips().add(rKey(p)));
+    rows.slice(2, 6).forEach(p => sures().add(rKey(p)));   // 셋째는 도움이면서 강화
+    rows.slice(6, 9).forEach(p => weaks().add(rKey(p)));
+    sureSave(); weakSave(); vipSave();
+    location.hash = '#/stats'; render();
+    const names = [...document.querySelectorAll('[data-rslist="중"] li a')].map(e => e.textContent.trim());
+    const rank = n => { const p = state.rows.find(x => x.name === n);
+      return isVip(p) ? 0 : isSure(p) ? 1 : isWeak(p) ? 3 : 2; };
+    return { names, ranks: names.map(rank) };
+  });
+  t('도움 → 강화 → 보통 → 약화 차례', O.ranks.every((v, i) => i === 0 || O.ranks[i - 1] <= v),
+    O.names.map((n, i) => `${n}${O.ranks[i]}`).join(' '));
+  t('네 자리가 다 나온다', new Set(O.ranks).size === 4, O.ranks.join(''));
+  t('도움이면 강화여도 맨 앞', O.ranks.slice(0, 3).every(v => v === 0), O.ranks.join(''));
+  t('같은 자리 안은 이름 오름차순', await page.evaluate(() => {
+    const names = [...document.querySelectorAll('[data-rslist="중"] li a')].map(e => e.textContent.trim());
+    const rank = n => { const p = state.rows.find(x => x.name === n);
+      return isVip(p) ? 0 : isSure(p) ? 1 : isWeak(p) ? 3 : 2; };
+    for (let i = 1; i < names.length; i++)
+      if (rank(names[i - 1]) === rank(names[i]) && names[i - 1].localeCompare(names[i], 'ko') > 0) return false;
+    return true;
+  }), O.names.join(' '));
+  await page.evaluate(() => { sureSet = new Set(); weakSet = new Set(); vipSet = new Set();
+    localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); localStorage.removeItem('jnu-vip'); });
+}
+
 /* ---------- 옛 갈래를 사다리로 옮기기 (2026-10-25) ----------
  * 갈래가 여섯에서 셋으로 줄면서 **긍정 → 중간+강화**, **모름 → 부정+강화** 로 옮긴다.
  * 쌓아 둔 자료가 걸린 일이라 꼼꼼히 본다. */

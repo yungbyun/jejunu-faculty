@@ -2060,6 +2060,13 @@ function tagStats() {
 const STP = { pick: false, only: false };
 
 /* 이름 칩 하나. 고르기 모드에서는 링크가 아니라 단추가 되어 눌러도 상세로 가지 않는다 */
+/* 선호도 안에서의 차례 — **도움 → 강화 → 보통 → 약화**, 같은 자리면 **이름 오름차순**
+ * (2026-10-25, 교수님 지정). 도움은 강화·약화와 함께 설 수 있으므로 **먼저** 가릅니다.
+ * 이름은 한글 차례로 맞춥니다(`localeCompare(…, 'ko')`) — 그냥 비교하면 자모 차례가 됩니다. */
+const stRank = p => isVip(p) ? 0 : isSure(p) ? 1 : isWeak(p) ? 3 : 2;
+const stSort = list => [...list].sort((a, b) =>
+  stRank(a) - stRank(b) || String(a.name).localeCompare(String(b.name), 'ko'));
+
 function stChip(p, r) {
   const met = getMet(p), pu = isPush(p), su = isSure(p), wk = isWeak(p), vi = isVip(p), pr = isPres(p), k = rKey(p);
   const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${wk ? ' weak' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
@@ -2119,7 +2126,7 @@ function renderStats() {
           ${CONFIG.RATINGS.LABELS.map(r => {
             const inRow = all.filter(p => getRating(p) === r);
             const np = inRow.filter(isPush).length;
-            const ps = STP.only ? inRow.filter(isPush) : inRow;
+            const ps = stSort(STP.only ? inRow.filter(isPush) : inRow);
             return `
             <div class="st-list" data-rslist="${esc(r)}"><h3><i class="sw sw--${rcls(r)}"></i>${esc(r)} <span class="n">${inRow.length}</span>${np ? `<span class="n n--push">${PUSH_FLAG} ${np}</span>` : ''}</h3>
               ${ps.length ? `<ul>${ps.map(p => stChip(p, r)).join('')}</ul>` : `<div class="muted st-small">${STP.only ? '공략으로 고른 분이 없습니다' : '없음'}</div>`}
