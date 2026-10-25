@@ -560,7 +560,30 @@ await page.waitForTimeout(250);
     String(NS.reduce((a, o) => a + o.n, 0)));
   t('숫자는 모두 제 조각 위에 얹힌다', NS.every(o => o.onBand),
     NS.filter(o => !o.onBand).map(o => `${o.lab} r=${o.rad.toFixed(1)}`).join(' ') || '없음');
-  t('좁은 조각만 작은 글씨', NS.filter(o => o.sm).length > 0 && NS.filter(o => !o.sm).length > 0,
+  /* 큰 글씨는 **갈래마다 하나**, 그 갈래에서 가장 많은 조각에만 (2026-10-26, 교수님 지정).
+     으뜸이라도 조각이 가늘면 작은 원에 담으므로 「큰 글씨는 으뜸뿐」만 못 박는다. */
+  t('큰 글씨는 갈래마다 많아야 하나', await page.evaluate(() => {
+    const by = {};
+    [...document.querySelectorAll('.pie__hit')].forEach(e => {
+      const big = !e.querySelector('text').classList.contains('pie__sn--sm');
+      by[e.dataset.rs] = (by[e.dataset.rs] || 0) + (big ? 1 : 0);
+    });
+    return Object.values(by).every(v => v <= 1);
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+    .map(e => `${e.dataset.rs}${e.querySelector('text').classList.contains('pie__sn--sm') ? '작' : '큰'}`).join(' ')));
+  t('큰 글씨는 그 갈래의 으뜸 조각에', await page.evaluate(() => {
+    const by = {};
+    [...document.querySelectorAll('.pie__hit')].forEach(e => {
+      const n = +e.querySelector('text').textContent;
+      const big = !e.querySelector('text').classList.contains('pie__sn--sm');
+      (by[e.dataset.rs] = by[e.dataset.rs] || []).push({ n, big });
+    });
+    return Object.values(by).every(v => {
+      const mx = Math.max(...v.map(x => x.n));
+      return v.every(x => !x.big || x.n === mx);        // 큰 글씨면 반드시 으뜸이다
+    });
+  }));
+  t('으뜸이 아니면 모두 작은 원', NS.filter(o => o.sm).length > 0 && NS.filter(o => !o.sm).length > 0,
     NS.map(o => `${o.lab}${o.sm ? '(작)' : ''}`).join(' '));
   /* 가는 조각이 잇달으면 원을 띠의 안쪽·바깥쪽으로 엇갈려 앉힌다 — 안 그러면 뒤에 그린
      원이 앞 숫자를 덮는다 (2026-10-26) */

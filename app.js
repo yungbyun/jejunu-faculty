@@ -1922,9 +1922,13 @@ function donut(profs) {
      앉히다 보면 어느 조각의 숫자인지 알기 어려웠고 띠에 묻히기도 했다. 색 위에 얹으면
      **무슨 색의 숫자인지가 곧 어느 갈래인지**라, 겹쳐도 읽어 낼 수 있다. */
   let lastT2 = -9, zig = 0;                        // 바싹 붙은 작은 원을 엇갈려 앉히려고
-  const num = (off2, len, n) => {
+  /* 큰 글씨는 **갈래마다 하나**, 그 갈래에서 가장 많은 조각에만 준다 (2026-10-26, 교수님 지정).
+   * 갈래 하나가 셋으로 갈리면 큰 글씨도 셋이 되어 어느 것이 그 갈래의 몸집인지 흐려진다.
+   * 으뜸만 크게 두면 **멀리서는 갈래의 크기가, 가까이서는 갈래 안의 갈림이** 읽힌다.
+   * 으뜸이라도 조각이 너무 가늘면(13 미만) 글자가 이웃을 덮으므로 작은 원에 담는다. */
+  const num = (off2, len, n, top) => {
     const [x, y] = midXY(off2, len);
-    if (len >= 13) return `<text class="pie__sn" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+    if (top && len >= 13) return `<text class="pie__sn" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
     /* 좁은 조각의 숫자는 **작은 원에 담는다** (2026-10-26, 교수님 지정). 조각이 가늘어
        글자가 이웃 조각까지 걸치는데, 원이 울타리 노릇을 해 **어느 숫자인지 한 덩이로**
        보인다. 원은 글자 수에 맞춰 넓힌다 — 두 자리면 조금 더 크게.
@@ -1958,6 +1962,7 @@ function donut(profs) {
   };
   const arcs = items.map(({ r, n }) => {
     const subs = subsOf(r);
+    const top = subs.reduce((a2, b2, i) => b2.n > subs[a2].n ? i : a2, 0);   // 그 갈래의 으뜸 조각
     const a = subs.map(({ tag, n: sn }, i) => {
       const len = sn / total * HALF;
       /* 갈래 **안**은 틈을 아예 두지 않는다 — 빛깔 턱만으로 가른다. 틈이 있으면 다른 갈래처럼
@@ -1972,7 +1977,7 @@ function donut(profs) {
       <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${shade(RCOLOR[r], SUB_D[tag])}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
         transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${num(off, len, sn)}
+      ${num(off, len, sn, i === top)}
     </g>`;
       off += len;
       return g;
