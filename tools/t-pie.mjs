@@ -431,6 +431,32 @@ await page.waitForTimeout(250);
     return g[0] < g[1] && g[1] < g[2];     // 강화 < 그냥 < 약화 (밝기)
   }));
   t('누를 자리는 갈래 그대로', D.rs.every(r => ['확','긍','중','모','부','미지정'].includes(r)), D.rs.join('|'));
+  /* 갈래 **안**에는 틈을 두지 않는다 — 틈이 있으면 다른 갈래처럼 보인다 (2026-10-25, 교수님 지적).
+     갈래끼리의 틈보다 반드시 좁아야 한다. */
+  t('갈래 안은 틈 없이 이어 붙는다', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')];
+    const L = e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'));
+    const OFF = e => -parseFloat(e.querySelector('circle').getAttribute('stroke-dashoffset'));
+    const inner = [], outer = [];
+    for (let i = 1; i < g.length; i++) {
+      const gapv = OFF(g[i]) - (OFF(g[i - 1]) + L(g[i - 1]));
+      (g[i].dataset.rs === g[i - 1].dataset.rs ? inner : outer).push(Math.round(gapv * 10) / 10);
+    }
+    return inner.length > 0 && inner.every(v => v < 0.05) && outer.every(v => v > 1.5);
+  }), await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')];
+    const L = e => parseFloat(e.querySelector('circle').getAttribute('stroke-dasharray'));
+    const OFF = e => -parseFloat(e.querySelector('circle').getAttribute('stroke-dashoffset'));
+    return g.slice(1).map((e, i) => `${g[i].dataset.rs}${e.dataset.rs === g[i].dataset.rs ? '=' : '|'}${(OFF(e) - OFF(g[i]) - L(g[i])).toFixed(1)}`).join(' ');
+  }));
+  t('빛깔 턱은 살짝만 — 같은 갈래로 보여야 한다', await page.evaluate(() => {
+    const lum = h => { const m = h.replace('#', '');
+      return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.dataset.rs === '긍')
+      .map(e => lum(e.querySelector('circle').getAttribute('stroke')));
+    const d = Math.max(...g) - Math.min(...g);
+    return d > 6 && d < 70;          // 눈에는 보이되 다른 색으로는 안 보일 만큼
+  }));
   t('조각 길이의 합이 그대로', await page.evaluate(() => {
     const total = state.rows.filter(p => getRating(p) !== '비').length;
     const HALF = Math.PI * 72;

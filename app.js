@@ -1900,7 +1900,7 @@ function donut(profs) {
    * 한다. 갈래 차례도 전체 길이도 그대로라 멀리서 보면 전과 같은 도넛이다.
    * 갈래 안의 틈은 좁게(0.8), 갈래끼리는 넓게(1.5) 두어 **어디까지가 한 갈래인지** 보인다.
    * 누를 자리(`data-rs`)는 갈래 그대로라, 어느 조각을 눌러도 그 갈래 명단으로 간다. */
-  const SUB_D = { '+강화': -22, '': 0, '-약화': 30 };
+  const SUB_D = { '+강화': -15, '': 0, '-약화': 20 };
   const subsOf = r => {
     const list = profs.filter(p => (getRating(p) || '미지정') === r);
     const su = list.filter(p => isSure(p) && W_SURE[r] != null);
@@ -1913,7 +1913,10 @@ function donut(profs) {
     const subs = subsOf(r);
     const a = subs.map(({ tag, n: sn }, i) => {
       const len = sn / total * HALF;
-      const gap = i === subs.length - 1 ? (items.length > 1 ? 1.5 : 0) : 0.8;
+      /* 갈래 **안**은 틈을 아예 두지 않는다 — 빛깔 턱만으로 가른다. 틈이 있으면 다른 갈래처럼
+         보인다(2026-10-25 에 교수님이 「같은 갈래로 안 보인다」고 짚어 주셨다).
+         갈래**끼리**의 틈은 1.5 → 2.4 로 넓혀 경계를 또렷이 한다. */
+      const gap = i === subs.length - 1 ? (items.length > 1 ? 2.4 : 0) : 0;
       const seg = Math.max(0, len - gap);
       const [tx, ty] = midXY(off, len);
       const name = `${r}${tag}`;
