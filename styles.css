@@ -642,6 +642,35 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @media (max-width:620px){ .pie__kpi--4 .pie__k{flex:1 1 42%} }
 /* 넷째 카드 — 환산 점수(굳기를 반영해 더한 값). 머릿수가 아니라 점수라 빛깔을 달리한다 */
 .pie__k--score b{color:var(--brand)}
+/* 눌러서 풀이를 펴는 칸 (2026-10-25) */
+.pie__k--score{cursor:pointer}
+.pie__k--score:hover{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.pie__k--score:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 40%,transparent);outline-offset:2px}
+.expl__v{margin-left:3px;vertical-align:-1px;transition:transform .18s var(--ease)}
+.pie__k--score[aria-expanded="true"] .expl__v{transform:rotate(180deg)}
+/* 풀이 칸 — 띠 하나가 모수 전체, 색칠한 데가 기대 표 수, 금이 절반 자리 */
+.expl{width:100%;max-width:560px;margin:2px 0 2px;padding:12px 14px 10px;
+  border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface)}
+.expl[hidden]{display:none}
+.expl__bar{position:relative;display:flex;height:22px;border-radius:6px;overflow:visible;
+  background:var(--surface-2);margin:2px 0 26px}
+.expl__seg{flex:0 0 var(--w);background:var(--c);min-width:0}
+.expl__seg:first-child{border-radius:6px 0 0 6px}
+.expl__sd{position:absolute;top:-3px;bottom:-3px;border-radius:4px;pointer-events:auto;
+  background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--ink) 13%,transparent) 0 3px,transparent 3px 6px);
+  outline:1px solid color-mix(in srgb,var(--ink) 30%,transparent)}
+.expl__half{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink);border-radius:2px}
+.expl__half b{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);
+  white-space:nowrap;font-size:10.5px;font-weight:700;color:var(--ink-2)}
+.expl__t{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.expl__t th,.expl__t td{padding:3px 4px;text-align:right}
+.expl__t th[scope="row"]{text-align:left;font-weight:600;white-space:nowrap}
+.expl__t thead th{font-size:10.5px;font-weight:700;color:var(--ink-3);border-bottom:1px solid var(--line)}
+.expl__t tfoot th,.expl__t tfoot td{border-top:1px solid var(--line);padding-top:5px}
+.expl__t tfoot em{font-style:normal;color:var(--ink-3);font-weight:600}
+.expl__t .sw{margin-right:5px;vertical-align:-1px}
+.expl__t--0{color:var(--ink-3)}
+.expl__p{margin:8px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-2);word-break:keep-all}
 .pie__k--score{border-color:color-mix(in srgb,var(--brand) 22%,var(--line))}
 /* 테두리는 **둘째 카드(확실+긍정)** 에 두른다 (2026-10-20, 사용자 지정. 전에는 셋째였다).
    지지 기반이 어디까지인지가 눈이 먼저 가야 할 자리라서다. 테두리 빛깔은 그 카드의

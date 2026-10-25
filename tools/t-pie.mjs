@@ -445,6 +445,8 @@ await page.waitForTimeout(250);
     sures().add(rKey(a)); sures().add(rKey(b2)); sureSave();
     return weightOf(a) === wa && weightOf(b2) === wb && wa === .2 && wb === 0;
   }));
+  const weightSumHere = await page.evaluate(() =>
+    Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);
   t('미지정은 0 이다', await page.evaluate(() => {
     const p = state.rows.find(x => !getRating(x));
     return !p || weightOf(p) === 0;
@@ -453,6 +455,58 @@ await page.waitForTimeout(250);
     const p = state.rows.find(x => getRating(x) === '비');
     return weightOf(p) === 0 && !document.querySelector('.pie__u').textContent.includes(`전체 ${state.rows.length}명`);
   }));
+  /* 기대 카드를 누르면 **풀이 칸**이 펴진다 (2026-10-25, 교수님 요청) */
+  t('처음엔 접혀 있다', await page.evaluate(() =>
+    document.querySelector('[data-expopen]').getAttribute('aria-expanded') === 'false'
+    && document.querySelector('#explBox').hidden));
+  await page.click('[data-expopen]');
+  await page.waitForTimeout(350);
+  const X = await page.evaluate(() => {
+    const e = document.querySelector('#explBox');
+    const seg = [...e.querySelectorAll('.expl__seg')];
+    const total = state.rows.filter(p => getRating(p) !== '비').length;
+    const sum = seg.reduce((a2, s2) => a2 + parseFloat(s2.style.getPropertyValue('--w')), 0);
+    const want = weightSum(state.rows.filter(p => getRating(p) !== '비')) / total * 100;
+    const foot = e.querySelector('.expl__t tfoot td b').textContent;
+    const rows = [...e.querySelectorAll('.expl__t tbody tr')].map(r => {
+      const c = [...r.children].map(x => x.textContent.trim());
+      return { k: c[0], n: +c[1].replace('명', ''), w: +c[2], s: +c[3] };
+    });
+    return { open: !e.hidden, segs: seg.length, sum, want, foot, rows,
+             half: parseFloat(e.querySelector('.expl__half').style.left),
+             halfWant: Math.ceil(total / 2) / total * 100,
+             sd: !!e.querySelector('.expl__sd') };
+  });
+  t('누르면 풀이가 펴진다', X.open && await page.evaluate(() =>
+    document.querySelector('[data-expopen]').getAttribute('aria-expanded') === 'true'));
+  t('띠의 길이가 기대 표 수와 같다', Math.abs(X.sum - X.want) < .2, `${X.sum.toFixed(1)}% / 셈 ${X.want.toFixed(1)}%`);
+  t('금이 절반 자리에 선다', Math.abs(X.half - X.halfWant) < .2, `${X.half}% / 셈 ${X.halfWant.toFixed(1)}%`);
+  t('흔들림 폭 띠도 그린다', X.sd);
+  t('갈래마다 인원 × 무게 = 보탬', X.rows.every(r => Math.abs(r.n * r.w - r.s) < .06),
+    X.rows.map(r => `${r.k} ${r.n}×${r.w}=${r.s}`).join(' / '));
+  t('강화는 따로 줄을 세운다', X.rows.some(r => /\+강화$/.test(r.k)), X.rows.map(r => r.k).join('|'));
+  t('보탬이 큰 차례로 적는다', X.rows.every((r, i) => i === 0 || X.rows[i - 1].s >= r.s),
+    X.rows.map(r => r.s).join(' '));
+  t('합계가 기대 표 수와 같다', Math.abs(+X.foot - weightSumHere) < .06,
+    `${X.foot} / 셈 ${weightSumHere}`);
+  t('비참여는 표에 없다', !X.rows.some(r => r.k === '비'), X.rows.map(r => r.k).join('|'));
+  await page.click('[data-expopen]');
+  await page.waitForTimeout(250);
+  t('다시 누르면 접힌다', await page.evaluate(() => document.querySelector('#explBox').hidden));
+  t('키보드로도 펴진다', await page.evaluate(() => {
+    const el = document.querySelector('[data-expopen]');
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    const on = !document.querySelector('#explBox').hidden;
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    return on;
+  }));
+  t('다시 그려도 펴진 채 그대로', await page.evaluate(() => {
+    EXP_OPEN = true; renderStats();
+    return !document.querySelector('#explBox').hidden
+      && document.querySelector('[data-expopen]').getAttribute('aria-expanded') === 'true';
+  }));
+  await page.evaluate(() => { EXP_OPEN = false; renderStats(); });
+
   /* 선호도는 그대로 둔다 — 뒤의 막대·범례 시험이 비참여가 있는 자료를 쓴다 */
   await page.evaluate(() => { sureSet = new Set(); localStorage.removeItem('jnu-sure'); renderStats(); });
 }

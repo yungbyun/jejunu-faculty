@@ -1694,6 +1694,10 @@ const rcls = r => r === '미지정' ? 'none' : rClass(r);
 
 /* ---------- 선호도 원그래프 ----------
  * '비'(평가제외)는 애초에 평가 대상이 아니므로 뺀다. 색은 화면 곳곳에서 쓰는 선호도 색과 같게 맞춘다. */
+let EXP_OPEN = false;    // 기대 카드의 풀이가 펴져 있는가 (2026-10-25). 다시 그려도 이어진다
+/* 풀이가 있다는 표 — 물음표가 아니라 「펴짐/접힘」을 보이는 작은 쐐기다 */
+const EXPL_MARK = '<svg class="expl__v" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
+  + '<path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const RCOLOR = { '확': '#38831c', '긍': '#0d8a6a', '중': '#0a7ab0', '모': '#6b7280', '부': '#c0392b', '비': '#7c5cbf', '미지정': '#b9c0cc' };
 const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 
@@ -1721,6 +1725,22 @@ function weightOf(p) {
   return isSure(p) && W_SURE[r] != null ? W_SURE[r] : W_RATE[r];
 }
 const weightSum = profs => profs.reduce((a, p) => a + weightOf(p), 0);
+/* 갈래별로 몇 명이 얼마씩 보탰는지 — 기대 카드를 누르면 펴지는 풀이에 쓴다 (2026-10-25).
+ * 강화가 값을 올리는 갈래(긍·중)는 「긍+강화」처럼 따로 줄을 세운다. 보탬이 큰 차례로 적는다. */
+function weightRows(profs) {
+  const key = p => {
+    const r = getRating(p) || '미지정';
+    return isSure(p) && W_SURE[r] != null ? `${r}+강화` : r;
+  };
+  const m = new Map();
+  profs.forEach(p => {
+    if (getRating(p) === '비') return;             // 셈에서도 모수에서도 빠진 분
+    const k = key(p), w = weightOf(p);
+    const e = m.get(k) || { k, r: (getRating(p) || '미지정'), w, n: 0 };
+    e.n++; m.set(k, e);
+  });
+  return [...m.values()].map(e => ({ ...e, sum: e.n * e.w })).sort((a, b) => b.sum - a.sum || b.n - a.n);
+}
 /* 흔들림 폭. 저마다 따로 움직인다고 보면 분산은 Σp(1−p) 다(베르누이의 합).
  * 뿌리를 씌워 ± 로 적는다 — 기대값 하나보다 「얼마나 안심해도 되는지」가 보인다. */
 const weightSd = profs => Math.sqrt(profs.reduce((a, p) => { const w = weightOf(p); return a + w * (1 - w); }, 0));
@@ -1782,6 +1802,41 @@ function donut(profs) {
     return `<span class="pie__kn" title="${f1(n)}명은 절반 ${half}명${say} — 상대 ${f1(total - n)}명과는 ${dif}명 차입니다">`
       + `${body}<span class="pie__kd">(${dif}명 차)</span></span>`;
   };
+  /* 기대 카드를 누르면 펴지는 **풀이 칸** (2026-10-25, 교수님 요청).
+   * 숫자 하나만 보여 주고 「믿으세요」 하는 대신, **어디서 얼마가 왔는지** 눈으로 보여 준다.
+   *  - 띠 하나가 모수(${total}명) 전체이고, 색칠한 몫이 기대 표 수다. 금 하나가 절반 자리라
+   *    **「절반 선을 넘었는가」가 한눈에** 든다.
+   *  - 색칠한 끝자락의 옅은 띠가 흔들림 폭(±)이다 — 그 띠가 금을 물고 있으면 아슬아슬하다는 뜻.
+   *  - 아래 표는 갈래마다 「인원 × 무게 = 보탬」을 적는다. 보탬이 큰 차례로 세운다. */
+  const explain = () => {
+    const rows = weightRows(profs);
+    const w = n => (n / total * 100);
+    const segs = rows.filter(r => r.sum > 0).map(r =>
+      `<span class="expl__seg" style="--w:${w(r.sum).toFixed(2)}%;--c:${esc(RCOLOR[r.r] || '#6b7280')}"
+        title="${esc(r.k)} ${r.n}명 × ${r.w} = ${f1(r.sum)}명"></span>`).join('');
+    const lo = Math.max(0, exp - sd), hi = Math.min(total, exp + sd);
+    const band = sd > .05
+      ? `<i class="expl__sd" style="left:${w(lo).toFixed(2)}%;width:${(w(hi) - w(lo)).toFixed(2)}%"
+           title="흔들림 폭 — ${f1(lo)}명에서 ${f1(hi)}명 사이"></i>` : '';
+    const body = rows.map(r => `<tr${r.sum ? '' : ' class="expl__t--0"'}>
+        <th scope="row"><i class="sw sw--${rcls(r.r)}"></i>${esc(r.k)}</th>
+        <td>${r.n}명</td><td>${r.w}</td><td><b>${f1(r.sum)}</b></td></tr>`).join('');
+    const na = profs.filter(p => getRating(p) === '비').length;
+    return `<div class="expl" id="explBox"${EXP_OPEN ? '' : ' hidden'}>
+      <div class="expl__bar" role="img" aria-label="모수 ${total}명 가운데 기대 표 수 ${f1(exp)}명. 절반은 ${half}명.">
+        ${segs}${band}<i class="expl__half" style="left:${w(half).toFixed(2)}%"><b>절반 ${half}</b></i>
+      </div>
+      <table class="expl__t">
+        <thead><tr><th scope="col">갈래</th><th scope="col">인원</th><th scope="col">무게</th><th scope="col">보탬</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><th scope="row">합계</th><td>${total}명</td><td></td><td><b>${f1(exp)}</b> <em>± ${f1(sd)}</em></td></tr></tfoot>
+      </table>
+      <p class="expl__p">갈래마다 <b>나를 찍을 확률</b>을 주어 더한 값입니다. 띠 하나가 모수 ${total}명이고,
+        색칠한 데가 기대 표 수, 금이 절반 ${half}명 자리입니다. 끝의 옅은 띠는 <b>흔들림 폭</b>(± ${f1(sd)})이라
+        그 띠가 금을 물고 있으면 아슬아슬하다는 뜻입니다.${na ? ` 비참여 ${na}명은 셈에서도 모수에서도 뺐습니다.` : ''}</p>
+    </div>`;
+  };
+
   /* 기대 카드의 맨 아랫줄 — 절반과의 거리와 **흔들림 폭(±)**. 폭과 견주어 얼마나 든든한지도
      말풍선에 말로 적는다. 숫자 하나보다 「얼마나 안심해도 되는지」가 보인다. */
   const expLine = () => {
@@ -1846,10 +1901,13 @@ function donut(profs) {
         ${profs.some(isSure) ? `<div class="pie__k pie__k--push" title="확 ${sure} · 긍 ${pos} 에 중인 강화 ${added}명을 더한 값입니다${puWhy ? ` (더해진 사람: ${puWhy})` : ''}${puOut ? ` — 더하지 않은 강화: ${puOut}` : ''}">
           <span class="pie__kl">+중-강화(${added}) <i>${reach}</i></span><b>${pct(reach)}%</b>
           ${vs(reach)}${gapLine(reach)}</div>` : ''}
-        <div class="pie__k pie__k--score" title="사람마다 「나를 찍을 확률」을 주어 더한 값입니다 — ${W_SAY}. 비참여는 셈에서도 모수에서도 빠지고, 아직 안 매긴 ${none}명은 0 으로 둡니다. ± 는 흔들림 폭입니다.">
-          <span class="pie__kl">기대 <i>${f1(exp)}</i></span><b>${pct(exp)}%</b>
+        <div class="pie__k pie__k--score" role="button" tabindex="0" data-expopen
+          aria-expanded="${EXP_OPEN}" aria-controls="explBox"
+          title="눌러서 풀이 보기 — 사람마다 「나를 찍을 확률」을 주어 더한 값입니다 (${W_SAY}). 비참여는 셈에서도 모수에서도 빠지고, 아직 안 매긴 ${none}명은 0 으로 둡니다. ± 는 흔들림 폭입니다.">
+          <span class="pie__kl">기대 <i>${f1(exp)}</i>${EXPL_MARK}</span><b>${pct(exp)}%</b>
           ${vs(Math.round(exp))}${expLine()}</div>
       </div>
+      ${explain()}
       <p class="pie__pool">더 끌어올 수 있는 분은 ${pool.replace(' 중에서', '')}입니다.</p>
       <div class="pie__legend">
         ${items.map(({ r, n }) => `<span class="pie__li"><i class="sw sw--${rcls(r)}"></i>${esc(r)} <b>${n}</b> <em>${Math.round(n / total * 100)}%</em></span>`).join('')}
@@ -1985,6 +2043,21 @@ function renderStats() {
     el.addEventListener('click', go);
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   });
+  /* 기대 카드를 누르면 풀이가 펴진다. 다시 그리지 않고 숨김만 토글해 자리가 안 튄다. */
+  const $exp = $app.querySelector('[data-expopen]');
+  if ($exp) {
+    const box = $app.querySelector('#explBox');
+    const toggle = () => {
+      EXP_OPEN = !EXP_OPEN;
+      $exp.setAttribute('aria-expanded', String(EXP_OPEN));
+      if (box) box.hidden = !EXP_OPEN;
+      if (EXP_OPEN && box) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+    $exp.addEventListener('click', toggle);
+    $exp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  }
   /* 도넛 조각 → 아래 명단의 그 줄로. 화면을 옮기지 않고 같은 페이지 안에서 내려간다. */
   $app.querySelectorAll('[data-rs]').forEach(el => {
     const go = () => {
