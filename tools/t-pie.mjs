@@ -521,9 +521,10 @@ await page.waitForTimeout(250);
     rows.filter(p => getRating(p) === '확').slice(0, 1).forEach(p => weaks().add(rKey(p)));
     rows.filter(p => getRating(p) === '부').slice(0, 2).forEach(p => sures().add(rKey(p)));
     sureSave(); weakSave(); renderStats();
-    /* 확 3×.95 + 확−약 1×.85 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.15 + 부 3×0 */
-    const want = 3 * .95 + .85 + 2 * .65 + 3 * .50 + .35 + 2 * .15;
-    const varr = 3 * .95 * .05 + .85 * .15 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65 + 2 * .15 * .85;
+    /* 확 3×.95 + 확−약 1×.85 + 중+강 2×.65 + 중 3×.5 + 중−약 1×.35 + 부+강 2×.15 + 부 3×.05 */
+    const want = 3 * .95 + .85 + 2 * .65 + 3 * .50 + .35 + 2 * .15 + 3 * .05;
+    const varr = 3 * .95 * .05 + .85 * .15 + 2 * .65 * .35 + 3 * .5 * .5 + .35 * .65
+      + 2 * .15 * .85 + 3 * .05 * .95;
     const kl = document.querySelector('.pie__k--score .pie__kl').textContent.trim();
     const kn = document.querySelector('.pie__k--score .pie__kn').textContent.trim();
     return { want: Math.round(want * 10) / 10, sd: Math.round(Math.sqrt(varr) * 10) / 10,
@@ -549,17 +550,27 @@ await page.waitForTimeout(250);
     sures().add(rKey(p)); sureSave(); renderStats();
     return Math.round((weightSum(state.rows.filter(q => getRating(q) !== '비')) - was) * 100) / 100;
   });
-  t('부에 강화를 더하면 .15 만큼 오른다', up2 === 0.15, String(up2));
-  t('확에 찍은 강화는 값을 안 올린다', await page.evaluate(() => {
-    const p = state.rows.find(x => getRating(x) === '확');
-    const was = weightOf(p); sures().add(rKey(p)); sureSave();
-    return weightOf(p) === was;
+  t('부에 강화를 더하면 .1 만큼 오른다 — 바닥이 .05 라서', up2 === 0.1, String(up2));
+  t('아홉 칸이 모두 다르다', await page.evaluate(() => {
+    const ws = [], sv = [...sures()], wv = [...weaks()];   // 다른 시험이 쓰는 표시를 지키려고 적어 둔다
+    for (const r of ['확', '중', '부']) for (const m of ['s', '', 'w']) {
+      const p = state.rows[0], was = getRating(p);
+      setRating(rKey(p), r); sureSet = new Set(); weakSet = new Set();
+      if (m === 's') sures().add(rKey(p));
+      if (m === 'w') weaks().add(rKey(p));
+      ws.push(weightOf(p));
+      sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), was || '');
+    }
+    sureSet = new Set(sv); weakSet = new Set(wv);          // 적어 둔 표시를 되돌린다
+    return new Set(ws).size === 9 && ws.every((v, i) => i === 0 || ws[i - 1] > v);
   }));
-  t('확에 찍힌 강화는 무시한다', await page.evaluate(() => {
-    const a = state.rows.find(x => getRating(x) === '확' && !isWeak(x));
+  t('확에 강화를 찍으면 .03 만큼 오른다 — 천장이 가깝다', await page.evaluate(() => {
+    const a = state.rows.find(x => getRating(x) === '확' && !isWeak(x) && !isSure(x));
     const wa = weightOf(a);
     sures().add(rKey(a)); sureSave();
-    return weightOf(a) === wa && wa === .95;        // 확실은 꼭대기라 강화가 안 먹는다
+    const nw = weightOf(a);
+    sures().delete(rKey(a)); sureSave();
+    return wa === .95 && Math.abs(nw - .98) < 1e-9;
   }));
   const weightSumHere = await page.evaluate(() =>
     Math.round(weightSum(state.rows.filter(p => getRating(p) !== '비')) * 10) / 10);
@@ -602,12 +613,12 @@ await page.waitForTimeout(250);
     X.rows.map(r => `${r.k} ${r.n}×${r.w}=${r.s}`).join(' / '));
   t('강화는 따로 줄을 세운다', X.rows.some(r => /\+강화$/.test(r.k)), X.rows.map(r => r.k).join('|'));
   t('굳은 쪽부터 차례로 적는다', await page.evaluate(() => {
-    const want = ['확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부', '미지정'];
+    const want = ['확+강화', '확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부', '부-약화', '미지정'];
     const got = [...document.querySelectorAll('#explBox .expl__t tbody th')].map(e => e.textContent.trim());
     return got.join('|') === want.filter(k => got.includes(k)).join('|');
   }), X.rows.map(r => r.k).join('|'));
   t('띠도 같은 차례로 쌓는다', await page.evaluate(() => {
-    const want = ['확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부'];
+    const want = ['확+강화', '확', '확-약화', '중+강화', '중', '중-약화', '부+강화', '부', '부-약화'];
     const got = [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]);
     return got.join('|') === want.filter(k => got.includes(k)).join('|');
   }), await page.evaluate(() => [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]).join('|')));
