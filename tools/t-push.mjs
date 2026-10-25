@@ -217,6 +217,47 @@ t('부에 약화를 찍어도 0 그대로', await wOf('부', 'weak') === 0, Stri
 t('모에 약화를 찍어도 .20 그대로', await wOf('모', 'weak') === .2, String(await wOf('모', 'weak')));
 t('settings 의 weak 키로도 등록', await page.evaluate(() =>
   SET_KEYS.includes('weak') && SET_LABEL['weak'] === '약화'));
+/* 분석 칩 — 약화는 바탕을 **기본보다 더 비운다** (2026-10-25, 교수님 지정).
+   밝은 화면에서는 거의 흰빛, 어두운 화면에서는 바탕 쪽으로 가라앉는다. */
+for (const theme of ['light', 'dark']) {
+  const C = await page.evaluate(th => {
+    document.documentElement.setAttribute('data-theme', th);
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
+    const rows = state.rows;
+    rows.slice(0, 9).forEach(p => setRating(rKey(p), '긍'));
+    rows.slice(0, 3).forEach(p => sures().add(rKey(p)));
+    rows.slice(3, 6).forEach(p => weaks().add(rKey(p)));
+    sureSave(); weakSave();
+    location.hash = '#/stats'; render();
+    const lum = c => { const [r, g, b2] = (c.match(/[\d.]+/g) || []).map(Number);
+      return (c.includes('srgb') ? (r + g + b2) / 3 * 255 : (r + g + b2) / 3); };
+    const pick = s2 => lum(getComputedStyle(document.querySelector(s2)).backgroundColor);
+    const base = lum(getComputedStyle([...document.querySelectorAll('.st-c')]
+      .find(e => !e.classList.contains('sure') && !e.classList.contains('weak'))).backgroundColor);
+    /* 「덜 실린 쪽」은 밝은 화면에서는 흰 쪽, 어두운 화면에서는 어두운 쪽이다 —
+       두 화면을 한 잣대로 보려면 **칸 바탕(--surface)** 과 견주면 된다. */
+    const hex = v => { const h = v.trim().replace('#', '');
+      const q = h.length === 3 ? h.split('').map(c => c + c) : h.match(/../g);
+      return q.slice(0, 3).reduce((a, x) => a + parseInt(x, 16), 0) / 3; };
+    const rootv = n => hex(getComputedStyle(document.documentElement).getPropertyValue(n));
+    return { base, weak: pick('.st-c.weak'), sure: pick('.st-c.sure'),
+             dash: getComputedStyle(document.querySelector('.st-c.weak')).borderTopStyle,
+             surface: rootv('--surface') };
+  }, theme);
+  const toBase = Math.abs(C.weak - C.base), toSurf = Math.abs(C.weak - C.surface);
+  t(`${theme}: 약화 바탕이 기본과 다르다`, toBase > 4, `기본 ${C.base.toFixed(0)} / 약화 ${C.weak.toFixed(0)}`);
+  t(`${theme}: 약화 바탕이 기본보다 더 비었다`, toSurf < toBase,
+    `칸 바탕 ${C.surface.toFixed(0)} / 약화 ${C.weak.toFixed(0)} / 기본 ${C.base.toFixed(0)}`);
+  t(`${theme}: 약화는 점선 테두리`, C.dash === 'dashed', C.dash);
+  t(`${theme}: 강화와 약화가 또렷이 갈린다`, Math.abs(C.sure - C.weak) > 8,
+    `강화 ${C.sure.toFixed(0)} / 약화 ${C.weak.toFixed(0)}`);
+}
+/* 테마를 되돌리고 **상세로 돌아간다** — 표시(강화·약화)는 그대로 둔다. 뒤의 시험들이
+   강화가 찍힌 자료와 열린 상세를 그대로 이어 쓴다. */
+await page.evaluate(() => { document.documentElement.removeAttribute('data-theme');
+  const p = state.rows[0]; location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
+await page.waitForSelector('.d-marks', { timeout: 10000 });
+await page.waitForTimeout(250);
 await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
   localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak'); });
 

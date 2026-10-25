@@ -769,10 +769,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-c.sure{background:color-mix(in srgb,var(--rc,#5f6672) 10%,var(--surface-2));
   border-color:color-mix(in srgb,var(--rc,#5f6672) 55%,var(--line))}
 .st-c.sure:hover{border-color:var(--rc,#5f6672)}
-/* 약화 — 강화와 같은 옅은 바탕이되 **점선 테두리**로 「내려간 쪽」임을 가른다 (2026-10-25).
-   깃발(공략)·바탕 꽉참(도움)·테 두 줄(VIP)과 겹치지 않는 표시가 필요했다. */
-.st-c.weak{background:color-mix(in srgb,var(--rc,#5f6672) 10%,var(--surface-2));
-  border:1px dashed color-mix(in srgb,var(--rc,#5f6672) 60%,var(--line))}
+/* 약화 — 바탕을 **기본(옅은 회색)보다 더 옅게**, 밝은 화면에서는 거의 흰빛으로 비운다
+   (2026-10-25, 교수님 지정). 바탕이 「얼마나 든든한가」를 말하므로, 강화가 색을 깔면
+   약화는 색을 빼는 쪽이 결이 맞다. 어두운 화면에서는 바탕 쪽으로 가라앉아 역시 옅어진다.
+   갈래는 **점선 테두리**로 알아본다 — 깃발(공략)·바탕 꽉참(도움)·테 두 줄(VIP)과 겹치지 않는다. */
+.st-c.weak{background:color-mix(in srgb,var(--surface-2) 15%,var(--surface));
+  border:1px dashed color-mix(in srgb,var(--rc,#5f6672) 50%,var(--line))}
 .st-c.weak:hover{border-color:var(--rc,#5f6672)}
 /* VIP — 투명도 없이 꽉 채우고 흰 글자. 7% 만 어둡게 해 대비를 4.5 위로 올린다
    (긍 #0d8a6a 를 그냥 쓰면 흰 글자 대비가 4.32 로 모자랐다). */
