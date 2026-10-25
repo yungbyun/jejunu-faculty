@@ -449,6 +449,48 @@ await page.waitForTimeout(250);
     const OFF = e => -parseFloat(e.querySelector('circle').getAttribute('stroke-dashoffset'));
     return g.slice(1).map((e, i) => `${g[i].dataset.rs}${e.dataset.rs === g[i].dataset.rs ? '=' : '|'}${(OFF(e) - OFF(g[i]) - L(g[i])).toFixed(1)}`).join(' ');
   }));
+  /* 조각마다 인원을 적는다 — 좁으면 띠 바깥에 (2026-10-25, 교수님 요청) */
+  t('조각마다 숫자가 하나씩 있다', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')];
+    return g.length > 0 && g.every(e => e.querySelectorAll('text').length === 1);
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+    .map(e => (e.querySelector('title').textContent.split(' —')[0]) + '→' + (e.querySelector('text') || {}).textContent).join(' ')));
+  t('좁은 조각은 바깥에 적는다', await page.evaluate(() => {
+    const rows = state.rows, p = rows.find(x => getRating(x) === '부');
+    /* 부를 한 명만 남겨 아주 좁은 조각을 만든다 */
+    rows.filter(x => getRating(x) === '부').slice(1).forEach(x => setRating(rKey(x), '모'));
+    renderStats();
+    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.dataset.rs === '부');
+    return !!g && g.querySelector('text').classList.contains('pie__sn--out');
+  }));
+  t('바깥 숫자에는 실마리 선이 붙는다', await page.evaluate(() =>
+    document.querySelectorAll('.pie__lead').length === document.querySelectorAll('.pie__sn--out').length
+    && document.querySelectorAll('.pie__lead').length > 0));
+  /* 모두 매긴 자료에서 — 좁은 조각이 몇 되지 않을 때는 하나도 안 포개져야 한다 */
+  t('바깥 숫자끼리 포개지지 않는다', await page.evaluate(() => {
+    const rows = state.rows, plan = [['확', 29], ['긍', 11], ['중', 12], ['모', 2], ['부', 1], ['비', 6]];
+    state.ratings.clear(); sureSet = new Set(); weakSet = new Set();
+    let i = 0;
+    for (const [rr, n] of plan) for (let k = 0; k < n; k++) if (rows[i]) setRating(rKey(rows[i++]), rr);
+    rows.filter(p => getRating(p) === '긍').slice(0, 5).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(0, 6).forEach(p => sures().add(rKey(p)));
+    rows.filter(p => getRating(p) === '중').slice(6, 7).forEach(p => weaks().add(rKey(p)));
+    renderStats();
+    const r = [...document.querySelectorAll('.pie__sn--out')].map(e => e.getBoundingClientRect());
+    if (r.length < 2) return false;      // 이 자료에서는 좁은 조각이 둘 이상 나와야 뜻이 있다
+    for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+      const a2 = r[i], b2 = r[j];
+      if (!(a2.right < b2.left - .5 || b2.right < a2.left - .5 || a2.bottom < b2.top - .5 || b2.bottom < a2.top - .5)) return false;
+    }
+    return true;
+  }));
+  t('바깥 숫자가 그림 틀을 넘지 않는다', await page.evaluate(() => {
+    const sv = document.querySelector('.pie__svg').getBoundingClientRect();
+    return [...document.querySelectorAll('.pie__sn--out')].every(e => {
+      const r = e.getBoundingClientRect();
+      return r.left >= sv.left - 1 && r.right <= sv.right + 1 && r.top >= sv.top - 1 && r.bottom <= sv.bottom + 1;
+    });
+  }));
   t('빛깔 턱은 살짝만 — 같은 갈래로 보여야 한다', await page.evaluate(() => {
     const lum = h => { const m = h.replace('#', '');
       return [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3; };

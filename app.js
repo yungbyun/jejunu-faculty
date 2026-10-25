@@ -1891,9 +1891,45 @@ function donut(profs) {
   let off = 0;
   /* 조각 한가운데 좌표. 파선은 9시에서 시작해 위로 도는 반원이므로, 시작점에서 잰 호 길이를
    * 각도로 바꿔 놓으면 된다(θ = 길이 / 반지름). */
-  const midXY = (a, b) => {
+  const midXY = (a, b, rad = R) => {
     const t = (a + b / 2) / R;
-    return [CX - R * Math.cos(t), CY - R * Math.sin(t)];
+    return [CX - rad * Math.cos(t), CY - rad * Math.sin(t)];
+  };
+  /* 조각마다 인원을 적는다. 넓으면 띠 **안**에, 좁으면 띠 **바깥**에 작게 적는다
+   * (2026-10-25, 교수님 요청 — 「모름에도 숫자를 넣어 봐」).
+   * 전에는 13px 보다 짧은 조각은 아예 안 적었는데, 모름·부처럼 적은 갈래가 늘 빠졌다.
+   * 바깥에 적으면 아무리 좁아도 들어가고 옆 조각을 가리지도 않는다. */
+  /* 바깥에 적는 숫자는 **앞서 적은 것과 안 겹칠 때까지 한 켜씩 밀어낸다**. 좁은 조각이
+     여럿 이웃하면(모 2명 옆에 부 1명처럼) 같은 각도라 숫자끼리 포개지는데, 두 켜로만
+     엇갈리면 셋 넘게 몰릴 때 또 붙는다. 그림 틀(0 0 200 138) 밖으로는 안 나가게 당긴다. */
+  const OUT_R = R + W / 2 + 7;
+  const taken = [];
+  /* 글자 한 자를 7, 높이를 14 로 잡고 본다 — 그림이 CSS 에서 1.25배로 커지므로 넉넉히 둔다 */
+  const hits = (x, y, w2) => taken.some(t =>
+    Math.abs(t.x - x) < (t.w + w2) / 2 + 2 && Math.abs(t.y - y) < 14);
+  const num = (off2, len, n) => {
+    if (len >= 13) {
+      const [x, y] = midXY(off2, len);
+      return `<text class="pie__sn" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+    }
+    const w2 = String(n).length * 7 + 3;
+    const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    /* 한 켜씩 밀어내며 자리를 찾는다. 틀 가장자리에서는 밀어내도 같은 자리로 당겨지므로,
+       그때는 위아래로도 비켜 본다. **당긴 뒤의 자리**로 겹침을 보아야 한다 — 당기기 전
+       자리로 보면 가장자리에서 둘이 같은 곳에 포개진다 (2026-10-25 에 겪었다). */
+    let rad = OUT_R, x = 0, y = 0;
+    outer: for (let k = 0; k < 3; k++) {
+      for (const dy of [0, -15, 15]) {
+        rad = OUT_R + k * 16;
+        const [px, py] = midXY(off2, len, rad);
+        x = cl(px, 8, 192); y = cl(py + dy, 8, 130);
+        if (!hits(x, y, w2)) break outer;
+      }
+    }
+    taken.push({ x, y, w: w2 });
+    const [lx, ly] = midXY(off2, len, R + W / 2 + 1);     // 띠에서 숫자로 긋는 실마리 선
+    return `<line class="pie__lead" x1="${lx.toFixed(1)}" y1="${ly.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`
+      + `<text class="pie__sn pie__sn--out" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
   };
   /* 조각을 **강화·약화까지 갈라** 그린다 (2026-10-25, 교수님 요청).
    * 한 갈래 안에서 차례는 **강화 → 그냥 → 약화**이고, 빛깔은 같은 색을 한 톤 진하게/옅게만
@@ -1925,7 +1961,7 @@ function donut(profs) {
       <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${shade(RCOLOR[r], SUB_D[tag])}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
         transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${len >= 13 ? `<text class="pie__sn" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}">${sn}</text>` : ''}
+      ${num(off, len, sn)}
     </g>`;
       off += len;
       return g;
