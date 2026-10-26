@@ -425,12 +425,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    상세의 강화(↑)·약화(↓) 화살표와 방향이 같아 배우지 않아도 읽힌다.
    10-26 낮에는 흰 점을 찍고 글자를 반대쪽으로 밀었는데, 작은 칸에서 글자가 비뚤어 보였다.
    반달은 **글자를 건드리지 않고** 칸의 절반만 칠하므로 가운데에 그대로 둘 수 있다.
-   칠은 **짙게**(검정 34%) 한다 — 옅게(흰색) 칠하면 그 반쪽에서 흰 글자가 묻힌다.
-   동그란 테두리가 가장자리를 잘라 주어 저절로 반달이 된다. */
+   칠은 **짙게**(검정 52%) 한다 — 옅게(흰색) 칠하면 그 쪽에서 흰 글자가 묻힌다.
+   동그란 테두리가 가장자리를 잘라 주어 저절로 반달이 된다. 절반이 아니라 **32% 만** 칠해
+   띠처럼 얇게 두르고 더 짙게 한다(2026-10-26 저녁, 교수님 지정) — 반이 다 칠해지면 칸의
+   본디 빛깔(갈래 색)이 반이나 가려진다. */
 .rate[data-mk="강화"] .rate__b[aria-pressed="true"]{
-  background-image:linear-gradient(to bottom,rgba(10,14,20,.34) 0 50%,transparent 50%)}
+  background-image:linear-gradient(to bottom,rgba(8,11,16,.52) 0 32%,transparent 32%)}
 .rate[data-mk="약화"] .rate__b[aria-pressed="true"]{
-  background-image:linear-gradient(to top,rgba(10,14,20,.34) 0 50%,transparent 50%)}
+  background-image:linear-gradient(to top,rgba(8,11,16,.52) 0 32%,transparent 32%)}
 .prof[data-rating="확"]{border-color:#38831c}.prof[data-rating="긍"]{border-color:#0d8a6a}.prof[data-rating="중"]{border-color:#0a7ab0}.prof[data-rating="모"]{border-color:#9ca3af}.prof[data-rating="부"]{border-color:#c0392b;opacity:.72}
 .prof[data-rating="비"]{border-color:#7c5cbf;border-style:dashed;opacity:.6}
 
