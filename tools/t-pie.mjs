@@ -13,7 +13,7 @@ await page.waitForFunction(()=>typeof state!=='undefined'&&state.rows.length>0,n
    g 의 테두리 상자 가운데는 도넛의 빈 속이라 아무것도 안 눌린다. */
 async function clickSeg(page, r) {
   const pt = await page.evaluate(rr => {
-    const tx = document.querySelector(`.pie__hit[data-rs="${rr}"] text`);
+    const tx = document.querySelector(`.pie__num[data-rs="${rr}"] text`);
     const svg = tx.ownerSVGElement, m = svg.getScreenCTM();
     const p = svg.createSVGPoint();
     p.x = +tx.getAttribute('x'); p.y = +tx.getAttribute('y');
@@ -28,7 +28,7 @@ await page.evaluate(()=>{ const v=CONFIG.RATINGS.LABELS; state.rows.forEach((p,i
 await page.waitForSelector('.pie__hit',{timeout:10000});
 
 // 1) 숫자가 제 조각에 얹혀 있다
-const nums = await page.evaluate(()=>[...document.querySelectorAll('.pie__hit')].map(g=>({r:g.dataset.rs, n:g.querySelector('text')?.textContent||''})));
+const nums = await page.evaluate(()=>[...document.querySelectorAll('.pie__num')].map(g=>({r:g.dataset.rs, n:g.querySelector('text')?.textContent||''})));
 t('조각마다 번호표', nums.every(x=>x.n!==''), JSON.stringify(nums));
 const real = await page.evaluate(()=>{ const c={}; state.rows.forEach(p=>{const g=getRating(p); if(g)c[g]=(c[g]||0)+1;}); return c; });
 t('숫자가 실제 인원과 같음', nums.every(x=>String(real[x.r])===x.n), JSON.stringify(real));
@@ -480,17 +480,27 @@ await page.waitForTimeout(250);
   }));
   /* 조각마다 인원을 적는다 — 좁으면 띠 바깥에 (2026-10-25, 교수님 요청) */
   t('조각마다 숫자가 하나씩 있다', await page.evaluate(() => {
-    const g = [...document.querySelectorAll('.pie__hit')];
-    return g.length > 0 && g.every(e => e.querySelectorAll('text').length === 1);
-  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
-    .map(e => (e.querySelector('title').textContent.split(' —')[0]) + '→' + (e.querySelector('text') || {}).textContent).join(' ')));
+    const a2 = [...document.querySelectorAll('.pie__hit')], g = [...document.querySelectorAll('.pie__num')];
+    return g.length > 0 && g.length === a2.length && g.every(e => e.querySelectorAll('text').length === 1);
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__num')]
+    .map(e => e.dataset.name + '→' + (e.querySelector('text') || {}).textContent).join(' ')));
+  /* 2026-10-26 — 숫자는 **맨 뒤 한 켜**에 모여 어느 띠에도 안 먹힌다(교수님 지적).
+     켜가 띠보다 뒤에 있어야 하고, 눌리지는 않아야 한다. */
+  t('숫자 켜가 띠보다 뒤에 온다', await page.evaluate(() => {
+    const kids = [...document.querySelector('.pie__svg').children];
+    const lastArc = kids.map(e => e.classList.contains('pie__hit')).lastIndexOf(true);
+    const layer = kids.findIndex(e => e.classList.contains('pie__nums'));
+    return lastArc >= 0 && layer > lastArc;
+  }));
+  t('숫자 켜는 눌리지 않는다 — 조각 누르기는 띠가 받는다', await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.pie__nums')).pointerEvents === 'none'));
   /* 2026-10-26 — 좁은 조각의 숫자도 **제 색 위**에 적는다(교수님 지정). 글씨만 작아진다.
      띠 바깥에 적고 실마리 선을 긋던 방식은 그만두었다. */
   t('좁은 조각은 글씨만 작게, 자리는 제 색 위', await page.evaluate(() => {
     const rows = state.rows;
     rows.filter(x => getRating(x) === '부').slice(1).forEach(x => setRating(rKey(x), '중'));
     renderStats();                                   // 부를 한 명만 남겨 아주 좁은 조각을 만든다
-    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.dataset.rs === '부');
+    const g = [...document.querySelectorAll('.pie__num')].find(e => e.dataset.rs === '부');
     const tx = g && g.querySelector('text');
     if (!tx) return false;
     const x = +tx.getAttribute('x'), y = +tx.getAttribute('y');
@@ -502,20 +512,21 @@ await page.waitForTimeout(250);
     document.querySelectorAll('.pie__snb').length === document.querySelectorAll('.pie__sn--sm').length
     && document.querySelectorAll('.pie__snb').length > 0));
   t('원이 숫자를 덮지 않는다 — 원이 먼저 그려진다', await page.evaluate(() => {
-    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.querySelector('.pie__snb'));
+    const g = [...document.querySelectorAll('.pie__num')].find(e => e.querySelector('.pie__snb'));
     const kids = [...g.children].map(e => e.tagName.toLowerCase() + '.' + (e.getAttribute('class') || ''));
     return kids.indexOf('circle.pie__snb') < kids.findIndex(k => k.startsWith('text.'));
   }));
   /* 원 안의 숫자가 **어느 갈래인지** 빛깔로 말한다 (2026-10-26, 교수님 물음).
      바탕을 **그 조각 색 그대로** 쓰고 흰 테를 둘러 울타리로 삼는다. */
   t('원 바탕은 그 조각 색 그대로', await page.evaluate(() => {
-    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.querySelector('.pie__snb'));
+    const g = [...document.querySelectorAll('.pie__num')].filter(e => e.querySelector('.pie__snb'));
     if (!g.length) return false;
+    const arc = n => document.querySelector(`.pie__hit[data-name="${CSS.escape(n)}"] .pie__seg`);
     return g.every(e => getComputedStyle(e.querySelector('.pie__snb')).fill
-                     === getComputedStyle(e.querySelector('.pie__seg')).stroke);
-  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+                     === getComputedStyle(arc(e.dataset.name)).stroke);
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__num')]
     .filter(e => e.querySelector('.pie__snb'))
-    .map(e => `${e.dataset.rs}:${e.querySelector('.pie__snb').style.getPropertyValue('--sc')}`).join(' ')));
+    .map(e => `${e.dataset.name}:${e.querySelector('.pie__snb').style.getPropertyValue('--sc')}`).join(' ')));
   t('테는 흰색 — 제 띠 위에서도 울타리가 된다', await page.evaluate(() =>
     [...document.querySelectorAll('.pie__snb')].every(e => {
       const k = getComputedStyle(e).stroke.match(/\d+/g).map(Number);
@@ -526,7 +537,7 @@ await page.waitForTimeout(250);
     const L = rgb => { const [r, g, b] = rgb.map(lin); return .2126 * r + .7152 * g + .0722 * b; };
     const cr = (a2, b2) => { const x = L(a2), y = L(b2); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
     const rgb = v => v.match(/\d+/g).map(Number);
-    return [...document.querySelectorAll('.pie__hit')].filter(e => e.querySelector('.pie__snb'))
+    return [...document.querySelectorAll('.pie__num')].filter(e => e.querySelector('.pie__snb'))
       .every(e => cr(rgb(getComputedStyle(e.querySelector('text')).fill),
                      rgb(getComputedStyle(e.querySelector('.pie__snb')).fill)) >= 4.5);
   }), await page.evaluate(() => {
@@ -534,7 +545,7 @@ await page.waitForTimeout(250);
     const L = rgb => { const [r, g, b] = rgb.map(lin); return .2126 * r + .7152 * g + .0722 * b; };
     const cr = (a2, b2) => { const x = L(a2), y = L(b2); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
     const rgb = v => v.match(/\d+/g).map(Number);
-    return [...document.querySelectorAll('.pie__hit')].filter(e => e.querySelector('.pie__snb'))
+    return [...document.querySelectorAll('.pie__num')].filter(e => e.querySelector('.pie__snb'))
       .map(e => cr(rgb(getComputedStyle(e.querySelector('text')).fill),
                    rgb(getComputedStyle(e.querySelector('.pie__snb')).fill)).toFixed(2)).join(' ');
   }));
@@ -548,7 +559,7 @@ await page.waitForTimeout(250);
   }), await page.evaluate(() => [...document.querySelectorAll('.pie__snb')]
     .map(e => `${e.style.getPropertyValue('--sc')}→${e.style.getPropertyValue('--si')}`).join(' ')));
   t('원이 숫자를 품을 만큼 크다', await page.evaluate(() => {
-    const g = [...document.querySelectorAll('.pie__hit')].find(e => e.querySelector('.pie__snb'));
+    const g = [...document.querySelectorAll('.pie__num')].find(e => e.querySelector('.pie__snb'));
     const c = g.querySelector('.pie__snb').getBoundingClientRect();
     const t2 = g.querySelector('text').getBoundingClientRect();
     return c.width >= t2.width + 2 && c.height >= t2.height - 1
@@ -575,10 +586,10 @@ await page.waitForTimeout(250);
   const nums = () => page.evaluate(() => {
     const R = 72, CX = 100, CY = 112;
     const W = parseFloat(getComputedStyle(document.querySelector('.pie__seg')).strokeWidth);
-    return [...document.querySelectorAll('.pie__hit')].map(e => {
+    return [...document.querySelectorAll('.pie__num')].map(e => {
       const t2 = e.querySelector('text');
       const x = +t2.getAttribute('x'), y = +t2.getAttribute('y');
-      return { lab: e.getAttribute('aria-label').split(' — ')[0], n: +t2.textContent,
+      return { lab: e.dataset.name, n: +t2.textContent,
         sm: t2.classList.contains('pie__sn--sm'), rad: Math.hypot(x - CX, y - CY),
         onBand: Math.abs(Math.hypot(x - CX, y - CY) - R) < W / 2 };
     });
@@ -606,16 +617,16 @@ await page.waitForTimeout(250);
      으뜸이라도 조각이 가늘면 작은 원에 담으므로 「큰 글씨는 으뜸뿐」만 못 박는다. */
   t('큰 글씨는 갈래마다 많아야 하나', await page.evaluate(() => {
     const by = {};
-    [...document.querySelectorAll('.pie__hit')].forEach(e => {
+    [...document.querySelectorAll('.pie__num')].forEach(e => {
       const big = !e.querySelector('text').classList.contains('pie__sn--sm');
       by[e.dataset.rs] = (by[e.dataset.rs] || 0) + (big ? 1 : 0);
     });
     return Object.values(by).every(v => v <= 1);
-  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__num')]
     .map(e => `${e.dataset.rs}${e.querySelector('text').classList.contains('pie__sn--sm') ? '작' : '큰'}`).join(' ')));
   t('큰 글씨는 그 갈래의 으뜸 조각에', await page.evaluate(() => {
     const by = {};
-    [...document.querySelectorAll('.pie__hit')].forEach(e => {
+    [...document.querySelectorAll('.pie__num')].forEach(e => {
       const n = +e.querySelector('text').textContent;
       const big = !e.querySelector('text').classList.contains('pie__sn--sm');
       (by[e.dataset.rs] = by[e.dataset.rs] || []).push({ n, big });
@@ -807,7 +818,7 @@ await page.waitForTimeout(250);
       const d = document.createElement('div');
       d.style.color = e.querySelector('.pie__seg').getAttribute('stroke');
       document.body.appendChild(d);
-      arc[e.getAttribute('aria-label').split(' ')[0]] = getComputedStyle(d).color;
+      arc[e.dataset.name] = getComputedStyle(d).color;
       d.remove();
     });
     return { seg, sw, arc };

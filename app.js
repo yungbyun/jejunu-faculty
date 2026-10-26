@@ -2002,6 +2002,12 @@ function donut(profs) {
     return [['+강화', su.length], ['', plain], ['-약화', wk.length]]
       .filter(([, n]) => n > 0).map(([tag, n]) => ({ tag, n }));
   };
+  /* 숫자는 조각과 **따로, 맨 뒤 한 켜에** 그린다 (2026-10-26, 교수님 지적).
+   * SVG 는 나중에 그린 것이 앞에 오므로, 숫자를 제 조각 안에 두면 **다음 조각의 띠가
+   * 그 숫자를 덮는다** — 가는 조각(확-약화 1명 같은)의 원이 옆 띠에 반쯤 먹혔다.
+   * 모아 두었다가 모든 띠를 그린 뒤 얹으면 어느 숫자도 가리지 않는다.
+   * 이 켜는 눌리지 않게 두어(`pointer-events:none`) 조각 누르기는 그대로 띠가 받는다. */
+  const numLayer = [];
   const arcs = items.map(({ r, n }) => {
     const subs = subsOf(r);
     const top = subs.reduce((a2, b2, i) => b2.n > subs[a2].n ? i : a2, 0);   // 그 갈래의 으뜸 조각
@@ -2015,12 +2021,13 @@ function donut(profs) {
       const [tx, ty] = midXY(off, len);
       const col = shade(RCOLOR[r], SUB_D[tag]);     // 그 조각의 빛깔 — 원 바탕에도 쓴다
       const name = `${r}${tag}`;
-      const g = `<g class="pie__hit" data-rs="${esc(r)}" role="button" tabindex="0"
+      numLayer.push(`<g class="pie__num" data-rs="${esc(r)}" data-name="${esc(name)}" aria-hidden="true">`
+        + num(off, len, sn, i === top, col) + `</g>`);
+      const g = `<g class="pie__hit" data-rs="${esc(r)}" data-name="${esc(name)}" role="button" tabindex="0"
       aria-label="${esc(name)} ${sn}명 — 아래 선호도별 교수 목록으로">
       <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${col}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
         transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${num(off, len, sn, i === top, col)}
     </g>`;
       off += len;
       return g;
@@ -2033,7 +2040,7 @@ function donut(profs) {
         aria-label="선호도 분포 — 확실 ${sure}명으로 ${pct(sure)}%${added ? `, 중간인 강화까지 더하면 ${reach}명으로 ${pct(reach)}%` : ''}. ${items.map(x => `${x.r} ${x.n}명`).join(', ')} , 찍을 확률로 환산한 기대 표 수는 ${f1(exp)}명으로 ${pct(exp)}%, 흔들림 폭은 ${f1(sd)}명. (평가제외 빼고 합계 ${total}명)">
         <circle r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="var(--surface-2)" stroke-width="${W}"
           stroke-dasharray="${HALF.toFixed(1)} ${HALF.toFixed(1)}" transform="rotate(180 ${CX} ${CY})"></circle>
-        ${arcs}
+        ${arcs}<g class="pie__nums">${numLayer.join('')}</g>
         <text class="pie__n" x="100" y="100">${pct(sure)}%</text>
         <text class="pie__u" x="100" y="122">전체 ${total}명(절반 ${half}명)</text>
       </svg>
