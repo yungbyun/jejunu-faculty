@@ -4165,7 +4165,7 @@ const REL_POS = ['가깝', '친하', '친분', '함께', '같이', '도와', '�
 const REL_NEG = ['서먹', '껄끄', '갈등', '틀어', '반대', '불편', '앙금', '거리감', '멀어', '비판',
   '부정적', '경쟁', '사이가 안', '사이가 좋지', '안 좋', '싫어', '껄끄럽'];
 const REL_FLIP = /(않|않다|안\s|못\s|아니|별로)/;
-const RELV = { all: true, alum: true, open: '' };   // 보기 설정 — 기본은 **전부**(사용자 지정 2026-10-17)
+const RELV = { all: true, alum: true, open: '', uni: '' };   // 보기 설정 — 기본은 **전부**(사용자 지정 2026-10-17)
 
 /* 메모 한 토막에서 그 이름에 대한 마음을 −2…+2 로 읽는다 */
 function relPolar(sentence, name) {
@@ -4258,6 +4258,54 @@ const relColor = e => e.kind === 'alum' ? 'var(--rel-mid)'
 const relWord = e => e.kind === 'alum' ? '동문(추정)' : e.pol > 0 ? '가까움' : e.pol < 0 ? '껄끄러움' : '언급';
 const nameOfKey = k => { const p = state.rows.find(x => rKey(x) === k); return p ? p.name : k; };
 
+/* ---------- 출신 대학 줄 (2026-10-26, 교수님 지정) ----------
+ * 관계 지도 **위**에 출신 대학을 쭉 늘어놓고, 하나를 누르면 그 대학을 거친 교수 명단을 편다.
+ * 동문선은 같은 대학끼리 **다 이어** 실타래가 되기 쉬운데(그래서 15명 넘는 묶음은 선을 긋지
+ * 않습니다), 명단은 몇 명이든 한눈에 듭니다. 선으로 못 보여 주는 큰 묶음을 여기서 봅니다.
+ * 비참여는 관계 지도와 똑같이 뺍니다 — 한 자리에 두 가지 셈이 있으면 숫자가 어긋나 보입니다.
+ * 한 분이 학·석·박을 다른 대학에서 받았으면 **그 대학마다** 셉니다(합이 인원보다 큽니다). */
+function relUnivs() {
+  const rows = state.rows.filter(p => getRating(p) !== '비');
+  const m = new Map();
+  rows.forEach(p => eduUnivs(eduOf(p)).forEach(u => {
+    if (!m.has(u)) m.set(u, []);
+    m.get(u).push(p);
+  }));
+  /* 많은 데부터, 같으면 이름 차례 — 자리가 들쭉날쭉 바뀌지 않게 못 박는다 */
+  return [...m.entries()].map(([u, ps]) => ({ u, ps }))
+    .sort((a, b) => b.ps.length - a.ps.length || a.u.localeCompare(b.u, 'ko'));
+}
+/* 그 대학에서 **무슨 학위**를 받았는지 — 학·석·박 */
+const eduDegs = (p, u) => { const e = eduOf(p) || {};
+  return [[e.bs, '학'], [e.ms, '석'], [e.phd, '박']].filter(x => x[0] === u).map(x => x[1]).join(''); };
+
+function relUniHtml() {
+  const list = relUnivs();
+  if (!list.length) return '';
+  const none = state.rows.filter(p => getRating(p) !== '비' && !eduUnivs(eduOf(p)).length).length;
+  const pick = list.find(x => x.u === RELV.uni);
+  const chips = list.map(({ u, ps }) => `<button type="button" class="rel-u${u === RELV.uni ? ' on' : ''}"
+      data-reluni="${esc(u)}" aria-pressed="${u === RELV.uni}"
+      title="${esc(u)} 출신 ${ps.length}명 — 누르면 명단">${esc(u)} <i>${ps.length}</i></button>`).join('');
+  /* 이름표는 분석 쪽과 같은 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략
+     토글 단추가 되는데, 여기서는 눌러서 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
+  const names = pick ? (() => {
+    const was = STP.pick; STP.pick = false;
+    const html = stSort(pick.ps).map(p => {
+      const d = eduDegs(p, pick.u);
+      return stChip(p, getRating(p)).replace('</a>', `${d ? `<em class="st-d">${esc(d)}</em>` : ''}</a>`);
+    }).join('');
+    STP.pick = was;
+    return html;
+  })() : '';
+  return `<div class="rel-unis" data-relunis>
+    <div class="rel-us">${chips}</div>
+    <p class="st-note">출신 대학 ${list.length}곳 · 누르면 그 대학을 거친 교수 명단이 펴집니다${none ? ` · 학력 자료가 없는 분 ${none}명` : ''}</p>
+    ${pick ? `<ul class="rel-unames">${names}</ul>
+      <p class="st-note">${esc(pick.u)} — ${pick.ps.length}명 (학사·석사·박사를 모두 셉니다. 학/석/박)</p>` : ''}
+  </div>`;
+}
+
 function relSection() {
   return `<section class="st-sec rel" id="relSec">
     <div class="cal-head"><h2>관계 지도</h2></div>
@@ -4312,6 +4360,7 @@ function relRefresh(keep) {
   if (hot) SIM.edges.forEach(e => { if (e.a === hot) near.add(e.b); if (e.b === hot) near.add(e.a); });
 
   box.innerHTML = `
+    ${relUniHtml()}
     <div class="rel-tools">
       <button type="button" class="btn${RELV.all ? '' : ' on'}" data-relme aria-pressed="${!RELV.all}">나와 이어진 것만</button>
       <button type="button" class="btn${RELV.alum ? ' on' : ''}" data-relalum aria-pressed="${RELV.alum}">동문선 보기</button>
@@ -4530,6 +4579,11 @@ function relBind(box) {
   box.querySelectorAll('[data-relrow]').forEach(el => el.addEventListener('click', () => open(el.dataset.relrow)));
   box.querySelectorAll('[data-relbr]').forEach(el => el.addEventListener('click', () => {
     SIM.focus = el.dataset.relbr; RELV.open = ''; relRefresh(true);
+  }));
+  /* 같은 것을 다시 누르면 접는다. 그림 자리는 물려받아(keep) 명단만 열고 닫아도 점이 안 튄다 */
+  box.querySelectorAll('[data-reluni]').forEach(el => el.addEventListener('click', () => {
+    RELV.uni = RELV.uni === el.dataset.reluni ? '' : el.dataset.reluni;
+    relRefresh(true);
   }));
   box.querySelector('[data-relme]')?.addEventListener('click', () => { RELV.all = !RELV.all; RELV.open = ''; SIM.focus = ''; relRefresh(); });
   box.querySelector('[data-relalum]')?.addEventListener('click', () => { RELV.alum = !RELV.alum; RELV.open = ''; relRefresh(); });

@@ -779,10 +779,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .st-list{display:grid;grid-template-columns:92px 1fr;align-items:start;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
 .st-list h3{margin:0;padding-top:4px;font-size:13.5px;display:flex;align-items:center;gap:6px}
 .st-list h3 .n{color:var(--ink-3);font-weight:500}
-.st-list ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:9px}   /* VIP 의 바깥 고리(3.5px)가 옆 칩에 닿지 않게 6→9 */
+.st-list ul,.rel-unames{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:9px}   /* VIP 의 바깥 고리(3.5px)가 옆 칩에 닿지 않게 6→9 */
 /* 칩은 이름만 (2026-09-20). 학과·직위는 title 로만 남겨 마우스를 올리면 보인다 */
-.st-list li a,.st-list li button{display:inline-flex;align-items:center;gap:0;padding:4px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-weight:600;font-size:13px;white-space:nowrap;color:inherit;cursor:pointer}
-.st-list li a:hover,.st-list li button:hover{border-color:var(--brand)}
+.st-list li a,.st-list li button,.rel-unames li a{display:inline-flex;align-items:center;gap:0;padding:4px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-weight:600;font-size:13px;white-space:nowrap;color:inherit;cursor:pointer}
+.st-list li a:hover,.st-list li button:hover,.rel-unames li a:hover{border-color:var(--brand)}
 /* 공략으로 고른 사람 — **깃발 하나만** (2026-10-16, 사용자 지정).
    예전에는 주황 테까지 둘렀는데, 바탕이 선호도 색을 입은 뒤로는 테까지 겹쳐 어지러웠다.
    깃발은 이름 왼쪽에 붙고 색도 주황이라 그것만으로 눈에 들어온다. */
@@ -890,6 +890,21 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rel-pos:#35b07a;--rel-neg:#d85f52;--rel-mid:#6f7a8a}}
 :root[data-theme="dark"]{--rel-pos:#35b07a;--rel-neg:#d85f52;--rel-mid:#6f7a8a}
 .rel-box{display:flex;flex-direction:column;gap:10px}
+/* 출신 대학 줄 — 관계 지도 위에 쭉 늘어놓고, 누르면 그 대학 교수 명단이 펴진다 (2026-10-26) */
+.rel-unis{display:flex;flex-direction:column;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+/* 대학이 서른 곳이 넘으면 폰에서 열 줄이 되어 지도가 밀려난다 — 키를 묶고 굴린다 */
+.rel-us{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow:auto;align-content:start}
+.rel-u{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-2);
+  font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .12s}
+.rel-u:hover{border-color:var(--line-2);color:var(--ink)}
+.rel-u i{font-style:normal;font-weight:800;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rel-u.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 10%,var(--surface));color:var(--brand)}
+.rel-u.on i{color:var(--brand)}
+/* 명단은 분석 쪽 칩을 그대로 쓰고(위의 `.st-list li a` 와 같은 줄에 묶어 두었다),
+   학위 글자만 뒤에 작게 붙인다 */
+.rel-unames{max-height:220px;overflow:auto;align-content:start}
+.st-d{font-style:normal;font-size:10px;font-weight:800;opacity:.75;margin-left:4px;letter-spacing:-.3px}
 .rel-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .rel-tools .btn{display:inline-flex;width:auto;flex:none}
 .rel-tools .btn.on{border-color:var(--brand);color:var(--brand);background:var(--surface-2)}

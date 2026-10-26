@@ -218,6 +218,62 @@ t('누르면 근거 문장을 보여 준다', (await page.evaluate(() => documen
 
 await page.evaluate(() => { state.rows.forEach(p => applyEntry(rKey(p), { rating: '', memo: '' })); });
 
+/* ---------- 출신 대학 줄 (2026-10-26, 교수님 지정) ----------
+ * 관계 지도 **위**에 출신 대학을 쭉 늘어놓고, 하나를 누르면 그 대학을 거친 교수 명단이 편다. */
+await page.waitForSelector('.rel-unis [data-reluni]', { timeout: 20000 });
+const U = await page.evaluate(() => {
+  const chips = [...document.querySelectorAll('[data-reluni]')];
+  const box = document.querySelector('.rel-unis');
+  const svg = document.querySelector('.rel-svg') || document.querySelector('.rel-tools');
+  return {
+    n: chips.length,
+    names: chips.map(e => e.dataset.reluni),
+    cnts: chips.map(e => +e.querySelector('i').textContent),
+    above: !!(box && svg) && (box.compareDocumentPosition(svg) & Node.DOCUMENT_POSITION_FOLLOWING) > 0,
+    open: document.querySelectorAll('.rel-unames').length,
+  };
+});
+t('대학 줄이 그림 위에 있다', U.above);
+t('대학을 쭉 늘어놓는다', U.n > 3, `${U.n}곳`);
+t('많은 데부터 적는다', U.cnts.every((v, i) => i === 0 || U.cnts[i - 1] >= v), U.cnts.join(','));
+t('같은 수면 이름 차례', U.names.every((v, i) => i === 0 ||
+  U.cnts[i - 1] > U.cnts[i] || U.names[i - 1].localeCompare(v, 'ko') <= 0), U.names.join(','));
+t('처음에는 명단이 접혀 있다', U.open === 0);
+
+const uni = U.names[0];
+await page.click(`[data-reluni="${uni}"]`);
+await page.waitForTimeout(400);
+const L = await page.evaluate(u => {
+  const li = [...document.querySelectorAll('.rel-unames li a')];
+  const want = state.rows.filter(p => getRating(p) !== '비' && [...new Set([eduOf(p)?.bs, eduOf(p)?.ms, eduOf(p)?.phd])].includes(u));
+  return {
+    n: li.length, want: want.length,
+    /* 「최수석」처럼 이름이 학위 글자로 끝나기도 한다 — 글자를 깎지 말고 학위 조각만 떼어 낸다 */
+    names: li.map(e => { const c = e.cloneNode(true); c.querySelector('.st-d')?.remove(); return c.textContent.trim(); }),
+    wantNames: want.map(p => p.name),
+    degs: li.map(e => (e.querySelector('.st-d') || {}).textContent || ''),
+    pressed: document.querySelector(`[data-reluni="${CSS.escape(u)}"]`).getAttribute('aria-pressed'),
+    link: li[0] && li[0].getAttribute('href'),
+    tip: li[0] && li[0].title,
+  };
+}, uni);
+t('고른 대학 명단이 펴진다', L.n > 0 && L.n === L.want, `${L.n} / ${L.want}명`);
+t('그 대학 사람만 나온다', L.names.every(n => L.wantNames.includes(n)), L.names.join(' '));
+t('고른 칩이 눌린 꼴', L.pressed === 'true');
+t('학위를 학·석·박으로 적는다', L.degs.every(d => /^[학석박]{1,3}$/.test(d)), L.degs.join(' '));
+t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(L.link || ''), L.link);
+t('도움말에 학과와 확률', /·/.test(L.tip || '') && /확률|비참여|미지정/.test(L.tip || ''), L.tip);
+t('비참여는 명단에서 뺀다', await page.evaluate(u => {
+  const li = [...document.querySelectorAll('.rel-unames li a')]
+    .map(e => { const c = e.cloneNode(true); c.querySelector('.st-d')?.remove(); return c.textContent.trim(); });
+  return !state.rows.some(p => getRating(p) === '비' && li.includes(p.name));
+}, uni));
+
+await page.click(`[data-reluni="${uni}"]`);
+await page.waitForTimeout(350);
+t('다시 누르면 접힌다', await page.evaluate(() => document.querySelectorAll('.rel-unames').length === 0));
+t('명단을 여닫아도 그림은 그대로', await page.evaluate(() => !!document.querySelector('.rel-svg') || !!document.querySelector('.rel-box .empty')));
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);
