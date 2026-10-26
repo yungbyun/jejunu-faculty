@@ -178,43 +178,53 @@ t('비참여는 셈에서 뺀다고 적는다', (await over('비')).includes('�
 t('비참여가 두 번 적히지 않는다', (await over('비')).split('비참여').length === 2, await over('비'));
 t('갈래 이름이 맨 앞에 있다', (await over('비')) === '비참여 · 셈에서 뺌', await over('비'));
 
-/* 고른 칸의 **강화는 위, 약화는 아래**에 흰 점 (2026-10-26, 교수님 안).
- * 상세의 강화(↑)·약화(↓) 화살표와 방향이 같다. 점은 `::after` 라, 있는지와 어느 쪽에
- * 붙었는지를 계산된 꼴에서 읽는다. */
-const dot = () => page.evaluate(() => {
+/* 고른 칸의 **강화는 위쪽, 약화는 아래쪽 반달**을 짙게 칠한다 (2026-10-26, 교수님 안).
+ * 상세의 강화(↑)·약화(↓) 화살표와 방향이 같다. 칠은 바탕 그림(선형 그라데이션)이라
+ * 계산된 꼴에서 읽는다 — 아래로 흐르면 **위 반달**, 위로 흐르면 **아래 반달**이 짙다.
+ * (`to bottom` 은 기본값이라 계산된 꼴에서 생략된다.) */
+const half = () => page.evaluate(() => {
   const b2 = document.querySelector('.rate[data-key] .rate__b[aria-pressed="true"]');
   if (!b2) return { none: true };
-  const a2 = getComputedStyle(b2, '::after');
-  return { mk: b2.closest('.rate').dataset.mk, has: a2.content !== 'none',
-    top: a2.top, bottom: a2.bottom, w: a2.width };
+  const bg = getComputedStyle(b2).backgroundImage;
+  return { mk: b2.closest('.rate').dataset.mk, has: bg !== 'none',
+    up: bg.includes('to top'), bg,
+    pad: getComputedStyle(b2).paddingTop + '/' + getComputedStyle(b2).paddingBottom };
 });
 
 await setup('중', '');
 await page.waitForSelector('.rate[data-key] .rate__b');
-let D = await dot();
-t('표시가 없으면 점도 없다', D.mk === '' && !D.has, JSON.stringify(D));
+let D = await half();
+t('표시가 없으면 반달도 없다', D.mk === '' && !D.has, D.bg);
 await setup('중', 's');
-D = await dot();
-t('강화면 점이 생긴다', D.mk === '강화' && D.has, JSON.stringify(D));
-t('강화 점은 위쪽에', parseFloat(D.top) < parseFloat(D.bottom), `위 ${D.top} / 아래 ${D.bottom}`);
+D = await half();
+t('강화면 반달이 생긴다', D.mk === '강화' && D.has, D.bg);
+t('강화는 위쪽 반달', D.has && !D.up, D.bg);
 await setup('중', 'w');
-D = await dot();
-t('약화면 점이 아래쪽에', D.mk === '약화' && D.has && parseFloat(D.bottom) < parseFloat(D.top),
-  `위 ${D.top} / 아래 ${D.bottom}`);
+D = await half();
+t('약화는 아래쪽 반달', D.mk === '약화' && D.has && D.up, D.bg);
+/* 위아래 안쪽 여백이 같으면 글자가 가운데다 — 반달은 글자를 건드리지 않는다.
+   0 이 아니라 **같은지**를 본다(단추에 본디 깔린 여백이 있다). */
+t('글자는 밀지 않는다 — 가운데 그대로', D.pad.split('/')[0] === D.pad.split('/')[1], D.pad);
 await setup('확', 's');
-D = await dot();
-t('확실에도 붙는다', D.mk === '강화' && D.has, JSON.stringify(D));
+D = await half();
+t('확실에도 칠한다', D.mk === '강화' && D.has && !D.up, D.bg);
 await setup('부', 'w');
-D = await dot();
-t('부정에도 붙는다', D.mk === '약화' && D.has, JSON.stringify(D));
+D = await half();
+t('부정에도 칠한다', D.mk === '약화' && D.has && D.up, D.bg);
 await setup('비', 's');
-D = await dot();
-t('비참여에는 안 붙는다 — 표시가 숫자를 못 바꾼다', D.mk === '' && !D.has, JSON.stringify(D));
+D = await half();
+t('비참여에는 안 칠한다 — 표시가 숫자를 못 바꾼다', D.mk === '' && !D.has, D.bg);
 await setup('중', 's');
-t('점은 고른 칸에만', await page.evaluate(() =>
+t('반달은 고른 칸에만', await page.evaluate(() =>
   [...document.querySelectorAll('.rate[data-key] .rate__b')]
     .filter(x => x.getAttribute('aria-pressed') !== 'true')
-    .every(x => getComputedStyle(x, '::after').content === 'none')));
+    .every(x => getComputedStyle(x).backgroundImage === 'none')));
+t('짙게 칠한다 — 흰 글자가 묻히지 않게', await page.evaluate(() => {
+  const b2 = document.querySelector('.rate[data-key] .rate__b[aria-pressed="true"]');
+  const m = getComputedStyle(b2).backgroundImage.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return !!m && Number(m[1]) < 60 && Number(m[2]) < 60 && Number(m[3]) < 60;
+}), await page.evaluate(() => getComputedStyle(
+  document.querySelector('.rate[data-key] .rate__b[aria-pressed="true"]')).backgroundImage));
 
 /* 상세에서 강화·약화를 누르면 **칸의 점도 그 자리에서** 따라와야 한다 */
 await page.evaluate(() => { const p = state.rows[0];
@@ -222,19 +232,19 @@ await page.evaluate(() => { const p = state.rows[0];
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
 await page.waitForSelector('.rate--wide');
 await page.waitForTimeout(250);
-t('상세에서 처음엔 점이 없다', await page.evaluate(() =>
+t('상세에서 처음엔 반달이 없다', await page.evaluate(() =>
   document.querySelector('.rate--wide').dataset.mk === ''));
 await page.click('[data-surebtn]');
 await page.waitForTimeout(250);
-t('강화를 누르면 바로 점이 붙는다', await page.evaluate(() =>
+t('강화를 누르면 바로 반달이 생긴다', await page.evaluate(() =>
   document.querySelector('.rate--wide').dataset.mk === '강화'));
 await page.click('[data-weakbtn]');
 await page.waitForTimeout(250);
-t('약화로 바꾸면 점도 아래로', await page.evaluate(() =>
+t('약화로 바꾸면 반달도 아래로', await page.evaluate(() =>
   document.querySelector('.rate--wide').dataset.mk === '약화'));
 await page.click('[data-weakbtn]');
 await page.waitForTimeout(250);
-t('풀면 점도 사라진다', await page.evaluate(() =>
+t('풀면 반달도 사라진다', await page.evaluate(() =>
   document.querySelector('.rate--wide').dataset.mk === ''));
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
