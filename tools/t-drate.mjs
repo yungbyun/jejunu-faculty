@@ -178,6 +178,65 @@ t('비참여는 셈에서 뺀다고 적는다', (await over('비')).includes('�
 t('비참여가 두 번 적히지 않는다', (await over('비')).split('비참여').length === 2, await over('비'));
 t('갈래 이름이 맨 앞에 있다', (await over('비')) === '비참여 · 셈에서 뺌', await over('비'));
 
+/* 고른 칸의 **강화는 위, 약화는 아래**에 흰 점 (2026-10-26, 교수님 안).
+ * 상세의 강화(↑)·약화(↓) 화살표와 방향이 같다. 점은 `::after` 라, 있는지와 어느 쪽에
+ * 붙었는지를 계산된 꼴에서 읽는다. */
+const dot = () => page.evaluate(() => {
+  const b2 = document.querySelector('.rate[data-key] .rate__b[aria-pressed="true"]');
+  if (!b2) return { none: true };
+  const a2 = getComputedStyle(b2, '::after');
+  return { mk: b2.closest('.rate').dataset.mk, has: a2.content !== 'none',
+    top: a2.top, bottom: a2.bottom, w: a2.width };
+});
+
+await setup('중', '');
+await page.waitForSelector('.rate[data-key] .rate__b');
+let D = await dot();
+t('표시가 없으면 점도 없다', D.mk === '' && !D.has, JSON.stringify(D));
+await setup('중', 's');
+D = await dot();
+t('강화면 점이 생긴다', D.mk === '강화' && D.has, JSON.stringify(D));
+t('강화 점은 위쪽에', parseFloat(D.top) < parseFloat(D.bottom), `위 ${D.top} / 아래 ${D.bottom}`);
+await setup('중', 'w');
+D = await dot();
+t('약화면 점이 아래쪽에', D.mk === '약화' && D.has && parseFloat(D.bottom) < parseFloat(D.top),
+  `위 ${D.top} / 아래 ${D.bottom}`);
+await setup('확', 's');
+D = await dot();
+t('확실에도 붙는다', D.mk === '강화' && D.has, JSON.stringify(D));
+await setup('부', 'w');
+D = await dot();
+t('부정에도 붙는다', D.mk === '약화' && D.has, JSON.stringify(D));
+await setup('비', 's');
+D = await dot();
+t('비참여에는 안 붙는다 — 표시가 숫자를 못 바꾼다', D.mk === '' && !D.has, JSON.stringify(D));
+await setup('중', 's');
+t('점은 고른 칸에만', await page.evaluate(() =>
+  [...document.querySelectorAll('.rate[data-key] .rate__b')]
+    .filter(x => x.getAttribute('aria-pressed') !== 'true')
+    .every(x => getComputedStyle(x, '::after').content === 'none')));
+
+/* 상세에서 강화·약화를 누르면 **칸의 점도 그 자리에서** 따라와야 한다 */
+await page.evaluate(() => { const p = state.rows[0];
+  sureSet = new Set(); weakSet = new Set(); setRating(rKey(p), '중');
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); });
+await page.waitForSelector('.rate--wide');
+await page.waitForTimeout(250);
+t('상세에서 처음엔 점이 없다', await page.evaluate(() =>
+  document.querySelector('.rate--wide').dataset.mk === ''));
+await page.click('[data-surebtn]');
+await page.waitForTimeout(250);
+t('강화를 누르면 바로 점이 붙는다', await page.evaluate(() =>
+  document.querySelector('.rate--wide').dataset.mk === '강화'));
+await page.click('[data-weakbtn]');
+await page.waitForTimeout(250);
+t('약화로 바꾸면 점도 아래로', await page.evaluate(() =>
+  document.querySelector('.rate--wide').dataset.mk === '약화'));
+await page.click('[data-weakbtn]');
+await page.waitForTimeout(250);
+t('풀면 점도 사라진다', await page.evaluate(() =>
+  document.querySelector('.rate--wide').dataset.mk === ''));
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);

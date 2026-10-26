@@ -3279,9 +3279,19 @@ function bindFavs(root) {
   }));
 }
 
+/* 고른 칸에 **강화는 위, 약화는 아래**로 흰 점을 찍는다 (2026-10-26, 교수님 안).
+ * 상세의 강화(↑)·약화(↓) 화살표와 방향이 같아 배우지 않아도 읽힌다. 칸 글자는 그대로
+ * 가운데 두고 점만 테두리 가까이 붙이므로 글자를 가리지 않는다.
+ * 무게가 없는 갈래(비참여·미지정)에서는 표시가 숫자를 못 바꾸므로 점도 찍지 않는다. */
+const rateMark = p => {
+  const r = getRating(p);
+  if (!r || W_RATE[r] == null) return '';
+  return isSure(p) ? '강화' : isWeak(p) ? '약화' : '';
+};
+
 function rateChips(p, big = false) {
   const cur = getRating(p);
-  return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
+  return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" data-mk="${esc(rateMark(p))}" role="group" aria-label="${esc(p.name)} 선호도">
     ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
   </div>`;
 }
@@ -3290,7 +3300,7 @@ function rateChips(p, big = false) {
  * (`.rate[data-key]` 만 있으면 눌러도 되고 저장·갱신도 알아서 된다). */
 function rateWide(p) {
   const cur = getRating(p);
-  return `<div class="rate rate--wide" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
+  return `<div class="rate rate--wide" data-key="${esc(rKey(p))}" data-mk="${esc(rateMark(p))}" role="group" aria-label="${esc(p.name)} 선호도">
     ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
   </div>`;
 }
@@ -3300,6 +3310,13 @@ function rateWide(p) {
  * 그래서 글자를 미리 박아 두지 않고 **올리는 그 순간에** 다시 적는다. 선호도를 바꾸거나
  * 강화·약화를 눌러도 따로 손볼 데가 없다. 고르지 않은 칸은 갈래 이름만 그대로 둔다 —
  * 아직 그 사람의 값이 아니므로 확률을 적으면 이미 고른 것처럼 읽힌다. */
+/* 선호도 칸의 점을 다시 찍는다. 화면을 다시 그리지 않고 쓰는 곳이 여럿이라 한 군데로 모은다. */
+function rateMarkSync(key) {
+  const p = state.rows.find(x => rKey(x) === key); if (!p) return;
+  const mk = rateMark(p);
+  document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"]`).forEach(el => { el.dataset.mk = mk; });
+}
+
 function rateTitle(b) {
   const box = b.closest('.rate'); if (!box) return;
   const p = state.rows.find(x => rKey(x) === box.dataset.key); if (!p) return;
@@ -3984,6 +4001,7 @@ async function keepTokenFresh() {
 /* 화면 전체를 다시 그리지 않고 해당 교수의 칩·카드·필터 숫자만 갱신 */
 function refreshRatingUI(key, val) {
   document.querySelectorAll(`.rate[data-key="${CSS.escape(key)}"] .rate__b`).forEach(b => b.setAttribute('aria-pressed', b.dataset.val === val));
+  rateMarkSync(key);
   const note = getNote(key);
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"] .counter__n`).forEach(el => { el.textContent = note.met; });
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"]`).forEach(el => el.classList.toggle('counter--zero', !note.met));
@@ -5514,6 +5532,7 @@ function openDrawer(p, d) {
     const a = $panel.querySelector('[data-surebtn]'), b = $panel.querySelector('[data-weakbtn]');
     if (a) { a.classList.toggle('on', isSure(p)); a.setAttribute('aria-pressed', String(isSure(p))); }
     if (b) { b.classList.toggle('on', isWeak(p)); b.setAttribute('aria-pressed', String(isWeak(p))); }
+    rateMarkSync(rKey(p));            // 선호도 칸의 점도 같이 (2026-10-26)
   };
   $panel.querySelector('[data-surebtn]')?.addEventListener('click', () => {
     const on = sureToggle(p);
