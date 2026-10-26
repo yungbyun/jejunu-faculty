@@ -618,7 +618,9 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__hit:hover .pie__seg{opacity:1;stroke-width:28}
 .st-list--hit{animation:stHit 1.5s ease}
 @keyframes stHit{0%,60%{background:color-mix(in srgb,var(--brand) 16%,transparent)}100%{background:transparent}}
-.pie__n{text-anchor:middle;font-size:36px;font-weight:800;fill:var(--ink);pointer-events:none}
+/* 2026-10-26 — 도넛을 10% 키운 뒤 가운데 숫자가 너무 커 보여 36 → 31 로 줄였다(교수님 지정).
+   viewBox 안의 치수라, 도넛이 커지면 이 숫자도 함께 커진다. */
+.pie__n{text-anchor:middle;font-size:31px;font-weight:800;fill:var(--ink);pointer-events:none}
 .pie__u{text-anchor:middle;font-size:11.5px;font-weight:600;fill:var(--ink-3);pointer-events:none}
 /* 카드는 셋이다 — 확실 · 확실+긍정 · +가능(강화) (2026-10-20) */
 .pie__kpi{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;width:100%;max-width:440px}
