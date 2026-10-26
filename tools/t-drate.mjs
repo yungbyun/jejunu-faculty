@@ -160,19 +160,23 @@ const setup = (r, mark) => page.evaluate(([rr, m]) => {
 await setup('확', '');
 await page.waitForSelector('.rate[data-key] .rate__b');
 t('고른 칸에 확률이 붙는다', (await over('확')).includes('확률 95%'), await over('확'));
-t('안 고른 칸에는 안 붙는다', !(await over('중')).includes('확률'), await over('중'));
+t('한 글자(확·중·부·비)는 안 적는다 — 단추에 이미 있다',
+  (await over('확')).startsWith('확실'), await over('확'));
+t('안 고른 칸에는 갈래 이름만', (await over('중')) === '중간', await over('중'));
 await setup('중', '');
 t('중간은 50%', (await over('중')).includes('확률 50%'), await over('중'));
 await setup('중', 's');
 t('강화를 끼면 65% 로 따라온다', (await over('중')).includes('확률 65%'), await over('중'));
+t('강화라고 적는다', (await over('중')) === '중간 · 강화 · 확률 65%', await over('중'));
 await setup('중', 'w');
 t('약화를 끼면 35% 로 따라온다', (await over('중')).includes('확률 35%'), await over('중'));
+t('약화라고 적는다', (await over('중')) === '중간 · 약화 · 확률 35%', await over('중'));
 await setup('부', '');
 t('부정은 0%', (await over('부')).includes('확률 0%'), await over('부'));
 await setup('비', '');
 t('비참여는 셈에서 뺀다고 적는다', (await over('비')).includes('셈에서 뺌'), await over('비'));
 t('비참여가 두 번 적히지 않는다', (await over('비')).split('비참여').length === 2, await over('비'));
-t('갈래 이름은 그대로 앞에 있다', (await over('비')).startsWith('비 · 비참여'), await over('비'));
+t('갈래 이름이 맨 앞에 있다', (await over('비')) === '비참여 · 셈에서 뺌', await over('비'));
 
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);

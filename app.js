@@ -3282,7 +3282,7 @@ function bindFavs(root) {
 function rateChips(p, big = false) {
   const cur = getRating(p);
   return `<div class="rate ${big ? 'rate--big' : ''}" data-key="${esc(rKey(p))}" role="group" aria-label="${esc(p.name)} 선호도">
-    ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(r)} · ${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
+    ${CONFIG.RATINGS.LABELS.map(r => `<button type="button" class="rate__b rate__b--${rClass(r)}" data-val="${esc(r)}" aria-pressed="${cur === r}" title="${esc(CONFIG.RATINGS.NAMES[r] || '')}" aria-label="${esc(r)} (${esc(CONFIG.RATINGS.NAMES[r] || '')})">${esc(r)}</button>`).join('')}
   </div>`;
 }
 
@@ -3303,12 +3303,15 @@ function rateWide(p) {
 function rateTitle(b) {
   const box = b.closest('.rate'); if (!box) return;
   const p = state.rows.find(x => rKey(x) === box.dataset.key); if (!p) return;
-  const r = b.dataset.val, name = CONFIG.RATINGS.NAMES[r] || '';
-  const head = box.classList.contains('rate--wide') ? name : `${r} · ${name}`;
+  const r = b.dataset.val, name = CONFIG.RATINGS.NAMES[r] || r;
+  if (getRating(p) !== r) { b.title = name; return; }
+  /* 강화·약화도 함께 적는다 (2026-10-26, 교수님 지정) — 확률이 왜 그 값인지가 드러난다.
+     비참여·미지정에는 무게가 없어 표시가 숫자를 못 바꾸므로 적지 않는다. */
+  const mk = W_RATE[r] != null ? (isSure(p) ? '강화' : isWeak(p) ? '약화' : '') : '';
   /* 비참여는 `weightTip()` 이 「비참여 · 셈에서 뺌」을 돌려주는데, 칸 이름이 이미 비참여라
      두 번 적힌다. 꼬리만 떼어 붙인다. */
   const tail = r === '비' ? '셈에서 뺌' : weightTip(p);
-  b.title = getRating(p) === r ? `${head} · ${tail}` : head;
+  b.title = [name, mk, tail].filter(Boolean).join(' · ');
 }
 document.addEventListener('pointerover', e => {
   const b = e.target.closest && e.target.closest('.rate__b'); if (b) rateTitle(b);
