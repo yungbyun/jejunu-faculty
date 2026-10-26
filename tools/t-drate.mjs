@@ -247,6 +247,27 @@ await page.waitForTimeout(250);
 t('풀면 반달도 사라진다', await page.evaluate(() =>
   document.querySelector('.rate--wide').dataset.mk === ''));
 
+/* 학과 이름 옆에 **학과 홈페이지** (2026-10-26, 교수님 지정).
+ * 새 창으로 열되 `rel="noopener"` 를 반드시 둔다 — 없으면 열린 쪽이 이 창을 되돌려 만질 수 있다. */
+const HP = await page.evaluate(() => {
+  const p = state.rows[0];
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+  const d = state.depts.find(x => x.id === p.dept_id);
+  const a2 = document.querySelector('.d-head .d-hp');
+  const head = document.querySelector('.d-head').getBoundingClientRect();
+  const close = document.querySelector('.d-head [data-close]').getBoundingClientRect();
+  return { url: d.url, href: a2 && a2.getAttribute('href'), txt: a2 && a2.textContent.trim(),
+    tgt: a2 && a2.target, rel: a2 && a2.rel, aria: a2 && a2.getAttribute('aria-label'),
+    afterPill: !!(a2 && document.querySelector('.d-head .dept-pill')
+      && (document.querySelector('.d-head .dept-pill').compareDocumentPosition(a2) & Node.DOCUMENT_POSITION_FOLLOWING) > 0),
+    closeRight: Math.round(head.right - close.right) < 30 };
+});
+t('학과 이름 옆에 홈페이지 링크', !!HP.href && HP.href === HP.url, `${HP.txt} → ${HP.href}`);
+t('이름표 뒤에 온다', HP.afterPill);
+t('새 창으로 열고 noopener 를 둔다', HP.tgt === '_blank' && /noopener/.test(HP.rel || ''), `${HP.tgt} / ${HP.rel}`);
+t('새 창임을 읽어 주는 이름표', /새 창/.test(HP.aria || ''), HP.aria);
+t('닫기 단추는 오른쪽 끝 그대로', HP.closeRight);
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);

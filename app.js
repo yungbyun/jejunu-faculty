@@ -5499,7 +5499,11 @@ function openDrawer(p, d) {
   $panel.style.setProperty('--dept-color', d.color);
   $panel.innerHTML = `
     <div class="d-head">
-      <a class="dept-pill" href="#/dept/${encodeURIComponent(d.id)}" title="${esc(d.name)} 교수 목록으로" aria-label="${esc(d.name)} 교수 목록으로">${esc(d.name)}</a>
+      <div class="d-headl">
+        <a class="dept-pill" href="#/dept/${encodeURIComponent(d.id)}" title="${esc(d.name)} 교수 목록으로" aria-label="${esc(d.name)} 교수 목록으로">${esc(d.name)}</a>
+        ${d.url ? `<a class="d-hp" href="${esc(d.url)}" target="_blank" rel="noopener"
+          title="${esc(d.name)} 홈페이지를 새 창에서 엽니다" aria-label="${esc(d.name)} 홈페이지 (새 창)">학과 홈페이지 ↗</a>` : ''}
+      </div>
       <button class="iconbtn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="d-body">

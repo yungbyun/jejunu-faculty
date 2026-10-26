@@ -265,6 +265,13 @@ main{min-height:60vh;padding:40px 20px 72px}
 @keyframes slide{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
 .d-head{position:sticky;top:0;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:1}
 .d-head .dept-pill{font-size:12px;font-weight:600;color:var(--dept-color,var(--accent));background:color-mix(in srgb,var(--dept-color,var(--accent)) 12%,transparent);border-radius:999px;padding:4px 10px}
+/* 학과 이름 옆에 학과 홈페이지 (2026-10-26, 교수님 지정). 이름표와 한 덩이로 묶어
+   두어야 닫기 단추가 오른쪽 끝에 그대로 남는다(머리줄이 space-between 이다). */
+.d-headl{display:flex;align-items:center;gap:8px;min-width:0}
+.d-hp{font-size:12px;font-weight:600;color:var(--ink-3);text-decoration:none;white-space:nowrap;
+  border-bottom:1px solid transparent;transition:color .12s,border-color .12s}
+.d-hp:hover{color:var(--dept-color,var(--accent));border-bottom-color:currentColor}
+.d-hp:focus-visible{outline:none;color:var(--dept-color,var(--accent));border-bottom-color:currentColor}
 .d-head a.dept-pill{text-decoration:none;cursor:pointer;transition:background-color .12s,box-shadow .12s}
 .d-head a.dept-pill:hover{background:color-mix(in srgb,var(--dept-color,var(--accent)) 22%,transparent)}
 .d-head a.dept-pill:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--dept-color,var(--accent)) 35%,transparent)}
