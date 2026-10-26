@@ -140,6 +140,40 @@ t('학과 카드의 고리는 그대로', await page.evaluate(()=>{
   return !!b && getComputedStyle(b).boxShadow !== 'none';
 }));
 
+/* 고른 칸에 마우스를 올리면 **확률도 같이** 보인다 (2026-10-26, 교수님 지정).
+ * 확률은 강화·약화까지 섞여 정해지므로 글자를 박아 두지 않고 **올리는 그 순간에** 다시
+ * 적는다. 그래서 시험도 `pointerover` 를 보낸 뒤에 읽는다. */
+const over = val => page.evaluate(v => {
+  const el = [...document.querySelectorAll('.rate[data-key] .rate__b')].find(x => x.dataset.val === v);
+  el.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  return el.title;
+}, val);
+const setup = (r, mark) => page.evaluate(([rr, m]) => {
+  const p = state.rows[0];
+  sureSet = new Set(); weakSet = new Set();
+  setRating(rKey(p), rr);
+  if (m === 's') sures().add(rKey(p));
+  if (m === 'w') weaks().add(rKey(p));
+  location.hash = `#/dept/${p.dept_id}`; render();
+}, [r, mark]);
+
+await setup('확', '');
+await page.waitForSelector('.rate[data-key] .rate__b');
+t('고른 칸에 확률이 붙는다', (await over('확')).includes('확률 95%'), await over('확'));
+t('안 고른 칸에는 안 붙는다', !(await over('중')).includes('확률'), await over('중'));
+await setup('중', '');
+t('중간은 50%', (await over('중')).includes('확률 50%'), await over('중'));
+await setup('중', 's');
+t('강화를 끼면 65% 로 따라온다', (await over('중')).includes('확률 65%'), await over('중'));
+await setup('중', 'w');
+t('약화를 끼면 35% 로 따라온다', (await over('중')).includes('확률 35%'), await over('중'));
+await setup('부', '');
+t('부정은 0%', (await over('부')).includes('확률 0%'), await over('부'));
+await setup('비', '');
+t('비참여는 셈에서 뺀다고 적는다', (await over('비')).includes('셈에서 뺌'), await over('비'));
+t('비참여가 두 번 적히지 않는다', (await over('비')).split('비참여').length === 2, await over('비'));
+t('갈래 이름은 그대로 앞에 있다', (await over('비')).startsWith('비 · 비참여'), await over('비'));
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 console.log('오류:', errs);

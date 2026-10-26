@@ -3295,6 +3295,28 @@ function rateWide(p) {
   </div>`;
 }
 
+/* 고른 칸에 마우스를 올리면 **확률도 같이** 보여 준다 (2026-10-26, 교수님 지정).
+ * 확률은 선호도만으로 정해지지 않는다 — 같은 「중」이라도 강화면 .65, 약화면 .35 다.
+ * 그래서 글자를 미리 박아 두지 않고 **올리는 그 순간에** 다시 적는다. 선호도를 바꾸거나
+ * 강화·약화를 눌러도 따로 손볼 데가 없다. 고르지 않은 칸은 갈래 이름만 그대로 둔다 —
+ * 아직 그 사람의 값이 아니므로 확률을 적으면 이미 고른 것처럼 읽힌다. */
+function rateTitle(b) {
+  const box = b.closest('.rate'); if (!box) return;
+  const p = state.rows.find(x => rKey(x) === box.dataset.key); if (!p) return;
+  const r = b.dataset.val, name = CONFIG.RATINGS.NAMES[r] || '';
+  const head = box.classList.contains('rate--wide') ? name : `${r} · ${name}`;
+  /* 비참여는 `weightTip()` 이 「비참여 · 셈에서 뺌」을 돌려주는데, 칸 이름이 이미 비참여라
+     두 번 적힌다. 꼬리만 떼어 붙인다. */
+  const tail = r === '비' ? '셈에서 뺌' : weightTip(p);
+  b.title = getRating(p) === r ? `${head} · ${tail}` : head;
+}
+document.addEventListener('pointerover', e => {
+  const b = e.target.closest && e.target.closest('.rate__b'); if (b) rateTitle(b);
+}, true);
+document.addEventListener('focusin', e => {
+  const b = e.target.closest && e.target.closest('.rate__b'); if (b) rateTitle(b);
+}, true);
+
 function bindRates(root) {
   root.querySelectorAll('.rate').forEach(g => g.addEventListener('click', e => {
     const b = e.target.closest('.rate__b'); if (!b) return;
