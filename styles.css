@@ -608,9 +608,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   pointer-events:none;letter-spacing:-.3px}
 /* 좁은 조각의 인원도 **제 색 위**에 적는다 (2026-10-26) — 글씨만 작게 줄인다.
    옆 조각을 조금 침범해도 괜찮다(교수님 지정). 글자를 **작은 원에 담아**(`.pie__snb`)
-   어느 숫자가 한 덩이인지 보이게 한다. 원이 바탕을 대 주므로 글자에 테는 두지 않는다. */
-.pie__sn--sm{font-size:9.5px;stroke:none;letter-spacing:-.2px}
-.pie__snb{fill:rgba(15,19,25,.68);stroke:rgba(255,255,255,.6);stroke-width:.9;pointer-events:none}
+   어느 숫자가 한 덩이인지 보이게 한다.
+   원은 **흰 바탕에 갈래 빛깔 숫자·테**다(`--sc`). 큰 숫자가 「색 위 흰 글자」이니 작은
+   숫자는 그 **뒤집은 꼴**이라, 한 체계의 두 크기로 읽힌다. 흰 바탕이라 어떤 띠 색 위에
+   얹혀도 섞이지 않고, 엇갈려 앉아 이웃 조각에 걸쳐도 **숫자 빛깔이 제 갈래를 가리킨다.**
+   갈래색 원에 흰 글자로 하면 제 띠 위에서 원이 사라져 울타리 구실을 못 한다. */
+.pie__sn--sm{font-size:9.5px;font-weight:800;stroke:none;fill:var(--sc);letter-spacing:-.2px}
+.pie__snb{fill:#fff;stroke:var(--sc);stroke-width:1.4;pointer-events:none}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
 .pie__hit:focus-visible .pie__seg{stroke-width:33}   /* 띠(26.4)보다 도톰하게 — 고른 티가 나게 */

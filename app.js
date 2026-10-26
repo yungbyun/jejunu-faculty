@@ -1706,6 +1706,14 @@ const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 /* 같은 빛깔을 **한 톤 진하게/옅게** 만든다 (2026-10-25) — 도넛에서 강화·약화를 가르는 데 쓴다.
  * 더하는 값이 음수면 검정 쪽으로, 양수면 흰 쪽으로 섞는다. 갈래 색은 그대로 알아보게 폭을 좁게 둔다.
  * `color-mix()` 를 SVG `stroke` 에 그냥 쓰면 브라우저에 따라 안 먹어, 숫자로 섞어 16진수를 만든다. */
+/* 작은 원(흰 바탕) 위에 얹을 **갈래 빛깔**. 띠 색 그대로는 흰 바탕에서 대비가 4.7 쯤이라
+ * 9.5px 글씨로는 빠듯해, 한 톤 눌러 5.8 로 올린다. 미지정처럼 **원래 옅은 빛깔**은 그대로
+ * 두면 1.8 밖에 안 나와 아예 안 읽히므로 훨씬 더 누른다(5.4). 어느 쪽이든 **같은 색**이라
+ * 띠와 짝이 지어진다. (2026-10-26, 교수님 물음 — 「작은 숫자가 어느 갈래인지 보이게」) */
+const lumOf = hex => { const m = String(hex || '').replace('#', '');
+  return m.length === 6 ? [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3 : 128; };
+const badgeInk = r => { const c = RCOLOR[r] || '#6b7280'; return shade(c, lumOf(c) > 150 ? -45 : -12); };
+
 function shade(hex, d) {
   const m = String(hex || '').replace('#', '');
   if (m.length !== 6) return hex;
@@ -1928,7 +1936,7 @@ function donut(profs) {
    * 갈래 하나가 셋으로 갈리면 큰 글씨도 셋이 되어 어느 것이 그 갈래의 몸집인지 흐려진다.
    * 으뜸만 크게 두면 **멀리서는 갈래의 크기가, 가까이서는 갈래 안의 갈림이** 읽힌다.
    * 으뜸이라도 조각이 너무 가늘면(13 미만) 글자가 이웃을 덮으므로 작은 원에 담는다. */
-  const num = (off2, len, n, top) => {
+  const num = (off2, len, n, top, rr) => {
     const [x, y] = midXY(off2, len);
     if (top && len >= 13) return `<text class="pie__sn" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
     /* 좁은 조각의 숫자는 **작은 원에 담는다** (2026-10-26, 교수님 지정). 조각이 가늘어
@@ -1942,8 +1950,9 @@ function donut(profs) {
     lastT2 = t2;
     const [bx, by] = midXY(off2, len, R + zig);
     const r2 = (6.4 + (String(n).length - 1) * 1.7).toFixed(1);
-    return `<circle class="pie__snb" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${r2}"/>`
-      + `<text class="pie__sn pie__sn--sm" x="${bx.toFixed(1)}" y="${by.toFixed(1)}">${n}</text>`;
+    const sc = ` style="--sc:${esc(badgeInk(rr))}"`;      // 숫자와 테에 그 갈래 빛깔을 입힌다
+    return `<circle class="pie__snb" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${r2}"${sc}/>`
+      + `<text class="pie__sn pie__sn--sm" x="${bx.toFixed(1)}" y="${by.toFixed(1)}"${sc}>${n}</text>`;
   };
   /* 조각을 **강화·약화까지 갈라** 그린다 (2026-10-25, 교수님 요청).
    * 한 갈래 안에서 차례는 **강화 → 그냥 → 약화**이고, 빛깔은 같은 색을 한 톤 진하게/옅게만
@@ -1979,7 +1988,7 @@ function donut(profs) {
       <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${shade(RCOLOR[r], SUB_D[tag])}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
         transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${num(off, len, sn, i === top)}
+      ${num(off, len, sn, i === top, r)}
     </g>`;
       off += len;
       return g;

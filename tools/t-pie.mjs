@@ -506,6 +506,48 @@ await page.waitForTimeout(250);
     const kids = [...g.children].map(e => e.tagName.toLowerCase() + '.' + (e.getAttribute('class') || ''));
     return kids.indexOf('circle.pie__snb') < kids.findIndex(k => k.startsWith('text.'));
   }));
+  /* 원 안의 숫자가 **어느 갈래인지** 빛깔로 말한다 (2026-10-26, 교수님 물음).
+     흰 바탕에 갈래 빛깔 숫자·테 — 큰 숫자(색 위 흰 글자)의 뒤집은 꼴이다. */
+  t('작은 원은 흰 바탕', await page.evaluate(() =>
+    [...document.querySelectorAll('.pie__snb')].every(e => {
+      const f = getComputedStyle(e).fill.match(/\d+/g).map(Number);
+      return f[0] > 245 && f[1] > 245 && f[2] > 245;
+    })));
+  t('숫자와 테가 그 갈래 빛깔', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.pie__hit')].filter(e => e.querySelector('.pie__snb'));
+    if (!g.length) return false;
+    return g.every(e => {
+      const c = e.querySelector('.pie__snb'), t2 = e.querySelector('text');
+      const sc = c.style.getPropertyValue('--sc');
+      return !!sc && getComputedStyle(c).stroke === getComputedStyle(t2).fill;
+    });
+  }));
+  t('갈래가 다르면 빛깔도 다르다', await page.evaluate(() => {
+    const by = {};
+    [...document.querySelectorAll('.pie__hit')].filter(e => e.querySelector('.pie__snb'))
+      .forEach(e => { (by[e.dataset.rs] = by[e.dataset.rs] || new Set())
+        .add(e.querySelector('.pie__snb').style.getPropertyValue('--sc')); });
+    const ks = Object.keys(by);
+    if (ks.length < 2) return false;
+    const one = ks.every(k => by[k].size === 1);          // 한 갈래 안에서는 같은 빛깔
+    const all = new Set(ks.map(k => [...by[k]][0]));
+    return one && all.size === ks.length;                 // 갈래끼리는 서로 다른 빛깔
+  }), await page.evaluate(() => [...document.querySelectorAll('.pie__hit')]
+    .filter(e => e.querySelector('.pie__snb'))
+    .map(e => `${e.dataset.rs}:${e.querySelector('.pie__snb').style.getPropertyValue('--sc')}`).join(' ')));
+  t('흰 원 위에서 숫자가 읽힌다(4.5 이상)', await page.evaluate(() => {
+    const lin = c => { c /= 255; return c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); };
+    const L = rgb => { const [r, g, b] = rgb.map(lin); return .2126 * r + .7152 * g + .0722 * b; };
+    return [...document.querySelectorAll('.pie__sn--sm')].every(e => {
+      const f = getComputedStyle(e).fill.match(/\d+/g).map(Number);
+      return (1.05) / (L(f) + .05) >= 4.5;                // 바탕이 흰색(L=1)이다
+    });
+  }), await page.evaluate(() => {
+    const lin = c => { c /= 255; return c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); };
+    const L = rgb => { const [r, g, b] = rgb.map(lin); return .2126 * r + .7152 * g + .0722 * b; };
+    return [...document.querySelectorAll('.pie__sn--sm')]
+      .map(e => (1.05 / (L(getComputedStyle(e).fill.match(/\d+/g).map(Number)) + .05)).toFixed(2)).join(' ');
+  }));
   t('원이 숫자를 품을 만큼 크다', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__hit')].find(e => e.querySelector('.pie__snb'));
     const c = g.querySelector('.pie__snb').getBoundingClientRect();
