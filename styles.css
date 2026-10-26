@@ -613,11 +613,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    숫자는 그 **뒤집은 꼴**이라, 한 체계의 두 크기로 읽힌다. 흰 바탕이라 어떤 띠 색 위에
    얹혀도 섞이지 않고, 엇갈려 앉아 이웃 조각에 걸쳐도 **숫자 빛깔이 제 갈래를 가리킨다.**
    갈래색 원에 흰 글자로 하면 제 띠 위에서 원이 사라져 울타리 구실을 못 한다. */
-.pie__sn--sm{font-size:9.5px;font-weight:800;stroke:none;fill:var(--sc);letter-spacing:-.2px}
-.pie__snb{fill:#fff;stroke:var(--sc);stroke-width:1.4;pointer-events:none}
+.pie__sn--sm{font-size:9.5px;font-weight:800;stroke:none;fill:var(--si);letter-spacing:-.2px}
+.pie__snb{fill:var(--sc);stroke:#fff;stroke-width:1.4;pointer-events:none}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
-.pie__hit:focus-visible .pie__seg{stroke-width:33}   /* 띠(26.4)보다 도톰하게 — 고른 티가 나게 */
+.pie__hit:focus-visible .pie__seg{stroke-width:36}   /* 띠(29)보다 도톰하게 — 고른 티가 나게 */
 .pie:hover .pie__hit .pie__seg{opacity:.45}
 .pie__hit:hover .pie__seg{opacity:1;stroke-width:28}
 .st-list--hit{animation:stHit 1.5s ease}

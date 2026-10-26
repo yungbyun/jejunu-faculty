@@ -1713,6 +1713,26 @@ const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 const lumOf = hex => { const m = String(hex || '').replace('#', '');
   return m.length === 6 ? [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3 : 128; };
 const badgeInk = r => { const c = RCOLOR[r] || '#6b7280'; return shade(c, lumOf(c) > 150 ? -45 : -12); };
+/* 원 바탕을 **그 조각 색 그대로** 쓸 때의 낯빛 (2026-10-26, 교수님 지정).
+ * 흰 글자와 어두운 글자 가운데 **더 또렷한 쪽**을 고른다 — 밝기를 눈대중(평균)으로 가르면
+ * 중-약화(#4f9fc6)처럼 어중간한 빛깔에서 흰 글자가 2.9 밖에 안 나와 읽히지 않는다.
+ * 둘 다 4.5 에 못 미치면(확 #38831c 가 4.43 으로 아슬아슬하다) **바탕을 한 톤만 눌러**
+ * 맞춘다 — 같은 빛깔로 알아볼 만큼만 어둡게 한다. */
+const RELL = hex => { const m = String(hex || '').replace('#', '');
+  const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+  return m.length === 6 ? .2126 * f(parseInt(m.slice(0, 2), 16)) + .7152 * f(parseInt(m.slice(2, 4), 16))
+    + .0722 * f(parseInt(m.slice(4, 6), 16)) : .5; };
+const CONTR = (a, b) => { const x = RELL(a), y = RELL(b);
+  return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+const BADGE_INK = '#1b2129';
+function badgeFace(col) {
+  for (const d of [0, -12, -25]) {
+    const c = shade(col, d);
+    const w = CONTR('#ffffff', c), k = CONTR(BADGE_INK, c);
+    if (Math.max(w, k) >= 4.5) return { bg: c, ink: w >= k ? '#ffffff' : BADGE_INK };
+  }
+  return { bg: shade(col, -40), ink: '#ffffff' };
+}
 
 function shade(hex, d) {
   const m = String(hex || '').replace('#', '');
@@ -1910,9 +1930,10 @@ function donut(profs) {
     + `<i>${f1(n)}</i> vs <i>${f1(total - n)}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중간 ${midlow}명 · 미지정 ${none}명 중에서` : `중간 ${midlow}명 중에서`;
-  /* 2026-10-26 — 띠를 10% 두껍게(24 → 26.4, 교수님 지정). 한가운데 지름(R)은 그대로라
-     띠가 안팎으로 1.2 씩 벌어진다(58.8 ~ 85.2). 그림 틀(0 0 200 138) 안에 그대로 든다. */
-  const R = 72, W = 26.4, CX = 100, CY = 112;
+  /* 2026-10-26 — 띠를 두 차례 10% 씩 두껍게(24 → 26.4 → 29, 교수님 지정). 한가운데
+     지름(R)은 그대로라 띠가 안팎으로 2.5 씩 벌어진다(57.5 ~ 86.5). 그림 틀(0 0 200 138)
+     안에 그대로 들고(위로 25.5), 가운데 구멍도 115 로 넉넉해 백분율이 들어간다. */
+  const R = 72, W = 29, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
   /* 조각 한가운데 좌표. 파선은 9시에서 시작해 위로 도는 반원이므로, 시작점에서 잰 호 길이를
@@ -1950,7 +1971,10 @@ function donut(profs) {
     lastT2 = t2;
     const [bx, by] = midXY(off2, len, R + zig);
     const r2 = (6.4 + (String(n).length - 1) * 1.7).toFixed(1);
-    const sc = ` style="--sc:${esc(badgeInk(rr))}"`;      // 숫자와 테에 그 갈래 빛깔을 입힌다
+    /* 바탕은 **그 조각 색 그대로**, 글자는 그 위에서 읽히는 쪽으로. 흰 테를 둘러
+       제 띠 위에 앉아도 원이 울타리 노릇을 하게 한다. */
+    const face = badgeFace(rr);
+    const sc = ` style="--sc:${esc(face.bg)};--si:${esc(face.ink)}"`;
     return `<circle class="pie__snb" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${r2}"${sc}/>`
       + `<text class="pie__sn pie__sn--sm" x="${bx.toFixed(1)}" y="${by.toFixed(1)}"${sc}>${n}</text>`;
   };
@@ -1982,13 +2006,14 @@ function donut(profs) {
       const gap = i === subs.length - 1 ? (items.length > 1 ? 2.4 : 0) : 0;
       const seg = Math.max(0, len - gap);
       const [tx, ty] = midXY(off, len);
+      const col = shade(RCOLOR[r], SUB_D[tag]);     // 그 조각의 빛깔 — 원 바탕에도 쓴다
       const name = `${r}${tag}`;
       const g = `<g class="pie__hit" data-rs="${esc(r)}" role="button" tabindex="0"
       aria-label="${esc(name)} ${sn}명 — 아래 선호도별 교수 목록으로">
-      <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${shade(RCOLOR[r], SUB_D[tag])}" stroke-width="${W}"
+      <circle class="pie__seg" r="${R}" cx="${CX}" cy="${CY}" fill="none" stroke="${col}" stroke-width="${W}"
         stroke-dasharray="${seg.toFixed(2)} ${(FULL - seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"
         transform="rotate(180 ${CX} ${CY})"><title>${esc(name)} ${sn}명 (${Math.round(sn / total * 100)}%) — 눌러서 명단 보기</title></circle>
-      ${num(off, len, sn, i === top, r)}
+      ${num(off, len, sn, i === top, col)}
     </g>`;
       off += len;
       return g;
