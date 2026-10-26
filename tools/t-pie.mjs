@@ -794,6 +794,44 @@ await page.waitForTimeout(250);
     const got = [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]);
     return got.join('|') === want.filter(k => got.includes(k)).join('|');
   }), await page.evaluate(() => [...document.querySelectorAll('#explBox .expl__seg')].map(e => e.title.split(' ')[0]).join('|')));
+  /* 띠·표의 빛깔이 **도넛과 같은 턱**으로 강화·약화를 가른다 (2026-10-26, 교수님 지정).
+     전에는 갈래 기둥색만 써서 파란 조각 셋이 똑같아 보였다 — 같은 사람이 두 그림에서
+     다른 말을 하면 안 된다. */
+  const paint = () => page.evaluate(() => {
+    const seg = {}, sw = {}, arc = {};
+    document.querySelectorAll('#explBox .expl__seg').forEach(e => {
+      seg[e.title.split(' ')[0]] = getComputedStyle(e).backgroundColor; });
+    document.querySelectorAll('#explBox .expl__t tbody tr').forEach(r => {
+      sw[r.querySelector('th').textContent.trim()] = getComputedStyle(r.querySelector('.sw')).backgroundColor; });
+    document.querySelectorAll('.pie__hit').forEach(e => {
+      const d = document.createElement('div');
+      d.style.color = e.querySelector('.pie__seg').getAttribute('stroke');
+      document.body.appendChild(d);
+      arc[e.getAttribute('aria-label').split(' ')[0]] = getComputedStyle(d).color;
+      d.remove();
+    });
+    return { seg, sw, arc };
+  });
+  const P = await paint();
+  t('띠의 빛깔이 도넛 조각과 같다', Object.keys(P.seg).length > 3
+    && Object.keys(P.seg).every(k => P.arc[k] === P.seg[k]),
+    Object.keys(P.seg).map(k => `${k} 띠${P.seg[k]} 도넛${P.arc[k]}`).join(' | '));
+  t('표의 네모도 같은 빛깔', Object.keys(P.seg).every(k => P.sw[k] === P.seg[k]),
+    Object.keys(P.seg).map(k => `${k} ${P.sw[k]}`).join(' | '));
+  t('한 갈래 안에서 강화·보통·약화가 서로 다른 빛깔', await page.evaluate(() => {
+    const by = {};
+    document.querySelectorAll('#explBox .expl__seg').forEach(e => {
+      const k = e.title.split(' ')[0], r = k[0];
+      (by[r] = by[r] || new Set()).add(getComputedStyle(e).backgroundColor);
+    });
+    const many = Object.entries(by).filter(([, v]) => v.size > 0);
+    const cnt = {};
+    document.querySelectorAll('#explBox .expl__seg').forEach(e => {
+      const r = e.title.split(' ')[0][0]; cnt[r] = (cnt[r] || 0) + 1; });
+    return many.length > 0 && many.every(([r, v]) => v.size === cnt[r]);
+  }), await page.evaluate(() => [...document.querySelectorAll('#explBox .expl__seg')]
+    .map(e => `${e.title.split(' ')[0]}:${getComputedStyle(e).backgroundColor}`).join(' ')));
+
   t('기대 칸은 옅은 바탕으로 띄워 둔다', await page.evaluate(() => {
     const bg = e => getComputedStyle(e).backgroundColor;
     return bg(document.querySelector('.pie__k--score')) !== bg(document.querySelector('.pie__k--high'));

@@ -1706,6 +1706,13 @@ const PIE_LABELS = () => RLABELS().filter(r => r !== '비');
 /* 같은 빛깔을 **한 톤 진하게/옅게** 만든다 (2026-10-25) — 도넛에서 강화·약화를 가르는 데 쓴다.
  * 더하는 값이 음수면 검정 쪽으로, 양수면 흰 쪽으로 섞는다. 갈래 색은 그대로 알아보게 폭을 좁게 둔다.
  * `color-mix()` 를 SVG `stroke` 에 그냥 쓰면 브라우저에 따라 안 먹어, 숫자로 섞어 16진수를 만든다. */
+/* 강화는 진하게, 약화는 옅게 (2026-10-25). 도넛의 조각과 풀이 띠·표가 **같은 턱**을 쓴다 —
+ * 한쪽만 고치면 같은 사람이 두 그림에서 다른 빛깔로 보인다 (2026-10-26 에 바깥으로 꺼냈다).
+ * 부정에서 강화는 **더 모진 쪽**이라 더 진한 빨강, 약화는 **덜 모진 쪽**이라 옅은 빨강이다. */
+const SUB_D = { '+강화': -20, '': 0, '-약화': 28 };
+/* 「중+강화」 같은 이름에서 꼬리(+강화·-약화)만 떼어 그 빛깔을 만든다 */
+const subColor = (r, k) => shade(RCOLOR[r] || '#6b7280', SUB_D[String(k || '').slice(String(r).length)] || 0);
+
 /* 작은 원(흰 바탕) 위에 얹을 **갈래 빛깔**. 띠 색 그대로는 흰 바탕에서 대비가 4.7 쯤이라
  * 9.5px 글씨로는 빠듯해, 한 톤 눌러 5.8 로 올린다. 미지정처럼 **원래 옅은 빛깔**은 그대로
  * 두면 1.8 밖에 안 나와 아예 안 읽히므로 훨씬 더 누른다(5.4). 어느 쪽이든 **같은 색**이라
@@ -1883,15 +1890,18 @@ function donut(profs) {
   const explain = () => {
     const rows = weightRows(profs);
     const w = n => (n / total * 100);
+    /* 띠와 표의 빛깔도 **도넛과 같은 턱**으로 강화·약화를 가른다 (2026-10-26, 교수님 지정).
+       전에는 갈래 기둥색만 써서 파란 조각 셋이 똑같아 보였다 — 같은 사람이 도넛에서는
+       갈리고 띠에서는 안 갈려, 두 그림이 서로 다른 말을 했다. */
     const segs = rows.filter(r => r.sum > 0).map(r =>
-      `<span class="expl__seg" style="--w:${w(r.sum).toFixed(2)}%;--c:${esc(RCOLOR[r.r] || '#6b7280')}"
+      `<span class="expl__seg" style="--w:${w(r.sum).toFixed(2)}%;--c:${esc(subColor(r.r, r.k))}"
         title="${esc(r.k)} ${r.n}명 × ${r.w} = ${f1(r.sum)}명"></span>`).join('');
     const lo = Math.max(0, exp - sd), hi = Math.min(total, exp + sd);
     const band = sd > .05
       ? `<i class="expl__sd" style="left:${w(lo).toFixed(2)}%;width:${(w(hi) - w(lo)).toFixed(2)}%"
            title="흔들림 폭 — ${f1(lo)}명에서 ${f1(hi)}명 사이"></i>` : '';
     const body = rows.map(r => `<tr${r.sum ? '' : ' class="expl__t--0"'}>
-        <th scope="row"><i class="sw sw--${rcls(r.r)}"></i>${esc(r.k)}</th>
+        <th scope="row"><i class="sw sw--${rcls(r.r)}" style="background:${esc(subColor(r.r, r.k))}"></i>${esc(r.k)}</th>
         <td>${r.n}명</td><td>${r.w}</td><td><b>${f1(r.sum)}</b></td></tr>`).join('');
     const na = profs.filter(p => getRating(p) === '비').length;
     return `<div class="expl" id="explBox"${EXP_OPEN ? '' : ' hidden'}>
@@ -1930,10 +1940,11 @@ function donut(profs) {
     + `<i>${f1(n)}</i> vs <i>${f1(total - n)}</i></span>`;   /* 「내·상대」는 빼고 숫자만 — 뜻은 말풍선에 (2026-10-19) */
   /* 아직 선호도를 안 매긴 사람도 끌어올 수 있는 사람이다. 숫자를 섞지는 않고 옆에 같이 적는다 */
   const pool = none ? `중간 ${midlow}명 · 미지정 ${none}명 중에서` : `중간 ${midlow}명 중에서`;
-  /* 2026-10-26 — 띠를 두 차례 10% 씩 두껍게(24 → 26.4 → 29, 교수님 지정). 한가운데
-     지름(R)은 그대로라 띠가 안팎으로 2.5 씩 벌어진다(57.5 ~ 86.5). 그림 틀(0 0 200 138)
-     안에 그대로 들고(위로 25.5), 가운데 구멍도 115 로 넉넉해 백분율이 들어간다. */
-  const R = 72, W = 29, CX = 100, CY = 112;
+  /* 2026-10-26 — 띠를 세 차례 10% 씩 두껍게(24 → 26.4 → 29 → 32, 교수님 지정). 한가운데
+     지름(R)은 그대로라 띠가 안팎으로 8 씩 벌어진다(56 ~ 88). 그림 틀(0 0 200 138) 안에
+     그대로 들고(위로 24), 가운데 구멍도 112 라 백분율이 넉넉히 들어간다.
+     작은 원(반지름 8.1 까지)을 ±6 으로 엇갈려 앉혀도 56 ~ 88 안에 머문다. */
+  const R = 72, W = 32, CX = 100, CY = 112;
   const HALF = Math.PI * R, FULL = 2 * Math.PI * R;
   let off = 0;
   /* 조각 한가운데 좌표. 파선은 9시에서 시작해 위로 도는 반원이므로, 시작점에서 잰 호 길이를
@@ -1983,10 +1994,6 @@ function donut(profs) {
    * 한다. 갈래 차례도 전체 길이도 그대로라 멀리서 보면 전과 같은 도넛이다.
    * 갈래 안의 틈은 좁게(0.8), 갈래끼리는 넓게(1.5) 두어 **어디까지가 한 갈래인지** 보인다.
    * 누를 자리(`data-rs`)는 갈래 그대로라, 어느 조각을 눌러도 그 갈래 명단으로 간다. */
-  /* 강화는 진하게, 약화는 옅게. 2026-10-26 에 턱을 넓혔다 — 교수님이 「부-약화가 부정보다
-     덜 진해야 색의 뜻이 어울린다」고 하셔서, 한눈에 갈리도록 -15/+20 에서 -20/+28 로.
-     부정에서 강화는 **더 모진 쪽**이라 더 진한 빨강, 약화는 **덜 모진 쪽**이라 옅은 빨강이다. */
-  const SUB_D = { '+강화': -20, '': 0, '-약화': 28 };
   const subsOf = r => {
     const list = profs.filter(p => (getRating(p) || '미지정') === r);
     const su = list.filter(p => isSure(p) && W_SURE[r] != null);
