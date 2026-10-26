@@ -39,7 +39,7 @@ t('띠 안의 숫자는 띠 위에 놓임', await page.evaluate(()=>
   [...document.querySelectorAll('.pie__sn')].every(tx=>{
     const x=+tx.getAttribute('x'), y=+tx.getAttribute('y');
     const d=Math.hypot(x-100, y-112);
-    return d>60 && d<84 && y<=112.5;
+    return d>58 && d<86 && y<=112.5;        // 띠는 72 ± 13.2 (2026-10-26 에 두꺼워졌다)
   })));
 
 // 3) 누르면 그 선호도의 명단으로 내려간다
@@ -532,7 +532,8 @@ await page.waitForTimeout(250);
      있었으나 자리를 찾다가 띠에 묻혀 있었다. 이제 **모든 숫자가 제 조각 한가운데**에
      얹히므로 빠지는 것이 없다. 겹쳐도 괜찮다 — 색이 곧 갈래라 읽어 낼 수 있다. */
   const nums = () => page.evaluate(() => {
-    const R = 72, W = 24, CX = 100, CY = 112;
+    const R = 72, CX = 100, CY = 112;
+    const W = parseFloat(getComputedStyle(document.querySelector('.pie__seg')).strokeWidth);
     return [...document.querySelectorAll('.pie__hit')].map(e => {
       const t2 = e.querySelector('text');
       const x = +t2.getAttribute('x'), y = +t2.getAttribute('y');
@@ -597,7 +598,8 @@ await page.waitForTimeout(250);
     [...document.querySelectorAll('.pie__snb')].every(e => {
       const d = Math.hypot(+e.getAttribute('cx') - 100, +e.getAttribute('cy') - 112);
       const r2 = +e.getAttribute('r');
-      return d - r2 >= 60 - 1 && d + r2 <= 84 + 1;
+      const W = parseFloat(getComputedStyle(document.querySelector('.pie__seg')).strokeWidth);
+      return d - r2 >= 72 - W / 2 - 1 && d + r2 <= 72 + W / 2 + 1;
     })));
   /* 부정에서 강화는 **더 모진 쪽**이라 진하고, 약화는 **덜 모진 쪽**이라 옅어야 한다
      (2026-10-26, 교수님 지정 — 「부-약화가 부정보다 덜 진하게」) */

@@ -613,7 +613,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .pie__snb{fill:rgba(15,19,25,.68);stroke:rgba(255,255,255,.6);stroke-width:.9;pointer-events:none}
 .pie__hit{cursor:pointer}
 .pie__hit:focus{outline:none}
-.pie__hit:focus-visible .pie__seg{stroke-width:30}
+.pie__hit:focus-visible .pie__seg{stroke-width:33}   /* 띠(26.4)보다 도톰하게 — 고른 티가 나게 */
 .pie:hover .pie__hit .pie__seg{opacity:.45}
 .pie__hit:hover .pie__seg{opacity:1;stroke-width:28}
 .st-list--hit{animation:stHit 1.5s ease}
