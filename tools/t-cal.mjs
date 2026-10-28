@@ -445,7 +445,11 @@ await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.q = ''; }
 /* 점심은 밝게, 저녁은 어둡게 — 달력의 점과 목록의 아이콘 (2026-10-12) */
 await page.evaluate(() => {
   meetMap = {};
-  const t0 = mtToday(), d = new Date(t0 + 'T00:00:00');
+  /* **다음 달 1일**을 밑동으로 잡는다 (2026-10-29 에 고침). 전에는 오늘에서 +1 · +3 일을
+     썼는데, 달 끝에서는 둘이 **다른 달**에 떨어져 달력에 한쪽만 그려졌다 — 오늘이 29일이면
+     +3 이 다음 달이라 밤 점이 아예 없어 시험이 깨졌다. 다음 달 안이면 늘 같은 달이다. */
+  const t0 = mtToday(), d0 = new Date(t0 + 'T00:00:00');
+  const d = new Date(d0.getFullYear(), d0.getMonth() + 1, 1);
   const day = n => { const x = new Date(d); x.setDate(x.getDate() + n);
     return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
   mtAdd(day(1), rKey(state.rows[0]), 'lunch');

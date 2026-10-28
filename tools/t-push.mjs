@@ -682,6 +682,40 @@ t('VIP 도 시트에서 내려받는다', await page.evaluate(() => {
   return isVip(state.rows[7]) && JSON.parse(localStorage.getItem('jnu-vip') || '[]')[0] === k;
 }));
 await page.evaluate(() => { pushSet = new Set(); localStorage.removeItem('jnu-push'); sureSet = new Set(); localStorage.removeItem('jnu-sure'); vipSet = new Set(); localStorage.removeItem('jnu-vip'); });
+/* ---------- 뜻 없는 강화 지우기 (2026-10-29, 교수님 지정) ----------
+ * 「확실 + 강화」처럼 강화가 숫자를 하나도 못 바꾸는 자리의 표시는 **털어 낸다**.
+ * 상세에서는 그 단추를 잠가 두었지만, 잠그기 전에 찍어 두신 것이 남아 있다. */
+const TR = await page.evaluate(() => {
+  const sv = [...sures()], wv = [...weaks()];
+  const was = state.rows.map(p => [rKey(p), getRating(p)]);
+  sureSet = new Set(); weakSet = new Set();
+  const [a2, b2, c2, d2, e2] = state.rows;
+  setRating(rKey(a2), '확'); setRating(rKey(b2), '중'); setRating(rKey(c2), '부');
+  setRating(rKey(d2), '비'); setRating(rKey(e2), '');
+  [a2, b2, c2, d2, e2].forEach(p => sures().add(rKey(p)));
+  const n = trimIdleSure();
+  const left = [a2, b2, c2, d2, e2].filter(isSure).map(p => getRating(p) || '미지정');
+  const again = trimIdleSure();
+  /* 약화는 건드리지 않는다 — 교수님이 강화만 말씀하셨다 */
+  sureSet = new Set(); weakSet = new Set();
+  setRating(rKey(a2), '확'); setRating(rKey(c2), '부');
+  weaks().add(rKey(a2)); weaks().add(rKey(c2));
+  trimIdleSure();
+  const weakKept = weaks().size;
+  was.forEach(([k, v]) => setRating(k, v || ''));
+  sureSet = new Set(sv); weakSet = new Set(wv);
+  return { n, left, again, weakKept };
+});
+t('확실에 찍힌 강화를 턴다', TR.n === 1, `${TR.n}명`);
+t('나머지 갈래는 그대로', TR.left.join('|') === '중|부|비|미지정', TR.left.join('|'));
+t('다시 돌려도 더 털 것이 없다', TR.again === 0, `${TR.again}명`);
+t('약화는 건드리지 않는다', TR.weakKept === 2, `${TR.weakKept}명`);
+/* 무게표에서 저절로 따라온다 — 손으로 갈래 이름을 적어 두지 않았다 */
+t('지우는 자리는 무게표를 따른다', await page.evaluate(() =>
+  Object.keys(W_RATE).filter(r => W_SURE[r] != null && W_SURE[r] === W_RATE[r]).join('|') === '확'),
+  await page.evaluate(() => Object.keys(W_RATE)
+    .filter(r => W_SURE[r] != null && W_SURE[r] === W_RATE[r]).join('|')));
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

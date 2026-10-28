@@ -2970,6 +2970,29 @@ function applyLadder(push) {
   return n;
 }
 
+/* ---------- 뜻 없는 강화 지우기 (2026-10-29, 교수님 지정) ----------
+ * 「확실 + 강화」처럼 **강화가 숫자를 하나도 못 바꾸는 자리**에 찍힌 표시를 지웁니다.
+ * 무게가 묶인 뒤로 확실의 위 두 칸이 .95 로 같아, 그 자리의 강화는 아무 일도 하지 않습니다.
+ * 상세에서는 10-25 부터 그 단추를 잠가 두었지만, **그 전에 찍어 두신 것**이 남아 있습니다.
+ * 어느 갈래를 지울지는 **무게표에서 저절로 따라옵니다**(`markIdle` 과 같은 규칙) — 손으로
+ * 갈래 이름을 적어 두지 않았으니, 나중에 무게를 바꾸시면 지우는 자리도 같이 바뀝니다.
+ * 약화는 건드리지 않습니다 — 교수님이 강화만 말씀하셨습니다.
+ * 지우면 `sureSave()` 가 시트에도 올려 둡니다. 안 올리면 다른 기기에서 또 내려옵니다. */
+function trimIdleSure() {
+  const s = sures();
+  if (!s.size || !state.rows.length) return 0;
+  const gone = [];
+  state.rows.forEach(p => {
+    const k = rKey(p), r = getRating(p);
+    if (!s.has(k) || !r || W_RATE[r] == null) return;
+    if (W_SURE[r] != null && W_SURE[r] === W_RATE[r]) gone.push(k);   // 눌러도 숫자가 안 움직이는 자리
+  });
+  if (!gone.length) return 0;
+  gone.forEach(k => s.delete(k));
+  sureSave();
+  return gone.length;
+}
+
 /* ---------- 관심 교수 ----------
  * 카드 왼쪽 위의 동그란 버튼으로 켜고 끕니다. 퀴즈 설정과 같은 길(settings 탭)로 저장되므로
  * 서버(Code.gs)는 고칠 것이 없고, 다른 기기에서도 그대로 따라옵니다. */
@@ -3585,6 +3608,7 @@ function loadRatingsCache() {
       }
     }
     applyLadder(false);      // 이 기기에 쌓인 값부터 옮긴다 (시트는 아래 맞춤에서)
+    trimIdleSure();          // 「확실+강화」처럼 뜻 없는 강화를 턴다 (2026-10-29)
   } catch { state.ratings = new Map(); }
   try {
     const m = JSON.parse(localStorage.getItem(notesCacheKey()) || '{}');
@@ -3664,9 +3688,11 @@ async function syncRatings({ initial = false } = {}) {
     for (const [k, e] of server) if (!locked(k) && !entryEq(entryOf(k), e)) { applyEntry(k, e); changed.push(k); }
     for (const k of keys) if (!server.has(k) && !locked(k) && !localOnly.some(([lk]) => lk === k)) { applyEntry(k, { rating: '', met: 0, memo: '' }); changed.push(k); }
     const moved = applyLadder(true);     // 옛 갈래를 강화로 찍고 시트 값도 새 값으로
+    const trimmed = trimIdleSure();      // 뜻 없는 강화를 턴다 (2026-10-29, 교수님 지정)
     saveRatingsCache();
     sync.last = Date.now();
     if (moved) flashStatus(`옛 갈래 ${moved}명을 새 사다리로 옮겼습니다 — 긍정은 중간+강화, 모름은 부정+강화`);
+    if (trimmed) flashStatus(`확실인데 강화로 찍혀 있던 ${trimmed}명의 강화를 풀었습니다 — 확실에서는 강화가 숫자를 바꾸지 않습니다`);
     if (initial) render();
     else if (changed.length) { const v = route().view; if (v === 'dept') changed.forEach(k => refreshRatingUI(k, state.ratings.get(k) || '')); else if (v !== 'quiz') render(); flashStatus(`다른 기기의 기록 ${changed.length}건을 반영했습니다`); }
     let n = 0;
@@ -3790,6 +3816,7 @@ function applySettings(m) {
     if (same) continue;
     settingApplyLocal(key, v); changed.push(key);
   }
+  if (changed.includes(SET_SU)) trimIdleSure();   // 다른 기기에서 내려온 강화도 턴다 (2026-10-29)
   if (changed.length) {
     if (changed.includes(SET_QD) || changed.includes(SET_QX)) quizStart();   // 퀴즈 설정이 바뀐 때만 새로 시작
     route().view === 'quiz' ? renderQuiz() : render();
