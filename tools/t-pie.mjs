@@ -518,15 +518,31 @@ await page.waitForTimeout(250);
   }));
   /* 원 안의 숫자가 **어느 갈래인지** 빛깔로 말한다 (2026-10-26, 교수님 물음).
      바탕을 **그 조각 색 그대로** 쓰고 흰 테를 둘러 울타리로 삼는다. */
-  t('원 바탕은 그 조각 색 그대로', await page.evaluate(() => {
+  /* 2026-10-31 — 글자를 **늘 흰색**으로 두면서, 흰 글자가 안 읽히는 옅은 빛깔은 바탕을
+     눌러 맞춘다. 그래서 원 바탕은 **띠 색이거나 그것을 어둡게 한 같은 빛깔**이다. */
+  t('원 바탕은 띠 색이거나 그것을 누른 색', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__num')].filter(e => e.querySelector('.pie__snb'));
     if (!g.length) return false;
     const arc = n => document.querySelector(`.pie__hit[data-name="${CSS.escape(n)}"] .pie__seg`);
-    return g.every(e => getComputedStyle(e.querySelector('.pie__snb')).fill
-                     === getComputedStyle(arc(e.dataset.name)).stroke);
+    const rgb = v => v.match(/\d+/g).map(Number);
+    return g.every(e => {
+      const f = rgb(getComputedStyle(e.querySelector('.pie__snb')).fill);
+      const t2 = rgb(getComputedStyle(arc(e.dataset.name)).stroke);
+      const same = f.every((v, i) => v === t2[i]);
+      const darker = f.every((v, i) => v <= t2[i] + 1);          // 눌렀으면 어느 칸도 안 밝아진다
+      const hue = (a2, b2) => Math.abs((a2[0] - a2[2]) / 255 - (b2[0] - b2[2]) / 255) < .22;
+      return same || (darker && hue(f, t2));                     // 같은 빛깔을 어둡게만 한 것
+    });
   }), await page.evaluate(() => [...document.querySelectorAll('.pie__num')]
     .filter(e => e.querySelector('.pie__snb'))
     .map(e => `${e.dataset.name}:${e.querySelector('.pie__snb').style.getPropertyValue('--sc')}`).join(' ')));
+  t('진한 조각은 안 누른다 — 띠 색 그대로', await page.evaluate(() => {
+    const arc = n => document.querySelector(`.pie__hit[data-name="${CSS.escape(n)}"] .pie__seg`);
+    const g = [...document.querySelectorAll('.pie__num')].filter(e => e.querySelector('.pie__snb'))
+      .filter(e => !/약화|미지정/.test(e.dataset.name));
+    return g.length > 0 && g.every(e => getComputedStyle(e.querySelector('.pie__snb')).fill
+                                     === getComputedStyle(arc(e.dataset.name)).stroke);
+  }));
   t('테는 흰색 — 제 띠 위에서도 울타리가 된다', await page.evaluate(() =>
     [...document.querySelectorAll('.pie__snb')].every(e => {
       const k = getComputedStyle(e).stroke.match(/\d+/g).map(Number);
@@ -549,15 +565,19 @@ await page.waitForTimeout(250);
       .map(e => cr(rgb(getComputedStyle(e.querySelector('text')).fill),
                    rgb(getComputedStyle(e.querySelector('.pie__snb')).fill)).toFixed(2)).join(' ');
   }));
-  t('글자색은 흰색 아니면 어두운 색 둘 중 또렷한 쪽', await page.evaluate(() => {
+  /* 글자는 **늘 흰색** (2026-10-31, 교수님 지정) — 큰 숫자가 흰 글자이니 작은 숫자만
+     어두우면 두 가지 글자가 되어 한 체계로 안 읽힌다 */
+  t('작은 숫자도 흰 글자', await page.evaluate(() => {
     const rgb = v => v.match(/\d+/g).map(Number);
-    return [...document.querySelectorAll('.pie__sn--sm')].every(e => {
-      const f = rgb(getComputedStyle(e).fill);
-      const white = f.every(v => v > 245), dark = f.every(v => v < 60);
-      return white || dark;
-    });
+    const e2 = [...document.querySelectorAll('.pie__sn--sm')];
+    return e2.length > 0 && e2.every(e => rgb(getComputedStyle(e).fill).every(v => v > 245));
   }), await page.evaluate(() => [...document.querySelectorAll('.pie__snb')]
     .map(e => `${e.style.getPropertyValue('--sc')}→${e.style.getPropertyValue('--si')}`).join(' ')));
+  t('큰 숫자와 작은 숫자가 같은 글자색', await page.evaluate(() => {
+    const f = e => getComputedStyle(e).fill;
+    const big = document.querySelector('.pie__sn:not(.pie__sn--sm)'), sm = document.querySelector('.pie__sn--sm');
+    return !!big && !!sm && f(big) === f(sm);
+  }));
   t('원이 숫자를 품을 만큼 크다', await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pie__num')].find(e => e.querySelector('.pie__snb'));
     const c = g.querySelector('.pie__snb').getBoundingClientRect();

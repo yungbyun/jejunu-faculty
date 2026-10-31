@@ -1721,24 +1721,23 @@ const lumOf = hex => { const m = String(hex || '').replace('#', '');
   return m.length === 6 ? [0, 2, 4].reduce((a, i) => a + parseInt(m.slice(i, i + 2), 16), 0) / 3 : 128; };
 const badgeInk = r => { const c = RCOLOR[r] || '#6b7280'; return shade(c, lumOf(c) > 150 ? -45 : -12); };
 /* 원 바탕을 **그 조각 색 그대로** 쓸 때의 낯빛 (2026-10-26, 교수님 지정).
- * 흰 글자와 어두운 글자 가운데 **더 또렷한 쪽**을 고른다 — 밝기를 눈대중(평균)으로 가르면
- * 중-약화(#4f9fc6)처럼 어중간한 빛깔에서 흰 글자가 2.9 밖에 안 나와 읽히지 않는다.
- * 둘 다 4.5 에 못 미치면(확 #38831c 가 4.43 으로 아슬아슬하다) **바탕을 한 톤만 눌러**
- * 맞춘다 — 같은 빛깔로 알아볼 만큼만 어둡게 한다. */
+ * 글자는 **늘 흰색**입니다 (2026-10-31, 교수님 지정) — 큰 숫자가 흰 글자이니 작은 숫자만
+ * 어두우면 두 가지 글자가 되어 한 체계로 안 읽힙니다.
+ * 흰 글자가 4.5 에 못 미치는 옅은 빛깔(중-약화 #4f9fc6 은 2.8 뿐)은 **바탕을 눌러** 맞춥니다.
+ * 같은 빛깔을 어둡게만 한 것이라 어느 갈래인지는 그대로 보이고, 옅은 띠 위에서는 오히려
+ * 원이 더 또렷해집니다. 진한 조각(확·중·부+강화 …)은 **누르지 않아 띠 색 그대로**입니다. */
 const RELL = hex => { const m = String(hex || '').replace('#', '');
   const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
   return m.length === 6 ? .2126 * f(parseInt(m.slice(0, 2), 16)) + .7152 * f(parseInt(m.slice(2, 4), 16))
     + .0722 * f(parseInt(m.slice(4, 6), 16)) : .5; };
 const CONTR = (a, b) => { const x = RELL(a), y = RELL(b);
   return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
-const BADGE_INK = '#1b2129';
 function badgeFace(col) {
-  for (const d of [0, -12, -25]) {
+  for (const d of [0, -12, -25, -40, -55]) {
     const c = shade(col, d);
-    const w = CONTR('#ffffff', c), k = CONTR(BADGE_INK, c);
-    if (Math.max(w, k) >= 4.5) return { bg: c, ink: w >= k ? '#ffffff' : BADGE_INK };
+    if (CONTR('#ffffff', c) >= 4.5) return { bg: c, ink: '#ffffff' };
   }
-  return { bg: shade(col, -40), ink: '#ffffff' };
+  return { bg: shade(col, -70), ink: '#ffffff' };
 }
 
 function shade(hex, d) {
