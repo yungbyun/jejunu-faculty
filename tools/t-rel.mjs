@@ -274,6 +274,65 @@ await page.waitForTimeout(350);
 t('다시 누르면 접힌다', await page.evaluate(() => document.querySelectorAll('.rel-unames').length === 0));
 t('명단을 여닫아도 그림은 그대로', await page.evaluate(() => !!document.querySelector('.rel-svg') || !!document.querySelector('.rel-box .empty')));
 
+/* ---------- 상세 화면의 「동문 교수」 (2026-11-02, 교수님 지정) ----------
+ * 선호도 **위**에, 같은 대학을 거친 교수를 대학마다 묶어 적는다. */
+const pick = await page.evaluate(() => {
+  /* 대학이 둘인 분을 고른다 — 묶음이 둘로 갈리는지 보려면 그래야 한다 */
+  const p = state.rows.find(x => alumGroups(x).length >= 2) || state.rows.find(x => alumGroups(x).length);
+  const g = alumGroups(p);
+  const mine = eduUnivs(eduOf(p));
+  return { name: p.name, hash: `#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}`,
+    groups: g.length, unis: g.map(x => x.u), ns: g.map(x => x.ps.length),
+    all: g.map(x => x.ps.map(y => y.name)),
+    /* 같은 대학인데 비참여라 빠져야 할 분 */
+    out: state.rows.filter(x => rKey(x) !== rKey(p) && getRating(x) === '비'
+      && eduUnivs(eduOf(x)).some(u => mine.includes(u))).map(x => x.name) };
+});
+await page.evaluate(h => { location.hash = h; }, pick.hash);
+await page.waitForSelector('.d-alum', { timeout: 15000 });
+await page.waitForTimeout(500);
+const al = await page.evaluate(() => {
+  const box = document.querySelector('.d-alum');
+  const secs = [...document.querySelectorAll('.d-section h3')].map(h => h.textContent.trim());
+  const txt = el => { const c = el.cloneNode(true); c.querySelector('.st-d')?.remove(); return c.textContent.trim(); };
+  return {
+    secs,
+    groups: box.querySelectorAll('.d-alum__g').length,
+    unis: [...box.querySelectorAll('.d-alum__u')].map(e => e.firstChild.textContent.trim()),
+    names: [...box.querySelectorAll('.d-alum__g')].map(g => [...g.querySelectorAll('li a')].map(txt)),
+    degs: [...box.querySelectorAll('li .st-d')].map(e => e.textContent.trim()),
+    href: box.querySelector('li a')?.getAttribute('href') || '',
+    note: box.querySelector('.st-note')?.textContent.trim() || '',
+    me: document.querySelector('.d-name').textContent.trim(),
+  };
+});
+t('상세에 「동문 교수」 칸이 있다', al.secs.includes('동문 교수'), al.secs.join(' | '));
+t('선호도 바로 위에 둔다', al.secs.indexOf('동문 교수') === al.secs.indexOf('선호도') - 1, al.secs.join(' | '));
+t('대학마다 묶는다', al.groups === pick.groups && al.groups >= 2, `${al.groups} / ${pick.groups}묶음`);
+t('묶음 머리에 대학 이름', al.unis.join(',') === pick.unis.join(','), `${al.unis.join(',')} / ${pick.unis.join(',')}`);
+t('그 대학 동문을 다 적는다', al.names.map(x => x.join(',')).join(' | ') === pick.all.map(x => x.join(',')).join(' | '),
+  al.names.map(x => x.length).join(',') + ' / ' + pick.ns.join(','));
+t('자기 자신은 안 넣는다', !al.names.flat().includes(al.me), al.me);
+t('비참여는 뺀다', !al.names.flat().some(n => pick.out.includes(n)), pick.out.join(' '));
+t('뺀 비참여가 몇 명인지 적는다', !pick.out.length || /비참여 \d+명은 뺐습니다/.test(al.note), al.note);
+t('이름 뒤에 학·석·박을 적는다', al.degs.length > 0 && al.degs.every(d => /^[학석박]+$/.test(d)), al.degs.join(' '));
+t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(al.href), al.href);
+
+/* 학력 자료는 관계 지도에서만 쓰던 것이라 **늦게** 온다 — 상세를 바로 열어도 채워져야 한다 */
+await page.goto('http://127.0.0.1:8080/' + pick.hash, { waitUntil: 'load' });
+await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
+await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
+await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
+await page.waitForTimeout(600);
+t('바로 연 상세에도 동문이 채워진다', await page.evaluate(async () => {
+  for (let i = 0; i < 60; i++) {
+    const box = document.querySelector('.d-alum');
+    if (box && box.querySelector('li a')) return true;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return false;
+}));
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

@@ -4304,6 +4304,47 @@ function relUnivs() {
 const eduDegs = (p, u) => { const e = eduOf(p) || {};
   return [[e.bs, '학'], [e.ms, '석'], [e.phd, '박']].filter(x => x[0] === u).map(x => x[1]).join(''); };
 
+/* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
+ * 교수 상세 화면의 **선호도 위**에, 이분과 같은 대학을 거친 교수를 적습니다.
+ * - **대학마다 묶어** 적습니다. 한 분이 학·석·박을 다른 데서 받으셨으면 묶음도 그만큼입니다.
+ * - 머리의 학/석/박은 **이 교수**가 그 대학에서 받은 학위, 이름 뒤의 것은 **상대**의 학위입니다.
+ * - 비참여는 뺍니다 — 관계 지도·출신 대학 명단과 같은 규칙입니다. 한 화면에서만 숫자가
+ *   달라지면 어느 쪽이 맞는지 알 수 없습니다. 뺀 것은 꼬리에 적어 둡니다.
+ * - 차례는 분석 쪽과 같습니다(`stSort`) — 도움·강화가 앞, 같으면 이름 차례.
+ * 학력 자료(`data/edu.json`)는 여태 관계 지도에서만 쓰던 것이라 **늦게 옵니다**. 자리를 먼저
+ * 띄우고, `loadEdu()` 가 끝나면 그 칸만 다시 채웁니다(상세를 통째로 다시 그리면 쓰시던
+ * 메모가 날아갑니다). */
+function alumGroups(p) {
+  const me = rKey(p);
+  const rows = state.rows.filter(x => rKey(x) !== me && getRating(x) !== '비');
+  return eduUnivs(eduOf(p)).map(u => ({
+    u, deg: eduDegs(p, u),
+    ps: stSort(rows.filter(x => eduUnivs(eduOf(x)).includes(u))),
+  })).filter(g => g.ps.length);
+}
+function alumHtml(p) {
+  if (!eduMap && !eduFixes()[rKey(p)]) return `<p class="st-note">불러오는 중…</p>`;
+  const mine = eduUnivs(eduOf(p));
+  if (!mine.length) return `<p class="st-note">학력 자료가 없습니다.</p>`;
+  const gs = alumGroups(p);
+  const head = mine.map(u => `${u}${eduDegs(p, u) ? ` ${eduDegs(p, u)}` : ''}`).join(' · ');
+  if (!gs.length) return `<p class="st-note">${esc(head)} — 같은 대학을 거친 다른 교수가 없습니다.</p>`;
+  const out = state.rows.filter(x => rKey(x) !== rKey(p) && getRating(x) === '비'
+    && eduUnivs(eduOf(x)).some(u => mine.includes(u))).length;
+  /* 이름표는 분석 쪽 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략 토글
+     단추가 되는데, 여기서는 눌러서 그 교수 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
+  const was = STP.pick; STP.pick = false;
+  const html = gs.map(g => `<div class="d-alum__g">
+      <div class="d-alum__u">${esc(g.u)}${g.deg ? `<em>${esc(g.deg)}</em>` : ''}<i>${g.ps.length}명</i></div>
+      <ul class="rel-unames">${g.ps.map(x => {
+        const dg = eduDegs(x, g.u);
+        return stChip(x, getRating(x)).replace('</a>', `${dg ? `<em class="st-d">${esc(dg)}</em>` : ''}</a>`);
+      }).join('')}</ul>
+    </div>`).join('');
+  STP.pick = was;
+  return html + `<p class="st-note">이름 뒤의 학/석/박은 그 대학에서 받은 학위입니다${out ? ` · 비참여 ${out}명은 뺐습니다` : ''}</p>`;
+}
+
 function relUniHtml() {
   const list = relUnivs();
   if (!list.length) return '';
@@ -5622,6 +5663,10 @@ function openDrawer(p, d) {
       </div>
 
 
+      <div class="d-section"><h3>동문 교수</h3>
+        <div class="d-alum" data-alum="${esc(p.slug)}">${alumHtml(p)}</div>
+      </div>
+
       <div class="d-section"><h3>선호도</h3>
         ${rateWide(p)}
       </div>
@@ -5723,6 +5768,11 @@ function openDrawer(p, d) {
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
     flashStatus(on ? `${p.name} 교수를 공략으로 표시했습니다` : `${p.name} 교수의 공략 표시를 풀었습니다`);
+  });
+  /* 학력은 관계 지도에서만 쓰던 자료라 아직 안 와 있을 수 있다 — 오면 그 칸만 고쳐 넣는다 */
+  if (!eduMap) loadEdu().then(() => {
+    const box = $panel.querySelector(`.d-alum[data-alum="${CSS.escape(p.slug)}"]`);
+    if (box) box.innerHTML = alumHtml(p);
   });
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);
