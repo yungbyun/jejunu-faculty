@@ -5447,17 +5447,32 @@ function mtRefreshWho() {
   if (head) head.textContent = mtNames(m).join(', ') || '사람 없음';
   bindWho();
 }
+/* 찾는 칸을 비우고 손을 그 자리에 둔다 — 다음 분을 바로 칠 수 있게 */
+function mtClearQ() {
+  CAL.q = '';
+  const q = $app.querySelector('[data-mtq]');
+  if (q) { q.value = ''; q.focus(); }
+}
 function bindWho() {
-  $app.querySelectorAll('[data-mtwho]').forEach(b => b.addEventListener('click', () => {
-    mtWho(CAL.open, b.dataset.mtwho);
-    mtRefreshWho();
-  }));
+  $app.querySelectorAll('[data-mtwho]').forEach(b => {
+    /* 같은 `data-mtwho` 가 **두 군데**에 쓰인다 — 추천 목록(더하기)과 고른 칩(빼기).
+       어느 쪽에서 눌렀는지는 담긴 상자로 가린다. */
+    const fromHits = !!b.closest('[data-mthits]');
+    b.addEventListener('click', () => {
+      mtWho(CAL.open, b.dataset.mtwho);
+      /* 추천에서 고르면 친 글자를 지웁니다 (2026-11-02, 교수님 지정) — 명단 밖의 분을
+         더할 때와 같은 결입니다. 남겨 두면 다음 분을 칠 때 지우기부터 해야 하고,
+         이미 고른 분이 추천에서 빠져 같은 글자에 다른 사람이 떠 헷갈립니다.
+         고른 칩(×)을 눌러 **뺄 때는 건드리지 않습니다** — 찾던 글자가 남아 있어야
+         이어서 고르실 수 있습니다. */
+      if (fromHits) mtClearQ();
+      mtRefreshWho();
+    });
+  });
   /* 명단 밖의 분 — 더하고 나면 찾는 칸을 비워 다음 사람을 바로 칠 수 있게 한다 */
   $app.querySelectorAll('[data-mtguest]').forEach(b => b.addEventListener('click', () => {
     mtGuest(CAL.open, b.dataset.mtguest);
-    CAL.q = '';
-    const q = $app.querySelector('[data-mtq]');
-    if (q) { q.value = ''; q.focus(); }
+    mtClearQ();
     mtRefreshWho();
   }));
   $app.querySelectorAll('[data-mtguestx]').forEach(b => b.addEventListener('click', () => {

@@ -134,8 +134,25 @@ t('조합 중에도 후보가 따라온다', await page.evaluate(() =>
 t('후보를 눌러도 칸이 살아 있다', await page.evaluate(() => {
   document.querySelector('[data-mthits] .cal-chip').click();
   const live = document.querySelector('[data-mtq]');
-  return live === window.__N && live.value === '길준';   // 찾던 글자도 그대로
+  return live === window.__N && document.activeElement === live;   // 같은 칸에 손이 그대로
 }));
+/* 2026-11-02, 교수님 지정 — **추천에서 고르면 친 글자를 지운다.** 남겨 두면 다음 분을
+   칠 때 지우기부터 해야 하고, 고른 분이 추천에서 빠져 같은 글자에 다른 사람이 떠 헷갈린다.
+   (그 전에는 찾던 글자를 그대로 두었다.) */
+t('추천에서 고르면 친 글자가 지워진다', await page.evaluate(() =>
+  document.querySelector('[data-mtq]').value === '' && CAL.q === ''),
+  await page.evaluate(() => `"${document.querySelector('[data-mtq]').value}" / "${CAL.q}"`));
+t('지운 뒤에도 같은 칸에 손이 있다', await page.evaluate(() =>
+  document.activeElement === window.__N));
+/* 고른 칩(×)을 눌러 **뺄 때는** 건드리지 않는다 — 찾던 글자가 남아 있어야 이어서 고른다 */
+t('고른 칩을 빼도 친 글자는 그대로', await page.evaluate(async () => {
+  const i = document.querySelector('[data-mtq]');
+  i.focus(); i.value = '길준'; i.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 150));
+  [...document.querySelectorAll('[data-mtpicked] [data-mtwho]')].pop().click();
+  await new Promise(r => setTimeout(r, 150));
+  return document.querySelector('[data-mtq]').value === '길준' && CAL.q === '길준';
+}), await page.evaluate(() => `"${document.querySelector('[data-mtq]').value}" / "${CAL.q}"`));
 await page.evaluate(() => {
   const m = meets()[CAL.open];
   m.who = m.who.slice(0, 1); mtSave();   // 여기서 더한 분만 도로 뺀다
