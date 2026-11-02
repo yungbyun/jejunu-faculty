@@ -88,6 +88,34 @@ for (const w of [320, 390]) {
     `토 ${dow.sat} / 상자 ${dow.right}`);
   t(`${w}px 날짜 칸도 안 밀려난다`, dow.cout === 0, `${dow.cout}칸 밖`);
 
+  /* 「이제까지 만난 분」의 갈래 고르기 단추 넷(모두·점심·저녁·Tea)은 폰에서도 **한 줄**이어야
+     한다 (2026-11-02, 교수님 지정). 횟수가 두 자리로 올라도 접히지 않는지 함께 본다 —
+     한 자리로만 재면 320px 에서 두 자리가 되는 날 조용히 두 줄이 된다. */
+  const ate = await page.evaluate(() => {
+    meetMap = {}; localStorage.removeItem('jnu-meets');
+    const d0 = new Date(mtToday() + 'T00:00:00');
+    const day = k => { const x = new Date(d0); x.setDate(x.getDate() + k);
+      return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
+    const who = i => rKey(state.rows[i % state.rows.length]);
+    const mk = (dd, key, kind) => { const id = mtAdd(dd, key, kind); meets()[id].done = 'met'; };
+    for (let i = 0; i < 13; i++) mk(day(-60 + i), who(i), 'lunch');
+    for (let i = 0; i < 13; i++) mk(day(-40 + i), who(i + 20), 'dinner');
+    for (let i = 0; i < 13; i++) mk(day(-9), who(i + 40), 'other');
+    CAL.ate = ''; location.hash = '#/cal'; render();
+    const box = document.querySelector('.mt-fs');
+    const bs = [...box.querySelectorAll('.mt-f')];
+    const br = box.getBoundingClientRect();
+    return { n: bs.length,
+      lines: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size,
+      slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
+      labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
+      wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  t(`${w}px 만난 분 고르기 단추가 넷`, ate.n === 4, ate.labels.join(' '));
+  t(`${w}px 그 단추가 한 줄`, ate.lines === 1, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
+  t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
+  t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);
+
   await page.evaluate(() => {
     pushSet = new Set(); sureSet = new Set(); mobileMap = {};
     localStorage.removeItem('jnu-push'); localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-mobile');

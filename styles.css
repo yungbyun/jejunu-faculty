@@ -961,14 +961,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .rel-k--alum{color:var(--ink-2);background:var(--surface-2);border:1px dashed var(--line-2)}
 
 /* 만난 적이 있는 교수 — 이름 오른쪽에 만난 횟수만큼 작은 불. 색은 그 선호도의 대표 색(--lit) */
-.metlit{display:inline-flex;align-items:center;gap:3px;margin-left:6px;
-  vertical-align:middle;position:relative;top:-1px}
-/* 2026-10-16 — 5px 에 번지는 빛까지 둘러 너무 커 보였다. 반으로 줄이고 빛을 걷어
-   **또렷한 단색 동그라미**로 둔다. 작아진 만큼 사이 틈도 조금 벌린다. */
-.metlit b{width:3px;height:3px;border-radius:50%;background:var(--lit,#22c55e);box-shadow:none}
-/* 다섯 번을 넘으면 점 대신 숫자로 */
-.metlit em{font-style:normal;font-size:10px;font-weight:800;line-height:1;
-  color:var(--lit,#22c55e);margin-left:1px}
+/* 만난 횟수 — 점이 아니라 작은 숫자 (2026-11-02, 교수님 지정). 이름 바로 뒤라 작게 두되,
+   굵게 해 이름 글자와 섞이지 않게 한다. 숫자 폭을 고정해 자리가 흔들리지 않는다. */
+.metlit{display:inline-flex;align-items:center;margin-left:5px;
+  vertical-align:middle;position:relative;top:-1px;
+  font-style:normal;font-size:10px;font-weight:800;line-height:1;letter-spacing:-.2px;
+  color:var(--lit,#22c55e);font-variant-numeric:tabular-nums}
 .btn{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
 .btn:hover{background:var(--surface-2)}
 .muted{color:var(--ink-3)}
@@ -1724,6 +1722,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-head [data-mttoday]{margin-left:auto}
   .cal-nav{padding:4px 9px}
   .cal-head .btn{padding:5px 9px;font-size:12px}
+  /* 만난 분 고르기 단추 넷(모두·점심·저녁·Tea)은 한 줄에 들어가야 한다 (2026-11-02, 교수님 지정).
+     위 `.cal-head .btn` 만으로는 320px 폰에서 두 줄로 접혀, 조금 더 줄인다. 힘이 같으므로
+     **그 줄보다 뒤에** 두어야 이긴다 — 위로 올리면 그냥 덮인다. */
+  .mt-fs{gap:4px}
+  .cal-new__b.mt-f{gap:3px;padding:5px 7px}
+  .cal-new__b.mt-f i{font-size:10px}
+  .cal-new__b.mt-f .mt-i{width:12px;height:12px;margin-right:3px}
   .cal-head--day,.cal-head--ate{gap:6px}
   .crumbs{margin-bottom:8px}
   .hero--thin{margin-bottom:8px}
@@ -1731,6 +1736,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-r__t{min-width:52px}
   .cal-r__a{min-width:32px;min-height:30px;padding:0}
   .cal-del{margin-left:0}
+}
+/* 가장 좁은 폰(320px)에서는 횟수가 두 자리가 되면 그래도 넘친다 — 한 걸음 더 줄인다.
+   위 520px 묶음과 힘이 같으므로 **그 묶음 뒤에** 있어야 이긴다 (2026-11-02). */
+@media (max-width:340px){
+  .cal-new__b.mt-f{padding:5px 6px;font-size:11px}
+  .cal-new__b.mt-f .mt-i{margin-right:2px}
 }
 
 /* 날짜 고르는 칸 — 브라우저가 칸 안에 그리는 10/13/26 은 우리가 못 바꾼다.

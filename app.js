@@ -3570,12 +3570,11 @@ const chickBadge = p => isNewProf(p)
 const getNote = key => state.notes.get(key) || { met: 0, memo: '' };
 const getMet = p => getNote(rKey(p)).met || 0;
 const getMemo = p => getNote(rKey(p)).memo || '';
-/* 만난 횟수만큼 작은 점. 여섯 번을 넘으면 칩이 길어지니 점은 다섯까지만 찍고 숫자로 적는다 */
-const MET_DOT_MAX = 5;
+/* 만난 횟수는 **작은 숫자**로 적는다 (2026-11-02, 교수님 지정). 전에는 횟수만큼 점을 찍고
+   다섯을 넘을 때만 숫자를 붙였는데, 점은 세어 봐야 알고 셋과 넷이 한눈에 갈리지 않았다.
+   숫자 하나면 길이도 늘 같아 칩이 들쭉날쭉하지 않다. 색은 그 줄의 선호도 색(`--lit`)이다. */
 const metDots = (met, color) => !met ? '' :
-  `<i class="metlit" style="--lit:${esc(color || '#22c55e')}" role="img" aria-label="만난 적 있음 ${met}회">`
-  + '<b></b>'.repeat(Math.min(met, MET_DOT_MAX))
-  + (met > MET_DOT_MAX ? `<em>${met}</em>` : '') + '</i>';
+  `<i class="metlit" style="--lit:${esc(color || '#22c55e')}" role="img" aria-label="만난 적 있음 ${met}회">${met}</i>`;
 const normMet = v => Math.max(0, Math.min(999, Math.round(Number(v) || 0)));
 const normMemo = v => String(v == null ? '' : v).slice(0, 2000);
 /* 한 교수의 로컬 기록 전체 {rating, met, memo} */

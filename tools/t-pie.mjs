@@ -124,8 +124,8 @@ const lit = await page.evaluate(()=>{
   const first = a.find(el=>el.querySelector('.metlit'));
   return { want, got, okPos, title: first ? first.getAttribute('title') : '' };
 });
-t('만난 사람 수만큼 불이 켜짐', lit.got === lit.want, `${lit.got} / ${lit.want}`);
-t('불은 이름 오른쪽 끝에', lit.okPos);
+t('만난 사람만 숫자가 붙는다', lit.got === lit.want, `${lit.got} / ${lit.want}`);
+t('숫자는 이름 오른쪽 끝에', lit.okPos);
 /* 2026-10-25 — 만남 횟수는 **말풍선에서 뺐습니다**(교수님 지정). 이름 옆 점으로 이미 보입니다 */
 t('도움말에 만남 횟수를 적지 않는다', !lit.title.includes('만남'), lit.title);
 
@@ -159,7 +159,9 @@ t('비참여는 셈에서 뺀다고 적는다', tip.비.includes('비참여') &&
 t('미지정은 0 으로 센다고 적는다', tip.없음.includes('미지정'), tip.없음);
 t('말풍선에 만남 횟수가 없다', !Object.values(tip).some(v => String(v).includes('만남')),
   Object.values(tip).join(' | '));
-t('안 만난 사람은 불 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
+t('안 만난 사람은 숫자 없음', await page.evaluate(()=>[...document.querySelectorAll('.st-list li a')].filter(e=>!e.querySelector('.metlit')).length)>0);
+/* 2026-11-02 — 교수님 지정으로 **점을 걷고 작은 숫자**로 적는다. 점은 세어 봐야 알고
+   셋과 넷이 한눈에 갈리지 않았다. 숫자는 길이가 늘 같아 칩도 들쭉날쭉하지 않다. */
 const dots = await page.evaluate(()=>{
   state.ratings.clear(); state.notes.clear();
   const v=['확','중','부'];
@@ -168,41 +170,38 @@ const dots = await page.evaluate(()=>{
   const rows = [...document.querySelectorAll('.st-list li a')].map(el=>{
     const p = state.rows.find(x=>el.getAttribute('href').endsWith(encodeURIComponent(x.slug)));
     const w = el.querySelector('.metlit');
-    return { met: p?getMet(p):-1, n: w?w.querySelectorAll('b').length:0, num: w&&w.querySelector('em')?w.querySelector('em').textContent:'' };
+    return { met: p?getMet(p):-1, txt: w?w.textContent.trim():'', dots: w?w.querySelectorAll('b, em').length:0 };
   });
+  const lit = rows.filter(x=>x.met>0), el = document.querySelector('.metlit');
+  const cs = el ? getComputedStyle(el) : null;
   return {
-    small: rows.some(x=>x.met>0) && rows.filter(x=>x.met>0&&x.met<=5).every(x=>x.n===x.met&&!x.num),
-    capped: rows.filter(x=>x.met>5).every(x=>x.n===5&&x.num===String(x.met)),
+    num: lit.length>0 && lit.every(x=>x.txt===String(x.met)),
+    big: rows.filter(x=>x.met>5).every(x=>x.txt===String(x.met)),
     many: rows.filter(x=>x.met>5).length,
-    size: (()=>{ const b=document.querySelector('.metlit b'); return b?Math.round(b.getBoundingClientRect().width):0; })(),
+    marks: rows.reduce((a,x)=>a+x.dots,0),
+    size: cs?Math.round(parseFloat(cs.fontSize)):0,
+    weight: cs?Number(cs.fontWeight):0,
+    nameSize: (()=>{ const a=document.querySelector('.st-list li a');
+      return a?Math.round(parseFloat(getComputedStyle(a).fontSize)):0; })(),
   };
 });
-t('만난 횟수만큼 점이 찍힌다', dots.small);
-t('다섯을 넘으면 점 다섯에 숫자', dots.capped && dots.many>0, `${dots.many}명`);
-t('점은 작고 또렷하다(4px 이하)', dots.size>0 && dots.size<=4, `${dots.size}px`);
-t('번지는 빛을 두르지 않는다', await page.evaluate(() =>
-  getComputedStyle(document.querySelector('.metlit b')).boxShadow === 'none'),
-  await page.evaluate(() => getComputedStyle(document.querySelector('.metlit b')).boxShadow));
-t('동그라미다', await page.evaluate(() => {
-  const b = document.querySelector('.metlit b'), cs = getComputedStyle(b), r = b.getBoundingClientRect();
-  return cs.borderRadius === '50%' && Math.abs(r.width - r.height) < 0.5;
-}));
-t('점끼리 붙지 않는다', await page.evaluate(() => {
-  const w = document.querySelector('.metlit');
-  const bs = [...w.querySelectorAll('b')].map(b => b.getBoundingClientRect());
-  return bs.length < 2 || bs.slice(1).every((r, i) => r.left - bs[i].right >= 2);
-}));
+t('만난 횟수를 숫자로 적는다', dots.num);
+t('다섯을 넘어도 숫자 그대로', dots.big && dots.many>0, `${dots.many}명`);
+t('점은 더 찍지 않는다', dots.marks===0, `${dots.marks}개`);
+t('숫자는 작다(11px 이하)', dots.size>0 && dots.size<=11, `${dots.size}px`);
+t('이름 글자보다 작다', dots.size>0 && dots.size < dots.nameSize, `${dots.size} / ${dots.nameSize}`);
+t('숫자는 굵다', dots.weight>=700, String(dots.weight));
 const cols = await page.evaluate(()=>{
   const v=CONFIG.RATINGS.LABELS; state.ratings.clear(); state.notes.clear();
   state.rows.forEach((p,i)=>{ state.ratings.set(rKey(p), v[i%6]); state.notes.set(rKey(p),{met:1,memo:''}); });
   render();
   const hex = x => '#'+x.match(/\d+/g).slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join('');
   return [...document.querySelectorAll('.st-list')].map(box=>{
-    const r=box.dataset.rslist, lit=box.querySelector('.metlit b');
-    return { r, got: lit?hex(getComputedStyle(lit).backgroundColor):'', want: RCOLOR[r] };
+    const r=box.dataset.rslist, lit=box.querySelector('.metlit');
+    return { r, got: lit?hex(getComputedStyle(lit).color):'', want: RCOLOR[r] };
   });
 });
-t('불 색이 그 선호도 대표색', cols.length===4 && cols.every(c=>c.got===c.want),
+t('숫자 색이 그 선호도 대표색', cols.length===4 && cols.every(c=>c.got===c.want),
   cols.map(c=>`${c.r} ${c.got}${c.got===c.want?'':'≠'+c.want}`).join(' '));
 
 // 7) 확+긍에 **중인 강화**를 더한 값 (2026-10-17, 전에는 중·모인 공략이었다)
