@@ -2887,6 +2887,24 @@ function dOffice(p) {
   return `<div class="d-office">${PIN_SVG}<span>${esc([lab, loc].filter(Boolean).join(' · '))}</span></div>`;
 }
 
+/* ---------- 출신 학교 — 영문 이름 아래 (2026-11-02, 교수님 지정) ----------
+ * 학사·석사·박사를 받으신 곳을 **학위마다** 적습니다. 같은 대학이면 이름이 거듭 나오지만,
+ * 어느 학위를 어디서 받으셨는지가 한눈에 들어오는 쪽을 택했습니다 — 묶어서 「제주대 학·석」
+ * 처럼 적으면 가운뎃점이 '학위 사이'와 '대학 사이' 두 뜻으로 쓰여 읽기가 흐려집니다.
+ * (아래 「동문 교수」 칸은 대학마다 묶습니다 — 거기서는 대학이 머리이기 때문입니다.)
+ * 학력 자료(`data/edu.json`)는 늦게 오므로 **자리만 두고** `loadEdu()` 뒤에 채웁니다. */
+const CAP_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<path d="M12 4 2.5 9 12 14l9.5-5L12 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'
+  + '<path d="M6.5 11.2V16c0 1.5 2.5 2.8 5.5 2.8s5.5-1.3 5.5-2.8v-4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const EDU_DEGS = [['bs', '학사'], ['ms', '석사'], ['phd', '박사']];
+function dEdu(p) {
+  const e = eduOf(p);
+  const got = e ? EDU_DEGS.filter(([k]) => e[k]) : [];
+  if (!got.length) return '';
+  return `<div class="d-edu" title="출신 학교">${CAP_SVG}<span>${got
+    .map(([k, n]) => `<em><i>${n}</i>${esc(e[k])}</em>`).join('')}</span></div>`;
+}
+
 function profCard(p, d, showDept = false) {
   const color = d ? d.color : '#1f8a5b';
   const { lab, loc } = officeParts(p.office);
@@ -5656,6 +5674,7 @@ function openDrawer(p, d) {
           <div class="d-top"><span class="d-rank">${esc(p.rank)}</span></div>
           <h2 class="d-name" id="drawerTitle">${esc(p.name)}</h2>
           <div class="d-en">${esc(p.name_en || '')}</div>
+          <div class="d-eduw" data-edu="${esc(p.slug)}">${dEdu(p)}</div>
           ${dOffice(p)}
           ${dPhones(p)}
           <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
@@ -5773,6 +5792,8 @@ function openDrawer(p, d) {
   if (!eduMap) loadEdu().then(() => {
     const box = $panel.querySelector(`.d-alum[data-alum="${CSS.escape(p.slug)}"]`);
     if (box) box.innerHTML = alumHtml(p);
+    const ebox = $panel.querySelector(`.d-eduw[data-edu="${CSS.escape(p.slug)}"]`);
+    if (ebox) ebox.innerHTML = dEdu(p);
   });
   if (!insCache.has(d.id)) loadInsights(d.id).then(data => {
     const box = $panel.querySelector(`.ins[data-slug="${CSS.escape(p.slug)}"]`);

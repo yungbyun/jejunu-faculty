@@ -849,6 +849,16 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .d-office{display:flex;align-items:center;gap:4px;margin:0 0 4px;font-size:12.5px;color:var(--ink-2)}
 .d-office svg{flex:none;opacity:.8}
 .d-en+.d-office{margin-top:-4px}
+/* 출신 학교 줄 — 연구실·번호 줄과 같은 결. 학위 이름만 작은 테두리로 떼어 둔다
+   (2026-11-02, 교수님 지정). 자료가 없으면 칸이 비어, 아래 줄이 그만큼 당겨 붙는다. */
+.d-edu{display:flex;align-items:flex-start;gap:4px;margin:-2px 0 5px;font-size:12.5px;color:var(--ink-2)}
+.d-edu svg{flex:none;opacity:.8;margin-top:1px}
+.d-edu>span{display:flex;flex-wrap:wrap;gap:3px 10px;min-width:0}
+.d-edu em{font-style:normal;display:inline-flex;align-items:center;gap:4px}
+.d-edu i{font-style:normal;font-size:10px;font-weight:800;color:var(--ink-3);
+  border:1px solid var(--line-2);border-radius:999px;padding:1px 5px;letter-spacing:-.3px}
+.d-eduw:empty+.d-office{margin-top:-4px}
+.d-eduw:empty+.d-phones{margin-top:-6px}
 .d-ct{display:inline-flex;align-items:center;gap:3px}
 .d-ct__n{color:inherit;text-decoration:none;font-variant-numeric:tabular-nums}
 .d-ct__n:hover,.d-ct__n:focus-visible{text-decoration:underline}

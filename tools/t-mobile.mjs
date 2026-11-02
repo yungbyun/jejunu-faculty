@@ -83,12 +83,19 @@ await page.evaluate(x => {
 await page.waitForSelector('.d-phones', { timeout: 10000 });
 check('연락처 칸을 따로 두지 않는다', await page.evaluate(() =>
   ![...document.querySelectorAll('.d-section h3')].some(h => h.textContent.trim() === '연락처')));
-/* 2026-10-15 에 연구실 줄이 사이에 들어왔다 — 영문 이름 / 연구실 / 번호 차례 */
-check('영문 이름 — 연구실 — 번호 차례', await page.evaluate(() => {
-  const en = document.querySelector('.d-en:not(.d-phones)'), ph = document.querySelector('.d-phones');
-  const of = document.querySelector('.d-office');
-  return of ? (en.nextElementSibling === of && of.nextElementSibling === ph)
-            : en.nextElementSibling === ph;
+/* 2026-10-15 에 연구실 줄이 사이에 들어왔고, 2026-11-02 에 **출신 학교**가 영문 이름 바로
+   아래로 들어왔다 — 영문 이름 / 출신 학교 / 연구실 / 번호 차례 (교수님 지정) */
+check('영문 이름 — 출신 학교 — 연구실 — 번호 차례', await page.evaluate(() => {
+  /* 번호 줄은 `.d-en .d-phones` 로 두 이름을 다 지고 있어 class 로 가리면 영문 이름과
+     헷갈린다 — 하나씩 집어서 **문서 차례**로만 본다 */
+  const els = [
+    document.querySelector('.d-profile .d-en:not(.d-phones)'),
+    document.querySelector('.d-profile .d-eduw'),
+    document.querySelector('.d-profile .d-office'),
+    document.querySelector('.d-profile .d-phones'),
+  ].filter(Boolean);
+  return els.length >= 3 && els.every((e, i) => i === 0 ||
+    (els[i - 1].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING));
 }), await page.evaluate(() => [...document.querySelector('.d-profile').lastElementChild.children].map(e => e.className).join(' / ')));
 check('글꼴·크기·색이 영문 이름과 같다', await page.evaluate(() => {
   const a = getComputedStyle(document.querySelector('.d-en'));

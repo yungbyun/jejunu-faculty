@@ -318,20 +318,46 @@ t('뺀 비참여가 몇 명인지 적는다', !pick.out.length || /비참여 \d+
 t('이름 뒤에 학·석·박을 적는다', al.degs.length > 0 && al.degs.every(d => /^[학석박]+$/.test(d)), al.degs.join(' '));
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(al.href), al.href);
 
+/* 영문 이름 **바로 아래**에 출신 학교를 적는다 (2026-11-02, 교수님 지정) */
+const edu = await page.evaluate(() => {
+  const en = document.querySelector('.d-en');
+  const box = document.querySelector('.d-eduw');
+  const e = eduOf(state.rows.find(p => p.slug === box.dataset.edu));
+  return {
+    afterEn: en.nextElementSibling === box,
+    beforeOffice: !!box.nextElementSibling && /d-(office|phones)/.test(box.nextElementSibling.className),
+    degs: [...box.querySelectorAll('em')].map(x => ({
+      deg: x.querySelector('i').textContent.trim(),
+      uni: x.textContent.replace(x.querySelector('i').textContent, '').trim() })),
+    want: [['학사', e.bs], ['석사', e.ms], ['박사', e.phd]].filter(x => x[1]),
+    icon: !!box.querySelector('svg'),
+  };
+});
+t('출신 학교가 영문 이름 바로 아래', edu.afterEn, String(edu.afterEn));
+t('연구실·번호 줄보다 위', edu.beforeOffice, String(edu.beforeOffice));
+t('학위마다 적는다', edu.degs.length === edu.want.length
+  && edu.degs.every((d, i) => d.deg === edu.want[i][0] && d.uni === edu.want[i][1]),
+  edu.degs.map(d => `${d.deg} ${d.uni}`).join(' · '));
+t('학위 이름을 붙여 둔다', edu.degs.every(d => /^(학사|석사|박사)$/.test(d.deg)),
+  edu.degs.map(d => d.deg).join(' '));
+t('앞에 학사모 그림', edu.icon);
+
 /* 학력 자료는 관계 지도에서만 쓰던 것이라 **늦게** 온다 — 상세를 바로 열어도 채워져야 한다 */
 await page.goto('http://127.0.0.1:8080/' + pick.hash, { waitUntil: 'load' });
 await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
 await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
 await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
 await page.waitForTimeout(600);
-t('바로 연 상세에도 동문이 채워진다', await page.evaluate(async () => {
+const late = await page.evaluate(async () => {
   for (let i = 0; i < 60; i++) {
     const box = document.querySelector('.d-alum');
-    if (box && box.querySelector('li a')) return true;
+    if (box && box.querySelector('li a')) break;
     await new Promise(r => setTimeout(r, 200));
   }
-  return false;
-}));
+  return { alum: !!document.querySelector('.d-alum li a'), edu: !!document.querySelector('.d-edu em') };
+});
+t('바로 연 상세에도 동문이 채워진다', late.alum);
+t('바로 연 상세에도 출신 학교가 채워진다', late.edu);
 
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
