@@ -767,7 +767,10 @@ await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
  * 달력 아래에 지금까지 만난 분을 쭉 적는다 — 날짜·갈래·이름·학과·장소.
  * **지난 날짜의 약속은 이미 만난 것으로 본다**(2026-11-02 저녁, 교수님 지정). 셈에서 빼는
  * 것은 **「못 만남」으로 손수 표시한 것뿐**이다. 오늘 자리는 아직 지나지 않았으므로
- * **「완료」를 누른 것만** 센다 — 저녁 약속이 점심때 벌써 「만났다」가 되면 안 된다. */
+ * **「완료」를 누른 것만** 만난 것으로 센다 — 저녁 약속이 점심때 벌써 「만났다」가 되면 안 된다.
+ * **앞으로의 약속도 같은 칸에 올리고 「예정」 쪽지를 단다**(2026-11-02 저녁, 교수님 지정) —
+ * 누구를 뵈었는지와 누구를 뵐지를 한 자리에서 보기 위해서다. 차례는 예정이 먼저(가까운
+ * 날부터), 그 뒤에 만난 자리(최근 날부터)다. */
 const A = await page.evaluate(() => {
   meetMap = {};
   const t0 = mtToday(), d0 = new Date(t0 + 'T00:00:00');
@@ -781,8 +784,8 @@ const A = await page.evaluate(() => {
   mk(day(-3), [rKey(R[3])], 'other', '', '');            // 지남 · 표시 없음 → 만난 것으로 본다
   mk(day(-2), [rKey(R[4])], 'lunch', 'met', '', ['김행정 과장']);         // 명단 밖의 분
   mk(day(-1), [rKey(R[5])], 'dinner', '', '');           // 지남 · 표시 없음 → 만난 것으로 본다
-  mk(day(0), [rKey(R[8])], 'dinner', '', '');            // 오늘 · 아직 → 안 센다
-  mk(day(2), [rKey(R[6])], 'lunch', '', '');                             // 앞으로의 약속
+  mk(day(0), [rKey(R[8])], 'dinner', '', '');            // 오늘 · 아직 → 예정
+  mk(day(2), [rKey(R[6])], 'lunch', '', '');             // 앞으로의 약속 → 예정
   mk(day(-7), [rKey(R[7])], 'lunch', 'no', '');                          // 못 만남 → 뺀다
   location.hash = '#/cal'; render();
   const li = [...document.querySelectorAll('.mt-ate li')];
@@ -792,7 +795,10 @@ const A = await page.evaluate(() => {
     names: li.map(e => cell(e, 'p').trim()),
     kinds: li.map(e => cell(e, 'k').trim()),
     depts: li.map(e => cell(e, 'u').trim()),
-    dates: li.map(e => cell(e, 'd').trim()),
+    /* 날짜 칸 안에 「예정」 쪽지가 들어 있어, 날짜만 보려면 떼어 내야 한다 */
+    dates: li.map(e => cell(e, 'd').replace('예정', '').trim()),
+    soon: li.map(e => e.classList.contains('is-soon')),
+    badges: li.map(e => ((e.querySelector('.mt-ate__s') || {}).textContent || '').trim()),
     head: document.querySelector('.cal-head--ate').textContent.replace(/\s+/g, ' ').trim(),
     note: [...document.querySelectorAll('.cal-sec .st-note')].pop().textContent.trim(),
     /* 줄 차례는 자료에 따라 바뀐다 — 자리를 박지 말고 **있는 줄을 찾아** 본다 */
@@ -803,27 +809,36 @@ const A = await page.evaluate(() => {
     place0: (li.map(e => cell(e, 'w').trim()).filter(Boolean)[0]) || '',
   };
 });
-/* 만난 자리는 다섯인데 **사람으로 세면 일곱 줄**이다 — 첫 자리에 두 분, 넷째 자리에 교수 한 분과
-   명단 밖의 한 분이 함께 계셨다. 사람마다 한 줄이라 그렇다. */
-t('만난 분을 사람마다 한 줄로 적는다', A.n === 7, `${A.n}줄`);
+/* 만난 자리 다섯과 앞으로의 자리 둘 — **사람으로 세면 아홉 줄**이다. 첫 자리에 두 분,
+   넷째 자리에 교수 한 분과 명단 밖의 한 분이 함께 계셨다. 사람마다 한 줄이라 그렇다. */
+t('약속을 사람마다 한 줄로 적는다', A.n === 9, `${A.n}줄`);
 t('지난 약속은 표시가 없어도 만난 것으로 본다', A.names.includes(A.pastNoMark), A.names.join(' '));
-t('오늘 자리는 「완료」를 눌러야 센다', !A.names.includes(A.todayP), A.names.join(' '));
+t('오늘 자리는 「완료」 전에는 예정', A.soon[A.names.indexOf(A.todayP)] === true,
+  `${A.todayP} → ${A.soon[A.names.indexOf(A.todayP)]}`);
 t('한 자리에 둘이면 두 줄', A.dates.filter(d => d === A.dates[A.dates.length - 1]).length === 2,
   A.dates.join(' | '));
-t('가까운 날부터', A.dates.every((d, i) => i === 0 || A.dates[i - 1] >= d), A.dates.join(' | '));
+/* 예정이 맨 위, 그 안에서는 가까운 날부터. 만난 자리는 그 뒤에 최근 날부터 */
+const soonD = A.dates.filter((_, i) => A.soon[i]), metD = A.dates.filter((_, i) => !A.soon[i]);
+t('예정이 맨 위에', soonD.length === 2 && A.soon.slice(0, 2).every(Boolean)
+  && !A.soon.slice(2).some(Boolean), A.soon.map(x => x ? '예' : '만').join(''));
+t('예정은 가까운 날부터', soonD.every((d, i) => i === 0 || soonD[i - 1] <= d), soonD.join(' | '));
+t('만난 자리는 최근 날부터', metD.every((d, i) => i === 0 || metD[i - 1] >= d), metD.join(' | '));
+t('예정에만 「예정」 쪽지를 단다',
+  A.badges.every((b2, i) => A.soon[i] ? b2 === '예정' : b2 === ''), A.badges.join('|'));
 t('갈래를 점심·저녁·Tea 로 적는다', A.kinds.join('|').includes('점심') && A.kinds.join('|').includes('저녁')
   && A.kinds.join('|').includes('Tea'), A.kinds.join('|'));
-t('학과를 적는다', A.depts.filter(Boolean).length === 7, A.depts.join('|'));
+t('학과를 적는다', A.depts.filter(Boolean).length === 9, A.depts.join('|'));
 t('명단 밖의 분은 「명단 밖」', A.depts.includes('명단 밖'), A.depts.join('|'));
 t('장소도 적는다', A.place0 === '교직원식당' || A.place0 === '연동 한식집', A.place0);
-t('앞으로의 약속은 안 센다', !A.names.includes(A.later), A.names.join(' '));
+t('앞으로의 약속도 예정으로 적는다', A.names.includes(A.later)
+  && A.soon[A.names.indexOf(A.later)] === true, A.names.join(' '));
 t('「못 만남」은 뺀다', !A.names.includes(A.noMet), A.names.join(' '));
-t('머리글에 사람 수와 횟수', /7명 · 7번/.test(A.head), A.head);
+t('머리글에 사람 수와 만남·예정 횟수', /9명 · 만남 7번 · 예정 2번/.test(A.head), A.head);
 /* 갈래별 수는 **고르기 단추**가 지고 있다 (2026-11-02) — 머리글에 또 적으면 같은 숫자가
    두 번 나와 어느 쪽을 봐야 할지 흐려진다. 단추 쪽은 아래 「단추에 몇 번인지 적는다」가 본다. */
 t('갈래별 수는 머리글에 겹쳐 적지 않는다',
   !/점심 \d/.test(A.head) && !/저녁 \d/.test(A.head), A.head);
-t('셈하는 규칙을 적어 둔다', /지난 날짜/.test(A.note) && /완료/.test(A.note), A.note);
+t('셈하는 규칙을 적어 둔다', /지난 날짜/.test(A.note) && /예정/.test(A.note), A.note);
 t('「못 만남」을 몇 건 뺐는지 적는다', /「못 만남」 1건/.test(A.note), A.note);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(A.link || ''), A.link);
 /* 갈래 고르기 — 머리줄 오른쪽의 아이콘 단추 (2026-11-02, 교수님 지정) */
@@ -838,7 +853,7 @@ const F = await page.evaluate(() => {
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
 t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'day|night|tea', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
-t('단추에 몇 번인지 적는다', F.cnt === '4,2,1', F.cnt);
+t('단추에 몇 번인지 적는다', F.cnt === '5,3,1', F.cnt);
 
 await page.click('[data-ateslot="night"]');
 await page.waitForTimeout(250);
@@ -849,26 +864,26 @@ const F2 = await page.evaluate(() => ({
     .every(e => e.getAttribute('aria-pressed') === 'false'),
   head: document.querySelector('.cal-head--ate .st-note').textContent.trim(),
 }));
-t('고른 갈래만 보인다', F2.kinds.length === 2 && F2.kinds.every(k => k === '저녁'), F2.kinds.join(','));
+t('고른 갈래만 보인다', F2.kinds.length === 3 && F2.kinds.every(k => k === '저녁'), F2.kinds.join(','));
 t('고른 단추만 눌린 꼴', F2.on === 'true' && F2.others);
-t('머리의 사람 수는 늘 전체', /7명 · 7번/.test(F2.head), F2.head);
-t('고른 갈래의 수를 따로 적는다', /저녁 2번만/.test(F2.head), F2.head);
+t('머리의 사람 수는 늘 전체', /9명 · 만남 7번 · 예정 2번/.test(F2.head), F2.head);
+t('고른 갈래의 수를 따로 적는다', /저녁 3번만/.test(F2.head), F2.head);
 
 await page.click('[data-ateslot="night"]');
 await page.waitForTimeout(250);
 t('같은 것을 다시 누르면 풀린다', await page.evaluate(() =>
-  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
+  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 9));
 await page.click('[data-ateslot="tea"]');
 await page.waitForTimeout(250);
 await page.click('[data-ateslot=""]');
 await page.waitForTimeout(250);
 t('모두를 누르면 다 보인다', await page.evaluate(() =>
-  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
+  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 9));
 
 t('기록이 없으면 빈 안내', await page.evaluate(() => {
   meetMap = {}; render();
   const sec = [...document.querySelectorAll('.cal-sec')].pop();
-  return !sec.querySelector('.mt-ate') && /아직 만난 기록이 없습니다/.test(sec.textContent);
+  return !sec.querySelector('.mt-ate') && /아직 약속이 없습니다/.test(sec.textContent);
 }));
 
 let bad = 0;

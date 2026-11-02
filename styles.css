@@ -1625,6 +1625,12 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-ate li{display:grid;grid-template-columns:auto auto auto auto 1fr;align-items:center;gap:10px;
   padding:7px 10px;border-radius:8px;font-size:13px}
 .mt-ate li:nth-child(odd){background:var(--surface-2)}
+/* 앞으로의 약속도 같은 칸에 올리고 「예정」으로 적는다 (2026-11-02, 교수님 지정).
+   지난 자리와 섞이지 않게 왼쪽에 색 띠를 둘러 둔다 — 테두리를 쓰면 줄 높이가 틀어진다. */
+.mt-ate li.is-soon{box-shadow:inset 2.5px 0 0 var(--brand)}
+.mt-ate__s{font-style:normal;font-weight:800;font-size:10px;letter-spacing:-.2px;margin-left:5px;
+  padding:1px 6px;border-radius:999px;color:var(--brand);
+  background:color-mix(in srgb,var(--brand) 13%,transparent)}
           <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
 .mt-ate__k{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);white-space:nowrap}
 .mt-ate__p{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
