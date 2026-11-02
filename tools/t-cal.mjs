@@ -815,7 +815,7 @@ const A = await page.evaluate(() => {
     /* 한 줄에 여러 분이 서므로 **줄마다 이름 묶음**으로 본다 */
     peo: li.map(e => [...e.querySelectorAll('.mt-ate__p a')].map(a2 => a2.textContent.trim())),
     kinds: li.map(e => cell(e, 'k').trim()),
-    depts: li.map(e => cell(e, 'u').trim()),
+    depts: li.map(e => cell(e, 'u').trim()),      // 2026-11-02 저녁에 뺀 칸 — 비어 있어야 한다
     /* 날짜 칸 안에 「예정」 쪽지가 들어 있어, 날짜만 보려면 떼어 내야 한다 */
     dates: li.map(e => cell(e, 'd').replace('예정', '').trim()),
     soon: li.map(e => e.classList.contains('is-soon')),
@@ -859,11 +859,29 @@ t('예정 줄에 왼쪽 띠를 두르지 않는다',
   `${SOON.shadow} / ${SOON.border}`);
 t('예정은 날짜 빛깔로 가른다', SOON.soonCol !== SOON.metCol && Number(SOON.soonW) > Number(SOON.metW),
   `${SOON.soonCol} ${SOON.soonW} / ${SOON.metCol} ${SOON.metW}`);
+/* 쪽지는 **꽉 찬 색**이고, 글자는 바탕색을 써서 밝은·어두운 화면 모두 또렷해야 한다
+   (2026-11-02 저녁, 교수님 지정 A+C안). 흰색으로 못 박으면 어두운 화면에서 묻힌다. */
+const PILL = await page.evaluate(() => {
+  const el = document.querySelector('.mt-ate li.is-soon .mt-ate__s');
+  const cs = getComputedStyle(el);
+  const rgb = x => x.match(/[\d.]+/g).slice(0, 3).map(Number);
+  const L = c => { const v = rgb(c).map(n => { const u = n / 255;
+    return u <= .03928 ? u / 12.92 : Math.pow((u + .055) / 1.055, 2.4); });
+    return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
+  const co = (a, b2) => (Math.max(L(a), L(b2)) + .05) / (Math.min(L(a), L(b2)) + .05);
+  const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim();
+  const probe = document.createElement('span');
+  probe.style.color = brand; document.body.appendChild(probe);
+  const bc = getComputedStyle(probe).color; probe.remove();
+  return { bg: cs.backgroundColor, ink: cs.color, brand: bc, ratio: co(cs.color, cs.backgroundColor) };
+});
+t('예정 쪽지를 브랜드색으로 채운다', PILL.bg === PILL.brand, `${PILL.bg} / ${PILL.brand}`);
+t('쪽지 글자가 또렷하다(대비 4.5 이상)', PILL.ratio >= 4.5, `${PILL.ratio.toFixed(1)} (${PILL.ink})`);
 t('갈래를 점심·저녁·Tea 로 적는다', A.kinds.join('|').includes('점심') && A.kinds.join('|').includes('저녁')
   && A.kinds.join('|').includes('Tea'), A.kinds.join('|'));
-t('학과를 적는다', A.depts.filter(Boolean).length === 7, A.depts.join('|'));
-t('명단 밖의 분은 넣지 않는다', !flat.includes('김행정 과장')
-  && !A.depts.includes('명단 밖'), `${flat.join(' ')} // ${A.depts.join('|')}`);
+/* 학과 이름은 2026-11-02 저녁에 뺐다 (교수님 지정) — 이름에 올리면 말풍선으로 나온다 */
+t('학과 이름을 적지 않는다', A.depts.every(x => x === ''), A.depts.join('|'));
+t('명단 밖의 분은 넣지 않는다', !flat.includes('김행정 과장'), flat.join(' '));
 t('장소도 적는다', A.place0 === '교직원식당' || A.place0 === '연동 한식집', A.place0);
 t('앞으로의 약속도 예정으로 적는다', flat.includes(A.later)
   && A.soon[A.peo.findIndex(x => x.includes(A.later))] === true, flat.join(' '));

@@ -5266,8 +5266,7 @@ function mtAteRows() {
        `who` 에 명단에 없는 열쇠만 남은 자리는 적을 사람이 없으므로 통째로 뺍니다. */
     const ps = m.who.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
     if (!ps.length) return;
-    out.push({ m, slot: mtSlot(m), ate: mtAte(m, today), ps,
-      keys: ps.map(rKey), depts: [...new Set(ps.map(x => x.dept_name))] });
+    out.push({ m, slot: mtSlot(m), ate: mtAte(m, today), ps, keys: ps.map(rKey) });
   });
   /* **뒷날부터** 한 줄로 내려옵니다 (2026-11-02 저녁, 교수님 지정) — 예정이 위에 서고
      그 아래로 만난 자리가 최근 순으로 이어집니다. 예정만 따로 오름차순으로 두었더니
@@ -5314,7 +5313,6 @@ function mtAteSection() {
           <span class="mt-ate__p">${r.ps.map(x =>
             `<a href="#/dept/${encodeURIComponent(x.dept_id)}/prof/${encodeURIComponent(x.slug)}"
                 title="${esc(x.dept_name)} · ${esc(x.rank)}">${esc(x.name)}</a>`).join('<i>·</i>')}</span>
-          <span class="mt-ate__u">${esc(r.depts.join(' · '))}</span>
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
         : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}

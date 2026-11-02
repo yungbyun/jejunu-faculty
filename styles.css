@@ -1623,14 +1623,18 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-i--all{color:var(--ink-3)}
 .mt-f.on .mt-i--all{color:var(--brand)}
 .mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
-/* 다섯 칸: 날짜 · 갈래 · 이름 · 학과 · 장소. 앞 넷은 글자만큼만 차지해 **왼쪽에 모이고**,
-   남는 자리는 장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다. */
-.mt-ate li{display:grid;grid-template-columns:auto auto auto auto 1fr;align-items:center;gap:10px;
+/* 네 칸: 날짜 · 갈래 · 이름 · 장소. 앞 셋은 글자만큼만 차지해 **왼쪽에 모이고**, 남는 자리는
+   장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다.
+   학과 칸은 2026-11-02 저녁에 뺐다 (교수님 지정) — 이름에 올리면 말풍선으로 나온다. */
+.mt-ate li{display:grid;grid-template-columns:auto auto auto 1fr;align-items:center;gap:10px;
   padding:7px 10px;border-radius:8px;font-size:13px}
 .mt-ate li:nth-child(odd){background:var(--surface-2)}
+/* 「예정」 쪽지 — **꽉 찬 색**으로 (2026-11-02 저녁, 교수님 지정 A+C안).
+   글자색은 `--surface` 다. 밝은 화면에서는 짙은 남색 위의 흰 글자(대비 12), 어두운 화면에서는
+   연한 하늘색 위의 어두운 글자(대비 8)가 되어 **두 화면 모두 또렷합니다.**
+   흰색으로 못 박으면 어두운 화면에서 대비가 2 로 떨어져 글자가 묻힙니다. */
 .mt-ate__s{font-style:normal;font-weight:800;font-size:10px;letter-spacing:-.2px;margin-left:5px;
-  padding:1px 6px;border-radius:999px;color:var(--brand);
-  background:color-mix(in srgb,var(--brand) 13%,transparent)}
+  padding:2px 7px;border-radius:999px;color:var(--surface);background:var(--brand)}
 /* 날짜 칸 — 숫자 폭을 고정해 줄마다 자리가 흔들리지 않게 (2026-11-02).
    여기에 자바스크립트 한 줄이 잘못 섞여 들어가 있었다. 그 바람에 이 규칙은 물론
    바로 아래 `.mt-ate__k` 까지 통째로 먹혀 **두 칸이 꾸밈 없이 서 있었다.** */
@@ -1648,13 +1652,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-ate__p>i{font-style:normal;font-weight:600;color:var(--ink-3)}
 .mt-ate__p a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
 .mt-ate__p a:hover{border-bottom-color:currentColor}
-.mt-ate__u{color:var(--ink-3);white-space:nowrap}
 .mt-ate__w{color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-self:start;min-width:0}
 @media (max-width:620px){
   .mt-ate li{grid-template-columns:auto 1fr;gap:4px 8px}
-  .mt-ate__u{justify-self:start}
   .mt-ate__p{grid-column:1/-1}
-  .mt-ate__u,.mt-ate__w{grid-column:1/-1;font-size:12px}
+  .mt-ate__w{grid-column:1/-1;font-size:12px}
 }
 
 .cal-sec{margin-bottom:16px}
