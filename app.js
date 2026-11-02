@@ -5185,15 +5185,18 @@ function mtShift(ym, n) {
 
 /* ---------- 이제까지 만난 분 (2026-11-02, 교수님 지정) ----------
  * 달력 아래에 **지금까지 만난 분을 쭉** 적습니다 — 날짜·갈래(점심·저녁·Tea)·학과·이름.
- * **완료(만남)로 표시한 약속만** 셉니다. 날짜가 지났다고 만난 것으로 치면, 미뤄졌거나
- * 못 나가신 자리까지 「만났다」가 되어 숫자가 저절로 부풉니다. 다만 지나고도 표시를 안 하신
- * 약속이 몇 건인지는 따로 적어 드립니다 — 그래야 빠뜨린 것을 알아채십니다.
+ * **지난 날짜의 약속은 이미 만난 것으로 봅니다** (2026-11-02 저녁, 교수님 지정) — 적어 두신
+ * 자리는 치르신 자리이고, 「완료」를 일일이 누르시게 하면 빠뜨리기 쉽습니다. 그래서 셈에서
+ * 빼는 것은 **「못 만남」으로 손수 표시하신 것뿐**입니다.
+ * 오늘 자리는 아직 지나지 않았으므로 **「완료」를 누르신 것만** 셉니다 — 저녁 약속이 점심때
+ * 벌써 「만났다」가 되면 안 됩니다.
  * 한 자리에 여러 분이 계시면 **사람마다 한 줄**입니다. 같은 분을 두 번 만나셨으면 두 줄이고,
  * 머리글의 「N명」은 **겹치지 않게** 센 숫자입니다.
  * 명단 밖의 분(`guests`)도 적습니다 — 학과 자리에는 「명단 밖」이라고 둡니다. */
+const mtAte = (m, today) => m.done !== 'no' && (m.done === 'met' || (m.date && m.date < today));
 function mtAteRows() {
-  const out = [];
-  mtList().filter(m => m.done === 'met').forEach(m => {
+  const out = [], today = mtToday();
+  mtList().filter(m => mtAte(m, today)).forEach(m => {
     const slot = mtSlot(m);
     m.who.forEach(k => {
       const p = state.rows.find(x => rKey(x) === k);
@@ -5211,9 +5214,8 @@ function mtAteSection() {
   const rows = mtAteRows();
   const people = new Set(rows.map(r => r.key || `g:${r.name}`)).size;
   const cnt = s => rows.filter(r => r.slot === s).length;
-  const today = mtToday();
-  /* 지나고도 완료로 표시 안 하신 약속 — 빠뜨린 것을 알아채시라고 */
-  const late = mtList().filter(m => !m.done && m.date && m.date < today).length;
+  /* 셈에서 뺀 자리 — 「못 만남」으로 표시하신 것. 왜 안 보이는지 알 수 있게 적어 둔다 */
+  const no = mtList().filter(m => m.done === 'no').length;
   const sum = ['day', 'night', 'tea', 'none'].map(s => [MT_SLOT_NAME[s], cnt(s)])
     .filter(x => x[1]).map(([n, c]) => `${n} ${c}`).join(' · ');
   return `
@@ -5232,7 +5234,7 @@ function mtAteSection() {
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
         : `<div class="empty"><strong>아직 만난 기록이 없습니다</strong>약속을 마치시면 「완료」를 눌러 주십시오.</div>`}
-        <p class="st-note">「완료」로 표시한 약속만 셉니다${late ? ` · 날짜가 지났는데 표시를 안 하신 약속이 ${late}건 있습니다` : ''}</p>
+        <p class="st-note">지난 날짜의 약속은 만난 것으로 봅니다 · 오늘 자리는 「완료」를 누르신 것만${no ? ` · 「못 만남」 ${no}건은 뺐습니다` : ''}</p>
       </section>`;
 }
 
