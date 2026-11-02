@@ -5260,22 +5260,21 @@ const mtAte = (m, today) => mtKeep(m) && (m.done === 'met' || m.date < today);
 function mtAteRows() {
   const out = [], today = mtToday();
   mtList().filter(mtKeep).forEach(m => {
-    const slot = mtSlot(m), ate = mtAte(m, today);
-    const add = (key, name, dept, p) => out.push({ m, slot, ate, key, name, dept, p });
-    m.who.forEach(k => {
-      const p = state.rows.find(x => rKey(x) === k);
-      add(k, p ? p.name : k, p ? p.dept_name : '', p);
-    });
-    mtArr(m.guests).forEach(n => add('', n, '', null));
+    /* **한 자리는 한 줄**입니다 (2026-11-02 저녁, 교수님 지정). 함께 뵌 분은 한 줄에 모아
+       적습니다 — 사람마다 줄을 쪼개면 같은 자리가 여러 번 있었던 것처럼 보입니다.
+       **명단 밖의 분은 넣지 않습니다**(같은 날 지정) — 이 칸은 교수진을 보는 자리입니다.
+       `who` 에 명단에 없는 열쇠만 남은 자리는 적을 사람이 없으므로 통째로 뺍니다. */
+    const ps = m.who.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
+    if (!ps.length) return;
+    out.push({ m, slot: mtSlot(m), ate: mtAte(m, today), ps,
+      keys: ps.map(rKey), depts: [...new Set(ps.map(x => x.dept_name))] });
   });
-  /* **예정이 먼저**, 그 안에서는 가까운 날부터. 그 뒤에 만난 자리를 최근 날부터.
-     오늘을 가운데 두고 바깥으로 펼치는 차례라, 맨 위가 늘 「다음에 뵐 분」입니다.
-     한쪽만 오름차순이라 어지러워 보이지만, 두 덩이가 「예정」 쪽지로 갈려 있어 읽힙니다. */
+  /* **뒷날부터** 한 줄로 내려옵니다 (2026-11-02 저녁, 교수님 지정) — 예정이 위에 서고
+     그 아래로 만난 자리가 최근 순으로 이어집니다. 예정만 따로 오름차순으로 두었더니
+     한 칸에서 차례가 두 번 뒤집혀 읽기 어려웠습니다. */
   const by = (x, y) => String(x || '').localeCompare(String(y || ''));
-  return out.sort((a, b) => (a.ate ? 1 : 0) - (b.ate ? 1 : 0)
-    || (a.ate ? by(b.m.date, a.m.date) : by(a.m.date, b.m.date))
-    || (a.ate ? by(b.m.time, a.m.time) : by(a.m.time, b.m.time))
-    || a.name.localeCompare(b.name, 'ko'));
+  return out.sort((a, b) => by(b.m.date, a.m.date) || by(b.m.time, a.m.time)
+    || a.ps[0].name.localeCompare(b.ps[0].name, 'ko'));
 }
 const MT_SLOT_NAME = { day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
 /* 「모두」 단추의 그림 — 네 갈래를 한 줌에 쥔 모양 (2026-11-02, 교수님 지정) */
@@ -5288,7 +5287,7 @@ function mtAteSection() {
      고른 것을 다시 누르면 풀립니다. **머리의 숫자는 늘 전체**를 셉니다 — 고른 갈래에 따라
      「몇 명 만났는가」가 달라 보이면 안 되기 때문입니다. 고른 때만 그 수를 따로 적습니다. */
   const rows = CAL.ate ? all.filter(r => r.slot === CAL.ate) : all;
-  const people = new Set(all.map(r => r.key || `g:${r.name}`)).size;
+  const people = new Set(all.flatMap(r => r.keys)).size;
   const cnt = s => all.filter(r => r.slot === s).length;
   /* 만난 자리와 앞으로의 자리를 **갈라 적습니다** — 한 숫자로 뭉치면 몇 분을 뵈었는지 모릅니다 */
   const met = all.filter(r => r.ate).length, soon = all.length - met;
@@ -5312,11 +5311,10 @@ function mtAteSection() {
           <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i>${
             r.ate ? '' : `<b class="mt-ate__s">예정</b>`}</span>
           <span class="mt-ate__k">${mtIcon(r.slot)}${esc(MT_SLOT_NAME[r.slot] || '')}</span>
-          <span class="mt-ate__p">${r.p
-            ? `<a href="#/dept/${encodeURIComponent(r.p.dept_id)}/prof/${encodeURIComponent(r.p.slug)}"
-                 title="${esc(r.p.dept_name)} · ${esc(r.p.rank)}">${esc(r.name)}</a>`
-            : `${esc(r.name)}`}</span>
-          <span class="mt-ate__u">${esc(r.dept || '명단 밖')}</span>
+          <span class="mt-ate__p">${r.ps.map(x =>
+            `<a href="#/dept/${encodeURIComponent(x.dept_id)}/prof/${encodeURIComponent(x.slug)}"
+                title="${esc(x.dept_name)} · ${esc(x.rank)}">${esc(x.name)}</a>`).join('<i>·</i>')}</span>
+          <span class="mt-ate__u">${esc(r.depts.join(' · '))}</span>
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
         : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}
@@ -5690,7 +5688,6 @@ function openDrawer(p, d) {
           <div class="d-eduw" data-edu="${esc(p.slug)}">${dEdu(p)}</div>
           ${dOffice(p)}
           ${dPhones(p)}
-          <div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         </div>
       </div>
 
@@ -5743,7 +5740,14 @@ function openDrawer(p, d) {
 
       <div class="d-section d-ins"><h3>검색 결과</h3><div class="ins" data-slug="${esc(p.slug)}">${insightsHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 
-      ${p.summary ? `<div class="d-section"><h3>세부 전공</h3><p class="d-summary" data-slug="${esc(p.slug)}">${summaryHtml(p, d)}</p></div>` : ''}
+      ${/* 전공 키워드 칩은 2026-11-02 에 머리(번호 줄 아래)에서 여기로 내렸습니다 — 교수님
+          지정입니다. 키워드와 세부 전공 글은 같은 이야기라 한자리에 모아야 읽힙니다.
+          칸이 **글이 없어도** 서야 합니다. 전에는 `p.summary` 가 있을 때만 세웠는데,
+          그대로 두면 글이 없는 분의 키워드가 통째로 사라집니다. */''}
+      ${p.summary || p.tags.length ? `<div class="d-section"><h3>세부 전공</h3>
+        ${p.tags.length ? `<div class="d-tags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${p.summary ? `<p class="d-summary" data-slug="${esc(p.slug)}">${summaryHtml(p, d)}</p>` : ''}
+      </div>` : ''}
 
       <div class="d-section d-aix"><h3>AI 융합 방향</h3><div class="aix" data-slug="${esc(p.slug)}" data-dept="${esc(d.id)}">${aiHtml(p, d, insCache.has(d.id) ? insCache.get(d.id) : undefined)}</div></div>
 

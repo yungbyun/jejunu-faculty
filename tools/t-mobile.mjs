@@ -337,12 +337,44 @@ check('방 번호가 번호 줄 위에 온다', await page.evaluate(() => {
   mobiles()[rKey(p)] = '010-1234-5678';
   location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
   const o = document.querySelector('.d-office'), ph = document.querySelector('.d-phones'),
-    en = document.querySelector('.d-en:not(.d-phones)'), tg = document.querySelector('.d-tags');
-  if (!o || !ph || !en || !tg) return false;
+    en = document.querySelector('.d-en:not(.d-phones)');
+  if (!o || !ph || !en) return false;
   const after = (a, b2) => !!(a.compareDocumentPosition(b2) & Node.DOCUMENT_POSITION_FOLLOWING);
-  return after(en, o) && after(o, ph) && after(ph, tg);
+  return after(en, o) && after(o, ph);
 }), await page.evaluate(() => [...document.querySelector('.d-profile').lastElementChild.children]
   .map(e => e.className).join(' / ')));
+/* 전공 키워드 칩은 2026-11-02 에 **머리에서 「세부 전공」 칸으로** 내렸다 (교수님 지정) —
+   키워드와 세부 전공 글은 같은 이야기라 한자리에 모아야 읽힌다. */
+const TAG = await page.evaluate(() => {
+  const sec = [...document.querySelectorAll('.d-section')]
+    .find(s => (s.querySelector('h3') || {}).textContent?.trim() === '세부 전공');
+  const tg = sec && sec.querySelector('.d-tags'), su = sec && sec.querySelector('.d-summary');
+  return {
+    head: !!document.querySelector('.d-profile .d-tags'),
+    sec: !!sec, inSec: !!(tg && tg.querySelector('.tag')),
+    tags: tg ? [...tg.querySelectorAll('.tag')].map(e => e.textContent.trim()) : [],
+    want: (state.rows.find(x => x.slug === location.hash.split('/').pop()) || {}).tags || [],
+    above: !tg || !su || !!(tg.compareDocumentPosition(su) & Node.DOCUMENT_POSITION_FOLLOWING),
+  };
+});
+check('전공 키워드를 머리에 두지 않는다', !TAG.head);
+check('전공 키워드가 「세부 전공」 칸에 있다', TAG.sec && TAG.inSec,
+  `${TAG.sec ? '칸 있음' : '칸 없음'} · ${TAG.tags.join('|')}`);
+check('키워드를 빠뜨리지 않는다', TAG.tags.join('|') === TAG.want.join('|'),
+  `${TAG.tags.join('|')} / ${TAG.want.join('|')}`);
+check('키워드가 세부 전공 글 위에', TAG.above);
+/* 글이 없어도 칸이 서야 한다 — 전에는 `p.summary` 가 있을 때만 세워, 글이 없는 분의
+   키워드가 통째로 사라질 자리였다 */
+check('세부 전공 글이 없어도 키워드는 보인다', await page.evaluate(() => {
+  const p = state.rows.find(x => (x.tags || []).length) || state.rows[0];
+  const was = p.summary; p.summary = '';
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+  const sec = [...document.querySelectorAll('.d-section')]
+    .find(s => (s.querySelector('h3') || {}).textContent?.trim() === '세부 전공');
+  const got = !!(sec && sec.querySelector('.d-tags .tag')) && !sec.querySelector('.d-summary');
+  p.summary = was; render();
+  return got;
+}));
 check('번호 줄 안에서는 연구실 다음 핸드폰', await page.evaluate(() => {
   const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').replace(/\D/g, ''));
   return a.length === 2 && a[0].startsWith('8264') && a[1].startsWith('8210');

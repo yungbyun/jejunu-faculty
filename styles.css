@@ -283,7 +283,10 @@ main{min-height:60vh;padding:40px 20px 72px}
 .d-name{font-size:24px;font-weight:800;letter-spacing:-.5px;margin:2px 0 0;line-height:1.2}
 .d-en{color:var(--ink-3);font-size:var(--fs-s);margin:2px 0 8px}
 .d-rank{display:inline-block;font-size:12.5px;font-weight:600;color:var(--dept-color,var(--accent));background:color-mix(in srgb,var(--dept-color,var(--accent)) 12%,transparent);border-radius:8px;padding:3px 9px;margin-bottom:10px}
+/* 전공 키워드 칩 — 2026-11-02 에 머리에서 「세부 전공」 칸으로 내렸다 (교수님 지정).
+   글이 뒤따르면 그만큼 사이를 띄운다. */
 .d-tags{display:flex;flex-wrap:wrap;gap:6px}
+.d-tags+.d-summary{margin-top:11px}
 .d-section{margin-top:26px}
 .d-section h3{font-size:12.5px;font-weight:700;color:var(--ink-3);letter-spacing:.8px;text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;gap:8px}
 .d-section h3::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -1633,7 +1636,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   background:color-mix(in srgb,var(--brand) 13%,transparent)}
           <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
 .mt-ate__k{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);white-space:nowrap}
-.mt-ate__p{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 한 자리에 여러 분이면 **한 줄에 모아** 적는다 (2026-11-02 저녁, 교수님 지정).
+   이름이 여럿일 수 있으니 자르지 말고 접히게 둔다 — 잘라 버리면 누가 함께였는지 사라진다. */
+.mt-ate__p{font-weight:700;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px}
+.mt-ate__p>i{font-style:normal;font-weight:600;color:var(--ink-3)}
 .mt-ate__p a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
 .mt-ate__p a:hover{border-bottom-color:currentColor}
 .mt-ate__u{color:var(--ink-3);white-space:nowrap}
