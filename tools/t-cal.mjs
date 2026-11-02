@@ -819,10 +819,52 @@ t('장소도 적는다', A.place0 === '교직원식당' || A.place0 === '연동 
 t('앞으로의 약속은 안 센다', !A.names.includes(A.later), A.names.join(' '));
 t('「못 만남」은 뺀다', !A.names.includes(A.noMet), A.names.join(' '));
 t('머리글에 사람 수와 횟수', /7명 · 7번/.test(A.head), A.head);
-t('머리글에 갈래별 수', /점심 4/.test(A.head) && /저녁 2/.test(A.head) && /Tea 1/.test(A.head), A.head);
+/* 갈래별 수는 **고르기 단추**가 지고 있다 (2026-11-02) — 머리글에 또 적으면 같은 숫자가
+   두 번 나와 어느 쪽을 봐야 할지 흐려진다. 단추 쪽은 아래 「단추에 몇 번인지 적는다」가 본다. */
+t('갈래별 수는 머리글에 겹쳐 적지 않는다',
+  !/점심 \d/.test(A.head) && !/저녁 \d/.test(A.head), A.head);
 t('셈하는 규칙을 적어 둔다', /지난 날짜/.test(A.note) && /완료/.test(A.note), A.note);
 t('「못 만남」을 몇 건 뺐는지 적는다', /「못 만남」 1건/.test(A.note), A.note);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(A.link || ''), A.link);
+/* 갈래 고르기 — 머리줄 오른쪽의 아이콘 단추 (2026-11-02, 교수님 지정) */
+const F = await page.evaluate(() => {
+  CAL.ate = ''; render();
+  return { btns: [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot),
+    hasAll: !!document.querySelector('[data-ateslot=""]'),
+    icons: [...document.querySelectorAll('[data-ateslot]')].every(e => !!e.querySelector('.mt-i')),
+    cnt: [...document.querySelectorAll('[data-ateslot]')].filter(e => e.dataset.ateslot)
+      .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(',') };
+});
+t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'day|night|tea', F.btns.join('|'));
+t('단추마다 아이콘', F.icons);
+t('단추에 몇 번인지 적는다', F.cnt === '4,2,1', F.cnt);
+
+await page.click('[data-ateslot="night"]');
+await page.waitForTimeout(250);
+const F2 = await page.evaluate(() => ({
+  kinds: [...document.querySelectorAll('.mt-ate li .mt-ate__k')].map(e => e.textContent.trim()),
+  on: document.querySelector('[data-ateslot="night"]').getAttribute('aria-pressed'),
+  others: [...document.querySelectorAll('[data-ateslot]')].filter(e => e.dataset.ateslot !== 'night')
+    .every(e => e.getAttribute('aria-pressed') === 'false'),
+  head: document.querySelector('.cal-head--ate .st-note').textContent.trim(),
+}));
+t('고른 갈래만 보인다', F2.kinds.length === 2 && F2.kinds.every(k => k === '저녁'), F2.kinds.join(','));
+t('고른 단추만 눌린 꼴', F2.on === 'true' && F2.others);
+t('머리의 사람 수는 늘 전체', /7명 · 7번/.test(F2.head), F2.head);
+t('고른 갈래의 수를 따로 적는다', /저녁 2번만/.test(F2.head), F2.head);
+
+await page.click('[data-ateslot="night"]');
+await page.waitForTimeout(250);
+t('같은 것을 다시 누르면 풀린다', await page.evaluate(() =>
+  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
+await page.click('[data-ateslot="tea"]');
+await page.waitForTimeout(250);
+await page.click('[data-ateslot=""]');
+await page.waitForTimeout(250);
+t('모두를 누르면 다 보인다', await page.evaluate(() =>
+  CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
+
 t('기록이 없으면 빈 안내', await page.evaluate(() => {
   meetMap = {}; render();
   const sec = [...document.querySelectorAll('.cal-sec')].pop();

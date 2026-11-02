@@ -5166,7 +5166,7 @@ const mtNames = m => m.who.map(k => (state.rows.find(p => rKey(p) === k) || {}).
   .concat(mtArr(m.guests));
 
 /* ---------- 식사 약속 화면 ---------- */
-const CAL = { ym: '', day: '', open: '', q: '', scroll: false };
+const CAL = { ym: '', day: '', open: '', q: '', scroll: false, ate: '' };   // ate: 만난 분 고르기(빈 값이면 모두)
 
 /* 그 달의 칸들. 앞뒤를 빈 칸으로 채워 일요일부터 시작하는 격자를 만든다 */
 function mtCells(ym) {
@@ -5210,20 +5210,35 @@ function mtAteRows() {
     || a.name.localeCompare(b.name, 'ko'));
 }
 const MT_SLOT_NAME = { day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
+/* 「모두」 단추의 그림 — 네 갈래를 한 줌에 쥔 모양 (2026-11-02, 교수님 지정) */
+const MT_ALL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">'
+  + '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>'
+  + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>';
 function mtAteSection() {
-  const rows = mtAteRows();
-  const people = new Set(rows.map(r => r.key || `g:${r.name}`)).size;
-  const cnt = s => rows.filter(r => r.slot === s).length;
+  const all = mtAteRows();
+  /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
+     고른 것을 다시 누르면 풀립니다. **머리의 숫자는 늘 전체**를 셉니다 — 고른 갈래에 따라
+     「몇 명 만났는가」가 달라 보이면 안 되기 때문입니다. 고른 때만 그 수를 따로 적습니다. */
+  const rows = CAL.ate ? all.filter(r => r.slot === CAL.ate) : all;
+  const people = new Set(all.map(r => r.key || `g:${r.name}`)).size;
+  const cnt = s => all.filter(r => r.slot === s).length;
   /* 셈에서 뺀 자리 — 「못 만남」으로 표시하신 것. 왜 안 보이는지 알 수 있게 적어 둔다 */
   const no = mtList().filter(m => m.done === 'no').length;
-  const sum = ['day', 'night', 'tea', 'none'].map(s => [MT_SLOT_NAME[s], cnt(s)])
-    .filter(x => x[1]).map(([n, c]) => `${n} ${c}`).join(' · ');
+  /* 있는 갈래만 단추로 세웁니다 — 한 번도 없던 「시각 미정」까지 늘 보이면 군더더기입니다 */
+  const slots = ['day', 'night', 'tea', 'none'].filter(s => cnt(s));
+  const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
+      data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
+      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ' 보기'}">${icon}${esc(name)}${s ? `<i>${cnt(s)}</i>` : ''}</button>`;
   return `
       <section class="cal-sec">
         <div class="cal-head cal-head--ate"><h2>이제까지 만난 분</h2>
-          ${rows.length ? `<span class="st-note">${people}명 · ${rows.length}번${sum ? ` · ${sum}` : ''}</span>` : ''}
+          ${all.length ? `<span class="st-note">${people}명 · ${all.length}번${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}</span>` : ''}
+          ${all.length ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
+            ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
+            ${slots.map(s => pick(s, MT_SLOT_NAME[s], mtIcon(s))).join('')}
+          </div>` : ''}
         </div>
-        ${rows.length ? `<ul class="mt-ate">${rows.map(r => `<li>
+        ${!all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li>
           <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
           <span class="mt-ate__k">${mtIcon(r.slot)}${esc(MT_SLOT_NAME[r.slot] || '')}</span>
           <span class="mt-ate__p">${r.p
@@ -5233,7 +5248,8 @@ function mtAteSection() {
           <span class="mt-ate__u">${esc(r.dept || '명단 밖')}</span>
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
-        : `<div class="empty"><strong>아직 만난 기록이 없습니다</strong>약속을 마치시면 「완료」를 눌러 주십시오.</div>`}
+        : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}
+        ${all.length ? '' : `<div class="empty"><strong>아직 만난 기록이 없습니다</strong>지난 약속을 적어 두시면 여기에 쌓입니다.</div>`}
         <p class="st-note">지난 날짜의 약속은 만난 것으로 봅니다 · 오늘 자리는 「완료」를 누르신 것만${no ? ` · 「못 만남」 ${no}건은 뺐습니다` : ''}</p>
       </section>`;
 }
@@ -5446,6 +5462,11 @@ function bindCal() {
   $('[data-mtnext]')?.addEventListener('click', () => { CAL.ym = mtShift(CAL.ym, 1); renderCal(); });
   $('[data-mttoday]')?.addEventListener('click', () => { CAL.ym = mtMonth(mtToday()); CAL.day = mtToday(); renderCal(); });
   $('[data-mtics]')?.addEventListener('click', exportIcs);
+  $app.querySelectorAll('[data-ateslot]').forEach(el => el.addEventListener('click', () => {
+    const v = el.dataset.ateslot;
+    CAL.ate = (!v || CAL.ate === v) ? '' : v;      // 「모두」이거나 고른 것을 다시 누르면 풀린다
+    renderCal();
+  }));
   $app.querySelectorAll('[data-mtday]').forEach(b => b.addEventListener('click', () => {
     CAL.day = b.dataset.mtday; CAL.open = ''; renderCal();
   }));

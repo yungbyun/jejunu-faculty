@@ -1595,6 +1595,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 
 /* 이제까지 만난 분 — 날짜 · 갈래 · 이름 · 학과 · 장소 (2026-11-02, 교수님 지정).
    폰에서는 줄이 길어 가로로 넘치므로, 좁아지면 이름·학과를 아랫줄로 내린다. */
+/* 갈래 고르기 단추 — 머리줄 오른쪽에 (2026-11-02, 교수님 지정) */
+.mt-fs{flex-wrap:wrap}
+.mt-f{gap:5px}
+.mt-f i{font-style:normal;font-weight:800;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.mt-f.on{border-color:var(--brand);color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface))}
+.mt-f.on i{color:var(--brand)}
+.mt-i--all{color:var(--ink-3)}
+.mt-f.on .mt-i--all{color:var(--brand)}
 .mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
 /* 다섯 칸: 날짜 · 갈래 · 이름 · 학과 · 장소. 앞 넷은 글자만큼만 차지해 **왼쪽에 모이고**,
    남는 자리는 장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다. */
