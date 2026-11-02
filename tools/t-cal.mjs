@@ -904,9 +904,29 @@ const F = await page.evaluate(() => {
       .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(',') };
 });
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
-t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'day|night|tea', F.btns.join('|'));
+/* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
+t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
-t('단추에 몇 번인지 적는다', F.cnt === '3,3,1', F.cnt);
+t('단추에 몇 번인지 적는다', F.cnt === '6,3,3,1', F.cnt);
+t('식사는 점심과 저녁을 합한 수', Number(F.cnt.split(',')[0])
+  === Number(F.cnt.split(',')[1]) + Number(F.cnt.split(',')[2]), F.cnt);
+
+/* 식사만 보기 — 점심과 저녁만 남고 Tea 는 빠져야 한다 */
+await page.click('[data-ateslot="meal"]');
+await page.waitForTimeout(250);
+const FM = await page.evaluate(() => ({
+  kinds: [...document.querySelectorAll('.mt-ate li .mt-ate__k')].map(e => e.textContent.trim()),
+  on: document.querySelector('[data-ateslot="meal"]').getAttribute('aria-pressed'),
+  head: document.querySelector('.cal-head--ate .st-note').textContent.trim(),
+}));
+t('식사를 고르면 점심·저녁만 보인다', FM.kinds.length === 6
+  && FM.kinds.every(k => k === '점심' || k === '저녁'), FM.kinds.join(','));
+t('식사에 점심과 저녁이 다 있다', FM.kinds.includes('점심') && FM.kinds.includes('저녁'), FM.kinds.join(','));
+t('식사 단추가 눌린 꼴', FM.on === 'true');
+t('식사 수를 따로 적는다', /식사 6번만/.test(FM.head), FM.head);
+await page.click('[data-ateslot="meal"]');
+await page.waitForTimeout(250);
 
 await page.click('[data-ateslot="night"]');
 await page.waitForTimeout(250);

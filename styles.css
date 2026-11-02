@@ -1620,8 +1620,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-f i{font-style:normal;font-weight:800;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .mt-f.on{border-color:var(--brand);color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface))}
 .mt-f.on i{color:var(--brand)}
-.mt-i--all{color:var(--ink-3)}
-.mt-f.on .mt-i--all{color:var(--brand)}
+.mt-i--all,.mt-i--meal{color:var(--ink-3)}
+.mt-f.on .mt-i--all,.mt-f.on .mt-i--meal{color:var(--brand)}
 .mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
 /* 네 칸: 날짜 · 갈래 · 이름 · 장소. 앞 셋은 글자만큼만 차지해 **왼쪽에 모이고**, 남는 자리는
    장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다.
@@ -1760,13 +1760,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-head [data-mttoday]{margin-left:auto}
   .cal-nav{padding:4px 9px}
   .cal-head .btn{padding:5px 9px;font-size:12px}
-  /* 만난 분 고르기 단추 넷(모두·점심·저녁·Tea)은 한 줄에 들어가야 한다 (2026-11-02, 교수님 지정).
-     위 `.cal-head .btn` 만으로는 320px 폰에서 두 줄로 접혀, 조금 더 줄인다. 힘이 같으므로
-     **그 줄보다 뒤에** 두어야 이긴다 — 위로 올리면 그냥 덮인다. */
-  .mt-fs{gap:4px}
-  .cal-new__b.mt-f{gap:3px;padding:5px 7px}
-  .cal-new__b.mt-f i{font-size:10px}
-  .cal-new__b.mt-f .mt-i{width:12px;height:12px;margin-right:3px}
+  /* 만난 분 고르기 단추 **다섯**(모두·식사·점심·저녁·Tea)이 한 줄에 들어가야 한다
+     (2026-11-02 저녁, 교수님 지정 — 그 전에는 넷이었다). 위 `.cal-head .btn` 만으로는
+     폰에서 두 줄로 접혀 더 줄인다. 힘이 같으므로 **그 줄보다 뒤에** 두어야 이긴다 —
+     위로 올리면 그냥 덮인다. */
+  .mt-fs{gap:3px}
+  .cal-new__b.mt-f{gap:2px;padding:4px 5px;font-size:11px}
+  .cal-new__b.mt-f i{font-size:9px}
+  .cal-new__b.mt-f .mt-i{width:11px;height:11px;margin-right:2px}
   .cal-head--day,.cal-head--ate{gap:6px}
   .crumbs{margin-bottom:8px}
   .hero--thin{margin-bottom:8px}
@@ -1775,11 +1776,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-r__a{min-width:32px;min-height:30px;padding:0}
   .cal-del{margin-left:0}
 }
-/* 가장 좁은 폰(320px)에서는 횟수가 두 자리가 되면 그래도 넘친다 — 한 걸음 더 줄인다.
+/* 가장 좁은 폰(320px)에서는 단추가 다섯이라 글자를 줄여도 넘친다 — **횟수를 접는다.**
+   갈래 이름이 먼저고 숫자는 거들 뿐이라, 한 줄을 지키려면 숫자를 접는 쪽이 낫다.
    위 520px 묶음과 힘이 같으므로 **그 묶음 뒤에** 있어야 이긴다 (2026-11-02). */
 @media (max-width:340px){
-  .cal-new__b.mt-f{padding:5px 6px;font-size:11px}
-  .cal-new__b.mt-f .mt-i{margin-right:2px}
+  .cal-new__b.mt-f{padding:4px 4px;font-size:10.5px}
+  .cal-new__b.mt-f .mt-i{width:10px;height:10px;margin-right:2px}
+  .cal-new__b.mt-f>i{display:none}
 }
 
 /* 날짜 고르는 칸 — 브라우저가 칸 안에 그리는 10/13/26 은 우리가 못 바꾼다.

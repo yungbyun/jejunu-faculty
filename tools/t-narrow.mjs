@@ -111,7 +111,8 @@ for (const w of [320, 390]) {
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
       wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
-  t(`${w}px 만난 분 고르기 단추가 넷`, ate.n === 4, ate.labels.join(' '));
+  /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 **다섯**이 되었다 (교수님 지정) */
+  t(`${w}px 만난 분 고르기 단추가 다섯`, ate.n === 5, ate.labels.join(' '));
   t(`${w}px 그 단추가 한 줄`, ate.lines === 1, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
   t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);

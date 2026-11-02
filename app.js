@@ -5275,25 +5275,37 @@ function mtAteRows() {
   return out.sort((a, b) => by(b.m.date, a.m.date) || by(b.m.time, a.m.time)
     || a.ps[0].name.localeCompare(b.ps[0].name, 'ko'));
 }
-const MT_SLOT_NAME = { day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
+/* `meal` 은 **점심+저녁을 함께 보는 묶음**입니다 (2026-11-02 저녁, 교수님 지정).
+   약속에 그런 갈래가 붙는 것은 아니고, 고르기 단추에서만 쓰는 이름입니다. */
+const MT_SLOT_NAME = { meal: '식사', day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
+const MT_MEAL = ['day', 'night'];
+const mtAteHit = (slot, pick) => pick === 'meal' ? MT_MEAL.includes(slot) : slot === pick;
 /* 「모두」 단추의 그림 — 네 갈래를 한 줌에 쥔 모양 (2026-11-02, 교수님 지정) */
 const MT_ALL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">'
   + '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>'
   + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>';
+/* 「식사」 단추의 그림 — 숟가락과 젓가락 (해·달을 겹치면 점심인지 저녁인지 헷갈립니다) */
+const MT_MEAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M8.4 4.2c1.5 0 2.4 1.3 2.4 2.9S9.9 10 8.4 10 6 8.7 6 7.1s.9-2.9 2.4-2.9z"/>'
+  + '<path d="M8.4 10v9.8"/><path d="M15.6 4.2 14.4 19.8"/><path d="M18.6 4.2 17.4 19.8"/></svg>';
 function mtAteSection() {
   const all = mtAteRows();
   /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
      고른 것을 다시 누르면 풀립니다. **머리의 숫자는 늘 전체**를 셉니다 — 고른 갈래에 따라
      「몇 명 만났는가」가 달라 보이면 안 되기 때문입니다. 고른 때만 그 수를 따로 적습니다. */
-  const rows = CAL.ate ? all.filter(r => r.slot === CAL.ate) : all;
+  const rows = CAL.ate ? all.filter(r => mtAteHit(r.slot, CAL.ate)) : all;
   const people = new Set(all.flatMap(r => r.keys)).size;
-  const cnt = s => all.filter(r => r.slot === s).length;
+  const cnt = s => all.filter(r => mtAteHit(r.slot, s)).length;
   /* 만난 자리와 앞으로의 자리를 **갈라 적습니다** — 한 숫자로 뭉치면 몇 분을 뵈었는지 모릅니다 */
   const met = all.filter(r => r.ate).length, soon = all.length - met;
   /* 셈에서 뺀 자리 — 「못 만남」으로 표시하신 것. 왜 안 보이는지 알 수 있게 적어 둔다 */
   const no = mtList().filter(m => m.done === 'no').length;
-  /* 있는 갈래만 단추로 세웁니다 — 한 번도 없던 「시각 미정」까지 늘 보이면 군더더기입니다 */
-  const slots = ['day', 'night', 'tea', 'none'].filter(s => cnt(s));
+  /* 있는 갈래만 단추로 세웁니다 — 한 번도 없던 「시각 미정」까지 늘 보이면 군더더기입니다.
+     「식사」는 점심·저녁을 함께 보는 묶음이라, **둘 다 있을 때만** 세웁니다 — 하나뿐이면
+     그 갈래 단추와 똑같은 것이 둘 서는 셈입니다. */
+  const slots = ['meal', 'day', 'night', 'tea', 'none']
+    .filter(s => cnt(s) && (s !== 'meal' || MT_MEAL.every(x => cnt(x))));
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
       title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ' 보기'}">${icon}${esc(name)}${s ? `<i>${cnt(s)}</i>` : ''}</button>`;
@@ -5303,7 +5315,8 @@ function mtAteSection() {
           ${all.length ? `<span class="st-note">${people}명 · 만남 ${met}번${soon ? ` · 예정 ${soon}번` : ''}${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}</span>` : ''}
           ${all.length ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
-            ${slots.map(s => pick(s, MT_SLOT_NAME[s], mtIcon(s))).join('')}
+            ${slots.map(s => pick(s, MT_SLOT_NAME[s],
+              s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))).join('')}
           </div>` : ''}
         </div>
         ${!all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
