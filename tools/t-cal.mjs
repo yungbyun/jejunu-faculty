@@ -844,6 +844,21 @@ t('예정이 맨 위에', A.soon.slice(0, 2).every(Boolean) && !A.soon.slice(2).
   A.soon.map(x => x ? '예' : '만').join(''));
 t('예정에만 「예정」 쪽지를 단다',
   A.badges.every((b2, i) => A.soon[i] ? b2 === '예정' : b2 === ''), A.badges.join('|'));
+/* 2026-11-02 저녁, 교수님 지정 — 왼쪽 색 띠는 **괄호처럼 보여 걷었다.** 대신 줄 맨 앞의
+   날짜 글자를 물들인다. 띠가 되살아나지 않게, 물든 날짜가 사라지지 않게 재 둔다. */
+const SOON = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.mt-ate li')];
+  const soon = li.find(e => e.classList.contains('is-soon'));
+  const met = li.find(e => !e.classList.contains('is-soon'));
+  const cs = e => getComputedStyle(e.querySelector('.mt-ate__d'));
+  return { shadow: getComputedStyle(soon).boxShadow, border: getComputedStyle(soon).borderLeftWidth,
+    soonCol: cs(soon).color, metCol: cs(met).color, soonW: cs(soon).fontWeight, metW: cs(met).fontWeight };
+});
+t('예정 줄에 왼쪽 띠를 두르지 않는다',
+  (SOON.shadow === 'none' || !/inset/.test(SOON.shadow)) && SOON.border === '0px',
+  `${SOON.shadow} / ${SOON.border}`);
+t('예정은 날짜 빛깔로 가른다', SOON.soonCol !== SOON.metCol && Number(SOON.soonW) > Number(SOON.metW),
+  `${SOON.soonCol} ${SOON.soonW} / ${SOON.metCol} ${SOON.metW}`);
 t('갈래를 점심·저녁·Tea 로 적는다', A.kinds.join('|').includes('점심') && A.kinds.join('|').includes('저녁')
   && A.kinds.join('|').includes('Tea'), A.kinds.join('|'));
 t('학과를 적는다', A.depts.filter(Boolean).length === 7, A.depts.join('|'));

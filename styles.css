@@ -1628,13 +1628,19 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-ate li{display:grid;grid-template-columns:auto auto auto auto 1fr;align-items:center;gap:10px;
   padding:7px 10px;border-radius:8px;font-size:13px}
 .mt-ate li:nth-child(odd){background:var(--surface-2)}
-/* 앞으로의 약속도 같은 칸에 올리고 「예정」으로 적는다 (2026-11-02, 교수님 지정).
-   지난 자리와 섞이지 않게 왼쪽에 색 띠를 둘러 둔다 — 테두리를 쓰면 줄 높이가 틀어진다. */
-.mt-ate li.is-soon{box-shadow:inset 2.5px 0 0 var(--brand)}
 .mt-ate__s{font-style:normal;font-weight:800;font-size:10px;letter-spacing:-.2px;margin-left:5px;
   padding:1px 6px;border-radius:999px;color:var(--brand);
   background:color-mix(in srgb,var(--brand) 13%,transparent)}
-          <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
+/* 날짜 칸 — 숫자 폭을 고정해 줄마다 자리가 흔들리지 않게 (2026-11-02).
+   여기에 자바스크립트 한 줄이 잘못 섞여 들어가 있었다. 그 바람에 이 규칙은 물론
+   바로 아래 `.mt-ate__k` 까지 통째로 먹혀 **두 칸이 꾸밈 없이 서 있었다.** */
+.mt-ate__d{color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.mt-ate__d i{font-style:normal;color:var(--ink-3)}
+/* 앞으로의 약속은 「예정」 쪽지와 **날짜 빛깔**로 가른다 (2026-11-02 저녁, 교수님 지정).
+   처음에는 왼쪽에 색 띠를 둘렀는데 괄호처럼 보여 걷었다. 줄의 맨 앞이 날짜라,
+   그 글자가 물들면 테두리 없이도 눈이 먼저 간다. */
+.mt-ate li.is-soon .mt-ate__d{color:var(--brand);font-weight:800}
+.mt-ate li.is-soon .mt-ate__d i{color:var(--brand);opacity:.75}
 .mt-ate__k{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);white-space:nowrap}
 /* 한 자리에 여러 분이면 **한 줄에 모아** 적는다 (2026-11-02 저녁, 교수님 지정).
    이름이 여럿일 수 있으니 자르지 말고 접히게 둔다 — 잘라 버리면 누가 함께였는지 사라진다. */
