@@ -1593,10 +1593,32 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .hero--thin{margin-bottom:10px}
 .cal-head h2{font-size:15px;margin:0}
 
+/* 이제까지 만난 분 — 날짜 · 갈래 · 이름 · 학과 · 장소 (2026-11-02, 교수님 지정).
+   폰에서는 줄이 길어 가로로 넘치므로, 좁아지면 이름·학과를 아랫줄로 내린다. */
+.mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
+/* 다섯 칸: 날짜 · 갈래 · 이름 · 학과 · 장소. 앞 넷은 글자만큼만 차지해 **왼쪽에 모이고**,
+   남는 자리는 장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다. */
+.mt-ate li{display:grid;grid-template-columns:auto auto auto auto 1fr;align-items:center;gap:10px;
+  padding:7px 10px;border-radius:8px;font-size:13px}
+.mt-ate li:nth-child(odd){background:var(--surface-2)}
+          <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
+.mt-ate__k{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);white-space:nowrap}
+.mt-ate__p{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-ate__p a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
+.mt-ate__p a:hover{border-bottom-color:currentColor}
+.mt-ate__u{color:var(--ink-3);white-space:nowrap}
+.mt-ate__w{color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-self:start;min-width:0}
+@media (max-width:620px){
+  .mt-ate li{grid-template-columns:auto 1fr;gap:4px 8px}
+  .mt-ate__u{justify-self:start}
+  .mt-ate__p{grid-column:1/-1}
+  .mt-ate__u,.mt-ate__w{grid-column:1/-1;font-size:12px}
+}
+
 .cal-sec{margin-bottom:16px}
 .cal-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .cal-head h2{min-width:120px}
-.cal-head--day h2{min-width:0;flex:1}
+.cal-head--day h2,.cal-head--ate h2{min-width:0;flex:1}
 .cal-nav{padding:4px 12px;font-size:16px;line-height:1}
 
 /* 폭을 묶어 두지 않으면 PC 에서 칸이 175px 까지 커져 달력처럼 안 보인다 */
@@ -1694,7 +1716,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-head [data-mttoday]{margin-left:auto}
   .cal-nav{padding:4px 9px}
   .cal-head .btn{padding:5px 9px;font-size:12px}
-  .cal-head--day{gap:6px}
+  .cal-head--day,.cal-head--ate{gap:6px}
   .crumbs{margin-bottom:8px}
   .hero--thin{margin-bottom:8px}
   .cal-sec{margin-bottom:12px}

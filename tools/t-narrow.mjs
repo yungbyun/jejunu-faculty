@@ -68,7 +68,7 @@ for (const w of [320, 390]) {
     };
     const top = document.querySelector('.crumbs').getBoundingClientRect().top;
     const bot = document.querySelector('.cal-new').getBoundingClientRect().bottom;
-    return { head: Math.round(line('.cal-head:not(.cal-head--day) > *')), neu: Math.round(line('.cal-new__b')),
+    return { head: Math.round(line('.cal-head:not(.cal-head--day):not(.cal-head--ate) > *')), neu: Math.round(line('.cal-new__b')),
       tall: Math.round(bot - top), wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
   t(`${w}px 달 머리줄이 한 줄`, cal.head <= 46, `${cal.head}px`);

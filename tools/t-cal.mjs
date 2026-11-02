@@ -763,6 +763,65 @@ t('10분 자리가 아닌 옛 시각도 그대로', await page.evaluate(() => {
 }), await page.evaluate(() => [...document.querySelector('[data-mtm]').options].map(o => o.value).join()));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
+/* ---------- 이제까지 만난 분 (2026-11-02, 교수님 지정) ----------
+ * 달력 아래에 지금까지 만난 분을 쭉 적는다 — 날짜·갈래·이름·학과·장소.
+ * **완료(만남)로 표시한 약속만** 센다. 날짜가 지났다고 만난 것으로 치면 미뤄진 자리까지
+ * 「만났다」가 되어 숫자가 부푼다. 대신 지나고도 표시를 안 한 약속은 몇 건인지 적어 준다. */
+const A = await page.evaluate(() => {
+  meetMap = {};
+  const t0 = mtToday(), d0 = new Date(t0 + 'T00:00:00');
+  const day = n => { const x = new Date(d0); x.setDate(x.getDate() + n);
+    return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
+  const R = state.rows;
+  const mk = (dd, ks, kind, done, place, guests) => { const id = mtAdd(dd, ks[0], kind);
+    const m = meets()[id]; m.who = ks; m.done = done; m.place = place || ''; m.guests = guests || []; };
+  mk(day(-9), [rKey(R[0]), rKey(R[1])], 'lunch', 'met', '교직원식당');   // 한 자리에 두 분
+  mk(day(-5), [rKey(R[2])], 'dinner', 'met', '연동 한식집');
+  mk(day(-3), [rKey(R[3])], 'other', 'met', '');
+  mk(day(-2), [rKey(R[4])], 'lunch', 'met', '', ['김행정 과장']);         // 명단 밖의 분
+  mk(day(-1), [rKey(R[5])], 'dinner', '', '');                           // 지났는데 표시 안 함
+  mk(day(2), [rKey(R[6])], 'lunch', '', '');                             // 앞으로의 약속
+  mk(day(-7), [rKey(R[7])], 'lunch', 'no', '');                          // 못 만남
+  location.hash = '#/cal'; render();
+  const li = [...document.querySelectorAll('.mt-ate li')];
+  const cell = (e, k) => (e.querySelector('.mt-ate__' + k) || {}).textContent || '';
+  return {
+    n: li.length,
+    names: li.map(e => cell(e, 'p').trim()),
+    kinds: li.map(e => cell(e, 'k').trim()),
+    depts: li.map(e => cell(e, 'u').trim()),
+    dates: li.map(e => cell(e, 'd').trim()),
+    head: document.querySelector('.cal-head--ate').textContent.replace(/\s+/g, ' ').trim(),
+    note: [...document.querySelectorAll('.cal-sec .st-note')].pop().textContent.trim(),
+    link: li[1] && li[1].querySelector('a') && li[1].querySelector('a').getAttribute('href'),
+    noMet: state.rows[7].name, later: state.rows[6].name,
+    place0: cell(li[3], 'w').trim(),
+  };
+});
+/* 만난 자리는 넷인데 **사람으로 세면 여섯 줄**이다 — 첫 자리에 두 분, 넷째 자리에 교수 한 분과
+   명단 밖의 한 분이 함께 계셨다. 사람마다 한 줄이라 그렇다. */
+t('만난 분을 사람마다 한 줄로 적는다', A.n === 6, `${A.n}줄`);
+t('한 자리에 둘이면 두 줄', A.dates.filter(d => d === A.dates[A.dates.length - 1]).length === 2,
+  A.dates.join(' | '));
+t('가까운 날부터', A.dates.every((d, i) => i === 0 || A.dates[i - 1] >= d), A.dates.join(' | '));
+t('갈래를 점심·저녁·Tea 로 적는다', A.kinds.join('|').includes('점심') && A.kinds.join('|').includes('저녁')
+  && A.kinds.join('|').includes('Tea'), A.kinds.join('|'));
+t('학과를 적는다', A.depts.filter(Boolean).length === 6, A.depts.join('|'));
+t('명단 밖의 분은 「명단 밖」', A.depts.includes('명단 밖'), A.depts.join('|'));
+t('장소도 적는다', A.place0 === '교직원식당' || A.place0 === '연동 한식집', A.place0);
+t('완료 안 한 약속은 안 센다', !A.names.includes(A.noMet) && !A.names.includes(A.later),
+  A.names.join(' '));
+t('못 만남도 안 센다', !A.names.includes(A.noMet), A.names.join(' '));
+t('머리글에 사람 수와 횟수', /6명 · 6번/.test(A.head), A.head);
+t('머리글에 갈래별 수', /점심 4/.test(A.head) && /저녁 1/.test(A.head) && /Tea 1/.test(A.head), A.head);
+t('표시 안 한 약속을 일러 준다', /1건/.test(A.note), A.note);
+t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(A.link || ''), A.link);
+t('기록이 없으면 빈 안내', await page.evaluate(() => {
+  meetMap = {}; render();
+  const sec = [...document.querySelectorAll('.cal-sec')].pop();
+  return !sec.querySelector('.mt-ate') && /아직 만난 기록이 없습니다/.test(sec.textContent);
+}));
+
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }
 console.log(`\n${ok.length - bad}/${ok.length} 통과`);

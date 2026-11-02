@@ -5183,6 +5183,59 @@ function mtShift(ym, n) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
 
+/* ---------- 이제까지 만난 분 (2026-11-02, 교수님 지정) ----------
+ * 달력 아래에 **지금까지 만난 분을 쭉** 적습니다 — 날짜·갈래(점심·저녁·Tea)·학과·이름.
+ * **완료(만남)로 표시한 약속만** 셉니다. 날짜가 지났다고 만난 것으로 치면, 미뤄졌거나
+ * 못 나가신 자리까지 「만났다」가 되어 숫자가 저절로 부풉니다. 다만 지나고도 표시를 안 하신
+ * 약속이 몇 건인지는 따로 적어 드립니다 — 그래야 빠뜨린 것을 알아채십니다.
+ * 한 자리에 여러 분이 계시면 **사람마다 한 줄**입니다. 같은 분을 두 번 만나셨으면 두 줄이고,
+ * 머리글의 「N명」은 **겹치지 않게** 센 숫자입니다.
+ * 명단 밖의 분(`guests`)도 적습니다 — 학과 자리에는 「명단 밖」이라고 둡니다. */
+function mtAteRows() {
+  const out = [];
+  mtList().filter(m => m.done === 'met').forEach(m => {
+    const slot = mtSlot(m);
+    m.who.forEach(k => {
+      const p = state.rows.find(x => rKey(x) === k);
+      out.push({ m, slot, key: k, name: p ? p.name : k, dept: p ? p.dept_name : '', p });
+    });
+    mtArr(m.guests).forEach(n => out.push({ m, slot, key: '', name: n, dept: '', p: null }));
+  });
+  /* 가장 가까운 날부터 — 어제 일이 맨 위에 와야 눈에 든다 */
+  return out.sort((a, b) => (b.m.date || '').localeCompare(a.m.date || '')
+    || (b.m.time || '').localeCompare(a.m.time || '')
+    || a.name.localeCompare(b.name, 'ko'));
+}
+const MT_SLOT_NAME = { day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
+function mtAteSection() {
+  const rows = mtAteRows();
+  const people = new Set(rows.map(r => r.key || `g:${r.name}`)).size;
+  const cnt = s => rows.filter(r => r.slot === s).length;
+  const today = mtToday();
+  /* 지나고도 완료로 표시 안 하신 약속 — 빠뜨린 것을 알아채시라고 */
+  const late = mtList().filter(m => !m.done && m.date && m.date < today).length;
+  const sum = ['day', 'night', 'tea', 'none'].map(s => [MT_SLOT_NAME[s], cnt(s)])
+    .filter(x => x[1]).map(([n, c]) => `${n} ${c}`).join(' · ');
+  return `
+      <section class="cal-sec">
+        <div class="cal-head cal-head--ate"><h2>이제까지 만난 분</h2>
+          ${rows.length ? `<span class="st-note">${people}명 · ${rows.length}번${sum ? ` · ${sum}` : ''}</span>` : ''}
+        </div>
+        ${rows.length ? `<ul class="mt-ate">${rows.map(r => `<li>
+          <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
+          <span class="mt-ate__k">${mtIcon(r.slot)}${esc(MT_SLOT_NAME[r.slot] || '')}</span>
+          <span class="mt-ate__p">${r.p
+            ? `<a href="#/dept/${encodeURIComponent(r.p.dept_id)}/prof/${encodeURIComponent(r.p.slug)}"
+                 title="${esc(r.p.dept_name)} · ${esc(r.p.rank)}">${esc(r.name)}</a>`
+            : `${esc(r.name)}`}</span>
+          <span class="mt-ate__u">${esc(r.dept || '명단 밖')}</span>
+          ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
+        </li>`).join('')}</ul>`
+        : `<div class="empty"><strong>아직 만난 기록이 없습니다</strong>약속을 마치시면 「완료」를 눌러 주십시오.</div>`}
+        <p class="st-note">「완료」로 표시한 약속만 셉니다${late ? ` · 날짜가 지났는데 표시를 안 하신 약속이 ${late}건 있습니다` : ''}</p>
+      </section>`;
+}
+
 function renderCal() {
   if (!CAL.ym) CAL.ym = mtMonth(mtToday());
   if (!CAL.day) CAL.day = mtToday();
@@ -5236,6 +5289,7 @@ function renderCal() {
         ${dayList.length ? `<div class="cal-list">${dayList.map(m => mtRow(m)).join('')}</div>`
           : `<div class="empty"><strong>이날은 약속이 없습니다</strong>위 단추로 하나 잡아 보세요.</div>`}
       </section>
+      ${mtAteSection()}
     </div>`;
   bindCal();
   /* 상세에서 약속을 잡고 넘어왔을 때 — 달력 아래에 펼쳐진 그 약속이 바로 보이게 한다 */
