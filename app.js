@@ -3458,6 +3458,7 @@ function bindNotes(root) {
       const st = box && box.querySelector('.memo__st');
       if (st) st.textContent = '입력 중…';
       memoMarkSync();
+      memoBar(t);               // 글이 길어지면 그 자리에서 바가 선다 (2026-11-03)
     };
     t.addEventListener('input', typed);
     t.addEventListener('blur', () => { commitMemo(t.dataset.key, memoRead(t)); memoMarkSync(); });
@@ -3488,6 +3489,32 @@ function bindNotes(root) {
       btn.addEventListener('mousedown', ev => ev.preventDefault()));   // 누를 때 고른 글자가 풀리지 않게
     box && box.querySelectorAll('[data-cmd]').forEach(btn =>
       btn.addEventListener('click', () => run(btn.dataset.cmd)));
+    /* 넘침 바 — 그리기, 그리고 끌어서 옮기기. 네이티브 바를 숨겼으니 이 바가 그 몫까지 한다. */
+    t.addEventListener('scroll', () => memoBar(t));
+    /* 드로어를 열 때는 `bindNotes` 가 **보이기 전에** 돌므로 그 자리에서 재면 높이가 0 이다.
+       그래서 글칸이 실제로 자리를 잡는 순간을 `ResizeObserver` 로 받는다 — 글꼴이 늦게
+       와서 줄 수가 달라지는 때도 함께 잡힌다. */
+    memoBar(t);                       // 이미 자리를 잡고 있으면 그 자리에서 바로 선다
+    if (window.ResizeObserver) new ResizeObserver(() => memoBar(t)).observe(t);
+    else requestAnimationFrame(() => memoBar(t));
+    const sb = box && box.querySelector('.memo__sb');
+    sb && sb.addEventListener('pointerdown', ev => {
+      const tr = sb.getBoundingClientRect(), th = sb.firstElementChild.getBoundingClientRect();
+      /* 빈 트랙을 누르면 그 자리로 간다 — 잡은 데가 막대 밖이면 막대 가운데를 잡은 셈으로 본다 */
+      let grab = ev.clientY - th.top;
+      if (grab < 0 || grab > th.height) grab = th.height / 2;
+      const span = tr.height - th.height;
+      const move = e2 => {
+        const p = span > 0 ? (e2.clientY - grab - tr.top) / span : 0;
+        t.scrollTop = Math.min(1, Math.max(0, p)) * (t.scrollHeight - t.clientHeight);
+        memoBar(t);
+      };
+      move(ev);
+      try { sb.setPointerCapture(ev.pointerId); } catch {}
+      sb.addEventListener('pointermove', move);
+      sb.addEventListener('pointerup', () => sb.removeEventListener('pointermove', move), { once: true });
+      ev.preventDefault();      // 메모 안의 커서가 날아가지 않게
+    });
   });
 }
 
@@ -3513,6 +3540,27 @@ function memoMarkSync() {
   });
 }
 document.addEventListener('selectionchange', memoMarkSync);
+
+/* ---------- 메모가 넘쳤다고 알리는 세로 바 (2026-11-03, 교수님 지정) ----------
+ * 메모가 320px 를 넘으면 뒷부분이 잘려 보입니다. 그런데 **잘렸다는 것 자체가 안 보였습니다** —
+ * 아이폰은 손가락을 떼면 바가 사라지고, 맥은 겹침 바라서 가만히 있으면 흔적이 없습니다.
+ * 그래서 네이티브 바를 숨기고(styles.css) 그 자리에 우리 바를 그립니다. **넘칠 때만** 섭니다.
+ * 바가 설 자리와 길이는 `.memo` 를 재어서 따옵니다 — 320px 을 여기 또 적어 두면 한쪽만
+ * 고치는 날이 옵니다. 길이는 28px 아래로 줄이지 않습니다. 손가락으로 집을 수 있어야 합니다. */
+function memoBar(t) {
+  const box = t.closest('.memo-box'), sb = box && box.querySelector('.memo__sb');
+  if (!sb) return;
+  const room = t.scrollHeight - t.clientHeight;
+  box.classList.toggle('memo-box--over', room > 2);
+  if (room <= 2) return;
+  sb.style.top = `${t.offsetTop}px`;
+  sb.style.height = `${t.clientHeight}px`;
+  const h = Math.max(28, Math.round(t.clientHeight * t.clientHeight / t.scrollHeight));
+  sb.firstElementChild.style.height = `${h}px`;
+  sb.firstElementChild.style.transform = `translateY(${(t.clientHeight - h) * t.scrollTop / room}px)`;
+}
+const memoBars = () => document.querySelectorAll('.memo[contenteditable]').forEach(memoBar);
+addEventListener('resize', memoBars);
 
 const MEMO_MARKS = [
   { mk: '**', tag: 'b', name: '굵게', key: 'b', cmd: 'bold' },
@@ -4063,7 +4111,10 @@ function refreshRatingUI(key, val) {
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"] .counter__n`).forEach(el => { el.textContent = note.met; });
   document.querySelectorAll(`.counter[data-key="${CSS.escape(key)}"]`).forEach(el => el.classList.toggle('counter--zero', !note.met));
   document.querySelectorAll(`.memo[contenteditable][data-key="${CSS.escape(key)}"]`).forEach(t => {
-    if (document.activeElement !== t && !memoTimers.has(key) && memoRead(t) !== note.memo) t.innerHTML = memoHtml(note.memo);
+    if (document.activeElement !== t && !memoTimers.has(key) && memoRead(t) !== note.memo) {
+      t.innerHTML = memoHtml(note.memo);
+      memoBar(t);             // 다른 기기에서 내려온 글이 길면 바도 따라 선다 (2026-11-03)
+    }
   });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"] .prof__note`).forEach(el => { el.innerHTML = noteBadge(entryOf(key)); });
   document.querySelectorAll(`.prof[data-dept="${CSS.escape(key.split('/')[0])}"][data-slug="${CSS.escape(key.split('/')[1])}"]`).forEach(c => c.dataset.rating = val);
@@ -4360,7 +4411,10 @@ function alumHtml(p) {
       }).join('')}</ul>
     </div>`).join('');
   STP.pick = was;
-  return html + `<p class="st-note">이름 뒤의 학/석/박은 그 대학에서 받은 학위입니다${out ? ` · 비참여 ${out}명은 뺐습니다` : ''}</p>`;
+  /* 「이름 뒤의 학/석/박은 …」 풀이는 뺐습니다 (2026-11-03, 교수님 지정) — 묶음 머리에 이미
+     대학 이름과 학위가 서 있어서, 이름 뒤의 한 글자가 무엇인지는 보면 압니다. 뺀 비참여는
+     그대로 적습니다 — 숫자가 왜 모자라는지는 보아서 알 수 없습니다. */
+  return html + (out ? `<p class="st-note">비참여 ${out}명은 뺐습니다</p>` : '');
 }
 
 function relUniHtml() {
@@ -5760,6 +5814,8 @@ function openDrawer(p, d) {
             ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
           </div>
           <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
+          ${/* 글이 넘칠 때만 서는 세로 바 (2026-11-03) — 자리는 `memoBar()` 가 잡습니다 */''}
+          <div class="memo__sb" aria-hidden="true"><i></i></div>
           <div class="memo__st" aria-live="polite"></div>
         </div>
       </div>

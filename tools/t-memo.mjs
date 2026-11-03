@@ -208,6 +208,87 @@ t('켜진 단추는 눈에도 띈다', await page.evaluate(async () => {
   const on = document.querySelector('.memo__b.on'), off = document.querySelector('.memo__b:not(.on)');
   return getComputedStyle(on).backgroundColor !== getComputedStyle(off).backgroundColor;
 }));
+/* ---------- 넘칠 때 서는 세로 바 (2026-11-03, 교수님 지정) ----------
+ * 메모가 320px 를 넘으면 뒷부분이 잘리는데 **잘렸다는 것 자체가 안 보였다**. 네이티브 바는
+ * 믿을 수 없다 — 아이폰은 손가락을 떼면 사라지고, 맥은 겹침 바라서 가만히 있으면 흔적이 없다.
+ * 그래서 네이티브 바를 숨기고 우리 바를 그린다. 아래 시험은 **그 바가 늘 서 있는지**를 본다. */
+const sb = async () => await page.evaluate(() => {
+  const t = document.querySelector('.memo'), box = t.closest('.memo-box');
+  const b = box.querySelector('.memo__sb'), th = b && b.firstElementChild;
+  const r = e => { const x = e.getBoundingClientRect(); return { t: x.top, b: x.bottom, l: x.left, r: x.right, w: x.width, h: x.height }; };
+  return { over: box.classList.contains('memo-box--over'), shown: b ? getComputedStyle(b).display !== 'none' : false,
+    bar: b ? r(b) : null, thumb: th ? r(th) : null, memo: r(t), pad: parseFloat(getComputedStyle(t).paddingRight),
+    sh: t.scrollHeight, ch: t.clientHeight, top: t.scrollTop,
+    native: getComputedStyle(t).scrollbarWidth,
+    /* 네이티브 바가 섬면 `clientWidth` 가 그만큼 줄어든다 — 테두리 두께는 빼고 본다 */
+    w: t.offsetWidth - t.clientWidth - parseFloat(getComputedStyle(t).borderLeftWidth)
+      - parseFloat(getComputedStyle(t).borderRightWidth) };
+});
+/* 상세를 **닫았다 열지 않는다** — 닫을 때 `flushMemo()` 가 화면의 글칸을 읽어 그대로 저장하므로,
+   방금 넣은 메모가 열자마자 빈 것으로 덮여 쓰인다. `render()` 만 불러 그 자리에서 다시 그린다. */
+const setMemo = async n => {
+  await page.evaluate(([k, n]) => applyEntry(k, { memo: n ? Array.from({ length: n },
+    (_, i) => `${i + 1}번째 줄 — 길어지면 뒤가 잘립니다.`).join(String.fromCharCode(10)) : '' }), [info.k, n]);
+  await page.evaluate(h => { location.hash = h; render(); }, info.h);
+  await page.waitForSelector('.memo[contenteditable]', { timeout: 10000 });
+  await page.waitForTimeout(250); };
+
+await setMemo(3);
+const few = await sb();
+t('짧은 메모에는 바가 없다', !few.over && !few.shown, `over=${few.over} shown=${few.shown}`);
+t('바가 없어도 자리는 비워 둔다', few.pad >= 18,
+  `padding-right ${few.pad}px`);   // 바가 설 때 글이 밀리면 안 된다
+
+await setMemo(30);
+const many = await sb();
+t('넘치면 바가 선다', many.over && many.shown, `over=${many.over} shown=${many.shown} ${many.sh}/${many.ch}`);
+t('네이티브 바는 숨긴다', many.native === 'none' && many.w <= 1, `${many.native} / 자리 ${many.w}px`);
+t('바가 글칸 안 오른쪽에 붙는다', many.bar.r <= many.memo.r && many.memo.r - many.bar.r < 12
+  && many.bar.r > many.memo.l + many.memo.w * 0.8, `바 ${Math.round(many.bar.r)} / 글칸 ${Math.round(many.memo.r)}`);
+t('바가 글칸 높이를 따라간다', Math.abs(many.bar.h - many.ch) <= 2 && Math.abs(many.bar.t - many.memo.t) <= 3,
+  `${Math.round(many.bar.h)} / ${many.ch}`);
+t('막대 길이가 넘친 만큼 짧다', many.thumb.h < many.bar.h - 20 && many.thumb.h >= 28,
+  `${Math.round(many.thumb.h)} / ${Math.round(many.bar.h)}`);
+t('맨 위에서는 막대도 맨 위', Math.abs(many.thumb.t - many.bar.t) <= 1,
+  `${Math.round(many.thumb.t)} / ${Math.round(many.bar.t)}`);
+
+/* 내리면 막대도 따라 내려간다 — 어디쯤 읽고 있는지 알려 주는 것이 바의 몫이다 */
+await page.evaluate(() => { const t = document.querySelector('.memo'); t.scrollTop = t.scrollHeight; });
+await page.waitForTimeout(150);
+const low = await sb();
+t('내리면 막대가 바닥에 닿는다', Math.abs(low.thumb.b - low.bar.b) <= 1 && low.top > 0,
+  `${Math.round(low.thumb.b)} / ${Math.round(low.bar.b)}`);
+
+/* 바를 끌어서도 옮긴다 — 네이티브 바를 숨겼으니 이 바가 그 몫까지 한다 */
+await page.evaluate(() => { const t = document.querySelector('.memo'); t.scrollTop = 0; });
+await page.waitForTimeout(100);
+const box0 = await page.evaluate(() => {
+  const b = document.querySelector('.memo__sb').getBoundingClientRect();
+  return { x: b.left + b.width / 2, y1: b.top + 10, y2: b.bottom - 10 };
+});
+await page.mouse.move(box0.x, box0.y1);
+await page.mouse.down();
+await page.mouse.move(box0.x, box0.y2, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(150);
+const drag = await sb();
+t('바를 끌면 글이 따라 내려간다', drag.top > 0, `scrollTop ${Math.round(drag.top)}`);
+
+/* 글을 쳐서 길어지는 그 자리에서 바가 서야 한다 — 다시 열어야 보이면 소용이 없다 */
+await setMemo(3);
+await page.click('.memo');
+await page.evaluate(() => {
+  const t = document.querySelector('.memo');
+  t.innerHTML = Array.from({ length: 40 }, (_, i) => `${i + 1}째 줄 길어집니다`).join('<br>');
+  t.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(200);
+const typed2 = await sb();
+t('치는 동안 바가 선다', typed2.over && typed2.shown, `over=${typed2.over} shown=${typed2.shown}`);
+await page.evaluate(() => document.querySelector('.memo').blur());
+await page.waitForTimeout(900);              // 밀린 저장이 끝나길 기다린 뒤에 지운다
+await setMemo(0);
+
 /* 글을 쓰는 동안 화면이 꺼지지 않게 (2026-10-15) */
 await page.evaluate(() => { document.activeElement.blur(); window.__wake.length = 0; });
 await page.waitForTimeout(400);

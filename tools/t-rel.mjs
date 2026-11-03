@@ -315,6 +315,9 @@ t('그 대학 동문을 다 적는다', al.names.map(x => x.join(',')).join(' | 
 t('자기 자신은 안 넣는다', !al.names.flat().includes(al.me), al.me);
 t('비참여는 뺀다', !al.names.flat().some(n => pick.out.includes(n)), pick.out.join(' '));
 t('뺀 비참여가 몇 명인지 적는다', !pick.out.length || /비참여 \d+명은 뺐습니다/.test(al.note), al.note);
+/* 「이름 뒤의 학/석/박은 …」 풀이는 명단에서 뺀다 (2026-11-03, 교수님 지정) —
+   묶음 머리에 대학 이름과 학위가 이미 서 있어서, 이름 뒤의 한 글자가 무엇인지는 보면 안다. */
+t('학위 풀이 문구는 없다', al.note.indexOf('학/석/박') < 0, al.note);
 t('이름 뒤에 학·석·박을 적는다', al.degs.length > 0 && al.degs.every(d => /^[학석박]+$/.test(d)), al.degs.join(' '));
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(al.href), al.href);
 
