@@ -4538,17 +4538,18 @@ function hireHtml(p) {
     return HIREDIT ? c.replace('</li>', `<button type="button" class="d-hire__x" data-hiredrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 입사 동기에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
   }).join('');
   STP.pick = was;
-  /* 더하는 자리는 **칩 줄 맨 뒤**입니다 (2026-11-04, 교수님 지정). 〈+〉를 누르면 그 자리가
-     **칩 모양 그대로 적는 칸**이 되고, 옆에 닫는 ⊗ 가 섭니다. 제목 옆이 아니라 칩 끝에 두어야
+  /* 더하는 자리는 **칩 줄 맨 뒤**입니다 (2026-11-04, 교수님 지정). 평소에는 **연필**(고치기)
+     이고 — 약속 쪽 「고치기」와 같은 그림입니다 — 누르면 그 자리가
+     **칩 모양 그대로 적는 칸**이 되고, 옆에 닫는 × 가 섭니다. 제목 옆이 아니라 칩 끝에 두어야
      「여기 이어서 한 분 더」라는 것이 눈으로 읽힙니다. 적는 칸과 칩의 높이·둥글기를 맞춰
      한 줄이 끊겨 보이지 않게 했습니다. */
   const add = HIREDIT
     ? `<li class="d-hire__a"><input class="d-hire__in" data-hirein type="text" autocomplete="off"
-         spellcheck="false" value="${esc(HIREQ)}" placeholder="이름이나 학과" aria-label="입사 동기로 더할 교수 찾기"
+         spellcheck="false" value="${esc(HIREQ)}" placeholder="이름" aria-label="입사 동기로 더할 교수 찾기"
          ><button type="button" class="d-hire__plus on" data-hireedit
          aria-label="더하기를 닫습니다" title="더하기를 닫습니다">×</button></li>`
     : `<li class="d-hire__a"><button type="button" class="d-hire__plus" data-hireedit
-         aria-label="입사 동기를 더합니다" title="입사 동기를 더합니다">+</button></li>`;
+         aria-label="입사 동기 고치기" title="입사 동기를 더하거나 뺍니다">${PEN15_SVG}</button></li>`;
   return `<ul class="rel-unames">${chips}${add}</ul>`
     + (HIREDIT ? `<div class="d-hire__hits" data-hirehits>${hireHits(p)}</div>` : '') + note;
 }

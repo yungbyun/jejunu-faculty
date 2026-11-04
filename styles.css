@@ -314,6 +314,7 @@ main{min-height:60vh;padding:40px 20px 72px}
   padding:4px 11px;border-radius:999px;border:1px dashed var(--line-2);background:var(--surface);
   color:var(--ink-3);font:inherit;font-size:13px;font-weight:700;line-height:1.5;cursor:pointer}
 .d-hire__plus:hover{border-style:solid;border-color:var(--brand);color:var(--brand)}
+.d-hire__plus svg{display:block}   /* 연필 그림이 글줄 아래로 처지지 않게 */
 .d-hire__plus.on{border-style:solid;border-color:var(--line);color:var(--ink-2)}
 .d-hire__plus.on:hover{border-color:#c0392b;color:#fff;background:#c0392b}
 /* ×는 칩 **안쪽** 오른편에 앉힙니다 (2026-11-04, 교수님 지정). 칩 안의 `<a>` 안에 넣으면

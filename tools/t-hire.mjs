@@ -166,13 +166,15 @@ const H3 = await page.evaluate(() => {
   const s = document.querySelector('.d-hiresec'), b = s.querySelector('[data-hireedit]');
   const lis = [...s.querySelectorAll('.d-hire li')];
   return { h3: s.querySelector('h3').textContent.trim(), label: b.textContent.trim(),
-    inLast: lis[lis.length - 1].contains(b), n: lis.length,
+    inLast: lis[lis.length - 1].contains(b), n: lis.length, pen: !!b.querySelector('svg'),
     head: !!s.querySelector('.d-hire__h') };
 });
 /* 더하는 자리는 **칩 줄 맨 뒤**입니다 (2026-11-04, 교수님 지정) — 제목 옆이 아니라 칩 끝에
    있어야 「여기 이어서 한 분 더」라는 것이 눈으로 읽힙니다. */
 t('제목에는 단추가 없다', H3.h3 === '입사 동기', H3.h3);
-t('+ 는 칩 줄 맨 뒤에 선다', H3.inLast && H3.label === '+', `${H3.n}칸 / ${H3.label}`);
+/* 표시는 **연필(고치기)** 입니다 (2026-11-04, 교수님 지정) — 약속 족 「고치기」와
+   같은 그림을 씁니다. 그림이라 `textContent` 는 비어 있으므로 `svg` 가 있는지를 봅니다. */
+t('고치는 표시는 칩 줄 맨 뒤에 선다', H3.inLast && H3.pen, `${H3.n}칸 / svg ${H3.pen}`);
 /* 「본인 빼고 N명」 머리줄은 뺐다 (2026-11-04, 교수님 지정) — 칩을 세면 알 수 있다 */
 t('사람 수 머리줄은 없다', !H3.head);
 t('「적어 둔 동기」 줄도 없다', (await read()).note.indexOf('적어 둔 동기') < 0, (await read()).note);
@@ -195,13 +197,16 @@ const IN = await page.evaluate(() => {
     dh: Math.abs(r(i).height - r(chip).height),
     rad: getComputedStyle(i).borderTopLeftRadius };
 });
-t('+ 는 × 로 바뀐다', IN.label === '×', IN.label);
+t('누르면 닫는 × 로 바뀐다', IN.label === '×', IN.label);
 /* 좁은 화면에서는 칩이 줄을 넘으므로 **같은 줄**이 아니라 **같은 칩 목록의 맨 끝**인지를
    본다 — 줄바꿈은 제대로 도는 것이지 잘못이 아니다. */
 t('적는 칸은 칩 목록 맨 뒤 그 자리에 선다', IN.inLast && IN.sameUl);
 t('적는 칸은 칩과 같은 모양이다', IN.dh < 3 && parseFloat(IN.rad) > 100,
   `높이차 ${IN.dh} / 둥글기 ${IN.rad}`);
 t('적는 칸과 × 는 한 칸에 묶인다', IN.together);
+/* 안내 글은 「이름」만 (2026-11-04, 교수님 지정) — 찾기는 학과로도 되지만 글은 짧게 */
+t('적는 칸의 안내 글은 「이름」이다',
+  (await page.evaluate(() => document.querySelector('[data-hirein]').placeholder)) === '이름');
 t('고치는 동안에는 칩마다 ×가 붙는다', (await page.$$('.d-hire [data-hiredrop]')).length === 4);
 /* ×는 **칩 안쪽**에 앉아야 한다 (2026-11-04, 교수님 지정) */
 const XB = await page.evaluate(() => {
