@@ -13,7 +13,7 @@ await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.leng
 const ok = []; const t = (n, v, x = '') => ok.push([n, v, x]);
 
 const SAID = await page.evaluate(() => HIRE_SAID.map(l => [...l]));
-const FIVE = ['박승민', '김민철', '홍정숙', '임형용', '최찬수'];
+const FIVE = ['박승민', '김민철', '홍정숙', '임형용', '이상엽'];   /* 최찬수 → 이상엽 (2026-11-04) */
 
 /* ---------- 이어 붙임 (`hireMerge`) — 들은 그대로 적어도 끊기지 않아야 한다 ---------- */
 const sort = g => g.map(x => [...x].sort().join(',')).sort();
@@ -93,6 +93,14 @@ await page.waitForSelector('.d-hire', { timeout: 10000 });
 const B = await read();
 t('적어 두지 않은 분은 빈 안내', !B.names.length && /적어 둔 분이 없습니다/.test(B.note),
   `${other}: ${B.note}`);
+
+/* 뺀 분은 정말 빠져야 한다 (2026-11-04) — `hireMerge()` 는 잇기만 하므로, 줄에서 지우는 것을
+   빠뜨리면 조용히 묶음에 남는다. 지워졌는지 여기서 못 박는다. */
+await open('최찬수');
+await page.waitForSelector('.d-hire', { timeout: 10000 });
+const E = await read();
+t('뺀 최찬수는 묶음에 없다', !E.names.length && /적어 둔 분이 없습니다/.test(E.note), E.note);
+t('박승민 쪽에도 최찬수가 없다', !A.names.includes('최찬수'), A.names.join(' '));
 
 /* 비참여는 뺀다 — 동문 교수·관계 지도와 같은 규칙 */
 await page.evaluate(() => {
