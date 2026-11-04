@@ -4520,13 +4520,6 @@ function hireHitsSync() {
   if (box && hireWho) box.innerHTML = hireHits(hireWho);
 }
 
-function hirePick(p) {
-  return `<div class="d-hire__add">
-      <input class="d-hire__in" data-hirein type="text" autocomplete="off" spellcheck="false"
-        value="${esc(HIREQ)}" placeholder="이름이나 학과로 찾기" aria-label="입사 동기로 더할 교수 찾기">
-    </div>
-    <div class="d-hire__hits" data-hirehits>${hireHits(p)}</div>`;
-}
 
 function hireHtml(p) {
   const h = hireOf(p);
@@ -4536,19 +4529,28 @@ function hireHtml(p) {
   /* 꼬리말은 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
   if (!h.ps.length) tail.unshift(h.has ? '함께 적어 둔 분이 명단에 없습니다' : '아직 적어 둔 분이 없습니다');
   const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
-  /* 머리줄(「본인 빼고 N명」)은 뺐습니다 (2026-11-04, 교수님 지정) — 칩을 세어 보면
-     알 수 있는 것을 굳이 한 줄 더 적을 까닭이 없습니다. 더하는 단추는 제목
-     「입사 동기」 오른쪽의 〈+〉입니다. */
   /* 이름표는 분석 쪽 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략 토글 단추가
      되는데, 여기서는 눌러서 그 교수 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
   const was = STP.pick; STP.pick = false;
-  const chips = h.ps.length ? `<ul class="rel-unames">${h.ps.map(x => {
-      const c = stChip(x, getRating(x));
-      /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
-      return HIREDIT ? c.replace('</li>', `<button type="button" class="d-hire__x" data-hiredrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 입사 동기에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
-    }).join('')}</ul>` : '';
+  const chips = h.ps.map(x => {
+    const c = stChip(x, getRating(x));
+    /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
+    return HIREDIT ? c.replace('</li>', `<button type="button" class="d-hire__x" data-hiredrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 입사 동기에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
+  }).join('');
   STP.pick = was;
-  return chips + (HIREDIT ? hirePick(p) : '') + note;
+  /* 더하는 자리는 **칩 줄 맨 뒤**입니다 (2026-11-04, 교수님 지정). 〈+〉를 누르면 그 자리가
+     **칩 모양 그대로 적는 칸**이 되고, 옆에 닫는 ⊗ 가 섭니다. 제목 옆이 아니라 칩 끝에 두어야
+     「여기 이어서 한 분 더」라는 것이 눈으로 읽힙니다. 적는 칸과 칩의 높이·둥글기를 맞춰
+     한 줄이 끊겨 보이지 않게 했습니다. */
+  const add = HIREDIT
+    ? `<li class="d-hire__a"><input class="d-hire__in" data-hirein type="text" autocomplete="off"
+         spellcheck="false" value="${esc(HIREQ)}" placeholder="이름이나 학과" aria-label="입사 동기로 더할 교수 찾기"
+         ><button type="button" class="d-hire__plus on" data-hireedit
+         aria-label="더하기를 닫습니다" title="더하기를 닫습니다">×</button></li>`
+    : `<li class="d-hire__a"><button type="button" class="d-hire__plus" data-hireedit
+         aria-label="입사 동기를 더합니다" title="입사 동기를 더합니다">+</button></li>`;
+  return `<ul class="rel-unames">${chips}${add}</ul>`
+    + (HIREDIT ? `<div class="d-hire__hits" data-hirehits>${hireHits(p)}</div>` : '') + note;
 }
 
 /* 이 칸만 다시 그린다 — 상세를 통째로 다시 그리면 쓰시던 메모가 날아갑니다.
@@ -4563,14 +4565,6 @@ function hireRedraw() {
     /* ×를 칩 **안쪽**에 앉히려면 칩이 그만큼 오른쪽을 비워 주어야 한다 — 고치는 동안에만
        비운다(늘 비워 두면 안 고칠 때 칩 오른쪽이 허전하게 뜬다). */
     box.classList.toggle('d-hire--edit', HIREDIT);
-  }
-  const b = sec.querySelector('[data-hireedit]');
-  if (b) {
-    b.classList.toggle('on', HIREDIT);
-    b.setAttribute('aria-pressed', String(HIREDIT));
-    b.textContent = HIREDIT ? '×' : '+';
-    b.setAttribute('aria-label', HIREDIT ? '입사 동기 고치기를 닫습니다' : '입사 동기를 더합니다');
-    b.title = b.getAttribute('aria-label');
   }
   if (HIREDIT) { const i = sec.querySelector('[data-hirein]'); if (i) i.focus(); }
 }
@@ -6035,7 +6029,7 @@ function openDrawer(p, d) {
       </div>
 
 
-      <div class="d-section d-hiresec"><h3>입사 동기<button type="button" class="d-hire__edit" data-hireedit aria-pressed="false" aria-label="입사 동기를 더합니다" title="입사 동기를 더합니다">+</button></h3>
+      <div class="d-section d-hiresec"><h3>입사 동기</h3>
         ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
             `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
         <div class="d-hire">${hireHtml(p)}</div>
