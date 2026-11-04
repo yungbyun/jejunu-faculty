@@ -3774,12 +3774,16 @@ const SET_QD = 'quiz-depts', SET_QX = 'quiz-ex', SET_FAV = 'fav', SET_MC = 'mail
 const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SET_PR = 'pres', SET_WK = 'weak';
 const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME];
+const SET_HR = 'hire';   /* 입사 동기 — 웹에서 고친 줄 (2026-11-04) */
+/* 이 열쇠는 바로 아래 `SET_LOCAL_KEY` 가 **읽는 순간** 필요합니다. 입사 동기 토막에 두었더니
+   그 줄에서 TDZ 로 터져 app.js 가 통째로 멈췄습니다 — 다른 *_KEY 들과 같은 자리에 둡니다. */
+const HIRE_KEY = 'jnu-hire';
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME, SET_HR];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록', [SET_HR]: '입사 동기' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -3802,6 +3806,7 @@ function settingValue(key) {
   if (key === SET_ME) return meets();
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
+  if (key === SET_HR) return hireStore() || [];   // 줄의 차례가 곧 값이다 — 정렬하지 않는다
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
   return null;
 }
@@ -3824,10 +3829,11 @@ function settingApplyLocal(key, v) {
     if (key === SET_ME) { meetMap = v; Object.keys(v).length ? localStorage.setItem(MEET_KEY, JSON.stringify(v)) : localStorage.removeItem(MEET_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
+    if (key === SET_HR) { hireList = v.map(l => (l || []).map(String)); localStorage.setItem(HIRE_KEY, JSON.stringify(hireList)); hireCache = null; }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY, [SET_HR]: HIRE_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -3875,12 +3881,13 @@ function applySettings(m) {
     const cur = settingValue(key) || (isObj ? {} : []);
     const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
     const same = isObj ? canon(cur) === canon(v)
-               : (key === SET_FAV || key === SET_NS || key === SET_DO) ? JSON.stringify(cur) === JSON.stringify(v)
+               : (key === SET_FAV || key === SET_NS || key === SET_DO || key === SET_HR) ? JSON.stringify(cur) === JSON.stringify(v)
                                  : JSON.stringify(cur) === JSON.stringify([...v].sort());
     if (same) continue;
     settingApplyLocal(key, v); changed.push(key);
   }
   if (changed.includes(SET_SU)) trimIdleSure();   // 다른 기기에서 내려온 강화도 턴다 (2026-10-29)
+  if (changed.includes(SET_HR)) hireRedraw();        // 다른 기기에서 더한 동기도 열린 상세에 바로 선다 (2026-11-04)
   if (changed.length) {
     if (changed.includes(SET_QD) || changed.includes(SET_QX)) quizStart();   // 퀴즈 설정이 바뀐 때만 새로 시작
     route().view === 'quiz' ? renderQuiz() : render();
@@ -4373,18 +4380,22 @@ function relUnivs() {
 const eduDegs = (p, u) => { const e = eduOf(p) || {};
   return [[e.bs, '학'], [e.ms, '석'], [e.phd, '박']].filter(x => x[0] === u).map(x => x[1]).join(''); };
 
-/* ---------- 입사동기 (2026-11-04, 교수님 지정) ----------
+/* ---------- 입사 동기 (2026-11-04, 교수님 지정) ----------
  * 교수 상세 화면의 **동문 교수 위**에, 이분과 같은 때 들어오신 교수를 적습니다.
  *
- * ★ 새 동기를 적으실 때 — `HIRE_SAID` 에 **줄을 하나 더하기만** 하십시오. 이미 있는 줄을
- *   손보거나 합치지 마십시오. 겹치는 사람이 있으면 `hireMerge()` 가 **저절로 한 묶음**으로
- *   잇습니다. 「박승민과 홍길동이 동기」라고 하시면 박승민과 동기인 분 모두가 홍길동과도
- *   동기가 되는데, 그 이어 붙이는 일을 사람이 하면 반드시 빠뜨립니다. 그래서 **들은 그대로**
- *   적어 두고 잇는 일은 코드에 맡깁니다. `t-hire.mjs` 가 그 이어 붙임을 재 둡니다.
+ * ★ 이제 **화면에서 고치십시오** (2026-11-04, 교수님 지정). 상세의 「입사 동기」 칸에서
+ *   〈고치기〉를 누르면 교수를 골라 더하거나 칩의 ×로 뿺 수 있습니다. 고친 것은 시트의
+ *   `settings` 에 `hire` 키로 올라가 다른 기기에서도 그대로 보입니다.
  *
- * ★ 빼실 때는 반대입니다 — 그 이름을 **적어 둔 줄에서 지웁니다**(여러 줄에 있으면 전부).
- *   `hireMerge()` 는 잇기만 하므로 한 줄에만 남겨 두면 그대로 묶음에 남습니다. 빼는 일은
- *   줄을 고치는 것뿐이라, 더하기와 달리 사람이 손대야 합니다.
+ * ★ 더하기는 **줄 하나를 보태는 것뿐**입니다. 「박승민과 홍길동」 한 줄을 보태면 박승민과
+ *   동기인 분 **모두**가 홍길동과도 동기가 됩니다 — 그 이어 붙이는 일을 사람이 하면 반드시
+ *   빠뜨리므로 `hireMerge()` 에 맡깁니다. 빼기는 반대로, 그 분을 **모든 줄에서** 지웁니다
+ *   (한 줄에라도 남으면 묶음에 그대로 남습니다). `t-hire.mjs` 가 양쪽을 다 재 둡니다.
+ *
+ * ★ `HIRE_SAID` 는 **씨앗**입니다 — 화면에서 **한 번이라도 고치면** 그때 이 씨앗이 열쇠로
+ *   굳어 저장되고, 그 뒤로는 저장된 줄만 씁니다. 그러니 그 뒤에 `HIRE_SAID` 를 고쳐도
+ *   화면은 달라지지 않습니다. 코드와 화면 두 곳이 서로 다른 말을 하는 일이 없도록
+ *   **으뜼은 하나**로 두었습니다.
  *
  * - 이름만 적습니다. 같은 이름이 둘 이상이면 `컴퓨터공학과/박승민` 처럼 **학과를 앞에** 붙이
  *   십시오(학과 이름도 `ce` 같은 학과 아이디도 받습니다). 못 찾은 이름은 조용히 사라지지
@@ -4419,37 +4430,142 @@ function hireTok(n) {
   const hit = state.rows.filter(r => r.name === nm && (!dp || r.dept_name === dp || r.dept_id === dp));
   return hit.length === 1 ? rKey(hit[0]) : `?${s}`;   // 없거나 여럿이면(학과를 안 붙이신 때) 못 찾은 것
 }
+/* 화면에서 고친 줄. `null` 이면 **아직 한 번도 손대지 않은 것**이라 씨앗(`HIRE_SAID`)을 씁니다.
+   빈 배열(`[]`)은 「다 지우셨다」는 뜻이라 씨앗으로 되돌아가지 **않습니다** — 둘을 가려야
+   하므로 비어도 localStorage 에서 지우지 않고 `[]` 를 그대로 남겨 둡니다. */
+let hireList = null;
+function hireStore() {
+  if (hireList) return hireList;
+  try {
+    const v = JSON.parse(localStorage.getItem(HIRE_KEY) || 'null');
+    if (Array.isArray(v)) hireList = v.map(l => (l || []).map(String));
+  } catch {}
+  return hireList;
+}
+/* 지금 쓰는 줄 — 한 번이라도 고쳤으면 저장된 쪽이 **전부**입니다 */
+function hireLines() {
+  const w = hireStore();
+  return w ? w.map(l => [...l]) : HIRE_SAID.map(l => l.map(hireTok));
+}
+function hireSave(lines) {
+  hireList = lines;
+  hireCache = null;
+  try { localStorage.setItem(HIRE_KEY, JSON.stringify(lines)); } catch {}
+  saveSetting(SET_HR, lines);
+}
+/* 더하기 — 들은 그대로 **줄 하나**만 보탭니다. 묶음끼리 잇는 일은 `hireMerge()` 가 합니다. */
+function hireAdd(a, b) { if (a !== b) hireSave(hireLines().concat([[a, b]])); }
+/* 빼기 — 그 분을 **모든 줄에서** 지웁니다. 한 줄에라도 남으면 묶음에 그대로 남습니다.
+   둘 미만으로 줄어든 줄은 동기라 할 것이 없으므로 버립니다. */
+function hireDrop(k) { hireSave(hireLines().map(l => l.filter(x => x !== k)).filter(l => l.length > 1)); }
+
 let hireCache = null;
 function hireAll() {
-  if (hireCache && hireCache.n === state.rows.length) return hireCache.g;
-  const g = hireMerge(HIRE_SAID.map(l => l.map(hireTok)));
-  hireCache = { n: state.rows.length, g };
+  const w = hireStore();
+  const stamp = `${state.rows.length}|${w ? JSON.stringify(w) : ''}`;
+  if (hireCache && hireCache.s === stamp) return hireCache.g;
+  const g = hireMerge(hireLines());
+  hireCache = { s: stamp, g };
   return g;
 }
+/* 묶음이 없어도 `null` 을 내지 **않습니다** — 〈고치기〉로 처음 한 분을 더하실 수 있어야
+   하므로, 비어 있을 때도 칸은 서야 합니다. 비었는지는 `has` 로 봅니다. */
 function hireOf(p) {
-  const me = rKey(p), g = hireAll().find(x => x.includes(me));
-  if (!g) return null;
+  const me = rKey(p), g = hireAll().find(x => x.includes(me)) || [];
   const rows = g.filter(k => k !== me && k[0] !== '?')
     .map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
-  return { ps: stSort(rows.filter(x => getRating(x) !== '비')),
+  return { has: g.length > 0,
+    ps: stSort(rows.filter(x => getRating(x) !== '비')),
     out: rows.filter(x => getRating(x) === '비').length,
     bad: g.filter(k => k[0] === '?').map(k => k.slice(1)) };
 }
+
+/* 〈고치기〉가 열려 있는가. 상세를 열 때마다 닫힌 자리에서 시작합니다 — 지난 교수에서 열어 둔
+   채로 다음 교수를 열면 ×가 늘어서 있어, 누를 뜻이 없던 것을 누르게 됩니다. */
+let HIREDIT = false;
+let hireWho = null;
+
+/* 더할 교수 고르기. 아이폰에서도 그대로 도는 **네이티브 고름칸**을 씁니다(`<datalist>` 는
+   기기마다 다르게 보이고 손가락으로 고르기 어렵습니다). 이미 묶음에 든 분과 본인은 뺍니다. */
+function hirePick(p) {
+  const me = rKey(p), inG = new Set(hireAll().find(x => x.includes(me)) || []);
+  const opts = state.depts.map(d => {
+    const list = (d.profs || []).filter(x => rKey(x) !== me && !inG.has(rKey(x)));
+    return list.length ? `<optgroup label="${esc(d.name)}">${list.map(x =>
+      `<option value="${esc(rKey(x))}">${esc(x.name)} ${esc(x.rank)}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  return `<div class="d-hire__add">
+      <select class="d-hire__sel" data-hiresel aria-label="입사 동기로 더할 교수">
+        <option value="">교수를 고르십시오…</option>${opts}</select>
+      <button type="button" class="d-hire__ok" data-hireok>더하기</button>
+    </div>
+    <p class="st-note">더하면 ${esc(p.name)} 교수의 동기 <b>모두</b>와 이어집니다 — 그 교수 쪽 화면에도 함께 섭니다.</p>`;
+}
+
 function hireHtml(p) {
   const h = hireOf(p);
-  if (!h) return `<p class="st-note">입사동기로 적어 둔 분이 없습니다.</p>`;
   const tail = [];
   if (h.out) tail.push(`비참여 ${h.out}명은 뺐습니다`);
   if (h.bad.length) tail.push(`명단에서 못 찾은 이름: ${h.bad.join(' · ')}`);
-  /* 남는 분이 없으면 꼬리말 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
-  if (!h.ps.length) tail.unshift('함께 적어 둔 분이 명단에 없습니다');
+  /* 꼬리말은 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
+  if (!h.ps.length) tail.unshift(h.has ? '함께 적어 둔 분이 명단에 없습니다' : '아직 적어 둔 분이 없습니다');
   const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
-  if (!h.ps.length) return note;
+  const head = `<div class="d-hire__h">${h.ps.length ? `본인 빼고<i>${h.ps.length}명</i>` : '<span>적어 둔 동기</span>'}
+      <button type="button" class="d-hire__edit${HIREDIT ? ' on' : ''}" data-hireedit aria-pressed="${HIREDIT}"
+        title="입사 동기를 더하거나 뺍니다">${HIREDIT ? '닫기' : '고치기'}</button></div>`;
+  /* 이름표는 분석 쪽 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략 토글 단추가
+     되는데, 여기서는 눌러서 그 교수 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
   const was = STP.pick; STP.pick = false;
-  const html = `<div class="d-hire__h">본인 빼고<i>${h.ps.length}명</i></div>
-    <ul class="rel-unames">${h.ps.map(x => stChip(x, getRating(x))).join('')}</ul>`;
+  const chips = h.ps.length ? `<ul class="rel-unames">${h.ps.map(x => {
+      const c = stChip(x, getRating(x));
+      /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
+      return HIREDIT ? c.replace('</li>', `<button type="button" class="d-hire__x" data-hiredrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 입사 동기에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
+    }).join('')}</ul>` : '';
   STP.pick = was;
-  return html + note;
+  return head + chips + (HIREDIT ? hirePick(p) : '') + note;
+}
+
+/* 이 칸만 다시 그린다 — 상세를 통째로 다시 그리면 쓰시던 메모가 날아갑니다 */
+function hireRedraw() {
+  const box = $panel && $panel.querySelector('.d-hire');
+  if (!box || !hireWho) return;
+  box.innerHTML = hireHtml(hireWho);
+  hireBind(hireWho);
+}
+/* 단추마다 듣는 이를 달지 **않습니다**. `openDrawer` 는 한 번 여는 데 두 번 돌 때가 있어
+   (주소가 바뀌며 한 번, `render()` 에서 또 한 번) 같은 단추에 둘이 붙고, 그러면 〈고치기〉가
+   켜졌다 곧바로 꺼져 아무 일도 안 한 것처럼 보입니다. 그래서 **`.d-hire` 에 한 번만** 달고
+   눌린 자리를 `closest` 로 가려냅니다 — 몇 번을 다시 그려도 듣는 이는 늘 하나입니다. */
+function hireBind(p) {
+  if (hireWho !== p) HIREDIT = false;   // 다른 교수를 열면 닫힌 자리에서 시작 (×가 늘어서 있지 않게)
+  hireWho = p;
+  const box = $panel && $panel.querySelector('.d-hire');
+  if (!box || box.dataset.bound === '1') return;
+  box.dataset.bound = '1';
+  box.addEventListener('click', e => {
+    const me = hireWho;
+    if (!me) return;
+    if (e.target.closest('[data-hireedit]')) { HIREDIT = !HIREDIT; hireRedraw(); return; }
+    if (e.target.closest('[data-hireok]')) {
+      const sel = box.querySelector('[data-hiresel]'), k = sel && sel.value;
+      if (!k) { flashStatus('더할 교수를 먼저 고르십시오', true); return; }
+      const other = state.rows.find(x => rKey(x) === k);
+      hireAdd(rKey(me), k);
+      hireRedraw();
+      /* 몇 명과 이어졌는지 **되읽어** 알려 드린다 — 한 분을 더했는데 넷이 되는 것이 이 칸의
+         핵심이라, 그 수를 직접 보여 드려야 이어 붙음을 믿으실 수 있습니다. */
+      const n = (hireAll().find(x => x.includes(k)) || []).length - 1;
+      flashStatus(`${other ? other.name : ''} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`);
+      return;
+    }
+    const x = e.target.closest('[data-hiredrop]');
+    if (x) {
+      const k = x.getAttribute('data-hiredrop'), other = state.rows.find(y => rKey(y) === k);
+      hireDrop(k);
+      hireRedraw();
+      flashStatus(`${other ? other.name : ''} 교수를 입사 동기에서 뺐습니다 — 다른 교수 쪽에서도 함께 빠집니다`);
+    }
+  });
 }
 
 /* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
@@ -5851,7 +5967,7 @@ function openDrawer(p, d) {
       </div>
 
 
-      <div class="d-section"><h3>입사동기</h3>
+      <div class="d-section"><h3>입사 동기</h3>
         ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
             `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
         <div class="d-hire">${hireHtml(p)}</div>
@@ -5966,6 +6082,7 @@ function openDrawer(p, d) {
     markSync();
     flashStatus(on ? `${p.name} 교수를 약화로 표시했습니다` : `${p.name} 교수의 약화 표시를 풀었습니다`);
   });
+  hireBind(p);   /* 입사 동기 칸의 〈고치기〉·더하기·빼기 (2026-11-04) */
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = pushToggle(p);
     btn.classList.toggle('on', on);
