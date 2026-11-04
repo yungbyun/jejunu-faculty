@@ -293,11 +293,14 @@ main{min-height:60vh;padding:40px 20px 72px}
 /* 동문 교수 — 대학마다 묶어서 (2026-11-02, 교수님 지정). 이름표는 분석 쪽 칩을 그대로 쓴다 */
 .d-alum{display:flex;flex-direction:column;gap:11px}
 .d-alum__g{display:flex;flex-direction:column;gap:6px}
-.d-alum__u{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+.d-alum__u,.d-hire__h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
   font-size:12.5px;font-weight:800;color:var(--ink-2)}
 .d-alum__u em{font-style:normal;font-size:10px;font-weight:800;color:var(--ink-3);
   border:1px solid var(--line-2);border-radius:999px;padding:1px 6px;letter-spacing:-.3px}
-.d-alum__u i{font-style:normal;font-size:11px;font-weight:700;color:var(--ink-3)}
+.d-alum__u i,.d-hire__h i{font-style:normal;font-size:11px;font-weight:700;color:var(--ink-3)}
+/* 입사동기 (2026-11-04) — 동문 교수와 같은 꼴이나 **클래스는 따로** 쓴다.
+   한 이름을 두 칸이 나눠 지면 querySelector('.d-alum') 가 위에 선 이쪽을 집는다 */
+.d-hire{display:flex;flex-direction:column;gap:6px}
 .d-info{display:grid;grid-template-columns:76px 1fr;gap:8px 12px;font-size:var(--fs-s);margin:0}
 .d-info dt{color:var(--ink-3);font-weight:500}
 .d-info dd{margin:0;word-break:break-all}

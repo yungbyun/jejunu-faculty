@@ -4373,6 +4373,81 @@ function relUnivs() {
 const eduDegs = (p, u) => { const e = eduOf(p) || {};
   return [[e.bs, '학'], [e.ms, '석'], [e.phd, '박']].filter(x => x[0] === u).map(x => x[1]).join(''); };
 
+/* ---------- 입사동기 (2026-11-04, 교수님 지정) ----------
+ * 교수 상세 화면의 **동문 교수 위**에, 이분과 같은 때 들어오신 교수를 적습니다.
+ *
+ * ★ 새 동기를 적으실 때 — `HIRE_SAID` 에 **줄을 하나 더하기만** 하십시오. 이미 있는 줄을
+ *   손보거나 합치지 마십시오. 겹치는 사람이 있으면 `hireMerge()` 가 **저절로 한 묶음**으로
+ *   잇습니다. 「박승민과 홍길동이 동기」라고 하시면 박승민과 동기인 분 모두가 홍길동과도
+ *   동기가 되는데, 그 이어 붙이는 일을 사람이 하면 반드시 빠뜨립니다. 그래서 **들은 그대로**
+ *   적어 두고 잇는 일은 코드에 맡깁니다. `t-hire.mjs` 가 그 이어 붙임을 재 둡니다.
+ *
+ * - 이름만 적습니다. 같은 이름이 둘 이상이면 `컴퓨터공학과/박승민` 처럼 **학과를 앞에** 붙이
+ *   십시오(학과 이름도 `ce` 같은 학과 아이디도 받습니다). 못 찾은 이름은 조용히 사라지지
+ *   않고 꼬리에 적어 드립니다 — 틀리게 적어 둔 것을 알아채셔야 합니다.
+ * - 비참여는 뺍니다 — 동문 교수·관계 지도와 같은 규칙입니다. 뺀 인원은 꼬리에 적습니다.
+ * - 차례는 분석 쪽과 같은 `stSort`, 이름표도 `stChip` 을 그대로 씁니다(「고르기 모드」는
+ *   잠깐 꺼 두고 그립니다 — 안 그러면 칩이 공략 토글 단추가 되어 상세로 안 갑니다). */
+const HIRE_SAID = [
+  ['박승민', '김민철', '홍정숙', '임형용', '최찬수'],
+];
+
+/* 겹치는 줄은 하나로 잇는다 — 들은 대로 적어 두어도 동기 관계가 끊기지 않게 */
+function hireMerge(said) {
+  const gs = [];
+  said.forEach(line => {
+    const mem = [...new Set(line)];
+    if (mem.length < 2) return;                      // 혼자인 줄은 동기라 할 것이 없다
+    const hit = gs.filter(g => mem.some(m => g.has(m)));
+    const g = hit[0] || new Set();
+    if (!hit.length) gs.push(g);
+    mem.forEach(m => g.add(m));
+    hit.slice(1).forEach(o => { o.forEach(m => g.add(m)); gs.splice(gs.indexOf(o), 1); });
+  });
+  return gs.map(g => [...g]);
+}
+
+/* 적어 둔 이름 한 토막을 명단의 열쇠로 바꾼다. 못 찾으면 `?` 를 앞에 붙여 그대로 들고 간다 —
+   그래야 이어 붙이는 일에는 끼면서, 화면에서는 「못 찾은 이름」으로 따로 알려 드릴 수 있다. */
+function hireTok(n) {
+  const s = String(n || '').trim(), i = s.lastIndexOf('/');
+  const nm = (i < 0 ? s : s.slice(i + 1)).trim(), dp = i < 0 ? '' : s.slice(0, i).trim();
+  const hit = state.rows.filter(r => r.name === nm && (!dp || r.dept_name === dp || r.dept_id === dp));
+  return hit.length === 1 ? rKey(hit[0]) : `?${s}`;   // 없거나 여럿이면(학과를 안 붙이신 때) 못 찾은 것
+}
+let hireCache = null;
+function hireAll() {
+  if (hireCache && hireCache.n === state.rows.length) return hireCache.g;
+  const g = hireMerge(HIRE_SAID.map(l => l.map(hireTok)));
+  hireCache = { n: state.rows.length, g };
+  return g;
+}
+function hireOf(p) {
+  const me = rKey(p), g = hireAll().find(x => x.includes(me));
+  if (!g) return null;
+  const rows = g.filter(k => k !== me && k[0] !== '?')
+    .map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
+  return { ps: stSort(rows.filter(x => getRating(x) !== '비')),
+    out: rows.filter(x => getRating(x) === '비').length,
+    bad: g.filter(k => k[0] === '?').map(k => k.slice(1)) };
+}
+function hireHtml(p) {
+  const h = hireOf(p);
+  if (!h) return `<p class="st-note">입사동기로 적어 둔 분이 없습니다.</p>`;
+  const tail = [];
+  if (h.out) tail.push(`비참여 ${h.out}명은 뺐습니다`);
+  if (h.bad.length) tail.push(`명단에서 못 찾은 이름: ${h.bad.join(' · ')}`);
+  /* 남는 분이 없으면 꼬리말 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
+  if (!h.ps.length) tail.unshift('함께 적어 둔 분이 명단에 없습니다');
+  const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
+  if (!h.ps.length) return note;
+  const was = STP.pick; STP.pick = false;
+  const html = `<div class="d-hire__h">본인 빼고<i>${h.ps.length}명</i></div>
+    <ul class="rel-unames">${h.ps.map(x => stChip(x, getRating(x))).join('')}</ul>`;
+  STP.pick = was;
+  return html + note;
+}
+
 /* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
  * 교수 상세 화면의 **선호도 위**에, 이분과 같은 대학을 거친 교수를 적습니다.
  * - **대학마다 묶어** 적습니다. 한 분이 학·석·박을 다른 데서 받으셨으면 묶음도 그만큼입니다.
@@ -5771,6 +5846,12 @@ function openDrawer(p, d) {
         </div>
       </div>
 
+
+      <div class="d-section"><h3>입사동기</h3>
+        ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
+            `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
+        <div class="d-hire">${hireHtml(p)}</div>
+      </div>
 
       <div class="d-section"><h3>동문 교수</h3>
         <div class="d-alum" data-alum="${esc(p.slug)}">${alumHtml(p)}</div>
