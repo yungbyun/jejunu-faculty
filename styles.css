@@ -306,9 +306,13 @@ main{min-height:60vh;padding:40px 20px 72px}
    〈고치기〉를 누르면 칩마다 ×가 붙고 아래에 고름칸이 섭니다. ×를 늘 달아 두지 않는 까닭은
    상세로 가려다 빼게 되기 때문입니다. 고름칸은 `<select>` 입니다 — 아이폰에서 손가락으로
    고르기에는 네이티브 고름칸이 가장 낫습니다. */
-.d-hire__edit{margin-left:auto;padding:3px 10px;border-radius:999px;border:1px solid var(--line);
-  background:var(--surface);color:var(--ink-2);font:inherit;font-size:11.5px;font-weight:700;
-  cursor:pointer;white-space:nowrap}
+/* 더하는 단추는 제목 「입사 동기」 **바로 오른쪽**에 섭니다 (2026-11-04, 교수님 지정).
+   `.d-section h3` 는 flex 이고 `::after` 로 가로줄을 깔므로, 글 뒤에 둔 이 단추는 그 줄
+   앞자리에 놓여 제목에 붙어 보입니다. 제목 글씨가 작아(12.5px) 단추도 그만큼 작게 두되,
+   손가락이 닿을 자리는 남기려고 22px 로 둡니다. */
+.d-hire__edit{flex:none;width:22px;height:22px;padding:0;display:inline-flex;align-items:center;
+  justify-content:center;border-radius:999px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink-2);font:inherit;font-size:15px;font-weight:700;line-height:1;cursor:pointer}
 .d-hire__edit:hover{border-color:var(--brand);color:var(--brand)}
 .d-hire__edit.on{background:var(--brand);border-color:var(--brand);color:#fff}
 /* ×는 칩 바깥에 붙인다 — 칩 안에 넣으면 그 자리도 상세로 가는 고리가 되어 잘못 눌린다 */
@@ -318,8 +322,12 @@ main{min-height:60vh;padding:40px 20px 72px}
   font:inherit;font-size:14px;font-weight:800;line-height:1;cursor:pointer}
 .d-hire__x:hover{border-color:#c0392b;color:#c0392b;background:color-mix(in srgb,#c0392b 10%,var(--surface))}
 .d-hire__add{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px}
-.d-hire__sel{flex:1 1 180px;min-width:0;padding:6px 10px;border-radius:9px;border:1px solid var(--line);
+/* 고르는 칸이 아니라 **이름을 적는 칸**입니다 (2026-11-04, 교수님 지정) — 69명을 굴려
+   찾기보다 두세 글자 치는 쪽이 빠릅니다. `list` 로 남은 분을 보여 주되 거기서 고르지
+   않고 그냥 치셔도 `hireFind()` 가 찾습니다. */
+.d-hire__in{flex:1 1 150px;min-width:0;padding:6px 10px;border-radius:9px;border:1px solid var(--line);
   background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+.d-hire__in:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent)}
 .d-hire__ok{padding:6px 14px;border-radius:9px;border:1px solid var(--brand);background:var(--brand);
   color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
 .d-hire__ok:hover{filter:brightness(1.1)}

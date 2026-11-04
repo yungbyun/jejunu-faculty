@@ -4485,18 +4485,35 @@ function hireOf(p) {
 let HIREDIT = false;
 let hireWho = null;
 
-/* 더할 교수 고르기. 아이폰에서도 그대로 도는 **네이티브 고름칸**을 씁니다(`<datalist>` 는
-   기기마다 다르게 보이고 손가락으로 고르기 어렵습니다). 이미 묶음에 든 분과 본인은 뺍니다. */
+/* 적어 주신 이름 한 토막으로 교수를 찾는다. 못 찾거나 여럿이면 **왜 그런지** 돌려준다 —
+   「안 됩니다」만 띄우면 교수님은 무엇을 고쳐야 하는지 알 수 없다. */
+function hireFind(s) {
+  const t = String(s || '').trim();
+  if (!t) return { err: '더할 교수의 이름을 적으십시오' };
+  const i = t.lastIndexOf('/');
+  const nm = (i < 0 ? t : t.slice(i + 1)).trim(), dp = i < 0 ? '' : t.slice(0, i).trim();
+  const hit = state.rows.filter(r => r.name === nm && (!dp || r.dept_name === dp || r.dept_id === dp));
+  if (!hit.length) return { err: `명단에 「${t}」 교수가 없습니다 — 이름을 다시 보아 주십시오` };
+  if (hit.length > 1) return { err: `「${nm}」 교수가 ${hit.length}분입니다 — 「${hit[0].dept_name}/${nm}」 처럼 학과를 앞에 붙여 적으십시오` };
+  return { p: hit[0] };
+}
+
+/* 더할 교수는 **이름을 적어** 고릅니다 (2026-11-04, 교수님 지정). 69명을 손가락으로 굴려
+   찾기보다 두세 글자 치는 쪽이 빠릅니다. 적는 동안 `<datalist>` 가 남은 분을 보여 주지만
+   거기서 고르지 않고 그냥 치셔도 됩니다 — 찾는 일은 `hireFind()` 가 합니다.
+   이름이 겹치는 분만 「학과/이름」으로 담습니다. 69명 가운데 겹치는 이름은 지금 없지만,
+   한 분이라도 들어오시면 그날로 고름이 갈립니다. */
 function hirePick(p) {
   const me = rKey(p), inG = new Set(hireAll().find(x => x.includes(me)) || []);
-  const opts = state.depts.map(d => {
-    const list = (d.profs || []).filter(x => rKey(x) !== me && !inG.has(rKey(x)));
-    return list.length ? `<optgroup label="${esc(d.name)}">${list.map(x =>
-      `<option value="${esc(rKey(x))}">${esc(x.name)} ${esc(x.rank)}</option>`).join('')}</optgroup>` : '';
-  }).join('');
+  const seen = new Set(), dup = new Set();
+  state.rows.forEach(x => { seen.has(x.name) ? dup.add(x.name) : seen.add(x.name); });
+  const opts = state.rows.filter(x => rKey(x) !== me && !inG.has(rKey(x)))
+    .map(x => `<option value="${esc(dup.has(x.name) ? `${x.dept_name}/${x.name}` : x.name)}">${esc(x.dept_name)} · ${esc(x.rank)}</option>`)
+    .join('');
   return `<div class="d-hire__add">
-      <select class="d-hire__sel" data-hiresel aria-label="입사 동기로 더할 교수">
-        <option value="">교수를 고르십시오…</option>${opts}</select>
+      <input class="d-hire__in" data-hirein type="text" list="hire-dl" autocomplete="off" spellcheck="false"
+        placeholder="이름을 적으십시오" aria-label="입사 동기로 더할 교수 이름">
+      <datalist id="hire-dl">${opts}</datalist>
       <button type="button" class="d-hire__ok" data-hireok>더하기</button>
     </div>
     <p class="st-note">더하면 ${esc(p.name)} 교수의 동기 <b>모두</b>와 이어집니다 — 그 교수 쪽 화면에도 함께 섭니다.</p>`;
@@ -4510,9 +4527,10 @@ function hireHtml(p) {
   /* 꼬리말은 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
   if (!h.ps.length) tail.unshift(h.has ? '함께 적어 둔 분이 명단에 없습니다' : '아직 적어 둔 분이 없습니다');
   const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
-  const head = `<div class="d-hire__h">${h.ps.length ? `본인 빼고<i>${h.ps.length}명</i>` : '<span>적어 둔 동기</span>'}
-      <button type="button" class="d-hire__edit${HIREDIT ? ' on' : ''}" data-hireedit aria-pressed="${HIREDIT}"
-        title="입사 동기를 더하거나 뺍니다">${HIREDIT ? '닫기' : '고치기'}</button></div>`;
+  /* 더하는 단추는 제목 「입사 동기」 오른쪽의 〈+〉로 옮겨 두었습니다 (2026-11-04, 교수님 지정).
+     그래서 여기 머리줄은 사람 수만 말합니다 — 비었을 때는 꼬리말이 이미 그렇게 적으므로
+     머리줄을 아예 세우지 않습니다(「적어 둔 동기」 한 줄은 빈 말이라 뺍니다). */
+  const head = h.ps.length ? `<div class="d-hire__h">본인 빼고<i>${h.ps.length}명</i></div>` : '';
   /* 이름표는 분석 쪽 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략 토글 단추가
      되는데, 여기서는 눌러서 그 교수 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
   const was = STP.pick; STP.pick = false;
@@ -4525,47 +4543,74 @@ function hireHtml(p) {
   return head + chips + (HIREDIT ? hirePick(p) : '') + note;
 }
 
-/* 이 칸만 다시 그린다 — 상세를 통째로 다시 그리면 쓰시던 메모가 날아갑니다 */
+/* 이 칸만 다시 그린다 — 상세를 통째로 다시 그리면 쓰시던 메모가 날아갑니다.
+   제목 옆 +/× 도 함께 맞춥니다. 그 단추는 `<h3>` 안이라 이 칸 바깥에 있어서,
+   칸만 바꾸면 단추가 혼자 옛 모습으로 남습니다. */
 function hireRedraw() {
-  const box = $panel && $panel.querySelector('.d-hire');
-  if (!box || !hireWho) return;
-  box.innerHTML = hireHtml(hireWho);
-  hireBind(hireWho);
+  const sec = $panel && $panel.querySelector('.d-hiresec');
+  if (!sec || !hireWho) return;
+  const box = sec.querySelector('.d-hire');
+  if (box) box.innerHTML = hireHtml(hireWho);
+  const b = sec.querySelector('[data-hireedit]');
+  if (b) {
+    b.classList.toggle('on', HIREDIT);
+    b.setAttribute('aria-pressed', String(HIREDIT));
+    b.textContent = HIREDIT ? '×' : '+';
+    b.setAttribute('aria-label', HIREDIT ? '입사 동기 고치기를 닫습니다' : '입사 동기를 더합니다');
+    b.title = b.getAttribute('aria-label');
+  }
+  if (HIREDIT) { const i = sec.querySelector('[data-hirein]'); if (i) i.focus(); }
 }
+
 /* 단추마다 듣는 이를 달지 **않습니다**. `openDrawer` 는 한 번 여는 데 두 번 돌 때가 있어
-   (주소가 바뀌며 한 번, `render()` 에서 또 한 번) 같은 단추에 둘이 붙고, 그러면 〈고치기〉가
-   켜졌다 곧바로 꺼져 아무 일도 안 한 것처럼 보입니다. 그래서 **`.d-hire` 에 한 번만** 달고
-   눌린 자리를 `closest` 로 가려냅니다 — 몇 번을 다시 그려도 듣는 이는 늘 하나입니다. */
+   (주소가 바뀌며 한 번, `render()` 에서 또 한 번) 같은 단추에 둘이 붙고, 그러면 〈+〉가
+   켜졌다 곧바로 꺼져 아무 일도 안 한 것처럼 보입니다. 그래서 **칸 하나에 한 번만** 달고
+   눌린 자리를 `closest` 로 가려냅니다 — 몇 번을 다시 그려도 듣는 이는 늘 하나입니다.
+   + 단추는 `<h3>` 안이고 칩은 `.d-hire` 안이라, 둘을 품는 `.d-hiresec` 에 답니다. */
 function hireBind(p) {
   if (hireWho !== p) HIREDIT = false;   // 다른 교수를 열면 닫힌 자리에서 시작 (×가 늘어서 있지 않게)
   hireWho = p;
-  const box = $panel && $panel.querySelector('.d-hire');
-  if (!box || box.dataset.bound === '1') return;
-  box.dataset.bound = '1';
-  box.addEventListener('click', e => {
-    const me = hireWho;
-    if (!me) return;
-    if (e.target.closest('[data-hireedit]')) { HIREDIT = !HIREDIT; hireRedraw(); return; }
-    if (e.target.closest('[data-hireok]')) {
-      const sel = box.querySelector('[data-hiresel]'), k = sel && sel.value;
-      if (!k) { flashStatus('더할 교수를 먼저 고르십시오', true); return; }
-      const other = state.rows.find(x => rKey(x) === k);
-      hireAdd(rKey(me), k);
-      hireRedraw();
-      /* 몇 명과 이어졌는지 **되읽어** 알려 드린다 — 한 분을 더했는데 넷이 되는 것이 이 칸의
-         핵심이라, 그 수를 직접 보여 드려야 이어 붙음을 믿으실 수 있습니다. */
-      const n = (hireAll().find(x => x.includes(k)) || []).length - 1;
-      flashStatus(`${other ? other.name : ''} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`);
-      return;
-    }
-    const x = e.target.closest('[data-hiredrop]');
-    if (x) {
+  const sec = $panel && $panel.querySelector('.d-hiresec');
+  if (!sec) return;
+  if (sec.dataset.bound !== '1') {
+    sec.dataset.bound = '1';
+    sec.addEventListener('click', e => {
+      if (e.target.closest('[data-hireedit]')) { HIREDIT = !HIREDIT; hireRedraw(); return; }
+      if (e.target.closest('[data-hireok]')) hireTake(sec);
+      const x = e.target.closest('[data-hiredrop]');
+      if (!x) return;
       const k = x.getAttribute('data-hiredrop'), other = state.rows.find(y => rKey(y) === k);
       hireDrop(k);
       hireRedraw();
       flashStatus(`${other ? other.name : ''} 교수를 입사 동기에서 뺐습니다 — 다른 교수 쪽에서도 함께 빠집니다`);
-    }
-  });
+    });
+    /* 이름을 치고 엔터를 누르면 그대로 더해집니다 — 거기서 또 단추를 찾아 누르게 하면
+       한 분씩 이어 적으실 때 손이 자꾸 멈춥니다. */
+    sec.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.closest('[data-hirein]')) { e.preventDefault(); hireTake(sec); }
+    });
+  }
+  hireRedraw();   // 단추의 +/× 와 칸을 지금 상태에 맞춘다
+}
+
+/* 적어 주신 이름을 받아 더한다 */
+function hireTake(sec) {
+  const me = hireWho;
+  if (!me) return;
+  const inp = sec.querySelector('[data-hirein]');
+  const r = hireFind(inp && inp.value);
+  if (r.err) { flashStatus(r.err, true); if (inp) inp.focus(); return; }
+  const k = rKey(r.p);
+  if (k === rKey(me)) { flashStatus('본인은 입사 동기로 더할 수 없습니다', true); return; }
+  if ((hireAll().find(x => x.includes(rKey(me))) || []).includes(k)) {
+    flashStatus(`${r.p.name} 교수는 이미 ${me.name} 교수의 입사 동기로 적혀 있습니다`, true); return;
+  }
+  hireAdd(rKey(me), k);
+  hireRedraw();
+  /* 몇 명과 이어졌는지 **되읽어** 알려 드린다 — 한 분을 더했는데 넷이 되는 것이 이 칸의
+     핵심이라, 그 수를 직접 보여 드려야 이어 붙음을 믿으실 수 있습니다. */
+  const n = (hireAll().find(x => x.includes(k)) || []).length - 1;
+  flashStatus(`${r.p.name} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`);
 }
 
 /* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
@@ -5967,7 +6012,7 @@ function openDrawer(p, d) {
       </div>
 
 
-      <div class="d-section"><h3>입사 동기</h3>
+      <div class="d-section d-hiresec"><h3>입사 동기<button type="button" class="d-hire__edit" data-hireedit aria-pressed="false" aria-label="입사 동기를 더합니다" title="입사 동기를 더합니다">+</button></h3>
         ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
             `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
         <div class="d-hire">${hireHtml(p)}</div>
