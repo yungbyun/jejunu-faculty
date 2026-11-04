@@ -76,7 +76,6 @@ t('함께 적어 둔 네 분이 다 보인다',
   A.names.slice().sort().join(',') === FIVE.filter(n => n !== '박승민').sort().join(','),
   A.names.join(' '));
 t('자기 자신은 안 넣는다', !A.names.includes('박승민'), A.names.join(' '));
-t('몇 명인지 적는다', /4명/.test(A.head), A.head);
 t('이름을 누르면 그 교수 상세로', /^#[/]dept[/].+[/]prof[/].+/.test(A.href), A.href);
 t('다 찾았으면 꼬리말이 없다', A.note === '', A.note);
 
@@ -139,19 +138,25 @@ t('적어 둔 다섯 분이 한 묶음', SAID.some(l => FIVE.every(n => l.includ
 
 
 /* ---------- 화면에서 고치기 (2026-11-04, 교수님 지정) ----------
-   더하는 단추는 제목 「입사 동기」 오른쪽의 〈+〉이고, 더할 분은 **이름을 적어** 고릅니다.
-   여기부터는 `jnu-hire` 에 저장이 쌓이므로 **차례가 뜻을 가집니다**. 앞의 시험들은 저장이
-   비어 있는(= 씨앗을 쓰는) 자리에서 돌아야 하므로 이 토막은 맨 뒤에 둡니다. */
+   더하는 단추는 제목 「입사 동기」 오른쪽의 〈+〉이고, 더할 분은 **이름이나 학과로 찾아**
+   뜬 칩을 눌러 고릅니다(접촉 쪽 「만날 분」과 같은 꼴). 여기부터는 `jnu-hire` 에 저장이
+   쌓이므로 **차례가 뜻을 가집니다**. 앞의 시험들은 저장이 비어 있는(= 씨앗을 쓰는)
+   자리에서 돌아야 하므로 이 토막은 맨 뒤에 둡니다. */
 const state0 = await page.evaluate(() => state.rows.map(r => ({ n: r.name, k: rKey(r), d: r.dept_name, i: r.dept_id })));
-const meK = state0.find(r => r.n === '박승민').k;
 const plus = async () => { await page.click('.d-hiresec [data-hireedit]'); await page.waitForTimeout(180); };
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('jnu-hire') || 'null'));
 const names = () => page.evaluate(() => [...document.querySelectorAll('.d-hire li a')].map(a => a.textContent.trim()));
 const status = () => page.evaluate(() => document.querySelector('.foot__status').textContent.trim());
-/* 이름을 치고 엔터 — 교수님이 쓰시는 길 그대로 */
-const typed = async v => {
+const hits = () => page.evaluate(() => [...document.querySelectorAll('[data-hireadd]')].map(b => b.textContent.trim()));
+/* 치는 시늉 — 적는 칸은 건드리지 않고 찾은 분만 갈아 끼워야 한글 조합이 안 끊긴다 */
+const q = async v => {
   await page.evaluate(x => { const i = document.querySelector('[data-hirein]'); i.value = x;
-    i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }, v);
+    i.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+  await page.waitForTimeout(220);
+};
+const enter = async () => {
+  await page.evaluate(() => document.querySelector('[data-hirein]')
+    .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   await page.waitForTimeout(300);
 };
 
@@ -160,64 +165,79 @@ await page.waitForSelector('.d-hire', { timeout: 10000 });
 const H3 = await page.evaluate(() => {
   const s = document.querySelector('.d-hiresec'), b = s.querySelector('[data-hireedit]');
   return { h3: s.querySelector('h3').textContent.trim(), label: b.textContent.trim(),
-    inH3: b.parentElement.tagName === 'H3', head: (s.querySelector('.d-hire__h') || {}).textContent || '' };
+    inH3: b.parentElement.tagName === 'H3', head: !!s.querySelector('.d-hire__h') };
 });
 t('더하는 단추는 제목 안에 있다', H3.inH3, H3.h3);
 t('제목 오른쪽에 + 가 붙는다', H3.h3 === '입사 동기+' && H3.label === '+', `${H3.h3} / ${H3.label}`);
-t('「적어 둔 동기」 머리줄은 없다', H3.head.indexOf('적어 둔 동기') < 0, H3.head);
-t('+ 를 누르기 전에는 입력칸이 없다', !(await page.$('[data-hirein]')));
+/* 「본인 빼고 N명」 머리줄은 뺐다 (2026-11-04, 교수님 지정) — 칩을 세면 알 수 있다 */
+t('사람 수 머리줄은 없다', !H3.head);
+t('「적어 둔 동기」 줄도 없다', (await read()).note.indexOf('적어 둔 동기') < 0, (await read()).note);
+t('+ 를 누르기 전에는 찾는 칸이 없다', !(await page.$('[data-hirein]')));
 t('+ 를 누르기 전에는 ×도 없다', (await page.$$('.d-hire [data-hiredrop]')).length === 0);
 
 await plus();
-t('+ 를 누르면 이름 적는 칸이 선다', !!(await page.$('[data-hirein]')));
+t('+ 를 누르면 찾는 칸이 선다', !!(await page.$('[data-hirein]')));
 t('그 칸에 바로 손이 가 있다', await page.evaluate(() =>
   document.activeElement === document.querySelector('[data-hirein]')));
 t('+ 는 × 로 바뀐다', (await page.evaluate(() =>
   document.querySelector('.d-hiresec [data-hireedit]').textContent.trim())) === '×');
 t('고치는 동안에는 칩마다 ×가 붙는다', (await page.$$('.d-hire [data-hiredrop]')).length === 4);
-/* 한 번 더 누르면 닫혀야 한다 — 단추에 듣는 이가 둘 붙으면 켜졌다 곧 꺼져 안 열린 것처럼
-   보인다. `openDrawer` 가 한 번 여는 데 두 번 도는 일이 있어 실제로 그랬다. */
+/* ×는 **칩 안쪽**에 앉아야 한다 (2026-11-04, 교수님 지정) */
+const XB = await page.evaluate(() => {
+  const li = document.querySelector('.d-hire li');
+  const a = li.querySelector('a').getBoundingClientRect(), x = li.querySelector('.d-hire__x').getBoundingClientRect();
+  return { inside: x.left >= a.left && x.right <= a.right + 0.5, a: [a.left, a.right], x: [x.left, x.right] };
+});
+t('× 는 칩 안쪽에 앉는다', XB.inside, `칩 ${XB.a} / × ${XB.x}`);
+/* 안 고칠 때는 칩 오른쪽을 비우지 않는다 — 비워 두면 허전하게 뜬다 */
+const padOn = await page.evaluate(() => getComputedStyle(document.querySelector('.d-hire .st-c')).paddingRight);
 await plus();
+const padOff = await page.evaluate(() => getComputedStyle(document.querySelector('.d-hire .st-c')).paddingRight);
+t('고칠 때만 칩이 오른쪽을 비운다', parseFloat(padOn) > parseFloat(padOff), `${padOn} / ${padOff}`);
 t('한 번 더 누르면 닫힌다', !(await page.$('[data-hirein]')));
 await plus();
 t('세 번째에 다시 열린다 — 듣는 이는 늘 하나', !!(await page.$('[data-hirein]')));
 
-/* 적다 보면 남은 분을 보여 준다 — 본인과 이미 묶인 분은 뺀다 */
-const dl = await page.evaluate(() => [...document.querySelectorAll('#hire-dl option')].map(o => o.value));
-t('추천 목록에 본인은 없다', !dl.includes('박승민'), String(dl.length));
-t('추천 목록에 이미 묶인 분도 없다',
-  !['김민철', '홍정숙', '임형용', '이상엽'].some(n => dl.includes(n)), String(dl.length));
-t('추천 목록은 남은 분 수만큼', dl.length === state0.length - 5, `${dl.length} / ${state0.length}`);
-
-/* 잘못 적으신 때 — 조용히 넘기지 않고 **무엇이 잘못인지** 말한다 */
-await typed('홍길동');
-t('명단에 없는 이름은 그렇다고 알려 준다', /없습니다/.test(await status()), await status());
-t('그때 더해지지는 않는다', (await names()).length === 4, (await names()).join(' '));
-await typed('박승민');
-t('본인은 더할 수 없다고 알려 준다', /본인/.test(await status()), await status());
-await typed('김민철');
-t('이미 적힌 분은 그렇다고 알려 준다', /이미/.test(await status()), await status());
+/* 찾기 — 접촉 쪽 「만날 분」과 같은 꼴로 칩이 선다 */
+t('치기 전에는 찾은 분이 없다', (await hits()).length === 0);
+await q('송왕철');
+t('이름으로 찾으면 칩이 선다', (await hits()).join(' ').indexOf('송왕철') >= 0, (await hits()).join(' '));
+await q('원자력');
+const dh = await hits();
+t('학과로도 찾는다', dh.length > 1 && dh.every(x => x.indexOf('원자력공학과') >= 0), dh.join(' '));
+await q('박승민');
+t('본인은 찾아도 안 나온다', (await hits()).length === 0, (await hits()).join(' '));
+await q('김민철');
+t('이미 묶인 분도 안 나온다', (await hits()).length === 0, (await hits()).join(' '));
+await q('홍길동');
+t('없는 이름이면 그렇다고 적는다', /명단에 없는 이름/.test((await read()).note) ||
+  await page.evaluate(() => /명단에 없는 이름/.test(document.querySelector('[data-hirehits]').textContent)));
 
 /* ★ 교수님이 특히 일러 주신 자리 — 한 분을 더하면 **묶음 전체**와 이어진다 */
-await typed('송왕철');
-t('이름을 치고 엔터로 더해진다', (await names()).includes('송왕철'), (await names()).join(' '));
+await q('송왕철');
+await page.click('[data-hireadd]');
+await page.waitForTimeout(300);
+t('찾은 칩을 누르면 더해진다', (await names()).includes('송왕철'), (await names()).join(' '));
 t('더한 뒤 몇 명과 이어졌는지 알려 준다', /동기 5명이 함께 섭니다/.test(await status()), await status());
+t('더한 뒤 찾는 칸은 비워 둔다', (await page.evaluate(() =>
+  document.querySelector('[data-hirein]').value)) === '');
 t('씨앗이 저장으로 굳는다', Array.isArray(await saved()) && (await saved()).length === 2,
   JSON.stringify(await saved()));
-/* 이름이 겹칠 날을 대비해 「학과/이름」도 받는다 — 학과 이름도 학과 아이디도 */
+
+/* 엔터 — 한 분이면 그대로, 여럿이면 고르라고, 아무도 없으면 왜 그런지 */
 const far = state0.find(r => r.i === 'nuclear');
-await typed(`${far.d}/${far.n}`);
-t('「학과/이름」으로도 더해진다', (await names()).includes(far.n), (await names()).join(' '));
-const cur = await names();
-const far2 = state0.find(r => r.i === 'civil' && !cur.includes(r.n));
-await typed(`civil/${far2.n}`);
-t('학과 아이디를 붙여도 더해진다', (await names()).includes(far2.n), (await names()).join(' '));
+await q(far.n); await enter();
+t('엔터 — 찾은 분이 하나면 그대로 더한다', (await names()).includes(far.n), (await names()).join(' '));
+await q('김'); await enter();
+t('엔터 — 여럿이면 고르시라 한다', /한 분을 누르십시오/.test(await status()), await status());
+await q('홍길동'); await enter();
+t('엔터 — 없는 이름은 그렇다고 알려 준다', /없습니다/.test(await status()), await status());
 
 await open('송왕철');
 await page.waitForSelector('.d-hire', { timeout: 10000 });
 const S = await names();
 t('더해진 교수 쪽에도 나머지가 함께 선다',
-  ['박승민', '김민철', '홍정숙', '임형용', '이상엽', far.n, far2.n].every(n => S.includes(n)), S.join(' '));
+  ['박승민', '김민철', '홍정숙', '임형용', '이상엽', far.n].every(n => S.includes(n)), S.join(' '));
 
 /* 빼기 — 모든 줄에서 지우므로 다른 교수 쪽에서도 함께 빠진다 */
 await plus();
