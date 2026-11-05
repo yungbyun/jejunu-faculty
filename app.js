@@ -5718,6 +5718,29 @@ const MT_MEAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
   + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
   + '<path d="M8.4 4.2c1.5 0 2.4 1.3 2.4 2.9S9.9 10 8.4 10 6 8.7 6 7.1s.9-2.9 2.4-2.9z"/>'
   + '<path d="M8.4 10v9.8"/><path d="M15.6 4.2 14.4 19.8"/><path d="M18.6 4.2 17.4 19.8"/></svg>';
+/* ---------- 날짜 칸에 올리면 뜨는 간단한 안내 (2026-11-05 저녁, 교수님 지정) ----------
+ * 달력은 칸이 좁아 그림만 섭니다 — 무엇이 몇 시에 누구와인지는 눌러 봐야 알았습니다.
+ * 마우스를 얹으면 그 날의 자리를 **한 줄에 하나씩** 보여 줍니다.
+ * - 자리가 없는 날은 표를 달지 않습니다. 빈 말풍선이 뜨면 걸리적거립니다.
+ * - **시각 순**으로 적습니다(시각을 안 적은 자리는 뒤로). 달력에 선 그림 차례와 같습니다.
+ * - 사람은 셋까지, 자리는 넷까지 적고 나머지는 「외 N명」·「+N건 더」로 접습니다 —
+ *   말풍선이 화면을 덮으면 달력이 보이지 않습니다.
+ * - 아직 치르지 않은 자리는 「예정」, 손수 「못 만남」으로 하신 자리는 그대로 적습니다. */
+function mtDayTip(day, list, today) {
+  if (!list || !list.length) return '';
+  const srt = list.slice().sort((a, b) => String(a.time || '99:99').localeCompare(String(b.time || '99:99')));
+  const line = m => {
+    const who = mtNames(m);
+    const nm = who.slice(0, 3).join(', ') + (who.length > 3 ? ` 외 ${who.length - 3}명` : '');
+    const tag = m.done === 'no' ? ' (못 만남)' : mtAte(m, today) ? '' : ' (예정)';
+    return [`${m.time ? m.time + ' ' : ''}${MT_SLOT_NAME[mtSlot(m)] || ''}`,
+      nm || '이름 없음'].join(' · ') + (m.place ? ` — ${m.place}` : '') + tag;
+  };
+  return [`${mtWhen(day)} · 약속 ${list.length}건`]
+    .concat(srt.slice(0, 4).map(line))
+    .concat(srt.length > 4 ? [`+${srt.length - 4}건 더`] : []).join('\n');
+}
+
 function mtAteSection() {
   const all = mtAteRows();
   /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
@@ -5798,8 +5821,9 @@ function renderCal() {
             if (!day) return `<div class="cal-c cal-c--pad"></div>`;
             const n = (byDay[day] || []).length;
             const dow = new Date(day + 'T00:00:00').getDay();
+            const tip = mtDayTip(day, byDay[day], today);
             return `<button type="button" class="cal-c${day === CAL.day ? ' on' : ''}${day === today ? ' today' : ''}${dow === 0 ? ' sun' : ''}"
-              data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${day === CAL.day ? ' aria-current="date"' : ''}>
+              data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${tip ? ` title="${esc(tip)}"` : ''}${day === CAL.day ? ' aria-current="date"' : ''}>
               <span class="cal-c__n">${Number(day.slice(8))}</span>
               ${/* 칸의 표시는 **점이 아니라 그림**입니다 (2026-11-05, 교수님 지정) — 점심은 해,
                    저녁은 달, Tea 는 찻잔, 시각 미정은 시계. 목록·칩과 같은 그림을 씁니다. */''}

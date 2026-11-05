@@ -691,6 +691,40 @@ t('달력 점도 같은 규칙', await page.evaluate(() => {
 }), await page.evaluate(() => [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => i.className).join(' ')));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
+/* ---------- 날짜 칸에 올리면 뜨는 안내 (2026-11-05 저녁, 교수님 지정) ----------
+ * 칸이 좁아 그림만 서므로, 마우스를 얹으면 그 날의 자리를 한 줄에 하나씩 보여 준다.
+ * 달은 **그 달만** 그려지므로 지난 자리와 앞으로의 자리를 따로 한 번씩 재야 한다. */
+const TIP = await page.evaluate(() => {
+  meetMap = {}; mealCache = null;
+  const r = state.rows, k = x => rKey(x);
+  const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const back = ymd(new Date(Date.now() - 864e5 * 3)), soon = ymd(new Date(Date.now() + 864e5 * 3));
+  meets()['p1'] = { date: back, time: '18:30', kind: 'dinner', who: [k(r[0]), k(r[1])], done: '', place: '제주대 앞' };
+  meets()['p2'] = { date: back, time: '12:00', kind: 'lunch', who: [k(r[2])], done: 'no' };
+  meets()['p3'] = { date: soon, time: '12:30', kind: 'lunch', who: [k(r[3]), k(r[4]), k(r[5]), k(r[6])], done: '' };
+  for (let i = 0; i < 5; i++) meets()['q' + i] = { date: soon, time: `1${i + 3}:00`, kind: 'lunch', who: [k(r[i])], done: '' };
+  mtSave();
+  const tip = (ym, d) => { CAL.ym = ym; CAL.day = d; renderCal();
+    const c = document.querySelector(`.cal-c[data-mtday="${d}"]`); return c ? (c.title || '') : ''; };
+  const b = tip(mtMonth(back), back), s2 = tip(mtMonth(soon), soon);
+  /* 자리가 없는 날 — 그림이 선 칸(.cal-c__d)이 없는 칸을 하나 집는다 */
+  const none = [...document.querySelectorAll('.cal-c:not(.cal-c--pad)')]
+    .filter(e => !e.querySelector('.cal-c__d')).map(e => e.title || '');
+  return { b, s2, noneHas: none.filter(Boolean).length, noneN: none.length, who: r[3].name };
+});
+t('자리가 있는 날엔 안내가 붙는다', /약속 2건/.test(TIP.b), JSON.stringify(TIP.b));
+t('시각 순으로 적는다', TIP.b.split('\n')[1].startsWith('12:00')
+  && TIP.b.split('\n')[2].startsWith('18:30'), JSON.stringify(TIP.b));
+t('무엇을 누구와 어디서인지 한 줄에', /18:30 저녁 · .+, .+ — 제주대 앞/.test(TIP.b), JSON.stringify(TIP.b));
+t('치른 자리엔 「예정」을 안 붙인다', !/18:30[^\n]*예정/.test(TIP.b), JSON.stringify(TIP.b));
+t('「못 만남」은 그대로 적는다', /12:00[^\n]*\(못 만남\)/.test(TIP.b), JSON.stringify(TIP.b));
+t('앞으로의 자리엔 「예정」', /12:30[^\n]*\(예정\)/.test(TIP.s2), JSON.stringify(TIP.s2));
+t('사람은 셋까지 적고 접는다', /외 1명/.test(TIP.s2) && TIP.s2.includes(TIP.who), JSON.stringify(TIP.s2));
+t('자리는 넷까지 적고 접는다', /\+2건 더/.test(TIP.s2)
+  && TIP.s2.split('\n').length === 6, JSON.stringify(TIP.s2));
+t('빈 날엔 안내를 안 단다', TIP.noneN > 0 && TIP.noneHas === 0, `${TIP.noneHas}/${TIP.noneN}`);
+await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.ym = ''; CAL.day = mtToday(); });
+
 /* 새 약속을 잡을 때 점심·저녁·직접 중에서 고른다 (2026-10-12) */
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.day = mtToday(); renderCal(); });
 await page.waitForSelector('[data-mtadd]', { timeout: 10000 });
