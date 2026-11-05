@@ -1726,7 +1726,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .hero--thin{margin-bottom:10px}
 .cal-head h2{font-size:15px;margin:0}
 
-/* 이제까지 만난 분 — 날짜 · 갈래 · 이름 · 학과 · 장소 (2026-11-02, 교수님 지정).
+/* 만나거나 만날 예정인 분 — 날짜 · 갈래 · 이름 · 학과 · 장소 (2026-11-02, 교수님 지정).
    폰에서는 줄이 길어 가로로 넘치므로, 좁아지면 이름·학과를 아랫줄로 내린다. */
 /* 갈래 고르기 단추 — 머리줄 오른쪽에 (2026-11-02, 교수님 지정) */
 .mt-fs{flex-wrap:wrap}

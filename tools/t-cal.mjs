@@ -779,8 +779,8 @@ t('10분 자리가 아닌 옛 시각도 그대로', await page.evaluate(() => {
 }), await page.evaluate(() => [...document.querySelector('[data-mtm]').options].map(o => o.value).join()));
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; });
 
-/* ---------- 이제까지 만난 분 (2026-11-02, 교수님 지정) ----------
- * 달력 아래에 지금까지 만난 분을 쭉 적는다 — 날짜·갈래·이름·학과·장소.
+/* ---------- 만나거나 만날 예정인 분 (2026-11-02, 교수님 지정) ----------
+ * 달력 아래에 뵌 분과 뵐 분을 쭉 적는다 — 날짜·갈래·이름·학과·장소.
  * **지난 날짜의 약속은 이미 만난 것으로 본다**(2026-11-02 저녁, 교수님 지정). 셈에서 빼는
  * 것은 **「못 만남」으로 손수 표시한 것뿐**이다. 오늘 자리는 아직 지나지 않았으므로
  * **「완료」를 누른 것만** 만난 것으로 센다 — 저녁 약속이 점심때 벌써 「만났다」가 되면 안 된다.
@@ -900,7 +900,10 @@ const F = await page.evaluate(() => {
     hasAll: !!document.querySelector('[data-ateslot=""]'),
     icons: [...document.querySelectorAll('[data-ateslot]')].every(e => !!e.querySelector('.mt-i')),
     cnt: [...document.querySelectorAll('[data-ateslot]')].filter(e => e.dataset.ateslot)
-      .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(',') };
+      .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(','),
+    all: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || ''),
+    allTip: document.querySelector('[data-ateslot=""]').getAttribute('title') || '',
+    head: (document.querySelector('.cal-head--ate .st-note') || {}).textContent || '' };
 });
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
 /* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
@@ -908,6 +911,31 @@ t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
 t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
 t('단추에 몇 번인지 적는다', F.cnt === '6,3,3,1', F.cnt);
+/* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
+   「명」을 붙여 갈래 단추의 횟수와 갈라 둡니다. 머리줄의 「N명」과 같은 셈이어야 합니다. */
+t('모두 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
+t('그 숫자는 머리줄의 사람 수와 같다',
+  F.all === ((F.head.match(/(\d+)명/) || [])[1] || 'x') + '명', `${F.all} / ${F.head}`);
+t('모두의 줄머리 표에도 사람 수', F.allTip === `모두 보기 — ${F.all}`, F.allTip);
+/* 머리글은 2026-11-05 저녁에 바뀌었다 (교수님 지정) — 앞으로의 자리도 이 칸에 서고
+   **사람 수에도 들므로**, 「이제까지 만난 분」이면 지난 일만 적는 칸으로 읽힌다. */
+t('머리글이 뵌 분과 뵐 분을 함께 말한다', await page.evaluate(() =>
+  (document.querySelector('.cal-head--ate h2') || {}).textContent) === '만나거나 만날 예정인 분');
+const FA = await page.evaluate(() => {
+  const keep = JSON.stringify(meets());
+  meetMap = {}; mealCache = null;
+  const [a, b] = state.rows, k = x => rKey(x);
+  const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  meets()['z1'] = { date: ymd(new Date(Date.now() - 864e5 * 3)), time: '12:00', kind: 'lunch', who: [k(a)], done: '' };
+  meets()['z2'] = { date: ymd(new Date(Date.now() + 864e5 * 3)), time: '18:30', kind: 'dinner', who: [k(b)], done: '' };
+  mtSave(); CAL.ate = ''; render();
+  const out = { badge: (document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || '',
+    head: (document.querySelector('.cal-head--ate .st-note') || {}).textContent || '' };
+  meetMap = JSON.parse(keep); mealCache = null; mtSave(); render();
+  return out;
+});
+t('예정만 있는 분도 사람 수에 든다', FA.badge === '2명', `${FA.badge} / ${FA.head}`);
+t('만남과 예정은 갈라 적는다', /만남 1번 · 예정 1번/.test(FA.head), FA.head);
 t('식사는 점심과 저녁을 합한 수', Number(F.cnt.split(',')[0])
   === Number(F.cnt.split(',')[1]) + Number(F.cnt.split(',')[2]), F.cnt);
 

@@ -5617,8 +5617,10 @@ function mtShift(ym, n) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
 
-/* ---------- 이제까지 만난 분 (2026-11-02, 교수님 지정) ----------
- * 달력 아래에 **지금까지 만난 분을 쭉** 적습니다 — 날짜·갈래(점심·저녁·Tea)·학과·이름.
+/* ---------- 만나거나 만날 예정인 분 (2026-11-02, 교수님 지정) ----------
+ * 달력 아래에 **뵌 분과 뵐 분을 쭉** 적습니다 — 날짜·갈래(점심·저녁·Tea)·학과·이름.
+ * 머리글은 2026-11-05 저녁에 「이제까지 만난 분」에서 바뀌었습니다 (교수님 지정) — 앞으로의
+ * 자리도 함께 서고 **사람 수에도 들어가므로**, 지난 일만 적는 칸처럼 읽히면 안 됩니다.
  * **지난 날짜의 약속은 이미 만난 것으로 봅니다** (2026-11-02 저녁, 교수님 지정) — 적어 두신
  * 자리는 치르신 자리이고, 「완료」를 일일이 누르시게 하면 빠뜨리기 쉽습니다. 그래서 셈에서
  * 빼는 것은 **「못 만남」으로 손수 표시하신 것뿐**입니다.
@@ -5733,12 +5735,15 @@ function mtAteSection() {
      그 갈래 단추와 똑같은 것이 둘 서는 셈입니다. */
   const slots = ['meal', 'day', 'night', 'tea', 'none']
     .filter(s => cnt(s) && (s !== 'meal' || MT_MEAL.every(x => cnt(x))));
+  /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정). 갈래 단추의 숫자는 **몇 번**이지만,
+     모두에서 궁금한 것은 **몇 분을 뵈었는가**입니다 — 그래서 사람 수를 적고 「명」을 붙여
+     번과 갈라 둡니다. 머리줄의 「N명」과 같은 셈이며, 갈래를 골라도 바뀌지 않습니다. */
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
-      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ' 보기'}">${icon}${esc(name)}${s ? `<i>${cnt(s)}</i>` : ''}</button>`;
+      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
   return `
       <section class="cal-sec">
-        <div class="cal-head cal-head--ate"><h2>이제까지 만난 분</h2>
+        <div class="cal-head cal-head--ate"><h2>만나거나 만날 예정인 분</h2>
           ${all.length ? `<span class="st-note">${people}명 · 만남 ${met}번${soon ? ` · 예정 ${soon}번` : ''}${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}</span>` : ''}
           ${all.length ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
