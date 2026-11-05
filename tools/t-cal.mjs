@@ -712,16 +712,20 @@ const TIP = await page.evaluate(() => {
     .filter(e => !e.querySelector('.cal-c__d')).map(e => e.title || '');
   return { b, s2, noneHas: none.filter(Boolean).length, noneN: none.length, who: r[3].name };
 });
-t('자리가 있는 날엔 안내가 붙는다', /약속 2건/.test(TIP.b), JSON.stringify(TIP.b));
-t('시각 순으로 적는다', TIP.b.split('\n')[1].startsWith('12:00')
-  && TIP.b.split('\n')[2].startsWith('18:30'), JSON.stringify(TIP.b));
+t('자리가 있는 날엔 안내가 붙는다', TIP.b.split('\n').length === 2, JSON.stringify(TIP.b));
+/* 날짜·건수 머리줄은 2026-11-05 저녁에 걷었다 (교수님 지정) — 어느 칸에 얹었는지는 보면서
+   아는 것이라, 되읊으면 정작 볼 줄이 한 칸씩 밀린다. */
+t('날짜·건수를 되읊지 않는다', !/약속 \d+건/.test(TIP.b) && !/\(월\)|\(일\)/.test(TIP.b),
+  JSON.stringify(TIP.b));
+t('시각 순으로 적는다', TIP.b.split('\n')[0].startsWith('12:00')
+  && TIP.b.split('\n')[1].startsWith('18:30'), JSON.stringify(TIP.b));
 t('무엇을 누구와 어디서인지 한 줄에', /18:30 저녁 · .+, .+ — 제주대 앞/.test(TIP.b), JSON.stringify(TIP.b));
 t('치른 자리엔 「예정」을 안 붙인다', !/18:30[^\n]*예정/.test(TIP.b), JSON.stringify(TIP.b));
 t('「못 만남」은 그대로 적는다', /12:00[^\n]*\(못 만남\)/.test(TIP.b), JSON.stringify(TIP.b));
 t('앞으로의 자리엔 「예정」', /12:30[^\n]*\(예정\)/.test(TIP.s2), JSON.stringify(TIP.s2));
 t('사람은 셋까지 적고 접는다', /외 1명/.test(TIP.s2) && TIP.s2.includes(TIP.who), JSON.stringify(TIP.s2));
 t('자리는 넷까지 적고 접는다', /\+2건 더/.test(TIP.s2)
-  && TIP.s2.split('\n').length === 6, JSON.stringify(TIP.s2));
+  && TIP.s2.split('\n').length === 5, JSON.stringify(TIP.s2));
 t('빈 날엔 안내를 안 단다', TIP.noneN > 0 && TIP.noneHas === 0, `${TIP.noneHas}/${TIP.noneN}`);
 await page.evaluate(() => { meetMap = {}; mtSave(); CAL.open = ''; CAL.ym = ''; CAL.day = mtToday(); });
 

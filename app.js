@@ -5721,6 +5721,8 @@ const MT_MEAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
 /* ---------- 날짜 칸에 올리면 뜨는 간단한 안내 (2026-11-05 저녁, 교수님 지정) ----------
  * 달력은 칸이 좁아 그림만 섭니다 — 무엇이 몇 시에 누구와인지는 눌러 봐야 알았습니다.
  * 마우스를 얹으면 그 날의 자리를 **한 줄에 하나씩** 보여 줍니다.
+ * - **날짜·건수 머리줄은 적지 않습니다** (2026-11-05 저녁, 교수님 지정). 어느 칸에 얹었는지는
+ *   보면서 아는 것이라, 되읊으면 정작 볼 줄이 한 칸씩 밀립니다.
  * - 자리가 없는 날은 표를 달지 않습니다. 빈 말풍선이 뜨면 걸리적거립니다.
  * - **시각 순**으로 적습니다(시각을 안 적은 자리는 뒤로). 달력에 선 그림 차례와 같습니다.
  * - 사람은 셋까지, 자리는 넷까지 적고 나머지는 「외 N명」·「+N건 더」로 접습니다 —
@@ -5736,8 +5738,7 @@ function mtDayTip(day, list, today) {
     return [`${m.time ? m.time + ' ' : ''}${MT_SLOT_NAME[mtSlot(m)] || ''}`,
       nm || '이름 없음'].join(' · ') + (m.place ? ` — ${m.place}` : '') + tag;
   };
-  return [`${mtWhen(day)} · 약속 ${list.length}건`]
-    .concat(srt.slice(0, 4).map(line))
+  return srt.slice(0, 4).map(line)
     .concat(srt.length > 4 ? [`+${srt.length - 4}건 더`] : []).join('\n');
 }
 
