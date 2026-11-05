@@ -235,6 +235,7 @@ refreshBtn?.addEventListener('click', refreshNow);
 document.querySelector('.brand').addEventListener('click', e => {
   e.preventDefault();
   $q.value = ''; state.query = ''; state.rankFilter = '전체';
+  qSync?.();                               /* 검색칸의 × 도 함께 거둔다 (2026-11-05) */
   if (location.hash && location.hash !== '#/') location.hash = '#/'; else render();
   refreshNow();
 });
@@ -2146,8 +2147,8 @@ function stChip(p, r) {
   const cls = `st-c${pu ? ' on' : ''}${su ? ' sure' : ''}${wk ? ' weak' : ''}${vi ? ' vip' : ''}${pr ? ' pres' : ''}`;
   /* 바탕은 그 선호도 색으로 칠한다 — 강화는 반쯤(50%), VIP 는 꽉. 색은 칩마다 --rc 로 넘긴다 */
   const rc = RCOLOR[r] || '#6b7280';
-  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${metDots(met, vi ? '#ffffff' : rc)}`;
-  const base = `${esc(p.dept_name)} · ${esc(p.rank)} · ${weightTip(p)}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
+  const inner = `${pu ? `<i class="pushm" aria-hidden="true">${PUSH_FLAG}</i>` : ''}${esc(p.name)}${mealMark(p)}${metDots(met, vi ? '#ffffff' : rc)}`;
+  const base = `${esc(p.dept_name)} · ${esc(p.rank)} · ${weightTip(p)}${mealTip(p)}${vi ? ' · 도움' : ''}${pr ? ' · VIP' : ''}${su ? ' · 강화' : ''}${wk ? ' · 약화' : ''}${pu ? ' · 공략' : ''}`;
   const sty = ` style="--rc:${esc(rc)}"`;
   return STP.pick
     ? `<li><button type="button" class="${cls}"${sty} data-pushkey="${esc(k)}" aria-pressed="${pu}" title="${base} — 누르면 공략 ${pu ? '해제' : '표시'}">${inner}</button></li>`
@@ -3888,7 +3889,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_MC) { mailMap = v; Object.keys(v).length ? localStorage.setItem(MAIL_KEY, JSON.stringify(v)) : localStorage.removeItem(MAIL_KEY); }
     if (key === SET_MB) { mobileMap = v; Object.keys(v).length ? localStorage.setItem(MOBILE_KEY, JSON.stringify(v)) : localStorage.removeItem(MOBILE_KEY); }
     if (key === SET_MS) { msendMap = v; Object.keys(v).length ? localStorage.setItem(MSEND_KEY, JSON.stringify(v)) : localStorage.removeItem(MSEND_KEY); }
-    if (key === SET_ME) { meetMap = v; Object.keys(v).length ? localStorage.setItem(MEET_KEY, JSON.stringify(v)) : localStorage.removeItem(MEET_KEY); }
+    if (key === SET_ME) { meetMap = v; mealCache = null; Object.keys(v).length ? localStorage.setItem(MEET_KEY, JSON.stringify(v)) : localStorage.removeItem(MEET_KEY); }
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (key === SET_HR) { hireList = v.map(l => (l || []).map(String)); localStorage.setItem(HIRE_KEY, JSON.stringify(hireList)); hireCache = null; }
@@ -4289,7 +4290,7 @@ function bindCards() {
   bindNotes($app);
   bindCopyNums($app);
   bindMobGo($app);
-  $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; });
+  $app.querySelector('[data-clear]')?.addEventListener('click', () => { $q.value = ''; state.query = ''; qSync(); });
 }
 
 /* ---------- 관계 지도 (2026-10-16) ----------
@@ -5457,7 +5458,7 @@ function bindMobEdit(p) {
  * 이미 센 사람을 counted 에 적어 두고, 되돌리면 그만큼 도로 내린다. */
 /* MEET_KEY·meetMap 은 SET_LOCAL_KEY 보다 먼저 있어야 한다 — 저 위 '직접 보낸 기록' 옆에 두었다 */
 function meets() { if (!meetMap) meetMap = loadObj(MEET_KEY); return meetMap; }
-function mtSave() { saveObj(MEET_KEY, meets(), SET_ME); }
+function mtSave() { mealCache = null; saveObj(MEET_KEY, meets(), SET_ME); }   /* 칩의 해·달도 다시 센다 (2026-11-05) */
 
 const mtArr = v => Array.isArray(v) ? v : [];
 const mtList = () => Object.entries(meets())
@@ -5650,6 +5651,41 @@ function mtAteRows() {
   return out.sort((a, b) => by(b.m.date, a.m.date) || by(b.m.time, a.m.time)
     || a.ps[0].name.localeCompare(b.ps[0].name, 'ko'));
 }
+/* ---------- 칩에 다는 점심·저녁 (2026-11-05, 교수님 지정) ----------
+ * 교수 칩(`stChip`) 이름 뒤에 **점심을 드신 분은 해, 저녁을 드신 분은 달**을 조그맣게 답니다.
+ * 옆의 만난 횟수(`metDots`)가 **몇 번**을 말한다면, 이것은 **무엇을 함께했는가**를 말합니다.
+ * - **치른 자리만** 셉니다(`mtAte`) — 앞으로의 약속은 아직 드신 것이 아닙니다.
+ * - Tea·시각 미정은 달지 않습니다. 교수님이 점심·저녁 둘만 말씀하셨고, 그림이 넷이 되면
+ *   이름보다 그림이 길어집니다.
+ * - 그림과 빛깔은 달력 것(`MT_ICON` · --mt-day/--mt-night)을 그대로 씁니다 — 달력에서 본 해가
+ *   칩에서는 다른 그림이면 같은 것으로 읽히지 않습니다.
+ * 셈은 약속이 바뀔 때만 다시 합니다(`mtSave` 와 시트에서 내려올 때 `mealCache` 를 비웁니다).
+ * 날짜가 바뀌면 어제의 「예정」이 오늘은 「드신 자리」가 되므로 오늘 날짜도 함께 재어 둡니다. */
+let mealCache = null;
+function mealAll() {
+  const today = mtToday();
+  if (mealCache && mealCache.t === today && mealCache.m === meetMap) return mealCache.g;
+  const g = new Map();
+  mtList().forEach(m => {
+    if (!mtAte(m, today)) return;
+    const s = mtSlot(m);
+    if (s !== 'day' && s !== 'night') return;
+    m.who.forEach(k => { const e = g.get(k) || { day: 0, night: 0 }; e[s]++; g.set(k, e); });
+  });
+  mealCache = { t: today, m: meetMap, g };
+  return g;
+}
+const mealOf = p => mealAll().get(rKey(p)) || null;
+const MEAL_NAME = { day: '점심', night: '저녁' };
+function mealMark(p) {
+  const e = mealOf(p);
+  if (!e) return '';
+  return ['day', 'night'].map(s => e[s]
+    ? `<i class="mealm mealm--${s}" role="img" aria-label="${MEAL_NAME[s]} ${e[s]}번">${MT_ICON[s]}</i>` : '').join('');
+}
+const mealTip = p => { const e = mealOf(p); return e
+  ? ['day', 'night'].map(s => e[s] ? ` · ${MEAL_NAME[s]} ${e[s]}번` : '').join('') : ''; };
+
 /* `meal` 은 **점심+저녁을 함께 보는 묶음**입니다 (2026-11-02 저녁, 교수님 지정).
    약속에 그런 갈래가 붙는 것은 아니고, 고르기 단추에서만 쓰는 이름입니다. */
 const MT_SLOT_NAME = { meal: '식사', day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
@@ -5744,8 +5780,10 @@ function renderCal() {
             return `<button type="button" class="cal-c${day === CAL.day ? ' on' : ''}${day === today ? ' today' : ''}${dow === 0 ? ' sun' : ''}"
               data-mtday="${esc(day)}" aria-label="${esc(mtWhen(day))} 약속 ${n}건"${day === CAL.day ? ' aria-current="date"' : ''}>
               <span class="cal-c__n">${Number(day.slice(8))}</span>
+              ${/* 칸의 표시는 **점이 아니라 그림**입니다 (2026-11-05, 교수님 지정) — 점심은 해,
+                   저녁은 달, Tea 는 찻잔, 시각 미정은 시계. 목록·칩과 같은 그림을 씁니다. */''}
               ${n ? `<span class="cal-c__d">${(byDay[day] || []).slice(0, 3)
-                  .map(x => `<i class="cal-dot--${mtSlot(x)}"></i>`).join('')}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
+                  .map(x => `<i class="cal-dot--${mtSlot(x)}">${MT_ICON[mtSlot(x)] || MT_ICON.none}</i>`).join('')}${n > 3 ? `<b>+${n - 3}</b>` : ''}</span>` : ''}
             </button>`;
           }).join('')}
         </div>
@@ -6281,8 +6319,21 @@ $drawer.addEventListener('click', e => { if (e.target.closest('[data-close]')) c
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(true); });
 
 /* ---------- 검색 · 테마 ---------- */
+/* 적은 글이 있을 때만 × 가 선다 (2026-11-05, 교수님 지정). 글을 지우는 길이 백스페이스밖에
+ * 없으면 긴 말을 지우는 데 손이 많이 갑니다. `$q` 를 **코드가 비우는 자리**(로고 누르기,
+ * 「검색 지우기」 단추)에서도 불러야 × 가 함께 사라집니다 — 그래서 `qClear()` 한 군데로 모읍니다. */
+const $qx = document.getElementById('qx');
+function qSync() { if ($qx) $qx.hidden = !$q.value; }
+function qClear(focus) {
+  $q.value = ''; state.query = ''; qSync();
+  clearTimeout(qTimer);                    // 치자마자 지우면 밀린 그리기가 뒤늦게 덮어쓴다
+  if (focus) $q.focus();
+  render();
+}
+$qx?.addEventListener('click', () => qClear(true));
 let qTimer;
 $q.addEventListener('input', () => {
+  qSync();                                 // × 는 기다리지 않고 바로 (글은 160ms 뒤에 거른다)
   clearTimeout(qTimer);
   qTimer = setTimeout(() => {
     state.query = $q.value;
@@ -6290,6 +6341,7 @@ $q.addEventListener('input', () => {
     else render();
   }, 160);
 });
+qSync();
 
 const themeBtn = document.getElementById('themeBtn');
 try { const t = localStorage.getItem('jnu-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}

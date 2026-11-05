@@ -143,6 +143,51 @@ for (const [w,h,tag] of [[1440,1000,'PC'],[390,844,'폰']]) {
   await page.close();
 }
 
+/* ---------- 검색어 지우기 × (2026-11-05, 교수님 지정) ----------
+ * 적은 글이 있을 때만 섭니다. 코드가 검색칸을 비우는 자리(로고 · 「검색 지우기」)에서도
+ * 함께 거둬야 합니다 — 글은 없는데 × 만 남으면 눌러도 아무 일이 없습니다. */
+{
+  const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await page.goto('http://127.0.0.1:8080/', { waitUntil: 'load' });
+  await page.waitForFunction(() => typeof enterApp === 'function', null, { timeout: 20000 });
+  await page.evaluate(() => { if (!document.body.classList.contains('authed')) enterApp(null); });
+  await page.waitForFunction(() => typeof state !== 'undefined' && state.rows.length > 0, null, { timeout: 25000 });
+  const type = async v => { await page.evaluate(x => {
+    const q = document.getElementById('q'); q.value = x; q.dispatchEvent(new Event('input', { bubbles: true }));
+  }, v); await page.waitForTimeout(320); };
+  const see = () => page.evaluate(() => {
+    const qx = document.getElementById('qx'), q = document.getElementById('q'), s = document.querySelector('.search');
+    const r = qx.getBoundingClientRect(), sr = s.getBoundingClientRect();
+    return { hidden: qx.hidden, value: q.value, query: state.query,
+      shown: !qx.hidden && getComputedStyle(qx).display !== 'none',
+      right: Math.round(sr.right - r.right), w: Math.round(r.width) };
+  });
+
+  t('빈 칸에는 × 가 없다', (await see()).hidden);
+  await type('김');
+  const on = await see();
+  t('글을 적으면 × 가 선다', on.shown && !on.hidden, JSON.stringify(on));
+  t('× 는 검색칸 **안** 오른쪽에', on.right >= 0 && on.right < 20 && on.w >= 18, `${on.right}px / ${on.w}px`);
+  await page.click('#qx');
+  await page.waitForTimeout(350);
+  const off = await see();
+  t('누르면 한 번에 지워진다', off.value === '' && off.query === '' && off.hidden, JSON.stringify(off));
+  t('지운 뒤 손은 검색칸에 그대로', await page.evaluate(() => document.activeElement.id) === 'q');
+  /* 제 × 와 나란히 서면 어느 것이 무엇인지 알 수 없다 — 브라우저 것은 숨긴다 */
+  t('브라우저가 띄우는 × 는 숨긴다', await page.evaluate(() => {
+    const st = [...document.styleSheets].flatMap(s2 => { try { return [...s2.cssRules]; } catch { return []; } })
+      .some(r => /search-cancel-button/.test(r.cssText) && /display:\s*none/.test(r.cssText));
+    return st;
+  }));
+  /* 로고를 누르면 검색이 풀리는데, × 도 함께 거둬야 한다 */
+  await type('박');
+  await page.evaluate(() => document.querySelector('.brand').click());
+  await page.waitForTimeout(500);
+  const af = await see();
+  t('로고로 돌아가면 × 도 거둔다', af.hidden && af.value === '', JSON.stringify(af));
+  await page.close();
+}
+
 let bad=0; for(const [n,v,x] of ok){ if(!v) bad++; console.log(`${v?'OK  ':'실패'} ${n}${x?'   ('+x+')':''}`); }
 console.log(`\n${ok.length-bad}/${ok.length} 통과`);
 await b.close(); process.exit(bad?1:0);

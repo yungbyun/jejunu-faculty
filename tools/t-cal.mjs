@@ -85,7 +85,7 @@ t('새 약속이 펼쳐진 채로 생김', await page.locator('.cal-e').count() 
 t('오늘 날짜로 잡힌다', await page.evaluate(() => document.querySelector('[data-mtdate]').value) === await page.evaluate(() => mtToday()));
 t('아직 사람이 없다', (await page.locator('.cal-who__p').innerText()).includes('아직 없습니다'));
 t('그날 목록에 한 줄', await page.locator('.cal-r').count() === 1);
-t('격자에 점이 찍힌다', await page.evaluate(() => !!document.querySelector('.cal-c.on .cal-c__d i')));
+t('격자에 그림이 선다', await page.evaluate(() => !!document.querySelector('.cal-c.on .cal-c__d i svg')));
 
 /* 날짜는 2026.10.08 꼴로 보여 준다 — 브라우저가 칸 안에 그리는 10/08/26 은 숨긴다 (2026-10-08) */
 t('날짜 글이 점으로 이어진다', await page.evaluate(() => fmtDate('2026-10-13')) === '2026.10.13',
@@ -485,24 +485,24 @@ const lum = () => page.evaluate(() => {
     return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
   const pick = k => { const i = document.querySelector(`.cal-c:not(.on) .cal-c__d i.cal-dot--${k}`)
       || document.querySelector(`.cal-c__d i.cal-dot--${k}`);
-    return i ? L(getComputedStyle(i).backgroundColor) : null; };
+    return i ? L(getComputedStyle(i).color) : null; };
   return { lunch: pick('day'), dinner: pick('night'), etc: pick('none') };
 });
 const Lm = await lum();
-t('갈래마다 점 색이 다르다', await page.evaluate(() => {
-  const c = k => { const i = document.querySelector(`.cal-c__d i.cal-dot--${k}`); return i && getComputedStyle(i).backgroundColor; };
+t('갈래마다 그림 색이 다르다', await page.evaluate(() => {
+  const c = k => { const i = document.querySelector(`.cal-c__d i.cal-dot--${k}`); return i && getComputedStyle(i).color; };
   const a = c('day'), b2 = c('night'), e = c('none');
   return a && b2 && e && a !== b2 && b2 !== e && a !== e;
 }), JSON.stringify(Lm));
-t('낮 점이 밤 점보다 밝다', Lm.lunch !== null && Lm.dinner !== null && Lm.lunch > Lm.dinner + .1,
+t('낮 그림이 밤 그림보다 밝다', Lm.lunch !== null && Lm.dinner !== null && Lm.lunch > Lm.dinner + .1,
   `점심 ${(Lm.lunch || 0).toFixed(3)} · 저녁 ${(Lm.dinner || 0).toFixed(3)}`);
 t('고른 날에도 갈래가 갈린다', await page.evaluate(() => {
   const on = document.querySelectorAll('.cal-c.on .cal-c__d i');
   if (on.length < 2) return false;
-  const s = new Set([...on].map(i => getComputedStyle(i).backgroundColor));
+  const s = new Set([...on].map(i => getComputedStyle(i).color));
   return s.size >= 2;
-}), await page.evaluate(() => [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => getComputedStyle(i).backgroundColor).join(' ')));
-t('고른 날 점이 바탕과 갈린다', await page.evaluate(() => {
+}), await page.evaluate(() => [...document.querySelectorAll('.cal-c.on .cal-c__d i')].map(i => getComputedStyle(i).color).join(' ')));
+t('고른 날 그림이 바탕과 갈린다', await page.evaluate(() => {
   const d = document.createElement('canvas'); d.width = d.height = 1; const x = d.getContext('2d');
   const px = c => { x.fillStyle = '#fff'; x.fillRect(0, 0, 1, 1); x.fillStyle = c; x.fillRect(0, 0, 1, 1);
     return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); };
@@ -510,7 +510,7 @@ t('고른 날 점이 바탕과 갈린다', await page.evaluate(() => {
     return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
   const cell = getComputedStyle(document.querySelector('.cal-c.on')).backgroundColor;
   return [...document.querySelectorAll('.cal-c.on .cal-c__d i')].every(i => {
-    const a = L(px(getComputedStyle(i).backgroundColor)), b2 = L(px(cell));
+    const a = L(px(getComputedStyle(i).color)), b2 = L(px(cell));
     return (Math.max(a, b2) + .05) / (Math.min(a, b2) + .05) >= 3;
   });
 }));
@@ -525,11 +525,11 @@ t('낮·밤·미정 아이콘이 갈린다', await page.evaluate(() => {
   const k = [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className);
   return k.some(c => c.includes('mt-i--day')) && k.some(c => c.includes('mt-i--night')) && k.some(c => c.includes('mt-i--none'));
 }), await page.evaluate(() => [...document.querySelectorAll('.cal-r__t .mt-i')].map(i => i.className).join(' | ')));
-t('아이콘 색이 달력의 점과 같다', await page.evaluate(() => {
+t('아이콘 색이 달력의 그림과 같다', await page.evaluate(() => {
   const dot = document.querySelector('.cal-c:not(.on) .cal-c__d i.cal-dot--night')
     || document.querySelector('.cal-c__d i.cal-dot--night');
   const ico = document.querySelector('.cal-r__t .mt-i--night');
-  return !!dot && !!ico && getComputedStyle(dot).backgroundColor === getComputedStyle(ico).color;
+  return !!dot && !!ico && getComputedStyle(dot).color === getComputedStyle(ico).color;
 }));
 t('아이콘이 글자를 밀어내지 않는다', await page.evaluate(() => {
   const e = document.querySelector('.cal-r__t');
@@ -576,7 +576,7 @@ await page.click('[data-mtkind="other"]');
 await page.waitForTimeout(350);
 t('Tea 로 고치면 찻잔이 된다', await page.evaluate(() =>
   mtList()[0].kind === 'other' && !!document.querySelector('.cal-r__t .mt-i--tea')));
-t('달력 점도 흰 점으로 바뀐다', await page.evaluate(() => !!document.querySelector('.cal-c__d i.cal-dot--tea')));
+t('달력 그림도 찻잔으로 바뀐다', await page.evaluate(() => !!document.querySelector('.cal-c__d i.cal-dot--tea svg')));
 t('적어 둔 시각은 안 건드린다', await page.evaluate(() => mtList()[0].time) === '15:20',
   await page.evaluate(() => mtList()[0].time));
 /* 찻잔은 그림만으로 뜻이 선다 — 「Tea」라고 또 적지 않는다 (2026-10-13) */
@@ -627,20 +627,19 @@ t('점심·저녁은 이름을 적는다', await page.evaluate(() =>
   && mtWhenText({ kind: '', time: '15:20' }) === '15:20'
   && mtWhenText({ kind: 'other', time: '' }) === '시각 미정'),
   await page.evaluate(() => mtWhenText({ kind: 'other', time: '16:00' })));
-t('달력 점은 연두, 다른 점과 같은 크기', await page.evaluate(() => {
+t('달력 찻잔은 연두, 다른 그림과 같은 크기', await page.evaluate(() => {
   const tea = document.querySelector('.cal-c__d i.cal-dot--tea');
   if (!tea) return false;
   const c = getComputedStyle(tea), r = tea.getBoundingClientRect();
-  const [red, g, bl] = (c.backgroundColor.match(/\d+/g) || []).map(Number);
+  const [red, g, bl] = (c.color.match(/\d+/g) || []).map(Number);
   const green = g > red + 30 && g > bl + 30;          // 연두
-  const plain = c.boxShadow === 'none';               // 테두리를 두르면 그만큼 커 보인다
-  return green && plain && Math.round(r.width) === 5;
+  return green && !!tea.querySelector('svg') && Math.round(r.width) === 11;
 }), await page.evaluate(() => {
   const t2 = document.querySelector('.cal-c__d i.cal-dot--tea');
   const c = t2 && getComputedStyle(t2);
-  return t2 ? `${c.backgroundColor} / 테두리 ${c.boxShadow} / ${Math.round(t2.getBoundingClientRect().width)}px` : '(없음)';
+  return t2 ? `${c.color} / ${Math.round(t2.getBoundingClientRect().width)}px` : '(없음)';
 }));
-t('다른 점과 크기가 같다', await page.evaluate(() => {
+t('다른 그림과 크기가 같다', await page.evaluate(() => {
   const w = [...document.querySelectorAll('.cal-c__d i')].map(i => Math.round(i.getBoundingClientRect().width));
   return new Set(w).size === 1;
 }), await page.evaluate(() => [...document.querySelectorAll('.cal-c__d i')]
@@ -958,6 +957,61 @@ t('기록이 없으면 빈 안내', await page.evaluate(() => {
   const sec = [...document.querySelectorAll('.cal-sec')].pop();
   return !sec.querySelector('.mt-ate') && /아직 약속이 없습니다/.test(sec.textContent);
 }));
+
+/* ---------- 칩에 다는 점심(해)·저녁(달) (2026-11-05, 교수님 지정) ----------
+ * 교수 칩 이름 뒤에 점심을 드신 분은 해, 저녁을 드신 분은 달이 조그맣게 섭니다.
+ * **치른 자리만** 셉니다 — 앞으로의 약속은 아직 드신 것이 아니고, Tea 는 달지 않습니다. */
+const MEALSET = async () => page.evaluate(() => {
+  meetMap = {}; localStorage.removeItem('jnu-meets'); mealCache = null;
+  const [a, b2, c, d] = state.rows, k = x => rKey(x);
+  const yd = new Date(Date.now() - 864e5 * 5), ah = new Date(Date.now() + 864e5 * 5);
+  const ymd = x => `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`;
+  meets()['c1'] = { date: ymd(yd), time: '12:00', kind: 'lunch',  who: [k(a)], done: '' };
+  meets()['c2'] = { date: ymd(yd), time: '18:30', kind: 'dinner', who: [k(a), k(b2)], done: '' };
+  meets()['c3'] = { date: ymd(ah), time: '12:00', kind: 'lunch',  who: [k(c)], done: '' };   // 예정
+  meets()['c4'] = { date: ymd(yd), time: '14:00', kind: 'other',  who: [k(d)], done: '' };   // Tea
+  mtSave();
+  const of = x => { const e = mealOf(x); return e ? `${e.day}/${e.night}` : '없음'; };
+  return { a: of(a), b: of(b2), c: of(c), d: of(d),
+    html: mealMark(a), tip: mealTip(a), none: mealMark(c) };
+});
+const ME = await MEALSET();
+t('점심을 드신 분에게 해, 저녁에는 달', ME.a === '1/1' && ME.b === '0/1', `${ME.a} / ${ME.b}`);
+t('앞으로의 약속은 아직 세지 않는다', ME.c === '없음' && ME.none === '', ME.c);
+t('Tea 는 달지 않는다', ME.d === '없음', ME.d);
+t('해·달 그림이 칩에 붙는다', ME.html.includes('mealm--day') && ME.html.includes('mealm--night'), ME.html.slice(0, 60));
+t('줄머리 표에도 적는다', ME.tip === ' · 점심 1번 · 저녁 1번', JSON.stringify(ME.tip));
+/* 실제 칩에 그려지고, 빛깔이 달력의 해·달과 같은지 */
+await page.evaluate(() => {
+  const [a, b2] = state.rows;
+  applyEntry(rKey(a), { rating: '확' }); applyEntry(rKey(b2), { rating: '확' });
+  location.hash = '#/stats'; render();
+});
+await page.waitForSelector('.st-c', { timeout: 10000 });
+await page.waitForTimeout(400);
+const MEC = await page.evaluate(() => {
+  const chip = [...document.querySelectorAll('.st-c')].find(x => x.querySelector('.mealm'));
+  if (!chip) return null;
+  const i = chip.querySelector('.mealm--day') || chip.querySelector('.mealm--night');
+  const cls = i.classList.contains('mealm--day') ? 'day' : 'night';
+  /* 달력 점과 **같은 빛깔**인가 — 점의 규칙은 `.cal-c__d i` 아래에 있으므로 그 자리에 두고 잰다 */
+  const box = document.createElement('div'); box.className = 'cal-c__d';
+  box.innerHTML = `<i class="cal-dot--${cls}"></i>`; document.body.appendChild(box);
+  const want = getComputedStyle(box.firstChild).color; box.remove();
+  const r = i.getBoundingClientRect(), nm = chip.querySelector('.metlit');
+  return { w: Math.round(r.width), h: Math.round(r.height), color: getComputedStyle(i).color, want,
+    afterName: chip.textContent.trim().length > 0, n: chip.querySelectorAll('.mealm').length,
+    tip: chip.getAttribute('title') || '' };
+});
+t('칩에 그림이 실제로 선다', !!MEC && MEC.n >= 1, MEC ? `${MEC.n}개` : '칩을 못 찾음');
+t('이름 옆이라 조그맣다(11px)', MEC && MEC.w === 11 && MEC.h === 11, MEC ? `${MEC.w}x${MEC.h}` : '');
+t('빛깔은 달력의 해·달과 같다', MEC && MEC.color === MEC.want, MEC ? `${MEC.color} / ${MEC.want}` : '');
+t('줄머리 표에 점심·저녁이 적힌다', MEC && /점심|저녁/.test(MEC.tip), MEC ? MEC.tip : '');
+await page.evaluate(() => {
+  meetMap = {}; localStorage.removeItem('jnu-meets'); mealCache = null;
+  state.rows.forEach(p => applyEntry(rKey(p), { rating: '' }));
+  location.hash = '#/cal'; render();
+});
 
 let bad = 0;
 for (const [n, v, x] of ok) { if (!v) bad++; console.log(`${v ? 'OK  ' : '실패'} ${n}${x ? '   (' + x + ')' : ''}`); }

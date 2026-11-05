@@ -64,6 +64,15 @@ img{display:block}
 .search:focus-within{border-color:var(--line-2);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent);color:var(--ink-2)}
 .search input{border:0;background:transparent;outline:0;flex:1;font:inherit;font-size:14px;color:var(--ink);min-width:0}
 .search input::placeholder{color:var(--ink-3)}
+/* 검색어 지우기 × (2026-11-05, 교수님 지정). 사파리·크롬이 `type=search` 에 띄우는 제 ×는
+   숨깁니다 — 두 개가 나란히 서면 어느 것이 무엇인지 알 수 없습니다. */
+.search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}
+.search__x{flex:none;width:20px;height:20px;margin-right:-4px;padding:0;display:grid;place-items:center;
+  border:0;border-radius:999px;background:color-mix(in srgb,var(--ink-3) 18%,transparent);
+  color:var(--ink-2);cursor:pointer}
+.search__x:hover{background:#c0392b;color:#fff}
+.search__x[hidden]{display:none}       /* grid 가 hidden 을 이기지 못하게 */
+.search__x svg{display:block}
 .iconbtn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;cursor:pointer;transition:background .15s,transform .15s}
 .iconbtn:hover{background:var(--line)}
 .iconbtn:active{transform:scale(.96)}
@@ -1787,10 +1796,15 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .cal-c.today .cal-c__n{color:var(--brand)}
 .cal-c.on{background:var(--brand);border-color:var(--brand)}
 .cal-c.on .cal-c__n,.cal-c.on.sun .cal-c__n{color:var(--bg)}
-.cal-c__d{display:flex;align-items:center;gap:2.5px;line-height:0}
-.cal-c__d i{width:5px;height:5px;border-radius:50%;background:var(--rs-high)}
+.cal-c__d{display:flex;align-items:center;gap:2px;line-height:0;max-width:100%}
+/* 칸의 표시는 **점이 아니라 그림**입니다 (2026-11-05, 교수님 지정) — 점심은 해, 저녁은 달,
+   Tea 는 찻잔. 점은 색으로만 말해서 무엇인지 외워야 했습니다. 색은 그대로 두고 꼴만 바꿉니다.
+   점이던 때와 달리 **색은 `background` 가 아니라 `color`** 로 들어갑니다(그림이 선을 긋는
+   빛깔입니다) — 아래 `.cal-dot--*` 규칙도 모두 `color` 입니다. */
+.cal-c__d i{width:11px;height:11px;flex:none;display:inline-grid;place-items:center;color:var(--rs-high)}
+.cal-c__d i svg{width:100%;height:100%;display:block}
 .cal-c__d b{font-size:9.5px;font-weight:800;color:var(--ink-3);line-height:1}
-.cal-c.on .cal-c__d i{background:var(--bg)}
+.cal-c.on .cal-c__d i{color:var(--bg)}
 .cal-c.on .cal-c__d b{color:var(--bg)}
 
 .cal-list{display:flex;flex-direction:column;gap:8px}
@@ -1858,6 +1872,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   /* 좁은 화면에서는 가로세로 비를 버리고 높이를 못 박는다 — 비를 지키려면 칸이 넓어야 해서
      일곱 칸이 안 들어갔다. 너비는 화면에 맞춰 줄어든다. */
   .cal-c{aspect-ratio:auto;height:36px;min-height:0}
+  /* 칸이 45px 남짓이라 그림 셋에 「+N」까지는 11px 로 안 들어간다 (2026-11-05) */
+  .cal-c__d{gap:1px}
+  .cal-c__d i{width:9px;height:9px}
+  .cal-c__d b{font-size:8.5px}
   /* 달 머리줄을 한 줄에 — 두 줄이 되면 달력 아랫단이 화면 밖으로 밀린다 */
   .cal-head{gap:5px;margin-bottom:6px}
   /* 달 이름은 넘길 단추 사이에 두고, 오늘·내보내기만 오른쪽으로 민다 */
@@ -2003,22 +2021,34 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   --mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d;--mt-tea-on:#2d5e15}}
 :root[data-theme="dark"]{--mt-night:#8fa0e0;--mt-day-on:#6a4500;--mt-night-on:#1e2a66;--mt-none-on:#39404d;--mt-tea-on:#2d5e15}
 /* 기본 규칙 .cal-c__d i 가 class+type 이라 더 세다 — 같은 꼴로 받아쳐야 색이 먹는다 */
-.cal-c__d i.cal-dot--day{background:var(--mt-day)}
-.cal-c__d i.cal-dot--night{background:var(--mt-night)}
-.cal-c__d i.cal-dot--none{background:var(--mt-none)}
-/* Tea 는 연두 — 테두리를 두르면 그만큼 커 보여 다른 점과 안 맞는다. 색만 쓴다. */
-.cal-c__d i.cal-dot--tea{background:var(--mt-tea)}
-/* 고른 날은 바탕이 짙다 — 점을 밝은 쪽으로 바꿔 점심·저녁 구분을 지키다 */
-.cal-c.on .cal-c__d i.cal-dot--day{background:var(--mt-day-on)}
-.cal-c.on .cal-c__d i.cal-dot--night{background:var(--mt-night-on)}
-.cal-c.on .cal-c__d i.cal-dot--none{background:var(--mt-none-on)}
-.cal-c.on .cal-c__d i.cal-dot--tea{background:var(--mt-tea-on)}
+.cal-c__d i.cal-dot--day{color:var(--mt-day)}
+.cal-c__d i.cal-dot--night{color:var(--mt-night)}
+.cal-c__d i.cal-dot--none{color:var(--mt-none)}
+/* Tea 는 연두 */
+.cal-c__d i.cal-dot--tea{color:var(--mt-tea)}
+/* 고른 날은 바탕이 짙다 — 그림을 밝은 쪽으로 바꿔 점심·저녁 구분을 지킨다 */
+.cal-c.on .cal-c__d i.cal-dot--day{color:var(--mt-day-on)}
+.cal-c.on .cal-c__d i.cal-dot--night{color:var(--mt-night-on)}
+.cal-c.on .cal-c__d i.cal-dot--none{color:var(--mt-none-on)}
+.cal-c.on .cal-c__d i.cal-dot--tea{color:var(--mt-tea-on)}
 .mt-i{flex:none;display:inline-grid;place-items:center;width:17px;height:17px;margin-right:6px;vertical-align:-3px}
 .mt-i svg{width:100%;height:100%}
 .mt-i--day{color:var(--mt-day)}
 .mt-i--night{color:var(--mt-night)}
 .mt-i--none{color:var(--mt-none)}
 .mt-i--tea{color:var(--mt-tea)}
+/* 칩에 다는 점심(해)·저녁(달) (2026-11-05, 교수님 지정) — 이름 바로 뒤라 11px 로 작게 두고,
+   빛깔은 달력과 **같은 것**을 씁니다(--mt-day/--mt-night). VIP 칩은 바탕이 꽉 찬 진한 색이라
+   그 위에서는 밤색 달이 묻히므로 밝은 쪽으로 바꿔 답니다. 이 둘만은 **색값을 그대로** 적습니다 —
+   --mt-*-on 은 어두운 바탕에서 거꾸로 어두워지는 값이라(달력에서 고른 칸이 밝아지기 때문),
+   늘 어두운 VIP 칩 위에서는 밤에 도리어 묻힙니다. */
+.mealm{flex:none;display:inline-grid;place-items:center;width:11px;height:11px;margin-left:4px;
+  vertical-align:-1px}
+.mealm svg{width:100%;height:100%;display:block}
+.mealm--day{color:var(--mt-day)}
+.mealm--night{color:var(--mt-night)}
+.st-c.vip .mealm--day{color:#ffd089}
+.st-c.vip .mealm--night{color:#c6cffb}
 
 /* 새 약속 — 점심·저녁·Tea 중에서 고른다 (2026-10-12) */
 /* 날짜 제목과 같은 줄에 두면 제목이 눌려 잘린다 — 아랫줄을 통째로 쓴다 */

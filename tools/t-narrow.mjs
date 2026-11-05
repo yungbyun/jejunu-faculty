@@ -117,6 +117,26 @@ for (const w of [320, 390]) {
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
   t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);
 
+  /* 달력 칸의 표시는 점이 아니라 **그림**입니다 (2026-11-05, 교수님 지정) — 점심은 해,
+     저녁은 달, Tea 는 찻잔. 점(5px)보다 크므로 셋에 「+N」까지 칸 안에 들어가는지 잽니다. */
+  const calx = await page.evaluate(() => {
+    /* 달력은 **이 달**을 보여 준다 — 위에서 넣은 자리는 지난달치라 칸에 아무것도 안 뜬다.
+       그래서 오늘 자리로 넷(해·달·찻잔·시계)을 깔고 잰다. 「+N」까지 보려고 넷을 넣는다. */
+    const d0 = mtToday();
+    ['lunch', 'dinner', 'other', ''].forEach((k, i) => { mtAdd(d0, rKey(state.rows[i]), k); });
+    CAL.ym = ''; CAL.day = d0; location.hash = '#/cal'; render();
+    const cs = [...document.querySelectorAll('.cal-c')].filter(c => c.querySelector('.cal-c__d'));
+    return cs.map(c => {
+      const d = c.querySelector('.cal-c__d').getBoundingClientRect(), b2 = c.getBoundingClientRect();
+      return { fits: d.left >= b2.left - .5 && d.right <= b2.right + .5,
+        svg: !!c.querySelector('.cal-c__d i svg'), tall: c.scrollHeight <= Math.ceil(b2.height) + 1,
+        w: Math.round(d.width), cw: Math.round(b2.width) };
+    });
+  });
+  t(`${w}px 달력 칸에 해·달·찻잔이 그려진다`, calx.length > 0 && calx.every(x => x.svg), `${calx.length}칸`);
+  t(`${w}px 그림이 칸을 넘지 않는다`, calx.every(x => x.fits && x.tall),
+    calx.filter(x => !x.fits || !x.tall).map(x => `${x.w}/${x.cw}`).join(' ') || '모두 들어감');
+
   await page.evaluate(() => {
     pushSet = new Set(); sureSet = new Set(); mobileMap = {};
     localStorage.removeItem('jnu-push'); localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-mobile');
