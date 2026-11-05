@@ -1227,7 +1227,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .memo-box{position:relative}
 /* 서식 단추는 **글칸 위**에 둔다 (2026-10-15) — 아이폰에서 글자를 고르면 「오려두기·복사」
    말풍선이 고른 자리 아래에 떠서, 글칸 밑에 있던 단추를 덮어 누를 수가 없었다. */
-.memo__bar{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+.memo__bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 6px}
 .memo__b{width:28px;height:28px;flex:none;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);
   color:var(--ink);font:inherit;font-size:13px;cursor:pointer;display:grid;place-items:center}
 .memo__b b{font-weight:800}
@@ -1239,6 +1239,37 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .memo__b.on{background:color-mix(in srgb,var(--ink-3) 20%,transparent);
   border-color:color-mix(in srgb,var(--ink-3) 45%,var(--line-2));color:var(--ink)}
 .memo__b.on:hover{border-color:var(--brand);color:var(--brand)}
+/* ---------- 글자색 (2026-11-05, 교수님 지정) ----------
+   메모는 평문으로 저장하므로(`{빨강:여기}`) 색값이 아니라 **색 이름**만 남는다. 그래서 바탕이
+   어두울 때 같은 「빨강」을 더 밝은 쪽으로 깔 수 있다 — 아래 --mc-* 한 곳만 고치면 된다.
+   화면의 글자는 `<font color="#c0392b">` 꼴인데, `color` 는 **표시 속성**이라 아무 CSS 규칙에도
+   진다. 그래서 그 색값을 표식으로 삼아 골라내 var(--mc-*) 로 갈아친다.
+   ⚠ 색값은 app.js 의 MEMO_COLORS·MEMO_INK 와 **같은 값이어야 한다** — 한쪽만 고치면 그 색이
+   평문으로 돌아가지 못하거나(표시가 안 붙는다) 밤에 안 보인다. */
+:root{--mc-red:#c0392b;--mc-blue:#2563eb;--mc-green:#1f8a5b;--mc-purple:#7c3aed}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --mc-red:#ff8f80;--mc-blue:#8ab4ff;--mc-green:#4ed69c;--mc-purple:#c9a8ff}}
+:root[data-theme="dark"]{--mc-red:#ff8f80;--mc-blue:#8ab4ff;--mc-green:#4ed69c;--mc-purple:#c9a8ff}
+.memo font[color="#c0392b"]{color:var(--mc-red)}
+.memo font[color="#2563eb"]{color:var(--mc-blue)}
+.memo font[color="#1f8a5b"]{color:var(--mc-green)}
+.memo font[color="#7c3aed"]{color:var(--mc-purple)}
+.memo font[color="#111827"]{color:var(--ink)}          /* 「기본」 — 색을 지운 자리 */
+/* 빛깔 단추는 **한 묶음**으로 — 줄이 넘어갈 때 색들만 함께 내려간다 */
+.memo__cs{display:flex;align-items:center;gap:6px}
+.memo__c{width:26px;height:26px;flex:none;padding:0;border-radius:999px;cursor:pointer;
+  border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);background:var(--ink)}
+.memo__c--red{background:var(--mc-red)}
+.memo__c--blue{background:var(--mc-blue)}
+.memo__c--green{background:var(--mc-green)}
+.memo__c--purple{background:var(--mc-purple)}
+/* 「기본」은 색이 없다는 뜻이라 **비워** 둔다 — 가운데 먹빛 점만 찍는다 */
+.memo__c--off{background:var(--surface);border-color:var(--line-2);display:grid;place-items:center}
+.memo__c--off::after{content:"";width:9px;height:9px;border-radius:999px;background:var(--ink)}
+.memo__c:hover{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 35%,transparent)}
+/* 커서가 선 자리의 색에 테를 두른다 (굵게 단추와 같은 뜻) */
+.memo__c.on{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink-2)}
+.memo__c.on:hover{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
 .memo{display:block;width:100%;box-sizing:border-box;min-height:84px;max-height:320px;overflow:auto;
   padding:10px 20px 10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
   font:inherit;font-size:14px;line-height:1.55;transition:border-color .15s,box-shadow .15s;white-space:pre-wrap;word-break:break-word}

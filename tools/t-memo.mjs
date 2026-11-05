@@ -24,6 +24,19 @@ t('*기울임* 이 <i> 로', await page.evaluate(()=>memoHtml('앞 *여기* 뒤'
 t('HTML 은 먼저 막는다', await page.evaluate(()=>memoHtml('<script>x</script>').indexOf('<script')<0));
 t('짝이 안 맞으면 그대로', await page.evaluate(()=>memoHtml('**열기만')==='**열기만'));
 t('표시 기호 없애기', await page.evaluate(()=>memoPlain('**가** __나__ *다*')==='가 나 다'));
+/* ---------- 글자색 (2026-11-05, 교수님 지정) ----------
+ * 저장은 굵게·밑줄과 같은 길로 평문 — `{빨강:여기}`. 색값이 아니라 **색 이름**을 적는다
+ * (시트를 사람이 읽어야 하고, 어두운 바탕에서 같은 빨강을 더 밝게 깔아야 하므로). */
+t('{빨강:…} 이 <font color> 로', await page.evaluate(()=>memoHtml('앞 {빨강:여기} 뒤')==='앞 <font color="#c0392b">여기</font> 뒤'));
+t('색 안의 굵게도 그대로 산다', await page.evaluate(()=>memoHtml('{보라:**여기**}')==='<font color="#7c3aed"><b>여기</b></font>'));
+t('빛깔표에 없는 이름은 건드리지 않는다', await page.evaluate(()=>memoHtml('{노랑:여기}')==='{노랑:여기}'));
+t('색 표시도 없애기', await page.evaluate(()=>memoPlain('{빨강:가} **나** {초록:다}')==='가 나 다'));
+t('색을 평문으로 되돌린다', await page.evaluate(()=>{
+  const src='{빨강:학과장님}과 가까운 분. **1순위**'+String.fromCharCode(10)+'{파랑:연구실 AX} 에 관심';
+  const d=document.createElement('div'); d.innerHTML=memoHtml(src); return memoRead(d)===src;
+}));
+t('굵게 뽑을 때 색 표시는 털어 낸다', await page.evaluate(()=>memoBold('**{빨강:중요}**').join()==='중요'));
+t('rgb() 로 와도 같은 색으로 읽는다', await page.evaluate(()=>memoHex('rgb(192, 57, 43)')==='#c0392b'&&memoHex('#C33')==='#cc3333'));
 
 // 화면 → 평문
 t('DOM 을 평문으로', await page.evaluate(()=>{
@@ -101,6 +114,13 @@ await page.evaluate(h=>{ location.hash=h; render(); }, info.h);
 await page.waitForSelector('.memo[contenteditable]',{timeout:10000});
 t('칸이 서식 편집기', await page.evaluate(()=>document.querySelector('.memo').getAttribute('contenteditable'))==='true');
 t('단추 세 개', await page.locator('.memo__b').count()===3);
+/* 빛깔 단추는 `.memo__c` 로 따로 둔다 — `.memo__b` 를 세거나 훑는 자리(markSync)가 흔들리면 안 된다 */
+t('빛깔 단추는 네 색 + 기본', await page.locator('.memo__c').count()===5);
+t('빛깔 단추는 같은 줄에 선다', await page.evaluate(()=>{
+  const bar=document.querySelector('.memo__bar'), cs=document.querySelector('.memo__cs');
+  return bar.contains(cs) && getComputedStyle(bar).flexWrap==='wrap'
+    && cs.getBoundingClientRect().right <= bar.getBoundingClientRect().right+1;
+}));
 /* 서식 단추는 글칸 **위**에 (2026-10-15) — 아이폰에서 글자를 고르면 「오려두기·복사」 말풍선이
    고른 자리 아래에 떠서, 글칸 밑에 있던 단추를 덮어 누를 수가 없었다. */
 t('서식 단추가 글칸 위에', await page.evaluate(() => {
@@ -208,6 +228,99 @@ t('켜진 단추는 눈에도 띈다', await page.evaluate(async () => {
   const on = document.querySelector('.memo__b.on'), off = document.querySelector('.memo__b:not(.on)');
   return getComputedStyle(on).backgroundColor !== getComputedStyle(off).backgroundColor;
 }));
+/* ---------- 글자색을 실제로 입혀 본다 (2026-11-05) ---------- */
+await page.evaluate(() => {
+  const p = state.rows[1];
+  applyEntry(rKey(p), { memo: '' });
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render();
+});
+await page.waitForSelector('.memo__c', { timeout: 10000 });
+const ck = await page.evaluate(() => rKey(state.rows[1]));
+/* 글을 치고 한 낱말만 고른다 */
+await page.click('.memo');
+await page.keyboard.type('학과장님과 가까운 분 1순위');
+await page.waitForTimeout(250);
+const pick = w => page.evaluate(word => {
+  const m = document.querySelector('.memo');
+  const tw = document.createTreeWalker(m, NodeFilter.SHOW_TEXT);
+  let n; while ((n = tw.nextNode())) {
+    const i = n.nodeValue.indexOf(word);
+    if (i < 0) continue;
+    const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + word.length);
+    m.focus(); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    return true;
+  }
+  return false;
+}, w);
+await pick('1순위');
+await page.click('.memo__c--red');
+await page.waitForTimeout(350);
+t('누르면 그 자리에서 색이 든다', await page.evaluate(()=>
+  document.querySelector('.memo').innerHTML.includes('<font color="#c0392b">1순위</font>')),
+  await page.evaluate(()=>document.querySelector('.memo').innerHTML));
+t('눌린 빛깔 단추에 테가 둘린다', await page.evaluate(()=>{
+  const b=document.querySelector('.memo__c--red');
+  return b.classList.contains('on') && b.getAttribute('aria-pressed')==='true'; }));
+t('화면에 { 빨강 } 표시가 안 보인다', !(await page.evaluate(()=>document.querySelector('.memo').textContent)).includes('{'));
+await page.evaluate(()=>document.querySelector('.memo').blur());
+await page.waitForTimeout(600);
+t('저장은 평문 {빨강:…} 으로', await page.evaluate(k=>getNote(k).memo==='학과장님과 가까운 분 {빨강:1순위}', ck),
+  await page.evaluate(k=>JSON.stringify(getNote(k).memo), ck));
+
+/* 색 글자 안에 커서를 꽂으면 그 색만 켜진다 — 보통 글이면 「기본」이 켜진다 */
+const cmarks = () => page.evaluate(() => [...document.querySelectorAll('.memo__c')]
+  .map(b => (b.className.match(/memo__c--(\w+)/) || [,'?'])[1] + ':' + (b.classList.contains('on') ? 'on' : 'off')).join(' '));
+const caretIn = w => page.evaluate(word => {
+  const m = document.querySelector('.memo');
+  const tw = document.createTreeWalker(m, NodeFilter.SHOW_TEXT);
+  let n; while ((n = tw.nextNode())) {
+    const i = n.nodeValue.indexOf(word);
+    if (i < 0) continue;
+    const r = document.createRange(); r.setStart(n, i + 1); r.collapse(true);
+    m.focus(); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    return true;
+  }
+  return false;
+}, w);
+await caretIn('1순위');
+await page.waitForTimeout(150);
+t('색 글자 안이면 그 색만 켜진다', (await cmarks())==='red:on blue:off green:off purple:off off:off', await cmarks());
+await caretIn('가까운');
+await page.waitForTimeout(150);
+t('보통 글이면 「기본」이 켜진다', (await cmarks())==='red:off blue:off green:off purple:off off:on', await cmarks());
+
+/* 「기본」은 **색만** 지운다 — removeFormat 을 쓰면 굵게·밑줄까지 날아간다 */
+await pick('1순위');
+await page.click('.memo__b--b');
+await page.waitForTimeout(250);
+await pick('1순위');
+await page.click('.memo__c--off');
+await page.waitForTimeout(350);
+t('「기본」은 색만 지우고 굵게는 남긴다', await page.evaluate(()=>memoRead(document.querySelector('.memo'))==='학과장님과 가까운 분 **1순위**'),
+  await page.evaluate(()=>JSON.stringify(memoRead(document.querySelector('.memo')))));
+t('지운 자리는 제 먹빛으로 보인다', await page.evaluate(()=>{
+  const f=document.querySelector('.memo font[color="#111827"]');
+  return !!f && getComputedStyle(f).color===getComputedStyle(document.querySelector('.memo')).color; }));
+await page.evaluate(()=>document.querySelector('.memo').blur());
+await page.waitForTimeout(600);
+
+/* 어두운 바탕에서는 같은 이름의 색을 더 밝게 깐다 — 색 이름으로 적어 두는 까닭이다.
+   app.js 의 빛깔표와 styles.css 가 **같은 색값**을 보아야 하므로, 색마다 규칙이 걸렸는지 본다. */
+t('밤에는 같은 색을 더 밝게 깐다', await page.evaluate(() => {
+  const m = document.querySelector('.memo'), keep = document.documentElement.dataset.theme || '';
+  const made = [...MEMO_COLORS.map(c => c.hex), MEMO_INK].map(hex => {
+    const f = document.createElement('font'); f.setAttribute('color', hex); f.textContent = '가';
+    m.appendChild(f); return { hex, f };
+  });
+  document.documentElement.dataset.theme = 'dark';
+  const out = made.map(({ hex, f }) => ({ hex, got: getComputedStyle(f).color }));
+  made.forEach(({ f }) => f.remove());
+  document.documentElement.dataset.theme = keep;
+  const rgb = h => `rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}, ${parseInt(h.slice(5,7),16)})`;
+  return out.every(x => x.got !== rgb(x.hex));          // 규칙이 빠지면 색값 그대로 나온다
+}), 'app.js 의 MEMO_COLORS·MEMO_INK 와 styles.css 의 .memo font[color="…"] 가 어긋났습니다');
+await page.evaluate(k => { applyEntry(k, { memo: '' }); }, ck);
+
 /* ---------- 넘칠 때 서는 세로 바 (2026-11-03, 교수님 지정) ----------
  * 메모가 320px 를 넘으면 뒷부분이 잘리는데 **잘렸다는 것 자체가 안 보였다**. 네이티브 바는
  * 믿을 수 없다 — 아이폰은 손가락을 떼면 사라지고, 맥은 겹침 바라서 가만히 있으면 흔적이 없다.

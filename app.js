@@ -3471,10 +3471,10 @@ function bindNotes(root) {
       const txt = (ev.clipboardData || window.clipboardData).getData('text');
       document.execCommand('insertText', false, String(txt || ''));
     });
-    const run = cmd => {
+    const run = (cmd, val) => {
       t.focus();
-      try { document.execCommand('styleWithCSS', false, false); } catch {}
-      document.execCommand(cmd, false, null);
+      try { document.execCommand('styleWithCSS', false, false); } catch {}   // b·u·i·font 꼴로 — 평문으로 되돌리기 쉽다
+      document.execCommand(cmd, false, val === undefined ? null : val);
       typed();
       memoMarkSync();
     };
@@ -3485,10 +3485,14 @@ function bindNotes(root) {
       ev.preventDefault();
       run(m.cmd);
     });
-    box && box.querySelectorAll('[data-cmd]').forEach(btn =>
+    box && box.querySelectorAll('[data-cmd],[data-color]').forEach(btn =>
       btn.addEventListener('mousedown', ev => ev.preventDefault()));   // 누를 때 고른 글자가 풀리지 않게
     box && box.querySelectorAll('[data-cmd]').forEach(btn =>
       btn.addEventListener('click', () => run(btn.dataset.cmd)));
+    /* 글자색 (2026-11-05) — 「기본」은 먹빛을 덧칠한다. removeFormat 을 쓰면 굵게·밑줄까지
+       함께 날아가는데, 색만 지우려는 분께 그것은 사고다. */
+    box && box.querySelectorAll('[data-color]').forEach(btn =>
+      btn.addEventListener('click', () => run('foreColor', btn.dataset.color)));
     /* 넘침 바 — 그리기, 그리고 끌어서 옮기기. 네이티브 바를 숨겼으니 이 바가 그 몫까지 한다. */
     t.addEventListener('scroll', () => memoBar(t));
     /* 드로어를 열 때는 `bindNotes` 가 **보이기 전에** 돌므로 그 자리에서 재면 높이가 0 이다.
@@ -3538,6 +3542,20 @@ function memoMarkSync() {
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  /* 색도 같이 비춘다 (2026-11-05) — 지금 커서가 선 자리의 색 하나만 테를 두른다.
+     빛깔표에 없는 색(평범한 먹빛)이면 「기본」에 테를 두른다. */
+  document.querySelectorAll('.memo-box .memo__c').forEach(b => {
+    const mine = live && b.closest('.memo-box').contains(a);
+    let on = false;
+    if (mine) {
+      let v = '';
+      try { v = document.queryCommandValue('foreColor'); } catch {}
+      const h = memoHex(v), named = MEMO_COLORS.find(c => c.hex === h);
+      on = b.classList.contains('memo__c--off') ? !named : (!!named && named.hex === b.dataset.color);
+    }
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
 }
 document.addEventListener('selectionchange', memoMarkSync);
 
@@ -3567,27 +3585,70 @@ const MEMO_MARKS = [
   { mk: '__', tag: 'u', name: '밑줄', key: 'u', cmd: 'underline' },
   { mk: '*',  tag: 'i', name: '기울임', key: 'i', cmd: 'italic' },
 ];
+/* ---------- 글자색 (2026-11-05, 교수님 지정) ----------
+ * 저장은 굵게·밑줄과 같은 길로 **평문**이다 — `{빨강:여기}`. 시트와 CSV 를 사람이 읽을 수
+ * 있어야 하므로 색값(#c0392b)이 아니라 **색 이름**을 적는다. 이름으로 적어 두면 어두운 바탕에서
+ * 같은 「빨강」을 더 밝은 쪽으로 깔 수 있다(styles.css 의 --mc-*). 색값을 적어 두면 밤에
+ * 읽을 수 없는 메모가 된다.
+ * 화면에서는 `document.execCommand('foreColor')` 가 만드는 `<font color="…">` 를 쓴다
+ * (styleWithCSS 를 꺼 두므로 b·u·i 와 같은 꼴이다). `color` 는 **표시 속성**이라 CSS 규칙이
+ * 늘 이기므로, 어두운 바탕 색갈이는 styles.css 한 곳에서 끝난다.
+ * `hex` 는 styles.css 가 그 색을 골라내는 **표식**이기도 하다 — 고치려면 두 곳을 함께 고친다. */
+const MEMO_COLORS = [
+  { nm: '빨강', cls: 'red',    hex: '#c0392b' },
+  { nm: '파랑', cls: 'blue',   hex: '#2563eb' },
+  { nm: '초록', cls: 'green',  hex: '#1f8a5b' },
+  { nm: '보라', cls: 'purple', hex: '#7c3aed' },
+];
+/* 「기본」 — 색을 지운 셈으로 본다. 지울 때 removeFormat 을 쓰면 굵게·밑줄까지 함께 날아가므로,
+ * 평범한 먹빛을 덧칠하고 **평문에는 아무 표시도 붙이지 않는다**. 이 값도 styles.css 가 골라내어
+ * var(--ink) 로 갈아치므로, 밤에도 제 빛으로 보인다. */
+const MEMO_INK = '#111827';
+const MEMO_CRE = new RegExp('\\{(' + MEMO_COLORS.map(c => c.nm).join('|') + '):([\\s\\S]+?)\\}', 'g');
+/* 같은 본을 `g` 없이도 하나 둔다 — `g` 붙은 본으로 `test()` 를 부르면 lastIndex 가 남아,
+   같은 글을 두 번 물으면 거짓이 나온다. */
+const MEMO_CR1 = new RegExp(MEMO_CRE.source);
+/* rgb(192, 57, 43) · #c33 처럼 제각각 오는 색을 #rrggbb 한 꼴로 맞춘다 */
+function memoHex(v) {
+  const t = String(v || '').trim().toLowerCase();
+  const m = t.match(/^rgba?\(([^)]+)\)$/);
+  if (m) return '#' + m[1].split(',').slice(0, 3)
+    .map(x => Math.max(0, Math.min(255, Math.round(parseFloat(x)))).toString(16).padStart(2, '0')).join('');
+  if (/^#[0-9a-f]{3}$/.test(t)) return '#' + t.slice(1).split('').map(c => c + c).join('');
+  return t;
+}
+/* 이 낱말에 걸린 색 이름 — 빛깔표에 없는 색(먹빛 포함)은 '' 이라 표시를 붙이지 않는다 */
+function memoColorOf(n) {
+  if (!n || n.nodeType !== 1) return '';
+  const raw = (n.getAttribute && n.getAttribute('color')) || (n.style && n.style.color) || '';
+  if (!raw) return '';
+  const h = memoHex(raw), hit = MEMO_COLORS.find(c => c.hex === h);
+  return hit ? hit.nm : '';
+}
 /* 메모에서 **굵게** 한 조각만 뽑는다. 간단히 보기에서 이름 아래에 적는다.
    같은 말을 여러 번 굵게 했으면 한 번만 센다. 줄바꿈은 빈칸으로 편다. */
 function memoBold(v) {
   const out = [];
   String(v || '').replace(/\*\*([\s\S]+?)\*\*/g, (_, t) => {
-    const x = t.replace(/\s+/g, ' ').trim();
+    const x = memoPlain(t).replace(/\s+/g, ' ').trim();   // 색 표시는 털어 낸다 (2026-11-05)
     if (x && !out.includes(x)) out.push(x);
     return '';
   });
   return out;
 }
 const memoHtml = s => esc(String(s || ''))
+  /* 색을 **먼저** 입힌다 — `{빨강:**중요**}` 처럼 겹쳐 적어도 안쪽 표시가 그대로 살아난다 */
+  .replace(MEMO_CRE, (_, nm, t) => `<font color="${(MEMO_COLORS.find(c => c.nm === nm) || {}).hex}">${t}</font>`)
   .replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>')
   .replace(/__([\s\S]+?)__/g, '<u>$1</u>')
   .replace(/\*([^*\n]+?)\*/g, '<i>$1</i>')
   .replace(/\n/g, '<br>');
 const memoPlain = s => String(s || '')
+  .replace(MEMO_CRE, '$2')
   .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
   .replace(/__([\s\S]+?)__/g, '$1')
   .replace(/\*([^*\n]+?)\*/g, '$1');
-const memoFancy = s => /\*\*|__|\*/.test(String(s || ''));
+const memoFancy = s => /\*\*|__|\*/.test(String(s || '')) || MEMO_CR1.test(String(s || ''));
 
 /* 편집기 안(꾸며진 DOM)을 저장용 평문으로 바꾼다.
  * 줄 하나를 묶음(div)이 끝낼 때 '뒤에 줄바꿈을 붙이는' 식으로 하면 안 된다 —
@@ -3605,9 +3666,10 @@ function memoFromDom(root) {
     if ((t === 'DIV' || t === 'P') && out && !out.endsWith('\n')) out += '\n';   // 앞 줄을 닫는다
     const at = out.length;
     n.childNodes.forEach(walk);
-    const mk = MEMO_MK[t];
-    const inner = out.slice(at);
-    if (mk && inner.trim()) out = out.slice(0, at) + mk + inner + mk;   // 빈 껍데기에는 표시를 안 붙인다
+    const mk = MEMO_MK[t], nm = memoColorOf(n);
+    let inner = out.slice(at);
+    if (mk && inner.trim()) { out = out.slice(0, at) + mk + inner + mk; inner = out.slice(at); }   // 빈 껍데기에는 표시를 안 붙인다
+    if (nm && inner.trim()) out = out.slice(0, at) + `{${nm}:` + inner + '}';   // 글자색 (2026-11-05)
   };
   root.childNodes.forEach(walk);
   return out;
@@ -4304,7 +4366,8 @@ function relGraph() {
 
   /* 2) 메모 — 적어 두신 말에 다른 교수 이름이 나오면 */
   rows.forEach(p => {
-    const memo = String(getMemo(p) || '');
+    /* 꾸밈 표시는 털어서 읽는다 — 근거 문장을 그대로 보여 주므로 `{빨강:…}` 가 비치면 안 된다 */
+    const memo = memoPlain(getMemo(p) || '');
     if (!memo.trim()) return;
     memo.split(/[.!?\n·]+/).forEach(raw => {
       const sent = raw.trim();
@@ -6076,6 +6139,10 @@ function openDrawer(p, d) {
         <div class="memo-box" data-key="${esc(rKey(p))}">
           <div class="memo__bar">
             ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
+            ${/* 글자색 (2026-11-05, 교수님 지정) — 저장은 평문 「{빨강:…}」입니다 */''}
+            <span class="memo__cs">${MEMO_COLORS.map(c => `<button type="button" class="memo__c memo__c--${c.cls}" data-color="${esc(c.hex)}" aria-pressed="false" title="고른 글자에 ${esc(c.nm)} 색을 입힙니다" aria-label="고른 글자를 ${esc(c.nm)} 색으로"></button>`).join('')}<button
+              type="button" class="memo__c memo__c--off" data-color="${esc(MEMO_INK)}" aria-pressed="false"
+              title="글자색을 지웁니다 — 굵게·밑줄은 그대로 둡니다" aria-label="글자색 지우기"></button></span>
           </div>
           <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           ${/* 글이 넘칠 때만 서는 세로 바 (2026-11-03) — 자리는 `memoBar()` 가 잡습니다 */''}
