@@ -5654,7 +5654,11 @@ function mtAteRows() {
 /* ---------- 칩에 다는 점심·저녁 (2026-11-05, 교수님 지정) ----------
  * 교수 칩(`stChip`) 이름 뒤에 **점심을 드신 분은 해, 저녁을 드신 분은 달**을 조그맣게 답니다.
  * 옆의 만난 횟수(`metDots`)가 **몇 번**을 말한다면, 이것은 **무엇을 함께했는가**를 말합니다.
- * - **치른 자리만** 셉니다(`mtAte`) — 앞으로의 약속은 아직 드신 것이 아닙니다.
+ * - **치른 자리와 예정을 함께** 답니다 (2026-11-05 저녁, 교수님 지정). 치른 자리는 또렷하게,
+ *   **앞으로의 약속은 흐리게**(`is-soon`) 섭니다 — 누구와 드셨는지와 누구를 뵐지를 칩 하나에서
+ *   보시기 위해서입니다. 「못 만남」으로 표시하신 자리만 뺍니다(`mtKeep`).
+ * - 한 갈래에 **그림은 하나**입니다. 치른 자리가 있으면 또렷한 그림 하나로 서고, 예정 수는
+ *   줄머리 표에만 적습니다 — 그림을 둘 그리면 이름보다 그림이 길어집니다.
  * - Tea·시각 미정은 달지 않습니다. 교수님이 점심·저녁 둘만 말씀하셨고, 그림이 넷이 되면
  *   이름보다 그림이 길어집니다.
  * - 그림과 빛깔은 달력 것(`MT_ICON` · --mt-day/--mt-night)을 그대로 씁니다 — 달력에서 본 해가
@@ -5667,24 +5671,36 @@ function mealAll() {
   if (mealCache && mealCache.t === today && mealCache.m === meetMap) return mealCache.g;
   const g = new Map();
   mtList().forEach(m => {
-    if (!mtAte(m, today)) return;
+    if (!mtKeep(m)) return;                       /* 「못 만남」·날짜 없는 자리만 뺀다 */
     const s = mtSlot(m);
     if (s !== 'day' && s !== 'night') return;
-    m.who.forEach(k => { const e = g.get(k) || { day: 0, night: 0 }; e[s]++; g.set(k, e); });
+    const soon = !mtAte(m, today);                /* 아직 치르지 않은 자리 — 흐리게 선다 */
+    m.who.forEach(k => {
+      const e = g.get(k) || { day: 0, night: 0, dayS: 0, nightS: 0 };
+      e[soon ? s + 'S' : s]++; g.set(k, e);
+    });
   });
   mealCache = { t: today, m: meetMap, g };
   return g;
 }
 const mealOf = p => mealAll().get(rKey(p)) || null;
 const MEAL_NAME = { day: '점심', night: '저녁' };
+/* 「점심 2번, 예정 1번」 — 치른 횟수가 먼저고 예정은 뒤에 붙는다 */
+const mealWord = (s, e) => {
+  const n = e[s], sn = e[s + 'S'];
+  return n && sn ? `${MEAL_NAME[s]} ${n}번, 예정 ${sn}번`
+    : n ? `${MEAL_NAME[s]} ${n}번` : `${MEAL_NAME[s]} 예정 ${sn}번`;
+};
+const mealHas = (s, e) => !!(e[s] || e[s + 'S']);
 function mealMark(p) {
   const e = mealOf(p);
   if (!e) return '';
-  return ['day', 'night'].map(s => e[s]
-    ? `<i class="mealm mealm--${s}" role="img" aria-label="${MEAL_NAME[s]} ${e[s]}번">${MT_ICON[s]}</i>` : '').join('');
+  /* 치른 자리가 하나라도 있으면 또렷하게, 예정뿐이면 흐리게 */
+  return ['day', 'night'].map(s => mealHas(s, e)
+    ? `<i class="mealm mealm--${s}${e[s] ? '' : ' is-soon'}" role="img" aria-label="${mealWord(s, e)}">${MT_ICON[s]}</i>` : '').join('');
 }
 const mealTip = p => { const e = mealOf(p); return e
-  ? ['day', 'night'].map(s => e[s] ? ` · ${MEAL_NAME[s]} ${e[s]}번` : '').join('') : ''; };
+  ? ['day', 'night'].map(s => mealHas(s, e) ? ` · ${mealWord(s, e)}` : '').join('') : ''; };
 
 /* `meal` 은 **점심+저녁을 함께 보는 묶음**입니다 (2026-11-02 저녁, 교수님 지정).
    약속에 그런 갈래가 붙는 것은 아니고, 고르기 단추에서만 쓰는 이름입니다. */

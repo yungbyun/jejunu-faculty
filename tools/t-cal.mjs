@@ -960,7 +960,7 @@ t('기록이 없으면 빈 안내', await page.evaluate(() => {
 
 /* ---------- 칩에 다는 점심(해)·저녁(달) (2026-11-05, 교수님 지정) ----------
  * 교수 칩 이름 뒤에 점심을 드신 분은 해, 저녁을 드신 분은 달이 조그맣게 섭니다.
- * **치른 자리만** 셉니다 — 앞으로의 약속은 아직 드신 것이 아니고, Tea 는 달지 않습니다. */
+ * 치른 자리는 또렷하게, **예정은 흐리게**(`is-soon`) 섭니다. Tea 는 달지 않습니다. */
 const MEALSET = async () => page.evaluate(() => {
   meetMap = {}; localStorage.removeItem('jnu-meets'); mealCache = null;
   const [a, b2, c, d] = state.rows, k = x => rKey(x);
@@ -972,12 +972,17 @@ const MEALSET = async () => page.evaluate(() => {
   meets()['c4'] = { date: ymd(yd), time: '14:00', kind: 'other',  who: [k(d)], done: '' };   // Tea
   mtSave();
   const of = x => { const e = mealOf(x); return e ? `${e.day}/${e.night}` : '없음'; };
-  return { a: of(a), b: of(b2), c: of(c), d: of(d),
-    html: mealMark(a), tip: mealTip(a), none: mealMark(c) };
+  const ofs = x => { const e = mealOf(x); return e ? `${e.dayS}/${e.nightS}` : '없음'; };
+  return { a: of(a), b: of(b2), c: of(c), d: of(d), cS: ofs(c), aS: ofs(a),
+    html: mealMark(a), tip: mealTip(a), soon: mealMark(c), tipC: mealTip(c) };
 });
 const ME = await MEALSET();
 t('점심을 드신 분에게 해, 저녁에는 달', ME.a === '1/1' && ME.b === '0/1', `${ME.a} / ${ME.b}`);
-t('앞으로의 약속은 아직 세지 않는다', ME.c === '없음' && ME.none === '', ME.c);
+t('앞으로의 약속도 그림이 선다', /mealm--day/.test(ME.soon), ME.soon.slice(0, 70));
+t('예정은 흐린 표를 달고 선다', /is-soon/.test(ME.soon), ME.soon.slice(0, 70));
+t('예정은 치른 셈에 섞이지 않는다', ME.c === '0/0' && ME.cS === '1/0', `${ME.c} / ${ME.cS}`);
+t('치른 자리는 흐리지 않다', !/is-soon/.test(ME.html) && ME.aS === '0/0', `${ME.aS} / ${ME.html.slice(0, 60)}`);
+t('줄머리 표에 「예정」이라 적힌다', ME.tipC === ' · 점심 예정 1번', JSON.stringify(ME.tipC));
 t('Tea 는 달지 않는다', ME.d === '없음', ME.d);
 t('해·달 그림이 칩에 붙는다', ME.html.includes('mealm--day') && ME.html.includes('mealm--night'), ME.html.slice(0, 60));
 t('줄머리 표에도 적는다', ME.tip === ' · 점심 1번 · 저녁 1번', JSON.stringify(ME.tip));
@@ -1007,6 +1012,16 @@ t('칩에 그림이 실제로 선다', !!MEC && MEC.n >= 1, MEC ? `${MEC.n}개` 
 t('이름 옆이라 조그맣다(11px)', MEC && MEC.w === 11 && MEC.h === 11, MEC ? `${MEC.w}x${MEC.h}` : '');
 t('빛깔은 달력의 해·달과 같다', MEC && MEC.color === MEC.want, MEC ? `${MEC.color} / ${MEC.want}` : '');
 t('줄머리 표에 점심·저녁이 적힌다', MEC && /점심|저녁/.test(MEC.tip), MEC ? MEC.tip : '');
+/* 예정 그림이 **실제로 흐리게** 그려지는가 — 치른 그림과 견준다 */
+await page.evaluate(() => { applyEntry(rKey(state.rows[2]), { rating: '확' }); render(); });
+await page.waitForTimeout(300);
+const MESO = await page.evaluate(() => {
+  const so = document.querySelector('.st-c .mealm.is-soon'), at = document.querySelector('.st-c .mealm:not(.is-soon)');
+  if (!so || !at) return null;
+  return { so: +getComputedStyle(so).opacity, at: +getComputedStyle(at).opacity };
+});
+t('예정 그림은 치른 그림보다 흐리다', MESO && MESO.so < MESO.at && MESO.so > 0.2,
+  MESO ? `${MESO.so} / ${MESO.at}` : '그림을 못 찾음');
 await page.evaluate(() => {
   meetMap = {}; localStorage.removeItem('jnu-meets'); mealCache = null;
   state.rows.forEach(p => applyEntry(rKey(p), { rating: '' }));
