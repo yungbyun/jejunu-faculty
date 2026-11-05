@@ -5490,8 +5490,8 @@ function mtWhenText(m) {
  * 점심·저녁이라는 갈래가 아니라 **몇 시냐**로 가른다 — 14시 커피도 해, 19시 40분도 달이다.
  * 여섯 시부터 열여덟 시 앞까지를 낮으로 본다. */
 const MT_ICON = {
-  day: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="currentColor"/>'
-    + '<g stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+  day: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor"/>'
+    + '<g stroke="currentColor" stroke-width="2.4" stroke-linecap="round">'
     + '<path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></g></svg>',
   night: '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<path d="M20 14.2A8.3 8.3 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z" fill="currentColor"/></svg>',

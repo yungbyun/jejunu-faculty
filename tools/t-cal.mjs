@@ -1012,6 +1012,24 @@ t('칩에 그림이 실제로 선다', !!MEC && MEC.n >= 1, MEC ? `${MEC.n}개` 
 t('이름 옆이라 조그맣다(11px)', MEC && MEC.w === 11 && MEC.h === 11, MEC ? `${MEC.w}x${MEC.h}` : '');
 t('빛깔은 달력의 해·달과 같다', MEC && MEC.color === MEC.want, MEC ? `${MEC.color} / ${MEC.want}` : '');
 t('줄머리 표에 점심·저녁이 적힌다', MEC && /점심|저녁/.test(MEC.tip), MEC ? MEC.tip : '');
+/* 해가 **밝은 바탕에서 묻히지 않는가** (2026-11-05 저녁, 교수님 지정 — 「칩에 해가 잘 안 띈다」).
+   11px 그림이라 3:1 아래로 내려가면 눈에 들어오지 않는다. 밤에는 거꾸로 밝은 쪽이 보인다. */
+const SUNC = await page.evaluate(() => {
+  const lum = c => { const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number)
+    .map(x => x / 255).map(x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const cr = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const pick = t => { document.documentElement.setAttribute('data-theme', t);
+    const box = document.createElement('div'); box.className = 'cal-c__d';
+    box.innerHTML = '<i class="cal-dot--day"></i>'; document.body.appendChild(box);
+    const v = { fg: getComputedStyle(box.firstChild).color, bg: getComputedStyle(document.body).backgroundColor };
+    box.remove(); return v; };
+  const li = pick('light'), dk = pick('dark');
+  document.documentElement.removeAttribute('data-theme');
+  return { light: +cr(li.fg, li.bg).toFixed(2), dark: +cr(dk.fg, dk.bg).toFixed(2), lf: li.fg, df: dk.fg };
+});
+t('낮에도 해가 묻히지 않는다(3:1 넘김)', SUNC.light >= 3, `${SUNC.light} (${SUNC.lf})`);
+t('밤에는 해를 밝은 쪽으로 되돌린다', SUNC.dark >= 3 && SUNC.df !== SUNC.lf, `${SUNC.dark} (${SUNC.df})`);
 /* 예정 그림이 **실제로 흐리게** 그려지는가 — 치른 그림과 견준다 */
 await page.evaluate(() => { applyEntry(rKey(state.rows[2]), { rating: '확' }); render(); });
 await page.waitForTimeout(300);
