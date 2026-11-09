@@ -3011,6 +3011,25 @@ function trimIdleSure() {
   return gone.length;
 }
 
+/* 그 한 분의 뜻 없는 강화를 **바로** 턴다 (2026-11-09, 교수님 지정).
+ * 확실로 바꾸시면 강화가 할 일이 없어 단추가 잠기는데, **전에 찍어 두신 표시는 켠 채로
+ * 잠겼습니다** — 숫자에는 안 들어가면서 칩과 상세에는 화살표가 남아 헷갈립니다.
+ * `trimIdleSure()` 는 켤 때와 시트에서 내려올 때만 돌아 그 자리에서는 늦습니다.
+ * 어느 자리가 「뜻 없는가」는 `markIdle` 과 같은 규칙이라 무게표를 고치면 함께 따라옵니다.
+ * 약화는 건드리지 않습니다 — 교수님이 강화만 말씀하셨습니다. */
+function trimIdleSureKey(key) {
+  const p = state.rows.find(x => rKey(x) === key);
+  if (!p || !isSure(p) || !markIdle(p, 'sure')) return false;
+  sures().delete(key);
+  sureSave();                 // 안 올리면 다른 기기에서 또 내려온다
+  /* 다시 그리지 않으므로 서 있는 단추를 그 자리에서 끈다 — 상세의 강화 단추와 선호도 칸의 점 */
+  document.querySelectorAll(`[data-surebtn="${CSS.escape(key)}"]`).forEach(b => {
+    b.classList.remove('on'); b.setAttribute('aria-pressed', 'false');
+  });
+  rateMarkSync(key);
+  return true;
+}
+
 /* ---------- 관심 교수 ----------
  * 카드 왼쪽 위의 동그란 버튼으로 켜고 끕니다. 퀴즈 설정과 같은 길(settings 탭)로 저장되므로
  * 서버(Code.gs)는 고칠 것이 없고, 다른 기기에서도 그대로 따라옵니다. */
@@ -4008,7 +4027,15 @@ async function saveEntry(key, fields) {
     }
   } finally { sync.queue.delete(key); updateSaveBar(); }
 }
-const setRating = (key, val) => saveEntry(key, { rating: val });
+/* 선호도를 바꾸면 **뜻 없어진 강화를 그 자리에서 턴다** (2026-11-09, 교수님 지정) —
+   확실에서는 강화가 숫자를 바꾸지 않으므로 표시만 남아 헷갈립니다. */
+const setRating = (key, val) => {
+  saveEntry(key, { rating: val });
+  if (trimIdleSureKey(key)) {
+    const p = state.rows.find(x => rKey(x) === key);
+    flashStatus(`${p ? p.name + ' 교수의 ' : ''}강화 표시를 풀었습니다 — ${CONFIG.RATINGS.NAMES[val] || val}에서는 강화가 숫자를 바꾸지 않습니다`);
+  }
+};
 const setMet = (key, n) => saveEntry(key, { met: normMet(n) });
 
 /* 메모: 입력을 멈추고 0.8초 뒤 저장, 창을 닫거나 화면을 떠날 때는 즉시 저장 */

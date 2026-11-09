@@ -199,6 +199,44 @@ t('강화를 켜면 약화가 풀린다', await page.evaluate(() => {
   return isSure(p) && !isWeak(p)
     && document.querySelector('[data-weakbtn]').getAttribute('aria-pressed') === 'false';
 }));
+
+/* 확실로 바꾸면 **뜻 없어진 강화를 그 자리에서 턴다** (2026-11-09, 교수님 지정).
+   확실에서는 강화가 숫자를 바꾸지 않아 단추가 잠기는데, 전에 찍어 두신 표시가 켠 채로
+   잠겨 숫자에는 안 들어가면서 화살표만 남았다. */
+await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak');
+  setRating(rKey(state.rows[0]), '중'); renderDept(state.depts[0]); });
+await page.click('[data-surebtn]'); await page.waitForTimeout(300);
+const SUT = await page.evaluate(() => {
+  const p = state.rows[0], k = rKey(p), before = isSure(p);
+  setRating(k, '확');
+  const b = document.querySelector('[data-surebtn]');
+  const box = document.querySelector(`.rate[data-key="${CSS.escape(k)}"]`);
+  return { before, after: isSure(p), on: b.classList.contains('on'),
+    pressed: b.getAttribute('aria-pressed'), dis: b.disabled,
+    mk: box ? (box.dataset.mk || '') : 'x',
+    kept: JSON.parse(localStorage.getItem('jnu-sure') || '[]').includes(k) };
+});
+t('확실로 바꾸면 강화가 풀린다', SUT.before && !SUT.after, JSON.stringify(SUT));
+t('강화 단추도 그 자리에서 꺼진다', !SUT.on && SUT.pressed === 'false' && SUT.dis, JSON.stringify(SUT));
+t('선호도 칸의 표식도 지운다', SUT.mk === '', JSON.stringify(SUT));
+t('푼 것을 저장도 한다', SUT.kept === false, JSON.stringify(SUT));
+/* 되돌려도 저절로 다시 켜지지는 않는다 — 지운 것은 지운 것이다 */
+t('중간으로 되돌려도 저절로 안 켜진다', await page.evaluate(() => {
+  setRating(rKey(state.rows[0]), '중');
+  return !isSure(state.rows[0]);
+}));
+/* 약화는 건드리지 않는다 — 교수님이 강화만 말씀하셨다 (2026-10-29 와 같은 뜻) */
+t('부정으로 바꿔도 약화는 그대로', await page.evaluate(() => {
+  const p = state.rows[0], k = rKey(p);
+  sureSet = new Set(); weakSet = new Set(); weaks().add(k); weakSave();
+  setRating(k, '부');
+  return isWeak(p);
+}));
+await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
+  localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak');
+  setRating(rKey(state.rows[0]), ''); renderDept(state.depts[0]); });
+await page.waitForTimeout(200);
 /* 무게 (2026-10-25 저녁에 맞춘 값) — 확실은 위 두 칸이 .95 로 같고 부정은 아래 두 칸이 0 으로
    같다. 묶고 나면 한 칸이 모두 .15 다: .95 .95 .80 .65 .50 .35 .20 0 0
    확 .95/.95/.80 · 중 .65/.50/.35 · 부 .20/.00/.00 (강화/보통/약화) */
