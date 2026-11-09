@@ -77,7 +77,11 @@ const C = await page.evaluate(() => {
     name: ctx.includes(a.name), rank: ctx.includes(a.rank),
     rate: /선호도 중간\+약화/.test(ctx), sureName: ctx.includes(b2.name),
     memo: ctx.includes('학장 선거에 뜻이 있다고 하셨다 조심'),
-    mark: /\*\*|\{빨강:/.test(ctx),
+    memoLine: ctx.includes('\n  메모: 학장 선거에 뜻이 있다고 하셨다 조심'),
+    howto: /# 이 자료를 읽는 법/.test(ctx) && /메모까지 살펴본 뒤에만/.test(ctx) && /근거가 된 자리를 괄호로/.test(ctx),
+    office: ctx.includes(String(a.office || '')) && /연구실 /.test(ctx),
+    /* 「읽는 법」 안내에도 ** 가 있으므로 **메모 줄만** 본다 */
+    mark: /\*\*|\{빨강:/.test((ctx.split('\n').find(x => x.startsWith('  메모: ')) || '')),
     met: /만남 2번/.test(ctx), edu: /학부 /.test(ctx),
     paper: ctx.includes(String(a.paper1 || '').split('|')[0].trim()),
     hire: /# 입사 동기 묶음/.test(ctx), alum: /# 같은 대학을 나온 분/.test(ctx),
@@ -93,6 +97,10 @@ t('학과별 셈을 적는다', C.dept);
 t('교수 이름·직급·선호도·표시', C.name && C.rank && C.rate, JSON.stringify([C.name, C.rank, C.rate]));
 t('만난 횟수도', C.met);
 t('메모는 표시를 턴 맨글로', C.memo && !C.mark, JSON.stringify([C.memo, C.mark]));
+/* 메모는 **제 줄에** 선다 (2026-11-09 저녁, 교수님 지정) — 긴 줄 끝에 매달면 뒤쪽이라 덜 띈다 */
+t('메모는 제 줄에 따로 선다', C.memoLine, JSON.stringify(C.memoLine));
+t('읽는 법을 자료 맨 위에 적는다', C.howto, JSON.stringify(C.howto));
+t('연구실도 싣는다', C.office, JSON.stringify(C.office));
 t('학력(동문)을 싣는다', C.edu);
 t('논문 제목을 싣는다', C.paper);
 t('입사 동기 묶음을 따로 적는다', C.hire);

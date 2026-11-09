@@ -2194,19 +2194,37 @@ function askLine(p) {
     .filter(Boolean).join('·') || '학력 모름';
   const pap = [p.paper1, p.paper2, p.paper3].filter(Boolean)
     .map(x => String(x).split('|')[0].trim()).join(' ; ');
-  const memo = memoPlain(getMemo(p)).replace(/\s+/g, ' ').trim().slice(0, 700);
+  /* 메모는 **제 줄에 따로** 답니다 (2026-11-09 저녁, 교수님 지정 — 「사는 집을 물었더니 못
+     찾더라」). 한 줄 끝에 매달아 두면 긴 줄 뒤쪽이라 눈에 덜 띕니다. 길이도 700자에서
+     1,500자로 늘렸습니다 — 시트는 2,000자까지 받으므로 그 앞이 잘리고 있었습니다. */
+  const memo = memoPlain(getMemo(p)).replace(/\s+/g, ' ').trim().slice(0, 1500);
   const mates = hireOf(p).ps.map(x => x.name).join(', ');
   const meal = askMeals(p);
   const kw = askKw(p), sum = String(p.summary || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-  return [`${p.dept_name} | ${p.name} | ${p.rank}`,
+  const head = [`${p.dept_name} | ${p.name} | ${p.rank}`,
     `선호도 ${r ? (CONFIG.RATINGS.NAMES[r] || r) : '미지정'}${mk ? `+${mk}` : ''}${tg.length ? `[${tg.join(',')}]` : ''}`,
     `만남 ${getMet(p)}번`, edu,
+    p.office ? `연구실 ${p.office}` : '',
     kw ? `전공 ${kw}` : '', sum ? `연구 ${sum}` : '', pap ? `논문 ${pap}` : '',
-    mates ? `입사동기 ${mates}` : '', meal ? `식사 ${meal}` : '', memo ? `메모 ${memo}` : '',
+    mates ? `입사동기 ${mates}` : '', meal ? `식사 ${meal}` : '',
   ].filter(Boolean).join(' | ');
+  return memo ? `${head}\n  메모: ${memo}` : head;
 }
 function askCtx() {
   const L = [], today = mtToday(), s = sureRate(state.rows);
+  /* ---------- 이 자료를 읽는 법 ----------
+   * 모델에게 주는 지침을 **서버가 아니라 자료 맨 위에** 적습니다 (2026-11-09 저녁).
+   * 서버의 규칙(`aiAsk` 의 sys)을 고치면 교수님이 Apps Script 를 다시 배포하셔야 하지만,
+   * 이 글은 화면이 만들어 보내므로 **배포 없이** 고칠 수 있습니다.
+   * 「최영준 교수가 사는 집」처럼 메모에만 적힌 것을 묻자 「자료에 없습니다」가 먼저 나왔습니다 —
+   * 메모까지 읽게 하고, 말이 달라도 같은 뜻이면 근거로 쓰게 하고, **근거를 밝히게** 합니다. */
+  L.push('# 이 자료를 읽는 법',
+    '- 사람에 대한 물음이면 그 사람 줄과 **바로 아래 「메모:」 줄까지** 끝까지 읽고 답하십시오.',
+    '- 사는 곳·가족·취미·건강·사이·부탁 같은 것은 **메모에만** 적혀 있습니다. 메모를 먼저 보십시오.',
+    '- 묻는 말과 자료의 말이 달라도 같은 뜻이면 근거로 쓰십시오(집=사신다=거주=동네 이름, 방=연구실).',
+    '- 「자료에 없습니다」는 **그 사람의 메모까지 살펴본 뒤에만** 쓰십시오.',
+    '- 답에는 근거가 된 자리를 괄호로 짧게 밝히십시오 — 예: (메모), (학력), (논문), (식사 약속).',
+    '');
   L.push('# 기본', `오늘: ${today}`,
     '나(후보): 제주대학교 공과대학 컴퓨터공학과 변영철 교수 — 공과대학 학장 선거에 나섭니다',
     `전체 ${state.rows.length}명 · 투표에 드는 분 ${s.pool}명(평가제외 ${s.na}명) · 확실 ${s.sure}명 ${fmtPct(s.pct)}`
