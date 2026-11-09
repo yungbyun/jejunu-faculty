@@ -108,6 +108,7 @@ function doPost(e) {
     return out({ ok: outCancel(email, String(body.id)) });
   }
   if (body.action === 'rewrite') return mailRewrite(email, body);
+  if (body.action === 'ask') return aiAsk(email, body);
   if (body.action === 'airewrite') return airewrite(email, body);
   if (body.action === 'airewrite_reset') {
     if (!body.dept_id || !body.slug) return out({ error: 'missing key' });
@@ -340,7 +341,7 @@ function airPrompt(b) {
 }
 
 /* Claude API 호출. 키는 스크립트 속성 ANTHROPIC_KEY 에 둡니다. */
-function airCallClaude(sys, user) {
+function airCallClaude(sys, user, maxTok) {
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
   if (!key) return { error: 'API 키가 설정되지 않았습니다 (스크립트 속성 ANTHROPIC_KEY)' };
   let res;
@@ -351,7 +352,7 @@ function airCallClaude(sys, user) {
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       payload: JSON.stringify({
         model: AIR_MODEL,
-        max_tokens: 1200,
+        max_tokens: maxTok || 1200,
         system: sys,
         messages: [{ role: 'user', content: user }],
       }),
@@ -414,6 +415,42 @@ function airewrite(email, body) {
   v.hint = hint;
   airSave(email, deptId, slug, idx, v);
   return out({ ok: true, item: { title: v.title, term: v.term, concl: v.concl, hint: hint, updated_at: new Date().toISOString() } });
+}
+
+/* ---------- AI 에게 묻기 (2026-11-09, 교수님 지정) ----------
+ * 분석 화면 맨 위에서 보낸 물음에 답합니다. 화면이 들고 있는 자료(선호도·메모·학력·논문·
+ * 입사 동기·식사 약속)를 통째로 받아 그대로 들려 주고, **아무것도 저장하지 않습니다** —
+ * 물음도 답도 흘려보냅니다. 시트에 쌓아 두면 교수님 말고 아무도 못 볼 글이 또 한 곳 늘어납니다.
+ * 자료를 서버에서 다시 모으지 않는 까닭: 선호도·메모는 시트에 있지만 학력·논문·입사 동기는
+ * 앱 쪽 자료라, 한자리에 모으는 일은 화면이 이미 하고 있습니다. */
+const ASK_MAX_CTX = 120000;        // 자료 글자 수 상한
+const ASK_MAX_TOK = 2000;          // 답의 길이 상한
+
+function aiAsk(email, b) {
+  if (!airThrottle(email)) return out({ error: '조금 전에 부르셨습니다. 몇 초 뒤에 다시 눌러 주세요' });
+  const q = String(b.q == null ? '' : b.q).trim().slice(0, 1000);
+  if (!q) return out({ error: '물어보실 것을 적어 주세요' });
+  const ctx = String(b.ctx == null ? '' : b.ctx).slice(0, ASK_MAX_CTX);
+
+  const sys = [
+    '당신은 제주대학교 공과대학 학장 선거에 나선 컴퓨터공학과 변영철 교수의 참모입니다.',
+    '아래 자료는 교수님이 앱에 모아 둔 것입니다 — 교수 명단과 선호도·표시, 메모, 학력(출신 대학),',
+    '전공과 논문, 입사 동기 묶음, 식사 약속, 학과별 셈.',
+    '',
+    '반드시 지킬 것:',
+    '1. 자료에 있는 것만 근거로 답하십시오. 자료에 없으면 "자료에 없습니다"라고 적고, 지어내지 마십시오.',
+    '2. 숫자를 물으면 자료의 줄을 세어 정확히 답하십시오. 어림잡지 마십시오.',
+    '3. 사람을 들 때는 학과와 이름을 함께 적으십시오.',
+    '4. 담백한 한국어 평서문으로 짧게 쓰십시오. 머리말·맺음말·이모지·코드펜스는 쓰지 마십시오.',
+    '5. 여러 사람이나 여러 가지를 들 때는 "- "로 시작하는 짧은 목록으로 적으십시오.',
+    '6. 중요한 말은 **별표 두 개**로 감싸 강조할 수 있습니다. 그 밖의 서식은 쓰지 마십시오.',
+    '7. 교수님을 치켜세우거나 과장하지 마십시오. 묻지 않은 조언을 덧붙이지 마십시오.',
+  ].join('\n');
+
+  const user = ['## 자료', ctx, '', '## 물음', q].join('\n');
+  const r = airCallClaude(sys, user, ASK_MAX_TOK);
+  if (r.error) return out({ error: r.error });
+  return out({ ok: true, text: String(r.text || '').trim() });
 }
 
 /* 시트에 남아 있는 예전 값(상→확, 하→모)을 한 번에 새 값으로 바꿉니다. (편집기에서 직접 실행)

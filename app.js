@@ -2155,6 +2155,155 @@ function stChip(p, r) {
     : `<li><a class="${cls}"${sty} href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
 }
 
+/* ---------- AI 에게 묻기 (2026-11-09, 교수님 지정) ----------
+ * 분석 화면 **맨 위**에서 교수님이 적으신 물음에 모델이 답합니다. 서버(Apps Script)가 Claude 를
+ * 부르는 길은 「AI 융합 방향 다시 쓰기」와 같고, 행동만 `ask` 로 하나 늘렸습니다.
+ * **앱에 쌓인 것을 통째로 들려 줍니다** (교수님 지정) — 선호도와 표시, 메모, 학력(동문),
+ * 논문, 입사 동기, 식사 약속, 학과별 셈. 그래서 「나와 같은 대학을 나왔는데 아직 확실이 아닌
+ * 분」처럼 **여러 자료를 가로지르는** 물음에도 답할 수 있습니다.
+ * - 물음도 답도 **저장하지 않습니다**. 이 창에서만 살고(`ASK`), 화면을 떠나면 사라집니다 —
+ *   시트에 쌓아 두면 교수님 말고 아무도 못 볼 글이 또 한 곳 늘어납니다.
+ * - 자료에 **전화번호·메일은 넣지 않습니다**. 물음에 쓸 일이 없고, 밖으로 나가는 글입니다.
+ * - 학력(`data/edu.json`)은 늦게 오므로 **묻기 전에 기다립니다**(`loadEdu`) — 안 기다리면
+ *   동문을 묻는 물음에만 「자료에 없습니다」가 돌아옵니다.
+ * - 자료가 커서 20초로는 모자랍니다. 이 길만 60초를 기다립니다.
+ * - 답은 **그 자리에서만** 고쳐 그립니다(`askSync`) — 통째로 다시 그리면 적던 물음이 날아갑니다. */
+const ASK = { q: '', a: '', err: '', busy: false };
+const ASK_WAIT = 60000;
+const ASK_MAX = 120000;              // 들려줄 자료의 글자 수 상한
+const ASK_TIPS = [
+  '아직 확실이 아닌 분 가운데 나와 같은 대학을 나온 분은?',
+  '입사 동기 가운데 아직 뵙지 못한 분을 알려 주세요',
+  '메모를 보고 먼저 만나야 할 다섯 분을 꼽아 주세요',
+  '학과별로 확실이 가장 모자란 곳은 어디입니까?',
+];
+const askTags = p => [isPush(p) ? '공략' : '', isVip(p) ? '도움' : '', isPres(p) ? 'VIP' : '',
+  favs().has(rKey(p)) ? '관심' : ''].filter(Boolean);
+const askKw = p => (Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags || '').replace(/;/g, ','))
+  .replace(/\s+/g, ' ').trim();
+/* 그분이 든 식사 자리 — 날짜와 갈래, 아직 치르지 않았으면 「예정」 */
+function askMeals(p) {
+  const k = rKey(p), today = mtToday();
+  return mtList().filter(m => m.done !== 'no' && m.date && (m.who || []).includes(k))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .map(m => `${m.date} ${MT_SLOT_NAME[mtSlot(m)] || ''}${mtAte(m, today) ? '' : '(예정)'}`).join(', ');
+}
+function askLine(p) {
+  const e = eduOf(p) || {}, r = getRating(p), mk = rateMark(p), tg = askTags(p);
+  const edu = [e.bs ? `학부 ${e.bs}` : '', e.ms ? `석사 ${e.ms}` : '', e.phd ? `박사 ${e.phd}` : '']
+    .filter(Boolean).join('·') || '학력 모름';
+  const pap = [p.paper1, p.paper2, p.paper3].filter(Boolean)
+    .map(x => String(x).split('|')[0].trim()).join(' ; ');
+  const memo = memoPlain(getMemo(p)).replace(/\s+/g, ' ').trim().slice(0, 700);
+  const mates = hireOf(p).ps.map(x => x.name).join(', ');
+  const meal = askMeals(p);
+  const kw = askKw(p), sum = String(p.summary || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return [`${p.dept_name} | ${p.name} | ${p.rank}`,
+    `선호도 ${r ? (CONFIG.RATINGS.NAMES[r] || r) : '미지정'}${mk ? `+${mk}` : ''}${tg.length ? `[${tg.join(',')}]` : ''}`,
+    `만남 ${getMet(p)}번`, edu,
+    kw ? `전공 ${kw}` : '', sum ? `연구 ${sum}` : '', pap ? `논문 ${pap}` : '',
+    mates ? `입사동기 ${mates}` : '', meal ? `식사 ${meal}` : '', memo ? `메모 ${memo}` : '',
+  ].filter(Boolean).join(' | ');
+}
+function askCtx() {
+  const L = [], today = mtToday(), s = sureRate(state.rows);
+  L.push('# 기본', `오늘: ${today}`,
+    '나(후보): 제주대학교 공과대학 컴퓨터공학과 변영철 교수 — 공과대학 학장 선거에 나섭니다',
+    `전체 ${state.rows.length}명 · 투표에 드는 분 ${s.pool}명(평가제외 ${s.na}명) · 확실 ${s.sure}명 ${fmtPct(s.pct)}`
+    + ` · 과반까지 ${s.need > 0 ? `${s.need}명 더` : `${-s.need}명 여유`}`,
+    `선호도: ${CONFIG.RATINGS.LABELS.map(r => `${r}=${CONFIG.RATINGS.NAMES[r] || r}`).join(', ')}`,
+    '표시: 강화(한 칸 위)·약화(한 칸 아래)·공략(공들일 분)·도움(나를 돕는 분)·VIP(총장이 청할 분)·관심', '');
+  L.push('# 학과별');
+  state.depts.forEach(d => {
+    const c = CONFIG.RATINGS.LABELS.map(r => `${r} ${d.profs.filter(x => getRating(x) === r).length}`).join(' · ');
+    L.push(`${d.name} (${d.profs.length}명): ${c} · 미지정 ${d.profs.filter(x => !getRating(x)).length}`);
+  });
+  L.push('', '# 교수 (한 줄에 한 분)');
+  state.depts.forEach(d => d.profs.forEach(p => L.push(askLine(p))));
+  /* 같은 대학을 나온 분끼리 묶어 둔다 — 한 줄씩 읽어 맞추는 것보다 틀릴 일이 적다 */
+  const uni = new Map();
+  state.rows.forEach(p => eduUnivs(eduOf(p)).forEach(u => {
+    (uni.get(u) || uni.set(u, []).get(u)).push(`${p.name}(${p.dept_name})`);
+  }));
+  const pairs = [...uni].filter(([, v]) => v.length > 1).sort((a, b) => b[1].length - a[1].length);
+  if (pairs.length) { L.push('', '# 같은 대학을 나온 분 (학부·석사·박사 가운데 하나라도 같으면)');
+    pairs.forEach(([u, v]) => L.push(`${u}: ${v.join(', ')}`)); }
+  const hires = hireAll().map(g => g.map(k => { const x = state.rows.find(y => rKey(y) === k);
+    return x ? `${x.name}(${x.dept_name})` : k.replace(/^\?/, ''); }).join(', ')).filter(Boolean);
+  if (hires.length) { L.push('', '# 입사 동기 묶음'); hires.forEach(x => L.push(x)); }
+  const rows = mtAteRows();
+  if (rows.length) { L.push('', '# 식사 약속 (가까운 날부터)');
+    rows.forEach(x => L.push(`${x.m.date} ${x.m.time || '시각 미정'} ${MT_SLOT_NAME[x.slot] || ''}`
+      + ` ${mtNames(x.m).join(', ')}${x.m.place ? ` — ${x.m.place}` : ''} (${x.ate ? '만남' : '예정'})`)); }
+  return L.join('\n').slice(0, ASK_MAX);
+}
+/* 답을 글로 그린다 — 모델이 쓰는 것은 **굵게**, 「- 」 목록, 빈 줄 뿐이다 */
+function askHtml(t) {
+  const inline = x => esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  const out = []; let ul = false;
+  String(t || '').split(/\r?\n/).forEach(ln => {
+    const m = ln.match(/^\s*[-*\u00b7]\s+(.*)$/);
+    if (m) { if (!ul) { out.push('<ul>'); ul = true; } out.push(`<li>${inline(m[1])}</li>`); return; }
+    if (ul) { out.push('</ul>'); ul = false; }
+    if (ln.trim()) out.push(`<p>${inline(ln.trim())}</p>`);
+  });
+  if (ul) out.push('</ul>');
+  return out.join('');
+}
+const askBody = () => ASK.busy ? '<p class="muted">생각하는 중… 20초쯤 걸립니다</p>'
+  : ASK.a ? askHtml(ASK.a) : '';
+function askSection() {
+  return `
+      <section class="st-sec ask">
+        <div class="st-head"><h2>AI 에게 묻기</h2>
+          <span class="ask__note">선호도·메모·학력·논문·입사 동기·식사 약속을 함께 보냅니다</span></div>
+        <div class="ask__row">
+          <textarea id="askQ" class="ask__ta" rows="2" maxlength="1000"
+            placeholder="${esc(ASK_TIPS[0])}" aria-label="AI 에게 물을 것">${esc(ASK.q)}</textarea>
+          <button type="button" class="btn btn--push ask__go" id="askGo"${ASK.busy ? ' disabled' : ''}>${ASK.busy ? '묻는 중…' : '묻기'}</button>
+        </div>
+        <div class="ask__tips">${ASK_TIPS.map(x =>
+          `<button type="button" class="ask__tip" data-asktip="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+        <p class="ask__err" role="alert"${ASK.err ? '' : ' hidden'}>${esc(ASK.err)}</p>
+        <div class="ask__out" aria-live="polite">${askBody()}</div>
+      </section>`;
+}
+function askSync() {
+  const box = $app.querySelector('.ask'); if (!box) return;
+  const go = box.querySelector('#askGo'), err = box.querySelector('.ask__err'), out = box.querySelector('.ask__out');
+  if (go) { go.disabled = ASK.busy; go.textContent = ASK.busy ? '묻는 중…' : '묻기'; }
+  if (err) { err.hidden = !ASK.err; err.textContent = ASK.err; }
+  if (out) out.innerHTML = askBody();
+}
+async function askGo() {
+  const ta = $app.querySelector('#askQ'); if (!ta) return;
+  const q = String(ta.value || '').trim();
+  if (!q || ASK.busy) { if (!q) ta.focus(); return; }
+  ASK.q = q; ASK.err = ''; ASK.a = ''; ASK.busy = true; askSync();
+  try {
+    await loadEdu();                 // 동문을 묻는 물음에만 「자료에 없습니다」가 나오지 않게
+    const r = await ratingsApi('ask', { q, ctx: askCtx() }, ASK_WAIT);
+    if (r && r.error === 'bad action') throw new Error('Apps Script 를 다시 배포해야 합니다 — 편집기에서 배포 → 배포 관리 → 새 버전');
+    if (!r || !r.ok || !r.text) throw new Error((r && r.error) || '답을 받지 못했습니다');
+    ASK.a = r.text;
+  } catch (e) { ASK.err = (e && e.message) || String(e); }
+  ASK.busy = false; askSync();
+}
+function bindAsk() {
+  const box = $app.querySelector('.ask'); if (!box) return;
+  const ta = box.querySelector('#askQ');
+  ta?.addEventListener('input', () => { ASK.q = ta.value; });
+  /* 적다가 바로 보내는 길 — 줄바꿈과 섞이지 않게 Ctrl(⌘)+Enter 로 */
+  ta?.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); askGo(); }
+  });
+  box.querySelector('#askGo')?.addEventListener('click', askGo);
+  box.querySelectorAll('[data-asktip]').forEach(b => b.addEventListener('click', () => {
+    if (!ta) return;
+    ta.value = b.dataset.asktip; ASK.q = ta.value; askGo();
+  }));
+}
+
 function renderStats() {
   const all = state.rows, rated = all.filter(getRating);
   const pct = all.length ? Math.round(rated.length / all.length * 100) : 0;
@@ -2164,6 +2313,7 @@ function renderStats() {
   $app.innerHTML = `
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
+      ${askSection()}
       <div class="hero">
         <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r =>
           /* 한 글자(확·긍…)는 빼고 뜻만 적는다 — 색칠한 네모가 이미 그 자리를 말해 준다 (2026-10-09) */
@@ -2213,6 +2363,8 @@ function renderStats() {
     </div>`;
 
   relRefresh();
+  bindAsk();
+  loadEdu();        // 학력은 늦게 오므로 화면을 열 때 미리 부른다 (2026-11-09)
   $app.querySelectorAll('[data-go]').forEach(el => {
     const go = () => { state.ratingFilter = el.dataset.rating; state._keepRating = true; location.hash = `#/dept/${encodeURIComponent(el.dataset.go)}`; };
     el.addEventListener('click', go);
@@ -4244,21 +4396,23 @@ function refreshRatingUI(key, val) {
 /* 시트 요청에 시간 제한을 둔다. 없으면 한 번 멈춘 요청이 sync.running 을 영영 붙잡아
    그 뒤로는 「지금 다시 저장」을 눌러도 아무 일도 일어나지 않는다. */
 const API_TIMEOUT = 20000;
-async function apiPost(payload) {
+/* `ms` 를 주면 그만큼 기다린다 — AI 에게 묻기는 자료가 커서 20초로는 모자란다 (2026-11-09) */
+async function apiPost(payload, ms) {
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), API_TIMEOUT);
+  const wait = ms || API_TIMEOUT;
+  const t = setTimeout(() => ac.abort(), wait);
   try {
     const res = await fetch(CONFIG.RATINGS.API_URL, { method: 'POST', body: JSON.stringify(payload),
       redirect: 'follow', keepalive: payload.action === 'set', signal: ac.signal });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   } catch (e) {
-    throw e.name === 'AbortError' ? new Error(`응답 없음(${API_TIMEOUT / 1000}초)`) : e;
+    throw e.name === 'AbortError' ? new Error(`응답 없음(${wait / 1000}초)`) : e;
   } finally { clearTimeout(t); }
 }
-async function ratingsApi(action, payload) {
+async function ratingsApi(action, payload, ms) {
   const token = await authToken();
-  return apiPost({ action, token, ...payload });
+  return apiPost({ action, token, ...payload }, ms);
 }
 
 /* 서버에 보낼 토큰.

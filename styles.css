@@ -2091,3 +2091,30 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600}
 .cal-tp select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
 .cal-tp select:disabled{opacity:.45}
+
+/* ---------- AI 에게 묻기 (2026-11-09, 교수님 지정) ----------
+   분석 화면 맨 위. 적는 칸과 단추가 한 줄이고, 좁은 화면에서는 단추가 아래로 내려간다. */
+/* 안내는 .st-note 와 같은 결이되 이름이 다르다 — 아래 칸들의 첫 .st-note 자리를 뺏지 않는다 */
+.ask__note{font-size:12.5px;color:var(--ink-3)}
+.ask__row{display:flex;gap:8px;align-items:flex-start;margin-top:6px}
+.ask__ta{flex:1;min-width:0;resize:vertical;padding:10px 12px;border:1px solid var(--line);
+  border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;line-height:1.5}
+.ask__ta:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
+.ask__go{flex:none;align-self:stretch;min-width:84px;border-radius:12px}   /* 칸과 같은 모서리 */
+.ask__tips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ask__tip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);
+  border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer;text-align:left}
+.ask__tip:hover{border-color:var(--brand);color:var(--brand)}
+.ask__err{margin:8px 0 0;color:#c0392b;font-size:13px}
+.ask__err[hidden]{display:none}
+.ask__out:not(:empty){margin-top:10px;padding:12px 14px;border:1px solid var(--line);
+  border-radius:12px;background:var(--surface-2);line-height:1.65}
+.ask__out p{margin:0 0 8px}
+.ask__out p:last-child,.ask__out ul:last-child{margin-bottom:0}
+.ask__out ul{margin:0 0 8px;padding-left:18px}
+.ask__out li{margin:2px 0}
+@media (max-width:520px){
+  .ask__row{flex-wrap:wrap}
+  .ask__go{width:100%;align-self:auto}
+  .ask__tip{font-size:11.5px;padding:4px 9px}
+}
