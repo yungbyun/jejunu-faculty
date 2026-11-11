@@ -141,7 +141,7 @@ const look = async sel => {
 await page.evaluate(() => { setRating(rKey(state.rows[0]), '중'); });
 await page.waitForTimeout(250);
 const clear = c => c.replace(/\s/g, '');
-for (const [name, sel] of [['강화', '[data-surebtn]'], ['약화', '[data-weakbtn]'], ['공략', '[data-pushbtn]'], ['도움', '[data-vipbtn]']]) {
+for (const [name, sel] of [['긍정', '[data-surebtn]'], ['부정', '[data-weakbtn]'], ['공략', '[data-pushbtn]'], ['도움', '[data-vipbtn]']]) {
   const L = await look(sel);
   t(`${name}: 켜면 바탕이 색으로 찬다`, clear(L.on.bg) !== clear(L.off.bg),
     `${L.off.bg} → ${L.on.bg} / ${L.on.fg}`);
@@ -156,13 +156,15 @@ for (const [name, sel] of [['강화', '[data-surebtn]'], ['약화', '[data-weakb
 /* 5-2) 강화 — 선호도 위에 한 칸 얹는 표시(확이면 더 확실, 긍이면 더 긍정).
    2026-10-14 에 「확실」에서 이름을 바꿨다 — 선호도 「확(확실)」과 글자가 겹쳤다. */
 /* 2026-10-16 — 넷이 되었다. 「도움」은 나를 밀어 주는 분, 「VIP」는 총장님이 청할 수 있는 분 */
-t('단추 차례는 강화·약화·공략·도움·VIP', await page.evaluate(() => {
+t('단추 차례는 긍정·부정·공략·도움·VIP', await page.evaluate(() => {
   const b = [...document.querySelectorAll('.d-marks button')];
   return b.length === 5 && b[0].hasAttribute('data-surebtn') && b[1].hasAttribute('data-weakbtn')
     && b[2].hasAttribute('data-pushbtn') && b[3].hasAttribute('data-vipbtn') && b[4].hasAttribute('data-presbtn');
 }), await page.evaluate(() => [...document.querySelectorAll('.d-marks button')].map(b => b.dataset.surebtn !== undefined ? 'sure' : b.dataset.pushbtn !== undefined ? 'push' : b.dataset.vipbtn !== undefined ? 'vip' : 'pres').join())); 
-t('단추 글자는 강화·약화·공략·도움·VIP', await page.evaluate(() =>
-  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '강화,약화,공략,도움,VIP',
+/* 2026-11-11, 교수님 지정 — 적는 말만 「긍정·부정」으로 바꿨다. 안에서 쓰는 이름
+   (data-surebtn·data-weakbtn·data-mk)은 그대로다. */
+t('단추 글자는 긍정·부정·공략·도움·VIP', await page.evaluate(() =>
+  [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()) === '긍정,부정,공략,도움,VIP',
   await page.evaluate(() => [...document.querySelectorAll('.d-marks button span')].map(e => e.textContent.trim()).join()));
 /* 다섯이 폰에서 **한 줄**에 들어가야 한다 (2026-10-25, 교수님 요청) */
 for (const w of [390, 360]) {
@@ -413,7 +415,16 @@ await page.click('[data-surebtn]');
 await page.waitForTimeout(400);
 t('강화가 켜진다', await page.evaluate(() => sures().size === 1 &&
   document.querySelector('[data-surebtn]').getAttribute('aria-pressed') === 'true'));
-t('강화 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '강화');
+t('긍정 글자도 그대로', (await page.locator('[data-surebtn] span').innerText()).trim() === '긍정');
+/* 말풍선과 알림도 같은 말로 (2026-11-11) — 단추는 「긍정」인데 말풍선만 「강화」면 두 가지로 읽힌다 */
+t('말풍선도 긍정·부정으로 적는다', await page.evaluate(() => {
+  const a = document.querySelector('[data-surebtn]').title, b = document.querySelector('[data-weakbtn]').title;
+  return /긍정/.test(a) && /부정/.test(b) && !/강화|약화/.test(a + b);
+}), await page.evaluate(() => document.querySelector('[data-surebtn]').title + ' / ' + document.querySelector('[data-weakbtn]').title));
+/* 안에서 쓰는 이름은 그대로여야 한다 — CSS 와 시트가 걸려 있다 */
+t('속은 그대로 강화·약화 (CSS·시트가 쓴다)', await page.evaluate(() =>
+  document.querySelector('.rate--wide').dataset.mk === '강화' && sures().size === 1),
+  await page.evaluate(() => document.querySelector('.rate--wide').dataset.mk));
 /* 단추 색도 그 교수의 선호도를 따라간다 — 선호도를 바꾸면 바로 따라와야 한다 (2026-10-14) */
 t('단추에 그 선호도 색이 실린다', await page.evaluate(() => {
   const p = state.rows[0], get = () => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc').trim();

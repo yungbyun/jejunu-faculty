@@ -3420,9 +3420,17 @@ function markIdle(p, kind) {
   const w = tbl[r] == null ? W_RATE[r] : tbl[r];
   return w === W_RATE[r];
 }
+/* ---------- 상세의 「선호도 추가정보」에 적는 말 (2026-11-11, 교수님 지정) ----------
+ * 교수님께서 **강화 → 긍정, 약화 → 부정**으로 적으라 하셨습니다. 바꾸는 것은 **적는 말뿐**입니다 —
+ * 안에서 쓰는 이름(`sure`/`weak`, `data-mk="강화"`, 시트의 `sure`·`weak` 키)은 그대로 둡니다.
+ * 그 이름들은 CSS 선택자(`.rate[data-mk="강화"]`)와 저장 자리에 걸려 있어, 함께 고치면
+ * 이미 시트에 쌓인 표시를 못 읽습니다.
+ * 적는 말을 여기 한 곳에 모아 두어, 다음에 또 바꾸실 때 이 줄만 고치면 되게 합니다.
+ * 분석 화면의 도넛·표와 칩 말풍선은 아직 「강화·약화」입니다 — 상세만 말씀하셨습니다. */
+const MARK_NAME = { sure: '긍정', weak: '부정' };
 const markWhy = (p, kind) => markIdle(p, kind)
-  ? `${CONFIG.RATINGS.NAMES[getRating(p)] || getRating(p)}에서는 ${kind === 'sure' ? '강화' : '약화'}가 숫자를 바꾸지 않습니다`
-  : `${kind === 'sure' ? '강화' : '약화'}로 표시`;
+  ? `${CONFIG.RATINGS.NAMES[getRating(p)] || getRating(p)}에서는 ${MARK_NAME[kind]}이 숫자를 바꾸지 않습니다`
+  : `${MARK_NAME[kind]}으로 표시`;
 
 /* 약화 표식 — 강화의 짝이라 아래 화살표 */
 const WEAK_MARK = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
@@ -4233,7 +4241,7 @@ const setRating = (key, val) => {
   saveEntry(key, { rating: val });
   if (trimIdleSureKey(key)) {
     const p = state.rows.find(x => rKey(x) === key);
-    flashStatus(`${p ? p.name + ' 교수의 ' : ''}강화 표시를 풀었습니다 — ${CONFIG.RATINGS.NAMES[val] || val}에서는 강화가 숫자를 바꾸지 않습니다`);
+    flashStatus(`${p ? p.name + ' 교수의 ' : ''}${MARK_NAME.sure} 표시를 풀었습니다 — ${CONFIG.RATINGS.NAMES[val] || val}에서는 ${MARK_NAME.sure}이 숫자를 바꾸지 않습니다`);
   }
 };
 const setMet = (key, n) => saveEntry(key, { met: normMet(n) });
@@ -6424,9 +6432,9 @@ function openDrawer(p, d) {
         <div class="d-marks"${RCOLOR[getRating(p)] ? ` style="--rc:${esc(RCOLOR[getRating(p)])}"` : ''}>
           <!-- 글자는 켜나 끄나 같다. 켜진 것은 색과 aria-pressed 로 보인다 -->
           <button type="button" class="surebtn${isSure(p) ? ' on' : ''}" data-surebtn="${esc(rKey(p))}" aria-pressed="${isSure(p)}"${markIdle(p, 'sure') ? ' disabled' : ''} title="${esc(markWhy(p, 'sure'))}">
-            ${SURE_MARK}<span>강화</span></button>
+            ${SURE_MARK}<span>${MARK_NAME.sure}</span></button>
           <button type="button" class="weakbtn${isWeak(p) ? ' on' : ''}" data-weakbtn="${esc(rKey(p))}" aria-pressed="${isWeak(p)}"${markIdle(p, 'weak') ? ' disabled' : ''} title="${esc(markWhy(p, 'weak'))}">
-            ${WEAK_MARK}<span>약화</span></button>
+            ${WEAK_MARK}<span>${MARK_NAME.weak}</span></button>
           <button type="button" class="pushbtn${isPush(p) ? ' on' : ''}" data-pushbtn="${esc(rKey(p))}" aria-pressed="${isPush(p)}">
             ${PUSH_FLAG}<span>공략</span></button>
           <button type="button" class="vipbtn${isVip(p) ? ' on' : ''}" data-vipbtn="${esc(rKey(p))}" aria-pressed="${isVip(p)}">
@@ -6518,12 +6526,12 @@ function openDrawer(p, d) {
   $panel.querySelector('[data-surebtn]')?.addEventListener('click', () => {
     const on = sureToggle(p);
     markSync();
-    flashStatus(on ? `${p.name} 교수를 강화로 표시했습니다` : `${p.name} 교수의 강화 표시를 풀었습니다`);
+    flashStatus(on ? `${p.name} 교수를 ${MARK_NAME.sure}으로 표시했습니다` : `${p.name} 교수의 ${MARK_NAME.sure} 표시를 풀었습니다`);
   });
   $panel.querySelector('[data-weakbtn]')?.addEventListener('click', () => {
     const on = weakToggle(p);
     markSync();
-    flashStatus(on ? `${p.name} 교수를 약화로 표시했습니다` : `${p.name} 교수의 약화 표시를 풀었습니다`);
+    flashStatus(on ? `${p.name} 교수를 ${MARK_NAME.weak}으로 표시했습니다` : `${p.name} 교수의 ${MARK_NAME.weak} 표시를 풀었습니다`);
   });
   hireBind(p);   /* 입사 동기 칸의 〈고치기〉·더하기·빼기 (2026-11-04) */
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
