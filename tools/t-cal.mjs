@@ -858,7 +858,9 @@ const A = await page.evaluate(() => {
     soon: li.map(e => e.classList.contains('is-soon')),
     badges: li.map(e => ((e.querySelector('.mt-ate__s') || {}).textContent || '').trim()),
     head: document.querySelector('.cal-head--ate').textContent.replace(/\s+/g, ' ').trim(),
-    note: [...document.querySelectorAll('.cal-sec .st-note')].pop().textContent.trim(),
+    note: ((document.querySelector('.mt-ate__no') || {}).textContent || '').trim(),
+    /* 규칙 풀이 한 줄은 2026-11-11 에 뺐다 — 칸 어디에도 남아 있지 않아야 한다 */
+    sec: document.querySelector('.cal-sec').textContent.replace(/\s+/g, ' '),
     /* 줄 차례는 자료에 따라 바뀐다 — 자리를 박지 말고 **있는 줄을 찾아** 본다 */
     link: (li.find(e => e.querySelector('.mt-ate__p a')) || {}).querySelector
       ? li.find(e => e.querySelector('.mt-ate__p a')).querySelector('.mt-ate__p a').getAttribute('href') : '',
@@ -928,7 +930,9 @@ t('머리글에 사람 수와 만남·예정 횟수', /8명 · 만남 5번 · �
    두 번 나와 어느 쪽을 봐야 할지 흐려진다. 단추 쪽은 아래 「단추에 몇 번인지 적는다」가 본다. */
 t('갈래별 수는 머리글에 겹쳐 적지 않는다',
   !/점심 \d/.test(A.head) && !/저녁 \d/.test(A.head), A.head);
-t('셈하는 규칙을 적어 둔다', /지난 날짜/.test(A.note) && /예정/.test(A.note), A.note);
+/* 2026-11-11, 교수님 지정 — 「지난 날짜의 약속은 만난 것으로 봅니다 · …」 한 줄을 뺐다.
+   줄마다 「예정」 쪽지가 이미 서 있어 눈으로 읽힌다. */
+t('셈하는 규칙 풀이는 적지 않는다', !/지난 날짜의 약속은/.test(A.sec), A.sec.slice(-120));
 t('「못 만남」을 몇 건 뺐는지 적는다', /「못 만남」 1건/.test(A.note), A.note);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(A.link || ''), A.link);
 /* 갈래 고르기 — 머리줄 오른쪽의 아이콘 단추 (2026-11-02, 교수님 지정) */
