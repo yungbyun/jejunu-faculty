@@ -3217,17 +3217,25 @@ function trimIdleSure() {
  * `trimIdleSure()` 는 켤 때와 시트에서 내려올 때만 돌아 그 자리에서는 늦습니다.
  * 어느 자리가 「뜻 없는가」는 `markIdle` 과 같은 규칙이라 무게표를 고치면 함께 따라옵니다.
  * 약화는 건드리지 않습니다 — 교수님이 강화만 말씀하셨습니다. */
-function trimIdleSureKey(key) {
-  const p = state.rows.find(x => rKey(x) === key);
-  if (!p || !isSure(p) || !markIdle(p, 'sure')) return false;
-  sures().delete(key);
-  sureSave();                 // 안 올리면 다른 기기에서 또 내려온다
-  /* 다시 그리지 않으므로 서 있는 단추를 그 자리에서 끈다 — 상세의 강화 단추와 선호도 칸의 점 */
-  document.querySelectorAll(`[data-surebtn="${CSS.escape(key)}"]`).forEach(b => {
+/* 표시 하나를 **그 자리에서** 끈다 — 켜져 있었으면 true.
+ * 끄는 자리가 둘(뜻 없어진 긍정, 부정으로 바꿀 때의 긍정·부정)이라 한 곳으로 모았습니다.
+ * 저장까지 해 둡니다 — 안 올리면 다른 기기에서 또 내려옵니다. */
+function markOffKey(key, kind) {
+  const set = kind === 'sure' ? sures() : weaks();
+  if (!set.has(key)) return false;
+  set.delete(key);
+  (kind === 'sure' ? sureSave : weakSave)();
+  /* 다시 그리지 않으므로 서 있는 단추를 그 자리에서 끈다 — 상세의 단추와 선호도 칸의 점 */
+  document.querySelectorAll(`[data-${kind}btn="${CSS.escape(key)}"]`).forEach(b => {
     b.classList.remove('on'); b.setAttribute('aria-pressed', 'false');
   });
   rateMarkSync(key);
   return true;
+}
+function trimIdleSureKey(key) {
+  const p = state.rows.find(x => rKey(x) === key);
+  if (!p || !isSure(p) || !markIdle(p, 'sure')) return false;
+  return markOffKey(key, 'sure');
 }
 
 /* ---------- 관심 교수 ----------
@@ -4235,13 +4243,29 @@ async function saveEntry(key, fields) {
     }
   } finally { sync.queue.delete(key); updateSaveBar(); }
 }
-/* 선호도를 바꾸면 **뜻 없어진 강화를 그 자리에서 턴다** (2026-11-09, 교수님 지정) —
-   확실에서는 강화가 숫자를 바꾸지 않으므로 표시만 남아 헷갈립니다. */
+/* ---------- 선호도를 바꿀 때 표시를 정리한다 ----------
+ * 하나. **뜻 없어진 긍정을 그 자리에서 턴다** (2026-11-09, 교수님 지정) — 확실에서는 긍정이
+ *   숫자를 바꾸지 않으므로 표시만 남아 헷갈립니다.
+ * 둘. **부정으로 고르면 긍정·부정 표시를 비웁니다** (2026-11-11, 교수님 지정 — 「부정이 선택될
+ *   경우 추가정보는 아무것도 선택되지 않도록」). 부정은 맨 아래 칸이라 부정 표시는 이미 숫자를
+ *   못 바꾸고, 긍정 표시는 남아 있으면 「부정인데 긍정」으로 읽혀 어지럽습니다.
+ *   **공략·도움·VIP 는 건드리지 않습니다** (교수님 지정) — 그것은 선호도의 세기가 아니라
+ *   「만날 사람·도와줄 사람」이라 뜻이 다르고, 찍어 두신 것이 사라지면 안 됩니다.
+ *   비운 뒤에도 긍정을 **다시 누르실 수는 있습니다** — 부정에서 긍정은 .20 으로 숫자를
+ *   올리므로(「부정이지만 덜 모진 분」) 길을 막지는 않았습니다. */
+const RATE_RESET_MARKS = '부';
 const setRating = (key, val) => {
   saveEntry(key, { rating: val });
+  const p = state.rows.find(x => rKey(x) === key);
+  const who = p ? `${p.name} 교수의 ` : '';
+  const name = CONFIG.RATINGS.NAMES[val] || val;
+  if (val === RATE_RESET_MARKS) {
+    const off = ['sure', 'weak'].filter(k => markOffKey(key, k)).map(k => MARK_NAME[k]);
+    if (off.length) flashStatus(`${who}${off.join('·')} 표시를 풀었습니다 — ${name}에서는 선호도 추가정보를 비웁니다`);
+    return;
+  }
   if (trimIdleSureKey(key)) {
-    const p = state.rows.find(x => rKey(x) === key);
-    flashStatus(`${p ? p.name + ' 교수의 ' : ''}${MARK_NAME.sure} 표시를 풀었습니다 — ${CONFIG.RATINGS.NAMES[val] || val}에서는 ${MARK_NAME.sure}이 숫자를 바꾸지 않습니다`);
+    flashStatus(`${who}${MARK_NAME.sure} 표시를 풀었습니다 — ${name}에서는 ${MARK_NAME.sure}이 숫자를 바꾸지 않습니다`);
   }
 };
 const setMet = (key, n) => saveEntry(key, { met: normMet(n) });

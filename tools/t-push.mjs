@@ -228,13 +228,44 @@ t('중간으로 되돌려도 저절로 안 켜진다', await page.evaluate(() =>
   setRating(rKey(state.rows[0]), '중');
   return !isSure(state.rows[0]);
 }));
-/* 약화는 건드리지 않는다 — 교수님이 강화만 말씀하셨다 (2026-10-29 와 같은 뜻) */
-t('부정으로 바꿔도 약화는 그대로', await page.evaluate(() => {
+/* 부정으로 고르면 **긍정·부정 표시를 비운다** (2026-11-11, 교수님 지정 — 「부정이 선택될
+   경우 추가정보는 아무것도 선택되지 않도록」). 공략·도움·VIP 는 뜻이 달라 건드리지 않는다.
+   2026-11-11 이전에는 「부정으로 바꿔도 약화는 그대로」였다. */
+const NEG = await page.evaluate(() => {
   const p = state.rows[0], k = rKey(p);
   sureSet = new Set(); weakSet = new Set(); weaks().add(k); weakSave();
+  pushSet = null; localStorage.removeItem('jnu-push'); pushToggle(p);
+  vipSet = null; localStorage.removeItem('jnu-vip'); vipToggle(p);
+  presSet = null; localStorage.removeItem('jnu-pres'); presToggle(p);
+  renderDept(state.depts[0]);
+  const before = isWeak(p);
   setRating(k, '부');
-  return isWeak(p);
+  const box = document.querySelector(`.rate[data-key="${CSS.escape(k)}"]`);
+  return { before, weak: isWeak(p), sure: isSure(p),
+    push: isPush(p), vip: isVip(p), pres: isPres(p),
+    mk: box ? (box.dataset.mk || '') : 'x',
+    kept: JSON.parse(localStorage.getItem('jnu-weak') || '[]').includes(k) };
+});
+t('부정으로 바꾸면 부정 표시가 풀린다', NEG.before && !NEG.weak, JSON.stringify(NEG));
+t('부정으로 바꾸면 긍정 표시도 없다', !NEG.sure, JSON.stringify(NEG));
+t('선호도 칸의 표식도 지운다(부정)', NEG.mk === '', JSON.stringify(NEG));
+t('푼 것을 저장도 한다(부정)', NEG.kept === false, JSON.stringify(NEG));
+/* 공략·도움·VIP 는 「만날 사람·도와줄 사람」이라 선호도의 세기와 뜻이 다르다 (교수님 지정) */
+t('공략·도움·VIP 는 그대로 남는다', NEG.push && NEG.vip && NEG.pres, JSON.stringify(NEG));
+/* 긍정은 부정에서도 숫자를 올린다(.20) — 비운 뒤에 다시 누르는 길까지 막지는 않았다 */
+t('부정에서 긍정을 다시 켤 수는 있다', await page.evaluate(() => {
+  const p = state.rows[0];
+  const b = document.querySelector('[data-surebtn]');
+  return !b.disabled && (sureToggle(p), isSure(p));
 }));
+t('긍정을 켜면 부정 표시도 그대로 꺼져 있다', await page.evaluate(() => !isWeak(state.rows[0])));
+await page.evaluate(() => {
+  const p = state.rows[0];
+  sureSet = new Set(); weakSet = new Set();
+  pushSet = null; vipSet = null; presSet = null;
+  localStorage.removeItem('jnu-push'); localStorage.removeItem('jnu-vip'); localStorage.removeItem('jnu-pres');
+  renderDept(state.depts[0]);
+});
 await page.evaluate(() => { sureSet = new Set(); weakSet = new Set();
   localStorage.removeItem('jnu-sure'); localStorage.removeItem('jnu-weak');
   setRating(rKey(state.rows[0]), ''); renderDept(state.depts[0]); });
@@ -433,6 +464,10 @@ t('단추에 그 선호도 색이 실린다', await page.evaluate(() => {
   setRating(rKey(p), ''); const c = get();
   return a === RCOLOR['부'] && b === RCOLOR['중'] && c === '';
 }), await page.evaluate(() => getComputedStyle(document.querySelector('.d-marks')).getPropertyValue('--rc')));
+/* 위 시험이 「부」를 거쳐 가므로 긍정 표시가 저절로 풀린다 (2026-11-11 규칙).
+   아래 시험들은 긍정이 켜져 있다고 보고 재므로 여기서 다시 켜 둔다. */
+await page.evaluate(() => { if (!isSure(state.rows[0])) sureToggle(state.rows[0]); });
+t('색을 재느라 「부」를 거쳐도 다시 켤 수 있다', await page.evaluate(() => sures().size === 1));
 t('선호도가 없으면 무채색으로, 글자는 읽힌다', await page.evaluate(() => {
   const btn = document.querySelector('[data-vipbtn]');
   if (!btn.classList.contains('on')) btn.click();
