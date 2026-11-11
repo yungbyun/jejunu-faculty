@@ -2167,8 +2167,10 @@ function stChip(p, r) {
  * - 학력(`data/edu.json`)은 늦게 오므로 **묻기 전에 기다립니다**(`loadEdu`) — 안 기다리면
  *   동문을 묻는 물음에만 「자료에 없습니다」가 돌아옵니다.
  * - 자료가 커서 20초로는 모자랍니다. 이 길만 60초를 기다립니다.
- * - 답은 **그 자리에서만** 고쳐 그립니다(`askSync`) — 통째로 다시 그리면 적던 물음이 날아갑니다. */
-const ASK = { q: '', a: '', err: '', busy: false };
+ * - 답은 **그 자리에서만** 고쳐 그립니다(`askSync`) — 통째로 다시 그리면 적던 물음이 날아갑니다.
+ * - 답 위에 **접기·지우기** 단추를 답니다 (2026-11-11, 교수님 지정) — 답이 길면 아래 도넛과
+ *   표가 저만치 밀려납니다. 접으면 첫 줄만 남고, 지우면 걷히고 물음 칸으로 돌아갑니다. */
+const ASK = { q: '', a: '', err: '', busy: false, min: false };
 const ASK_WAIT = 60000;
 const ASK_MAX = 120000;              // 들려줄 자료의 글자 수 상한
 const ASK_TIPS = [
@@ -2268,8 +2270,28 @@ function askHtml(t) {
   if (ul) out.push('</ul>');
   return out.join('');
 }
-const askBody = () => ASK.busy ? '<p class="muted">생각하는 중… 20초쯤 걸립니다</p>'
-  : ASK.a ? askHtml(ASK.a) : '';
+/* ---------- 답을 접거나 지우기 (2026-11-11, 교수님 지정) ----------
+ * 「접기」는 첫 줄만 남깁니다 — 답은 그대로 두므로 펼치면 다시 보이고, 다시 물을 일이 없습니다.
+ * 「지우기」는 답을 걷고 물음 칸으로 돌아갑니다(Esc 로도 됩니다). 말썽 글도 같이 걷습니다.
+ * 접힘은 이 창에서만 삽니다(`ASK.min`) — 물음도 답도 저장하지 않는 칸이라 접힘도 남길 것이 없습니다. */
+const askPeek = t => String(t || '').replace(/[*#>]/g, '').replace(/\s+/g, ' ').trim();
+function askClear() {
+  if (!ASK.a && !ASK.err) return false;
+  ASK.a = ''; ASK.err = ''; ASK.min = false; askSync();
+  const ta = $app.querySelector('#askQ'); if (ta) ta.focus();
+  return true;
+}
+function askBody() {
+  if (ASK.busy) return '<p class="muted">생각하는 중… 20초쯤 걸립니다</p>';
+  if (!ASK.a) return '';
+  const tools = `<div class="ask__tools">
+          <button type="button" class="ask__tool" data-askmin aria-expanded="${!ASK.min}"
+            title="${ASK.min ? '답을 다시 펼칩니다' : '첫 줄만 남깁니다'}">${ASK.min ? '펼치기' : '접기'}</button>
+          <button type="button" class="ask__tool" data-askclose title="답을 지웁니다 (Esc)">지우기</button></div>`;
+  if (!ASK.min) return tools + askHtml(ASK.a);
+  const peek = askPeek(ASK.a);
+  return `${tools}<p class="ask__peek">${esc(peek.slice(0, 80))}${peek.length > 80 ? '…' : ''}</p>`;
+}
 function askSection() {
   return `
       <section class="st-sec ask">
@@ -2297,7 +2319,7 @@ async function askGo() {
   const ta = $app.querySelector('#askQ'); if (!ta) return;
   const q = String(ta.value || '').trim();
   if (!q || ASK.busy) { if (!q) ta.focus(); return; }
-  ASK.q = q; ASK.err = ''; ASK.a = ''; ASK.busy = true; askSync();
+  ASK.q = q; ASK.err = ''; ASK.a = ''; ASK.min = false; ASK.busy = true; askSync();
   try {
     await loadEdu();                 // 동문을 묻는 물음에만 「자료에 없습니다」가 나오지 않게
     const r = await ratingsApi('ask', { q, ctx: askCtx() }, ASK_WAIT);
@@ -2314,6 +2336,14 @@ function bindAsk() {
   /* 적다가 바로 보내는 길 — 줄바꿈과 섞이지 않게 Ctrl(⌘)+Enter 로 */
   ta?.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); askGo(); }
+    if (e.key === 'Escape' && askClear()) e.preventDefault();   /* 적던 자리에서 바로 걷는다 */
+  });
+  /* 접기·지우기 단추는 답을 고쳐 그릴 때마다 새로 생기므로 **칸에** 걸어 둔다 */
+  box.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-askmin],[data-askclose]');
+    if (!b) return;
+    if (b.hasAttribute('data-askclose')) askClear();
+    else { ASK.min = !ASK.min; askSync(); }
   });
   box.querySelector('#askGo')?.addEventListener('click', askGo);
   box.querySelectorAll('[data-asktip]').forEach(b => b.addEventListener('click', () => {

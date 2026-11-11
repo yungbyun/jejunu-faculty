@@ -2109,6 +2109,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .ask__err[hidden]{display:none}
 .ask__out:not(:empty){margin-top:10px;padding:12px 14px;border:1px solid var(--line);
   border-radius:12px;background:var(--surface-2);line-height:1.65}
+.ask__tools{display:flex;justify-content:flex-end;gap:6px;margin:-2px 0 8px}
+.ask__tool{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);
+  border-radius:999px;padding:3px 11px;font-size:12px;line-height:1.5;cursor:pointer}
+.ask__tool:hover{border-color:var(--brand);color:var(--brand)}
+.ask__peek{margin:0;color:var(--ink-2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ask__out p{margin:0 0 8px}
 .ask__out p:last-child,.ask__out ul:last-child{margin-bottom:0}
 .ask__out ul{margin:0 0 8px;padding-left:18px}

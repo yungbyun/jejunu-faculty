@@ -23,7 +23,7 @@ const stub = (reply, ms = 0) => page.evaluate(([r, w]) => {
 }, [reply, ms]);
 
 const openStats = async () => {
-  await page.evaluate(() => { ASK.q = ''; ASK.a = ''; ASK.err = ''; ASK.busy = false; location.hash = '#/stats'; render(); });
+  await page.evaluate(() => { ASK.q = ''; ASK.a = ''; ASK.err = ''; ASK.busy = false; ASK.min = false; location.hash = '#/stats'; render(); });
   await page.waitForSelector('.ask #askQ', { timeout: 10000 });
 };
 
@@ -118,6 +118,62 @@ const A = await page.evaluate(() => {
 t('굵게는 굵게, 목록은 목록으로', A.b === 1 && A.li === 2, JSON.stringify([A.b, A.li]));
 t('별표는 글자로 남지 않는다', !A.txt.includes('**'), A.txt);
 t('답에 이름이 보인다', A.txt.includes('박은진') || A.txt.includes('변영철'), A.txt);
+
+/* ---------- 접기·지우기 (2026-11-11, 교수님 지정) ---------- */
+t('접기·지우기 단추가 답과 함께 선다', await page.evaluate(() =>
+  !!document.querySelector('.ask__out [data-askmin]') && !!document.querySelector('.ask__out [data-askclose]')));
+const asked = await page.evaluate(() => window.__ask.length);
+await page.click('[data-askmin]'); await page.waitForTimeout(200);
+const M = await page.evaluate(() => {
+  const box = document.querySelector('.ask__out'), pk = box.querySelector('.ask__peek');
+  return { li: box.querySelectorAll('li').length, peek: pk ? pk.textContent.trim() : '',
+    label: box.querySelector('[data-askmin]').textContent.trim(),
+    exp: box.querySelector('[data-askmin]').getAttribute('aria-expanded'),
+    n: window.__ask.length, h: box.getBoundingClientRect().height };
+});
+t('접으면 첫 줄만 남는다', M.li === 0 && M.peek.includes('둘'), JSON.stringify([M.li, M.peek]));
+t('접힌 뒤 단추는 펼치기가 된다', M.label === '펼치기' && M.exp === 'false', JSON.stringify([M.label, M.exp]));
+t('접을 때 다시 묻지 않는다', M.n === asked, `${asked} -> ${M.n}`);
+await page.click('[data-askmin]'); await page.waitForTimeout(200);
+const E = await page.evaluate(() => {
+  const box = document.querySelector('.ask__out');
+  return { li: box.querySelectorAll('li').length, b: box.querySelectorAll('b').length,
+    peek: !!box.querySelector('.ask__peek'), n: window.__ask.length,
+    label: box.querySelector('[data-askmin]').textContent.trim(), h: box.getBoundingClientRect().height };
+});
+t('펼치면 답이 그대로 돌아온다', E.li === 2 && E.b === 1 && !E.peek, JSON.stringify([E.li, E.b, E.peek]));
+t('펼칠 때도 다시 묻지 않는다', E.n === asked, `${asked} -> ${E.n}`);
+t('접으면 칸이 줄어든다', M.h < E.h, `${Math.round(M.h)} < ${Math.round(E.h)}`);
+await page.click('[data-askclose]'); await page.waitForTimeout(200);
+t('지우면 답이 사라진다', await page.evaluate(() =>
+  document.querySelector('.ask__out').textContent.trim() === '' && ASK.a === ''),
+  await page.evaluate(() => document.querySelector('.ask__out').innerHTML.slice(0, 60)));
+t('지운 뒤 물음 칸으로 돌아간다', await page.evaluate(() => document.activeElement.id === 'askQ'),
+  await page.evaluate(() => document.activeElement.id || document.activeElement.tagName));
+t('지워도 적은 물음은 남는다', await page.evaluate(() =>
+  document.querySelector('#askQ').value === '내 질문'), await page.evaluate(() => document.querySelector('#askQ').value));
+/* Esc 로도 걷힌다 — 물음을 적던 자리에서 손을 떼지 않게 */
+await stub({ ok: true, text: 'Esc 시험용 답' });
+await page.fill('#askQ', 'Esc 물음');
+await page.click('#askGo'); await page.waitForTimeout(500);
+await page.focus('#askQ');
+await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+t('Esc 로도 답을 걷는다', await page.evaluate(() =>
+  document.querySelector('.ask__out').textContent.trim() === ''));
+/* 새로 물으면 접힘이 풀린 채로 답이 온다 */
+await stub({ ok: true, text: '첫 줄\n- 하나\n- 둘' });
+await page.fill('#askQ', '다시 물음');
+await page.click('#askGo'); await page.waitForTimeout(500);
+await page.click('[data-askmin]'); await page.waitForTimeout(200);
+await page.fill('#askQ', '또 물음');
+await page.click('#askGo'); await page.waitForTimeout(500);
+t('새로 물으면 접힘이 풀린다', await page.evaluate(() =>
+  ASK.min === false && !document.querySelector('.ask__peek')
+  && document.querySelectorAll('.ask__out li').length === 2));
+t('답이 없으면 단추도 없다', await page.evaluate(() => {
+  ASK.a = ''; ASK.min = false; askSync();
+  return !document.querySelector('[data-askmin]') && !document.querySelector('[data-askclose]');
+}));
 
 /* 남이 보낸 글이라도 꾸밈은 못 들어온다 */
 await stub({ ok: true, text: '<img src=x onerror=alert(1)> **굵게**' });

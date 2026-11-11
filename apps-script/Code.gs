@@ -35,7 +35,10 @@ const norm = v => { v = String(v || ''); return LEGACY[v] || (RATINGS.indexOf(v)
  * 원본 data/insights/*.json 은 건드리지 않고, 화면에서 이 값이 있으면 덮어 그립니다. */
 const AIR_SHEET = 'airewrites';
 const AIR_HEADER = ['email', 'dept_id', 'slug', 'idx', 'title', 'term', 'concl', 'hint', 'updated_at'];
-const AIR_MODEL = 'claude-sonnet-4-5';
+/* 모델은 Opus 5.5 로 올렸습니다 (2026-11-11, 교수님 지정). 「AI 에게 묻기」가 메모·학력·
+   논문을 가로지르며 따져야 해서 더 영리한 쪽이 낫고, 다시 쓰기도 같은 모델을 씁니다.
+   값을 바꾸면 **배포 → 배포 관리 → 새 버전**까지 해야 듣습니다. */
+const AIR_MODEL = 'claude-opus-5-5';
 const AIR_MAX_ITEMS = 12;          // 교수 한 명당 항목 수 상한 (idx 범위 검사용)
 const AIR_MIN_GAP_MS = 3000;       // 같은 사람이 연달아 부르는 것을 막는 최소 간격
 
