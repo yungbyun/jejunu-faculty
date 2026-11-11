@@ -2155,201 +2155,69 @@ function stChip(p, r) {
     : `<li><a class="${cls}"${sty} href="#/dept/${encodeURIComponent(p.dept_id)}/prof/${encodeURIComponent(p.slug)}" title="${base}">${inner}</a></li>`;
 }
 
-/* ---------- AI 에게 묻기 (2026-11-09, 교수님 지정) ----------
- * 분석 화면 **맨 위**에서 교수님이 적으신 물음에 모델이 답합니다. 서버(Apps Script)가 Claude 를
- * 부르는 길은 「AI 융합 방향 다시 쓰기」와 같고, 행동만 `ask` 로 하나 늘렸습니다.
- * **앱에 쌓인 것을 통째로 들려 줍니다** (교수님 지정) — 선호도와 표시, 메모, 학력(동문),
- * 논문, 입사 동기, 식사 약속, 학과별 셈. 그래서 「나와 같은 대학을 나왔는데 아직 확실이 아닌
- * 분」처럼 **여러 자료를 가로지르는** 물음에도 답할 수 있습니다.
- * - 물음도 답도 **저장하지 않습니다**. 이 창에서만 살고(`ASK`), 화면을 떠나면 사라집니다 —
- *   시트에 쌓아 두면 교수님 말고 아무도 못 볼 글이 또 한 곳 늘어납니다.
- * - 자료에 **전화번호·메일은 넣지 않습니다**. 물음에 쓸 일이 없고, 밖으로 나가는 글입니다.
- * - 학력(`data/edu.json`)은 늦게 오므로 **묻기 전에 기다립니다**(`loadEdu`) — 안 기다리면
- *   동문을 묻는 물음에만 「자료에 없습니다」가 돌아옵니다.
- * - 자료가 커서 20초로는 모자랍니다. 이 길만 60초를 기다립니다.
- * - 답은 **그 자리에서만** 고쳐 그립니다(`askSync`) — 통째로 다시 그리면 적던 물음이 날아갑니다.
- * - 답 위에 **접기·지우기** 단추를 답니다 (2026-11-11, 교수님 지정) — 답이 길면 아래 도넛과
- *   표가 저만치 밀려납니다. 접으면 첫 줄만 남고, 지우면 걷히고 물음 칸으로 돌아갑니다. */
-const ASK = { q: '', a: '', err: '', busy: false, min: false };
-const ASK_WAIT = 60000;
-const ASK_MAX = 120000;              // 들려줄 자료의 글자 수 상한
-const ASK_TIPS = [
-  '아직 확실이 아닌 분 가운데 나와 같은 대학을 나온 분은?',
-  '입사 동기 가운데 아직 뵙지 못한 분을 알려 주세요',
-  '메모를 보고 먼저 만나야 할 다섯 분을 꼽아 주세요',
-  '학과별로 확실이 가장 모자란 곳은 어디입니까?',
-];
-const askTags = p => [isPush(p) ? '공략' : '', isVip(p) ? '도움' : '', isPres(p) ? 'VIP' : '',
-  favs().has(rKey(p)) ? '관심' : ''].filter(Boolean);
-const askKw = p => (Array.isArray(p.tags) ? p.tags.join(', ') : String(p.tags || '').replace(/;/g, ','))
-  .replace(/\s+/g, ' ').trim();
-/* 그분이 든 식사 자리 — 날짜와 갈래, 아직 치르지 않았으면 「예정」 */
-function askMeals(p) {
-  const k = rKey(p), today = mtToday();
-  return mtList().filter(m => m.done !== 'no' && m.date && (m.who || []).includes(k))
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .map(m => `${m.date} ${MT_SLOT_NAME[mtSlot(m)] || ''}${mtAte(m, today) ? '' : '(예정)'}`).join(', ');
+/* ---------- 핵심 메모 — 분석 화면 맨 위 (2026-11-11, 교수님 지정) ----------
+ * 여기에 있던 「AI 에게 묻기」를 걷고 그 자리에 **메모 상자**를 놓았습니다 (교수님 지정).
+ * 교수 한 분 한 분의 메모는 상세에 있지만, **선거 전체를 놓고 적어 둘 자리**가 없었습니다.
+ * - 글쓰기는 상세 메모와 **똑같은 길**을 씁니다(`.memo-box` · `bindNotes`) — 굵게·밑줄·
+ *   기울임·글자색, Ctrl+B 같은 빠른 길, 넘칠 때 서는 세로 바까지 그대로입니다. 배울 것이 없습니다.
+ * - 저장은 **`settings` 탭의 `keymemo` 키** 한 자리입니다. 서버(Code.gs)는 키 이름을 가리지
+ *   않으므로 **다시 배포할 것이 없습니다**. 교수 메모가 쓰는 `ratings` 탭과 섞이지 않습니다.
+ * - 값은 `{ t: "…" }` 꼴입니다. 설정 칸은 배열 아니면 객체만 받아(`SET_OBJ`) 맨글 한 줄은
+ *   못 담습니다. 한 겹 싸 두면 나중에 「언제 고쳤는지」 같은 것을 더하기도 쉽습니다.
+ * - 글은 상세 메모와 같은 **평문**(`**굵게**`·`__밑줄__`·`{빨강:…}`)으로 담깁니다 — 시트를
+ *   눈으로 읽을 수 있고, 남의 서식이 딸려 들어오지 않습니다.
+ * - 다른 기기에서 고친 것이 내려오면 그 자리에서 바꿔 그립니다. 다만 **지금 적고 계시면
+ *   건드리지 않습니다**(`settingApplyLocal`) — 적던 글이 날아가는 것보다 늦게 반영되는 쪽이 낫습니다. */
+const KM_SET = '@keymemo';          // 메모 상자의 data-key — 교수 열쇠(`학과/slug`)와 겹치지 않는 꼴
+const KM_KEY = 'jnu-keymemo';       // 이 기기
+let kmText = null;
+function keyMemo() {
+  if (kmText == null) { try { kmText = String(localStorage.getItem(KM_KEY) || ''); } catch { kmText = ''; } }
+  return kmText;
 }
-function askLine(p) {
-  const e = eduOf(p) || {}, r = getRating(p), mk = rateMark(p), tg = askTags(p);
-  const edu = [e.bs ? `학부 ${e.bs}` : '', e.ms ? `석사 ${e.ms}` : '', e.phd ? `박사 ${e.phd}` : '']
-    .filter(Boolean).join('·') || '학력 모름';
-  const pap = [p.paper1, p.paper2, p.paper3].filter(Boolean)
-    .map(x => String(x).split('|')[0].trim()).join(' ; ');
-  /* 메모는 **제 줄에 따로** 답니다 (2026-11-09 저녁, 교수님 지정 — 「사는 집을 물었더니 못
-     찾더라」). 한 줄 끝에 매달아 두면 긴 줄 뒤쪽이라 눈에 덜 띕니다. 길이도 700자에서
-     1,500자로 늘렸습니다 — 시트는 2,000자까지 받으므로 그 앞이 잘리고 있었습니다. */
-  const memo = memoPlain(getMemo(p)).replace(/\s+/g, ' ').trim().slice(0, 1500);
-  const mates = hireOf(p).ps.map(x => x.name).join(', ');
-  const meal = askMeals(p);
-  const kw = askKw(p), sum = String(p.summary || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-  const head = [`${p.dept_name} | ${p.name} | ${p.rank}`,
-    `선호도 ${r ? (CONFIG.RATINGS.NAMES[r] || r) : '미지정'}${mk ? `+${mk}` : ''}${tg.length ? `[${tg.join(',')}]` : ''}`,
-    `만남 ${getMet(p)}번`, edu,
-    p.office ? `연구실 ${p.office}` : '',
-    kw ? `전공 ${kw}` : '', sum ? `연구 ${sum}` : '', pap ? `논문 ${pap}` : '',
-    mates ? `입사동기 ${mates}` : '', meal ? `식사 ${meal}` : '',
-  ].filter(Boolean).join(' | ');
-  return memo ? `${head}\n  메모: ${memo}` : head;
+const kmBox = () => document.querySelector(`.memo-box[data-key="${KM_SET}"]`);
+function kmStatus(msg) {
+  const st = kmBox() && kmBox().querySelector('.memo__st');
+  if (st) st.textContent = msg;
 }
-function askCtx() {
-  const L = [], today = mtToday(), s = sureRate(state.rows);
-  /* ---------- 이 자료를 읽는 법 ----------
-   * 모델에게 주는 지침을 **서버가 아니라 자료 맨 위에** 적습니다 (2026-11-09 저녁).
-   * 서버의 규칙(`aiAsk` 의 sys)을 고치면 교수님이 Apps Script 를 다시 배포하셔야 하지만,
-   * 이 글은 화면이 만들어 보내므로 **배포 없이** 고칠 수 있습니다.
-   * 「최영준 교수가 사는 집」처럼 메모에만 적힌 것을 묻자 「자료에 없습니다」가 먼저 나왔습니다 —
-   * 메모까지 읽게 하고, 말이 달라도 같은 뜻이면 근거로 쓰게 하고, **근거를 밝히게** 합니다. */
-  L.push('# 이 자료를 읽는 법',
-    '- 사람에 대한 물음이면 그 사람 줄과 **바로 아래 「메모:」 줄까지** 끝까지 읽고 답하십시오.',
-    '- 사는 곳·가족·취미·건강·사이·부탁 같은 것은 **메모에만** 적혀 있습니다. 메모를 먼저 보십시오.',
-    '- 묻는 말과 자료의 말이 달라도 같은 뜻이면 근거로 쓰십시오(집=사신다=거주=동네 이름, 방=연구실).',
-    '- 「자료에 없습니다」는 **그 사람의 메모까지 살펴본 뒤에만** 쓰십시오.',
-    '- 답에는 근거가 된 자리를 괄호로 짧게 밝히십시오 — 예: (메모), (학력), (논문), (식사 약속).',
-    '');
-  L.push('# 기본', `오늘: ${today}`,
-    '나(후보): 제주대학교 공과대학 컴퓨터공학과 변영철 교수 — 공과대학 학장 선거에 나섭니다',
-    `전체 ${state.rows.length}명 · 투표에 드는 분 ${s.pool}명(평가제외 ${s.na}명) · 확실 ${s.sure}명 ${fmtPct(s.pct)}`
-    + ` · 과반까지 ${s.need > 0 ? `${s.need}명 더` : `${-s.need}명 여유`}`,
-    `선호도: ${CONFIG.RATINGS.LABELS.map(r => `${r}=${CONFIG.RATINGS.NAMES[r] || r}`).join(', ')}`,
-    '표시: 강화(한 칸 위)·약화(한 칸 아래)·공략(공들일 분)·도움(나를 돕는 분)·VIP(총장이 청할 분)·관심', '');
-  L.push('# 학과별');
-  state.depts.forEach(d => {
-    const c = CONFIG.RATINGS.LABELS.map(r => `${r} ${d.profs.filter(x => getRating(x) === r).length}`).join(' · ');
-    L.push(`${d.name} (${d.profs.length}명): ${c} · 미지정 ${d.profs.filter(x => !getRating(x)).length}`);
-  });
-  L.push('', '# 교수 (한 줄에 한 분)');
-  state.depts.forEach(d => d.profs.forEach(p => L.push(askLine(p))));
-  /* 같은 대학을 나온 분끼리 묶어 둔다 — 한 줄씩 읽어 맞추는 것보다 틀릴 일이 적다 */
-  const uni = new Map();
-  state.rows.forEach(p => eduUnivs(eduOf(p)).forEach(u => {
-    (uni.get(u) || uni.set(u, []).get(u)).push(`${p.name}(${p.dept_name})`);
-  }));
-  const pairs = [...uni].filter(([, v]) => v.length > 1).sort((a, b) => b[1].length - a[1].length);
-  if (pairs.length) { L.push('', '# 같은 대학을 나온 분 (학부·석사·박사 가운데 하나라도 같으면)');
-    pairs.forEach(([u, v]) => L.push(`${u}: ${v.join(', ')}`)); }
-  const hires = hireAll().map(g => g.map(k => { const x = state.rows.find(y => rKey(y) === k);
-    return x ? `${x.name}(${x.dept_name})` : k.replace(/^\?/, ''); }).join(', ')).filter(Boolean);
-  if (hires.length) { L.push('', '# 입사 동기 묶음'); hires.forEach(x => L.push(x)); }
-  const rows = mtAteRows();
-  if (rows.length) { L.push('', '# 식사 약속 (가까운 날부터)');
-    rows.forEach(x => L.push(`${x.m.date} ${x.m.time || '시각 미정'} ${MT_SLOT_NAME[x.slot] || ''}`
-      + ` ${mtNames(x.m).join(', ')}${x.m.place ? ` — ${x.m.place}` : ''} (${x.ate ? '만남' : '예정'})`)); }
-  return L.join('\n').slice(0, ASK_MAX);
-}
-/* 답을 글로 그린다 — 모델이 쓰는 것은 **굵게**, 「- 」 목록, 빈 줄 뿐이다 */
-function askHtml(t) {
-  const inline = x => esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-  const out = []; let ul = false;
-  String(t || '').split(/\r?\n/).forEach(ln => {
-    const m = ln.match(/^\s*[-*\u00b7]\s+(.*)$/);
-    if (m) { if (!ul) { out.push('<ul>'); ul = true; } out.push(`<li>${inline(m[1])}</li>`); return; }
-    if (ul) { out.push('</ul>'); ul = false; }
-    if (ln.trim()) out.push(`<p>${inline(ln.trim())}</p>`);
-  });
-  if (ul) out.push('</ul>');
-  return out.join('');
-}
-/* ---------- 답을 접거나 지우기 (2026-11-11, 교수님 지정) ----------
- * 「접기」는 첫 줄만 남깁니다 — 답은 그대로 두므로 펼치면 다시 보이고, 다시 물을 일이 없습니다.
- * 「지우기」는 답을 걷고 물음 칸으로 돌아갑니다(Esc 로도 됩니다). 말썽 글도 같이 걷습니다.
- * 접힘은 이 창에서만 삽니다(`ASK.min`) — 물음도 답도 저장하지 않는 칸이라 접힘도 남길 것이 없습니다. */
-const askPeek = t => String(t || '').replace(/[*#>]/g, '').replace(/\s+/g, ' ').trim();
-function askClear() {
-  if (!ASK.a && !ASK.err) return false;
-  ASK.a = ''; ASK.err = ''; ASK.min = false; askSync();
-  const ta = $app.querySelector('#askQ'); if (ta) ta.focus();
+/* 적으신 글을 담는다 — 이 기기에 먼저 적고, 시트에는 `settings` 로 올린다 */
+function kmSet(text) {
+  text = normMemo(text);
+  if (keyMemo() === text) return false;
+  kmText = text;
+  try { text ? localStorage.setItem(KM_KEY, text) : localStorage.removeItem(KM_KEY); } catch {}
+  if (!CONFIG.RATINGS.API_URL || !state.session) { kmStatus('이 기기에만 저장했습니다'); return true; }
+  kmStatus('저장 중…');
+  Promise.resolve(saveSetting(SET_KM, settingValue(SET_KM)))
+    .then(() => kmStatus(sync.dirtyS.has(SET_KM)
+      ? '시트에 저장하지 못했습니다 — 연결되면 다시 올립니다' : '저장됨 ✓'));
   return true;
 }
-function askBody() {
-  if (ASK.busy) return '<p class="muted">생각하는 중… 20초쯤 걸립니다</p>';
-  if (!ASK.a) return '';
-  const tools = `<div class="ask__tools">
-          <button type="button" class="ask__tool" data-askmin aria-expanded="${!ASK.min}"
-            title="${ASK.min ? '답을 다시 펼칩니다' : '첫 줄만 남깁니다'}">${ASK.min ? '펼치기' : '접기'}</button>
-          <button type="button" class="ask__tool" data-askclose title="답을 지웁니다 (Esc)">지우기</button></div>`;
-  if (!ASK.min) return tools + askHtml(ASK.a);
-  const peek = askPeek(ASK.a);
-  return `${tools}<p class="ask__peek">${esc(peek.slice(0, 80))}${peek.length > 80 ? '…' : ''}</p>`;
+/* 메모 상자의 연장 줄 — 상세 메모와 **한 벌**을 쓴다 (2026-11-11에 함수로 뺐습니다) */
+function memoToolbar() {
+  return `<div class="memo__bar">
+            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
+            ${/* 글자색 (2026-11-05, 교수님 지정) — 저장은 평문 「{빨강:…}」입니다 */''}
+            <span class="memo__cs">${MEMO_COLORS.map(c => `<button type="button" class="memo__c memo__c--${c.cls}" data-color="${esc(c.hex)}" aria-pressed="false" title="고른 글자에 ${esc(c.nm)} 색을 입힙니다" aria-label="고른 글자를 ${esc(c.nm)} 색으로"></button>`).join('')}<button
+              type="button" class="memo__c memo__c--off" data-color="${esc(MEMO_INK)}" aria-pressed="false"
+              title="글자색을 지웁니다 — 굵게·밑줄은 그대로 둡니다" aria-label="글자색 지우기"></button></span>
+          </div>`;
 }
-function askSection() {
+function kmSection() {
   return `
-      <section class="st-sec ask">
-        <div class="st-head"><h2>AI 에게 묻기</h2>
-          <span class="ask__note">선호도·메모·학력·논문·입사 동기·식사 약속을 함께 보냅니다</span></div>
-        <div class="ask__row">
-          <textarea id="askQ" class="ask__ta" rows="2" maxlength="1000"
-            placeholder="${esc(ASK_TIPS[0])}" aria-label="AI 에게 물을 것">${esc(ASK.q)}</textarea>
-          <button type="button" class="btn btn--push ask__go" id="askGo"${ASK.busy ? ' disabled' : ''}>${ASK.busy ? '묻는 중…' : '묻기'}</button>
+      <section class="st-sec km">
+        <div class="st-head"><h2>핵심 메모</h2>
+          <span class="km__note">선거까지 잊으면 안 될 것을 적어 두십시오 — 모든 기기에서 같이 보입니다</span></div>
+        <div class="memo-box km__box" data-key="${KM_SET}">
+          ${memoToolbar()}
+          <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${KM_SET}"
+            data-ph="예) 11/20 교수회의 전에 기계공학과 세 분 꼭 뵙기 · 공약 셋째 줄 다시 손보기"
+            aria-label="핵심 메모">${memoHtml(keyMemo())}</div>
+          ${/* 글이 넘칠 때만 서는 세로 바 (2026-11-03) — 자리는 `memoBar()` 가 잡습니다 */''}
+          <div class="memo__sb" aria-hidden="true"><i></i></div>
+          <div class="memo__st" aria-live="polite"></div>
         </div>
-        <div class="ask__tips">${ASK_TIPS.map(x =>
-          `<button type="button" class="ask__tip" data-asktip="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-        <p class="ask__err" role="alert"${ASK.err ? '' : ' hidden'}>${esc(ASK.err)}</p>
-        <div class="ask__out" aria-live="polite">${askBody()}</div>
       </section>`;
-}
-function askSync() {
-  const box = $app.querySelector('.ask'); if (!box) return;
-  const go = box.querySelector('#askGo'), err = box.querySelector('.ask__err'), out = box.querySelector('.ask__out');
-  if (go) { go.disabled = ASK.busy; go.textContent = ASK.busy ? '묻는 중…' : '묻기'; }
-  if (err) { err.hidden = !ASK.err; err.textContent = ASK.err; }
-  if (out) out.innerHTML = askBody();
-}
-async function askGo() {
-  const ta = $app.querySelector('#askQ'); if (!ta) return;
-  const q = String(ta.value || '').trim();
-  if (!q || ASK.busy) { if (!q) ta.focus(); return; }
-  ASK.q = q; ASK.err = ''; ASK.a = ''; ASK.min = false; ASK.busy = true; askSync();
-  try {
-    await loadEdu();                 // 동문을 묻는 물음에만 「자료에 없습니다」가 나오지 않게
-    const r = await ratingsApi('ask', { q, ctx: askCtx() }, ASK_WAIT);
-    if (r && r.error === 'bad action') throw new Error('Apps Script 를 다시 배포해야 합니다 — 편집기에서 배포 → 배포 관리 → 새 버전');
-    if (!r || !r.ok || !r.text) throw new Error((r && r.error) || '답을 받지 못했습니다');
-    ASK.a = r.text;
-  } catch (e) { ASK.err = (e && e.message) || String(e); }
-  ASK.busy = false; askSync();
-}
-function bindAsk() {
-  const box = $app.querySelector('.ask'); if (!box) return;
-  const ta = box.querySelector('#askQ');
-  ta?.addEventListener('input', () => { ASK.q = ta.value; });
-  /* 적다가 바로 보내는 길 — 줄바꿈과 섞이지 않게 Ctrl(⌘)+Enter 로 */
-  ta?.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); askGo(); }
-    if (e.key === 'Escape' && askClear()) e.preventDefault();   /* 적던 자리에서 바로 걷는다 */
-  });
-  /* 접기·지우기 단추는 답을 고쳐 그릴 때마다 새로 생기므로 **칸에** 걸어 둔다 */
-  box.addEventListener('click', e => {
-    const b = e.target.closest && e.target.closest('[data-askmin],[data-askclose]');
-    if (!b) return;
-    if (b.hasAttribute('data-askclose')) askClear();
-    else { ASK.min = !ASK.min; askSync(); }
-  });
-  box.querySelector('#askGo')?.addEventListener('click', askGo);
-  box.querySelectorAll('[data-asktip]').forEach(b => b.addEventListener('click', () => {
-    if (!ta) return;
-    ta.value = b.dataset.asktip; ASK.q = ta.value; askGo();
-  }));
 }
 
 function renderStats() {
@@ -2361,7 +2229,7 @@ function renderStats() {
   $app.innerHTML = `
     <div class="view stats">
       <div class="crumbs"><a href="#/">학과 목록</a><span class="sep">/</span><span>분석</span></div>
-      ${askSection()}
+      ${kmSection()}
       <div class="hero">
         <div class="legend legend--names" aria-label="선호도 뜻">${CONFIG.RATINGS.LABELS.map(r =>
           /* 한 글자(확·긍…)는 빼고 뜻만 적는다 — 색칠한 네모가 이미 그 자리를 말해 준다 (2026-10-09) */
@@ -2411,8 +2279,7 @@ function renderStats() {
     </div>`;
 
   relRefresh();
-  bindAsk();
-  loadEdu();        // 학력은 늦게 오므로 화면을 열 때 미리 부른다 (2026-11-09)
+  bindNotes($app);  /* 핵심 메모 상자 — 상세 메모와 **같은 손잡이**를 씁니다 (2026-11-11) */
   $app.querySelectorAll('[data-go]').forEach(el => {
     const go = () => { state.ratingFilter = el.dataset.rating; state._keepRating = true; location.hash = `#/dept/${encodeURIComponent(el.dataset.go)}`; };
     el.addEventListener('click', go);
@@ -4073,15 +3940,16 @@ const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SE
 const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
 const SET_HR = 'hire';   /* 입사 동기 — 웹에서 고친 줄 (2026-11-04) */
+const SET_KM = 'keymemo';   /* 핵심 메모 — 분석 화면 맨 위의 메모 상자 (2026-11-11) */
 /* 이 열쇠는 바로 아래 `SET_LOCAL_KEY` 가 **읽는 순간** 필요합니다. 입사 동기 토막에 두었더니
    그 줄에서 TDZ 로 터져 app.js 가 통째로 멈췄습니다 — 다른 *_KEY 들과 같은 자리에 둡니다. */
 const HIRE_KEY = 'jnu-hire';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME, SET_HR];
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME, SET_HR, SET_KM];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
-const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록', [SET_HR]: '입사 동기' };
+const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME, SET_KM];   // 값이 배열이 아니라 객체인 키
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록', [SET_HR]: '입사 동기', [SET_KM]: '핵심 메모' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -4105,6 +3973,7 @@ function settingValue(key) {
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
   if (key === SET_HR) return hireStore() || [];   // 줄의 차례가 곧 값이다 — 정렬하지 않는다
+  if (key === SET_KM) return { t: keyMemo() };    // 맨글 한 줄은 설정 칸에 못 담는다 — 한 겹 싼다
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
   return null;
 }
@@ -4128,10 +3997,18 @@ function settingApplyLocal(key, v) {
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (key === SET_HR) { hireList = v.map(l => (l || []).map(String)); localStorage.setItem(HIRE_KEY, JSON.stringify(hireList)); hireCache = null; }
+    /* 지금 적고 계시면 건드리지 않는다 — 적던 글이 날아가는 것보다 늦게 반영되는 쪽이 낫다 */
+    if (key === SET_KM) {
+      const ed = document.querySelector(`.memo[data-key="${KM_SET}"]`);
+      if (!(ed && document.activeElement === ed) && !memoTimers.has(KM_SET)) {
+        kmText = String((v && v.t) || '');
+        kmText ? localStorage.setItem(KM_KEY, kmText) : localStorage.removeItem(KM_KEY);
+      }
+    }
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY, [SET_HR]: HIRE_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY, [SET_HR]: HIRE_KEY, [SET_KM]: KM_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -4278,6 +4155,8 @@ function scheduleMemo(key, text) {
 }
 function commitMemo(key, text) {
   text = normMemo(text);
+  /* 핵심 메모는 교수가 아니라 **설정 한 자리**에 담긴다 (2026-11-11) */
+  if (key === KM_SET) { clearTimeout(memoTimers.get(key)); memoTimers.delete(key); kmSet(text); return; }
   if (getNote(key).memo === text && !memoTimers.has(key)) return;
   clearTimeout(memoTimers.get(key)); memoTimers.delete(key);
   saveEntry(key, { memo: text });
@@ -4285,7 +4164,9 @@ function commitMemo(key, text) {
 function flushMemo() {
   document.querySelectorAll('.memo[contenteditable][data-key]').forEach(t => {
     const v = memoRead(t);
-    if (memoTimers.has(t.dataset.key) || getNote(t.dataset.key).memo !== normMemo(v)) commitMemo(t.dataset.key, v);
+    const k = t.dataset.key;
+    const cur = k === KM_SET ? keyMemo() : getNote(k).memo;
+    if (memoTimers.has(k) || cur !== normMemo(v)) commitMemo(k, v);
   });
 }
 
@@ -6486,13 +6367,7 @@ function openDrawer(p, d) {
 
       <div class="d-section"><h3>메모</h3>
         <div class="memo-box" data-key="${esc(rKey(p))}">
-          <div class="memo__bar">
-            ${MEMO_MARKS.map(m => `<button type="button" class="memo__b memo__b--${m.tag}" data-cmd="${esc(m.cmd)}" aria-pressed="false" title="고른 글자를 ${esc(m.name)} (Ctrl+${m.key.toUpperCase()})" aria-label="고른 글자를 ${esc(m.name)}"><${m.tag}>가</${m.tag}></button>`).join('')}
-            ${/* 글자색 (2026-11-05, 교수님 지정) — 저장은 평문 「{빨강:…}」입니다 */''}
-            <span class="memo__cs">${MEMO_COLORS.map(c => `<button type="button" class="memo__c memo__c--${c.cls}" data-color="${esc(c.hex)}" aria-pressed="false" title="고른 글자에 ${esc(c.nm)} 색을 입힙니다" aria-label="고른 글자를 ${esc(c.nm)} 색으로"></button>`).join('')}<button
-              type="button" class="memo__c memo__c--off" data-color="${esc(MEMO_INK)}" aria-pressed="false"
-              title="글자색을 지웁니다 — 굵게·밑줄은 그대로 둡니다" aria-label="글자색 지우기"></button></span>
-          </div>
+          ${memoToolbar()}
           <div class="memo" contenteditable="true" role="textbox" aria-multiline="true" data-key="${esc(rKey(p))}" data-ph="이 교수에 대한 메모 — 입력하면 자동으로 시트에 저장됩니다" aria-label="${esc(p.name)} 메모">${memoHtml(getMemo(p))}</div>
           ${/* 글이 넘칠 때만 서는 세로 바 (2026-11-03) — 자리는 `memoBar()` 가 잡습니다 */''}
           <div class="memo__sb" aria-hidden="true"><i></i></div>
