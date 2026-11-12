@@ -3940,16 +3940,18 @@ const SET_PU = 'push', SET_SU = 'sure', SET_DO = 'deptorder', SET_VI = 'vip', SE
 const SET_ME = 'meets';
 const SET_EP = 'eps', SET_EPS = 'epsent';
 const SET_HR = 'hire';   /* 입사 동기 — 웹에서 고친 줄 (2026-11-04) */
+const SET_PA = 'pals';   /* 친한 사람 — 상세에서 고친 짝 (2026-11-12) */
 const SET_KM = 'keymemo';   /* 핵심 메모 — 분석 화면 맨 위의 메모 상자 (2026-11-11) */
 /* 이 열쇠는 바로 아래 `SET_LOCAL_KEY` 가 **읽는 순간** 필요합니다. 입사 동기 토막에 두었더니
    그 줄에서 TDZ 로 터져 app.js 가 통째로 멈췄습니다 — 다른 *_KEY 들과 같은 자리에 둡니다. */
 const HIRE_KEY = 'jnu-hire';
-const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME, SET_HR, SET_KM];
+const PAL_KEY = 'jnu-pals';   /* 친한 사람 — 같은 까닭으로 여기 둡니다 (2026-11-12) */
+const SET_KEYS = [SET_QD, SET_QX, SET_FAV, SET_MC, SET_MB, SET_NS, SET_MS, SET_EP, SET_EPS, SET_PU, SET_SU, SET_WK, SET_DO, SET_VI, SET_PR, SET_ME, SET_HR, SET_KM, SET_PA];
 /* 회차 덮어쓰기(epov1, epov2 …)는 회차 수만큼 늘어나므로 그때그때 만들어 붙인다 */
 const setKeys = () => SET_KEYS.concat(epNos().map(n => EPOV_PRE + n));
 const isEpov = k => k.indexOf(EPOV_PRE) === 0;
 const SET_OBJ = [SET_MC, SET_MB, SET_MS, SET_EP, SET_EPS, SET_ME, SET_KM];   // 값이 배열이 아니라 객체인 키
-const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록', [SET_HR]: '입사 동기', [SET_KM]: '핵심 메모' };
+const SET_LABEL = { [SET_QD]: '퀴즈 설정', [SET_QX]: '퀴즈 설정', [SET_FAV]: '관심 교수', [SET_MC]: '메일 보낸 횟수', [SET_MB]: '핸드폰 번호', [SET_NS]: '항시 제외', [SET_MS]: '직접 보낸 기록', [SET_PU]: '공략', [SET_SU]: '강화', [SET_WK]: '약화', [SET_DO]: '학과 순서', [SET_VI]: '도움', [SET_PR]: 'VIP', [SET_ME]: '약속', [SET_EP]: '회차 원고', [SET_EPS]: '회차 발송 기록', [SET_HR]: '입사 동기', [SET_KM]: '핵심 메모', [SET_PA]: '친한 사람' };
 const setDirtyKey = () => 'jnu-settings-dirty:' + (state.session ? state.session.email : 'local');
 function loadSetDirty() { try { sync.dirtyS = new Map(Object.entries(JSON.parse(localStorage.getItem(setDirtyKey()) || '{}'))); } catch { sync.dirtyS = new Map(); } }
 function saveSetDirty() { try { sync.dirtyS.size ? localStorage.setItem(setDirtyKey(), JSON.stringify(Object.fromEntries(sync.dirtyS))) : localStorage.removeItem(setDirtyKey()); } catch {} }
@@ -3973,6 +3975,7 @@ function settingValue(key) {
   if (key === SET_EP) return eps();
   if (key === SET_EPS) return epsent();
   if (key === SET_HR) return hireStore() || [];   // 줄의 차례가 곧 값이다 — 정렬하지 않는다
+  if (key === SET_PA) return palStore() || [];    // 친한 사람도 짝의 차례를 그대로 둔다
   if (key === SET_KM) return { t: keyMemo() };    // 맨글 한 줄은 설정 칸에 못 담는다 — 한 겹 싼다
   if (isEpov(key)) return epov(key.slice(EPOV_PRE.length));
   return null;
@@ -3997,6 +4000,7 @@ function settingApplyLocal(key, v) {
     if (key === SET_EP) { epsMap = v; Object.keys(v).length ? localStorage.setItem(EPS_KEY, JSON.stringify(v)) : localStorage.removeItem(EPS_KEY); }
     if (key === SET_EPS) { epsentMap = v; Object.keys(v).length ? localStorage.setItem(EPSENT_KEY, JSON.stringify(v)) : localStorage.removeItem(EPSENT_KEY); }
     if (key === SET_HR) { hireList = v.map(l => (l || []).map(String)); localStorage.setItem(HIRE_KEY, JSON.stringify(hireList)); hireCache = null; }
+    if (key === SET_PA) { palList = v.map(l => (l || []).map(String)); localStorage.setItem(PAL_KEY, JSON.stringify(palList)); }
     /* 지금 적고 계시면 건드리지 않는다 — 적던 글이 날아가는 것보다 늦게 반영되는 쪽이 낫다 */
     if (key === SET_KM) {
       const ed = document.querySelector(`.memo[data-key="${KM_SET}"]`);
@@ -4008,7 +4012,7 @@ function settingApplyLocal(key, v) {
     if (isEpov(key)) { const n = key.slice(EPOV_PRE.length); epovMap[n] = v; Object.keys(v).length ? localStorage.setItem(epovLKey(n), JSON.stringify(v)) : localStorage.removeItem(epovLKey(n)); }
   } catch {}
 }
-const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY, [SET_HR]: HIRE_KEY, [SET_KM]: KM_KEY };
+const SET_LOCAL_KEY = { [SET_QD]: QUIZ_DEPTS_KEY, [SET_QX]: QUIZ_EX_KEY, [SET_FAV]: FAV_KEY, [SET_MC]: MAIL_KEY, [SET_MB]: MOBILE_KEY, [SET_NS]: NOSEND_KEY, [SET_MS]: MSEND_KEY, [SET_EP]: EPS_KEY, [SET_EPS]: EPSENT_KEY, [SET_PU]: PUSH_KEY, [SET_SU]: SURE_KEY, [SET_WK]: WEAK_KEY, [SET_DO]: DORDER_KEY, [SET_VI]: VIP_KEY, [SET_PR]: PRES_KEY, [SET_ME]: MEET_KEY, [SET_HR]: HIRE_KEY, [SET_KM]: KM_KEY, [SET_PA]: PAL_KEY };
 const setLocalKey = key => isEpov(key) ? epovLKey(key.slice(EPOV_PRE.length)) : SET_LOCAL_KEY[key];
 const setStored = key => { try { return localStorage.getItem(setLocalKey(key)) != null; } catch { return false; } };
 
@@ -4056,13 +4060,14 @@ function applySettings(m) {
     const cur = settingValue(key) || (isObj ? {} : []);
     const canon = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]]));
     const same = isObj ? canon(cur) === canon(v)
-               : (key === SET_FAV || key === SET_NS || key === SET_DO || key === SET_HR) ? JSON.stringify(cur) === JSON.stringify(v)
+               : (key === SET_FAV || key === SET_NS || key === SET_DO || key === SET_HR || key === SET_PA) ? JSON.stringify(cur) === JSON.stringify(v)
                                  : JSON.stringify(cur) === JSON.stringify([...v].sort());
     if (same) continue;
     settingApplyLocal(key, v); changed.push(key);
   }
   if (changed.includes(SET_SU)) trimIdleSure();   // 다른 기기에서 내려온 강화도 턴다 (2026-10-29)
   if (changed.includes(SET_HR)) hireRedraw();        // 다른 기기에서 더한 동기도 열린 상세에 바로 선다 (2026-11-04)
+  if (changed.includes(SET_PA)) palRedraw();         // 친한 사람도 같이 (2026-11-12)
   if (changed.length) {
     if (changed.includes(SET_QD) || changed.includes(SET_QX)) quizStart();   // 퀴즈 설정이 바뀐 때만 새로 시작
     route().view === 'quiz' ? renderQuiz() : render();
@@ -4835,6 +4840,175 @@ function hireTakeKey(k) {
      핵심이라, 그 수를 직접 보여 드려야 이어 붙음을 믿으실 수 있습니다. */
   const n = (hireAll().find(x => x.includes(k)) || []).length - 1;
   flashStatus(`${other.name} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`);
+}
+
+/* ---------- 친한 사람 (2026-11-12, 교수님 지정) ----------
+ * 교수 상세 화면의 **입사 동기 위**에, 이분과 친한 교수를 적습니다. 고치는 길은 입사 동기와
+ * 똑같습니다 — 연필을 누르고 이름을 치면 찾은 분이 칩으로 뜨고, 누르면 그 자리에 섭니다.
+ * 빼기는 칩 안의 ×입니다. 고친 것은 시트의 `settings` 에 **`pals` 키**로 올라가 다른 기기에서도
+ * 그대로 보입니다 — 서버(`Code.gs`)는 키 이름을 가리지 않으므로 **다시 배포할 것이 없습니다**.
+ *
+ * ★ 입사 동기와 **딱 하나가 다릅니다 — 묶음으로 이어 붙이지 않습니다**. 같은 때 들어오신 분은
+ *   서로 모두가 동기이므로 `hireMerge()` 가 줄을 잇지만, 친분은 그렇지 않습니다. 甲과 乙이
+ *   친하고 乙과 丙이 친하다고 甲과 丙이 친한 것은 아닙니다. 그래서 **두 분씩 짝으로만** 담습니다.
+ *   짝은 **양쪽에서 같이** 보입니다(乙 상세에도 甲이 섭니다) — 한쪽만 친한 사이는 없으므로.
+ *   묶음으로 잇기를 바라시면 말씀해 주십시오, `hireMerge()` 를 함께 쓰면 됩니다.
+ *
+ * - 코드에 미리 적어 둔 **씨앗은 두지 않았습니다** — 누가 누구와 친한지는 교수님만 아십니다.
+ *   그러니 이 칸은 처음에 비어 있고, 적으신 것만이 전부입니다.
+ * - 비참여는 뺍니다 — 입사 동기·동문 교수와 같은 규칙입니다. 뺀 인원은 꼬리에 적습니다.
+ * - 차례는 분석 쪽과 같은 `stSort`, 이름표도 `stChip` 을 그대로 씁니다(「고르기 모드」는 잠깐
+ *   꺼 두고 그립니다 — 안 그러면 칩이 공략 토글 단추가 되어 상세로 안 갑니다). */
+let palList = null;
+function palStore() {
+  if (palList) return palList;
+  try {
+    const v = JSON.parse(localStorage.getItem(PAL_KEY) || 'null');
+    if (Array.isArray(v)) palList = v.map(l => (l || []).map(String));
+  } catch {}
+  return palList;
+}
+/* 지금 쓰는 짝들. 씨앗이 없으므로 아직 아무것도 없으면 그냥 빈 줄입니다. */
+const palLines = () => (palStore() || []).map(l => [...l]);
+const isPal = (a, b) => palLines().some(l => l.includes(a) && l.includes(b));
+function palSave(lines) {
+  palList = lines;
+  try { localStorage.setItem(PAL_KEY, JSON.stringify(lines)); } catch {}
+  saveSetting(SET_PA, lines);
+}
+/* 더하기 — **짝 하나**를 보탭니다. 이미 적힌 짝은 보태지 않습니다(같은 짝이 두 줄로 쌓이면
+   빼기에서 하나만 지워져 「뺐는데 그대로 있다」가 됩니다). */
+function palAdd(a, b) { if (a !== b && !isPal(a, b)) palSave(palLines().concat([[a, b]])); }
+/* 빼기 — **그 짝만** 풉니다. 입사 동기는 묶음이라 그 분을 모든 줄에서 지우지만, 여기서는
+   甲과 乙을 풀어도 乙과 丙은 그대로여야 합니다. */
+function palDrop(me, k) { palSave(palLines().filter(l => !(l.includes(me) && l.includes(k)))); }
+
+function palsOf(p) {
+  const me = rKey(p);
+  const ks = [...new Set(palLines().filter(l => l.includes(me)).flat())].filter(k => k !== me);
+  const rows = ks.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
+  return { ps: stSort(rows.filter(x => getRating(x) !== '비')),
+    out: rows.filter(x => getRating(x) === '비').length,
+    gone: ks.length - rows.length };   // 명단이 바뀌어 사라진 분 — 조용히 지우지 않고 알려 드린다
+}
+
+/* 〈고치기〉가 열려 있는가. 입사 동기와 마찬가지로 상세를 열 때마다 닫힌 자리에서 시작합니다 —
+   지난 교수에서 열어 둔 채로 다음 교수를 열면 ×가 늘어서 있어, 누를 뜻이 없던 것을 누르게 됩니다. */
+let PALEDIT = false;
+let palWho = null;
+let PALQ = '';
+/* 친 대로 찾아 칩으로 세운다 — 입사 동기 쪽과 같은 꼴입니다. 이름으로도 학과로도 찾고,
+   이미 친한 분으로 적힌 분은 뺍니다. */
+function palHits(p) {
+  const q = PALQ.trim().toLowerCase();
+  if (!q) return '';
+  const me = rKey(p);
+  const hits = state.rows.filter(x => rKey(x) !== me && !isPal(me, rKey(x)) &&
+    (x.name.toLowerCase().includes(q) || x.dept_name.toLowerCase().includes(q))).slice(0, 12);
+  if (!hits.length) return `<p class="st-note">명단에 없는 이름입니다</p>`;
+  return hits.map(x => `<button type="button" class="d-pal__hit" data-paladd="${esc(rKey(x))}"
+    title="${esc(x.dept_name)} · ${esc(x.rank)} — 누르면 친한 사람으로 더합니다">${esc(x.name)}<small>${esc(x.dept_name)}</small></button>`).join('');
+}
+/* 찾은 분만 갈아 끼운다. **적는 칸은 건드리지 않는다** — 한 글자 칠 때마다 그 칸까지 다시
+   그리면 한글 조합이 끊겨 자모가 흩어진다(ㅎ ㅏ ㄴ). 입사 동기·접촉에서 이미 겪은 자리다. */
+function palHitsSync() {
+  const sec = $panel && $panel.querySelector('.d-palsec');
+  const box = sec && sec.querySelector('[data-palhits]');
+  if (box && palWho) box.innerHTML = palHits(palWho);
+}
+
+function palHtml(p) {
+  const h = palsOf(p);
+  const tail = [];
+  if (h.out) tail.push(`비참여 ${h.out}명은 뺐습니다`);
+  if (h.gone) tail.push(`명단에 없는 분 ${h.gone}명은 뺐습니다`);
+  if (!h.ps.length) tail.unshift('아직 적어 둔 분이 없습니다');
+  const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
+  const was = STP.pick; STP.pick = false;
+  const chips = h.ps.map(x => {
+    const c = stChip(x, getRating(x));
+    /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
+    return PALEDIT ? c.replace('</li>', `<button type="button" class="d-pal__x" data-paldrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 친한 사람에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
+  }).join('');
+  STP.pick = was;
+  const add = PALEDIT
+    ? `<li class="d-pal__a"><input class="d-pal__in" data-palin type="text" autocomplete="off"
+         spellcheck="false" value="${esc(PALQ)}" placeholder="이름" aria-label="친한 사람으로 더할 교수 찾기"
+         ><button type="button" class="d-pal__plus on" data-paledit
+         aria-label="더하기를 닫습니다" title="더하기를 닫습니다">×</button></li>`
+    : `<li class="d-pal__a"><button type="button" class="d-pal__plus" data-paledit
+         aria-label="친한 사람 고치기" title="친한 사람을 더하거나 뺍니다">${PEN15_SVG}</button></li>`;
+  return `<ul class="rel-unames">${chips}${add}</ul>`
+    + (PALEDIT ? `<div class="d-pal__hits" data-palhits>${palHits(p)}</div>` : '') + note;
+}
+
+/* 이 칸만 다시 그린다 — 상세를 통째로 다시 그리면 쓰시던 메모가 날아갑니다. */
+function palRedraw() {
+  const sec = $panel && $panel.querySelector('.d-palsec');
+  if (!sec || !palWho) return;
+  const box = sec.querySelector('.d-pal');
+  if (box) {
+    box.innerHTML = palHtml(palWho);
+    /* ×를 칩 **안쪽**에 앉히려면 칩이 그만큼 오른쪽을 비워 주어야 한다 — 고치는 동안에만 */
+    box.classList.toggle('d-pal--edit', PALEDIT);
+  }
+  if (PALEDIT) { const i = sec.querySelector('[data-palin]'); if (i) i.focus(); }
+}
+
+/* 듣는 이는 **칸 하나에 한 번만** 답니다 — 입사 동기 쪽과 같은 까닭입니다(`hireBind` 의
+   풀이를 보십시오). 몇 번을 다시 그려도 듣는 이는 늘 하나입니다. */
+function palBind(p) {
+  if (palWho !== p) { PALEDIT = false; PALQ = ''; }   // 다른 교수를 열면 닫힌 빈 자리에서 시작
+  palWho = p;
+  const sec = $panel && $panel.querySelector('.d-palsec');
+  if (!sec) return;
+  if (sec.dataset.bound !== '1') {
+    sec.dataset.bound = '1';
+    sec.addEventListener('click', e => {
+      if (e.target.closest('[data-paledit]')) { PALEDIT = !PALEDIT; PALQ = ''; palRedraw(); return; }
+      const add = e.target.closest('[data-paladd]');
+      if (add) { palTakeKey(add.getAttribute('data-paladd')); return; }
+      const x = e.target.closest('[data-paldrop]');
+      if (!x || !palWho) return;
+      const k = x.getAttribute('data-paldrop'), other = state.rows.find(y => rKey(y) === k);
+      palDrop(rKey(palWho), k);
+      palRedraw();
+      flashStatus(`${other ? other.name : ''} 교수를 친한 사람에서 뺐습니다 — 그 교수 쪽에서도 함께 빠집니다`);
+    });
+    /* 치는 동안 찾은 분만 갈아 끼운다 — 적는 칸은 그대로 두어야 한글 조합이 안 끊긴다 */
+    sec.addEventListener('input', e => {
+      if (!e.target.closest('[data-palin]')) return;
+      PALQ = e.target.value;
+      palHitsSync();
+    });
+    /* 엔터 — 찾은 분이 한 분이면 그대로 더합니다. 여럿이면 고르시라 하고, 아무도 없으면
+       적으신 그대로 찾아 **무엇이 잘못인지** 말합니다(`hireFind` 를 함께 씁니다 — 적어 주신
+       이름을 교수로 바꾸는 일은 두 칸이 똑같습니다). */
+    sec.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || !e.target.closest('[data-palin]')) return;
+      e.preventDefault();
+      const n = sec.querySelectorAll('[data-paladd]');
+      if (n.length === 1) { palTakeKey(n[0].getAttribute('data-paladd')); return; }
+      if (n.length > 1) { flashStatus('찾은 분 가운데 한 분을 누르십시오', true); return; }
+      const r = hireFind(PALQ);
+      flashStatus(r.err || '', true);
+    });
+  }
+  palRedraw();
+}
+
+/* 고르신 분을 더한다 */
+function palTakeKey(k) {
+  const me = palWho, other = state.rows.find(x => rKey(x) === k);
+  if (!me || !other) return;
+  if (k === rKey(me)) { flashStatus('본인은 친한 사람으로 더할 수 없습니다', true); return; }
+  if (isPal(rKey(me), k)) {
+    flashStatus(`${other.name} 교수는 이미 ${me.name} 교수의 친한 사람으로 적혀 있습니다`, true); return;
+  }
+  palAdd(rKey(me), k);
+  PALQ = '';            // 다음 분을 바로 치실 수 있게 비운다
+  palRedraw();
+  flashStatus(`${other.name} 교수를 친한 사람으로 더했습니다 — 그 교수 쪽에도 ${me.name} 교수가 섭니다`);
 }
 
 /* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
@@ -6323,6 +6497,13 @@ function openDrawer(p, d) {
       </div>
 
 
+      ${/* 친한 사람 — **입사 동기 위**입니다 (2026-11-12, 교수님 지정). 칸 이름은 `.d-palsec`
+            으로 따로 둡니다: 입사 동기와 같은 이름을 나눠 지면 `querySelector('.d-hire')` 가
+            위에 선 이쪽을 집어 두 칸이 서로 섞입니다. */''}
+      <div class="d-section d-palsec"><h3>친한 사람</h3>
+        <div class="d-pal">${palHtml(p)}</div>
+      </div>
+
       <div class="d-section d-hiresec"><h3>입사 동기</h3>
         ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
             `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
@@ -6436,6 +6617,7 @@ function openDrawer(p, d) {
     markSync();
     flashStatus(on ? `${p.name} 교수를 ${MARK_NAME.weak}으로 표시했습니다` : `${p.name} 교수의 ${MARK_NAME.weak} 표시를 풀었습니다`);
   });
+  palBind(p);    /* 친한 사람 칸의 〈고치기〉·더하기·빼기 (2026-11-12) */
   hireBind(p);   /* 입사 동기 칸의 〈고치기〉·더하기·빼기 (2026-11-04) */
   $panel.querySelector('[data-pushbtn]')?.addEventListener('click', e => {
     const btn = e.currentTarget, on = pushToggle(p);
