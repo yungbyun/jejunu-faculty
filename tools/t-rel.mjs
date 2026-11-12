@@ -307,7 +307,11 @@ const al = await page.evaluate(() => {
   };
 });
 t('상세에 「동문 교수」 칸이 있다', al.secs.includes('동문 교수'), al.secs.join(' | '));
-t('선호도 바로 위에 둔다', al.secs.indexOf('동문 교수') === al.secs.indexOf('선호도') - 1, al.secs.join(' | '));
+/* 자리가 바뀌었습니다 (2026-11-12, 교수님 지정) — 선호도·선호도 추가정보가 맨 위로 가고,
+   사람 칸이 그 아래에 **친한 사람 → 입사 동기 → 동문 교수** 차례로 섭니다. */
+t('입사 동기 바로 아래, 사람 칸의 맨 끝에 둔다',
+  al.secs.indexOf('동문 교수') === al.secs.indexOf('입사 동기') + 1
+  && al.secs.indexOf('동문 교수') > al.secs.indexOf('선호도 추가정보'), al.secs.join(' | '));
 t('대학마다 묶는다', al.groups === pick.groups && al.groups >= 2, `${al.groups} / ${pick.groups}묶음`);
 t('묶음 머리에 대학 이름', al.unis.join(',') === pick.unis.join(','), `${al.unis.join(',')} / ${pick.unis.join(',')}`);
 t('그 대학 동문을 다 적는다', al.names.map(x => x.join(',')).join(' | ') === pick.all.map(x => x.join(',')).join(' | '),

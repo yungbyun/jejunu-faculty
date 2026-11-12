@@ -4591,6 +4591,36 @@ function relUnivs() {
 const eduDegs = (p, u) => { const e = eduOf(p) || {};
   return [[e.bs, '학'], [e.ms, '석'], [e.phd, '박']].filter(x => x[0] === u).map(x => x[1]).join(''); };
 
+/* ---------- 명단 밖 사람 (2026-11-12, 교수님 지정) ----------
+ * 「친한 사람·입사 동기에 명단에 없는 사람도 넣을 수 있도록」 하신 자리입니다. 본부 보직자나
+ * 다른 단과대 교수처럼 **우리 명단(공과대학) 밖의 분**도 이름만으로 적어 두실 수 있습니다.
+ * - 열쇠는 **`@이름`** 입니다. 명단에 있는 분의 열쇠는 `학과/slug` 꼴이라 `@` 로 시작할 수
+ *   없으니 서로 섞이지 않습니다.
+ * - 씨앗에서 **못 찾은 이름**(`?이름`)과는 다릅니다 — 그쪽은 잘못 적으신 것이라 꼬리에
+ *   알려 드리고, 이쪽은 **일부러 적으신 것**이라 칩으로 세웁니다.
+ * - 갈 상세가 없으므로 고리(`<a>`)가 아니라 **글자**(`<span>`)로 세우고, 테두리를 점선으로
+ *   두어 명단 밖임이 눈에 보이게 했습니다. 선호도·만난 횟수 같은 것은 붙지 않습니다 —
+ *   그 숫자들은 명단에 있는 분에게만 있습니다.
+ * - 두 칸(`친한 사람`·`입사 동기`)이 **이 한 벌을 나눠 씁니다**. `pre` 로 칸마다 다른 이름
+ *   (`hire`/`pal`)을 받아 `data-hiredrop`·`data-paladd` 를 만듭니다. */
+const EXT_PRE = '@';
+const isExt = k => String(k || '')[0] === EXT_PRE;
+const extName = k => String(k || '').slice(1);
+const extKey = s => EXT_PRE + String(s || '').trim().replace(/\s+/g, ' ');
+function extChip(k, edit, pre, what) {
+  const nm = extName(k);
+  /* ×는 명단에 있는 분과 똑같이 **고치는 동안에만** 답니다 */
+  const x = edit ? `<button type="button" class="d-${pre}__x" data-${pre}drop="${esc(k)}" title="${esc(nm)} 님을 ${what}에서 뺍니다" aria-label="${esc(nm)} 빼기">×</button>` : '';
+  return `<li><span class="st-c st-c--out" title="명단에 없는 분 — 이름만 적어 두었습니다">${esc(nm)}</span>${x}</li>`;
+}
+/* 「그대로 더하기」 — 친 이름을 **명단 밖 사람으로** 더하는 칩. 찾은 분 뒤에 답니다. */
+function extHit(q, pre, what) {
+  const nm = String(q || '').trim();
+  if (!nm) return '';
+  return `<button type="button" class="d-${pre}__hit d-${pre}__hit--new" data-${pre}add="${esc(extKey(nm))}"
+    title="명단에 없는 분으로 「${esc(nm)}」 이름만 ${what}에 적어 둡니다">${esc(nm)}<small>명단 밖</small></button>`;
+}
+
 /* ---------- 입사 동기 (2026-11-04, 교수님 지정) ----------
  * 교수 상세 화면의 **동문 교수 위**에, 이분과 같은 때 들어오신 교수를 적습니다.
  *
@@ -4683,11 +4713,14 @@ function hireAll() {
    하므로, 비어 있을 때도 칸은 서야 합니다. 비었는지는 `has` 로 봅니다. */
 function hireOf(p) {
   const me = rKey(p), g = hireAll().find(x => x.includes(me)) || [];
-  const rows = g.filter(k => k !== me && k[0] !== '?')
+  const rows = g.filter(k => k !== me && k[0] !== '?' && !isExt(k))
     .map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
   return { has: g.length > 0,
     ps: stSort(rows.filter(x => getRating(x) !== '비')),
     out: rows.filter(x => getRating(x) === '비').length,
+    /* 명단 밖 분은 적으신 차례 그대로 뒤에 세웁니다 — 선호도가 없어 `stSort` 로 줄 세울 것이
+       없고, 적으신 차례가 곧 교수님 머릿속의 차례입니다 (2026-11-12) */
+    ext: g.filter(k => k !== me && isExt(k)),
     bad: g.filter(k => k[0] === '?').map(k => k.slice(1)) };
 }
 
@@ -4695,19 +4728,6 @@ function hireOf(p) {
    채로 다음 교수를 열면 ×가 늘어서 있어, 누를 뜻이 없던 것을 누르게 됩니다. */
 let HIREDIT = false;
 let hireWho = null;
-
-/* 적어 주신 이름 한 토막으로 교수를 찾는다. 못 찾거나 여럿이면 **왜 그런지** 돌려준다 —
-   「안 됩니다」만 띄우면 교수님은 무엇을 고쳐야 하는지 알 수 없다. */
-function hireFind(s) {
-  const t = String(s || '').trim();
-  if (!t) return { err: '더할 교수의 이름을 적으십시오' };
-  const i = t.lastIndexOf('/');
-  const nm = (i < 0 ? t : t.slice(i + 1)).trim(), dp = i < 0 ? '' : t.slice(0, i).trim();
-  const hit = state.rows.filter(r => r.name === nm && (!dp || r.dept_name === dp || r.dept_id === dp));
-  if (!hit.length) return { err: `명단에 「${t}」 교수가 없습니다 — 이름을 다시 보아 주십시오` };
-  if (hit.length > 1) return { err: `「${nm}」 교수가 ${hit.length}분입니다 — 「${hit[0].dept_name}/${nm}」 처럼 학과를 앞에 붙여 적으십시오` };
-  return { p: hit[0] };
-}
 
 /* 친 대로 찾아 칩으로 세운다 — **접촉 쪽 「만날 분」과 같은 꼴**입니다 (2026-11-04, 교수님
    지정). `<datalist>` 는 기기마다 보이는 모습이 달라 아예 안 뜨는 데가 있어서 그만두고,
@@ -4719,9 +4739,12 @@ function hireHits(p) {
   const me = rKey(p), inG = new Set(hireAll().find(x => x.includes(me)) || []);
   const hits = state.rows.filter(x => rKey(x) !== me && !inG.has(rKey(x)) &&
     (x.name.toLowerCase().includes(q) || x.dept_name.toLowerCase().includes(q))).slice(0, 12);
-  if (!hits.length) return `<p class="st-note">명단에 없는 이름입니다</p>`;
+  /* 명단에 없는 분도 적으실 수 있습니다 (2026-11-12, 교수님 지정) — 찾은 분 **뒤에** 답니다.
+     앞에 두면 명단에 있는 분을 고르려다 이쪽을 누르게 됩니다. 이미 적어 둔 이름이면 뺍니다. */
+  const ext = inG.has(extKey(HIREQ)) ? '' : extHit(HIREQ, 'hire', '입사 동기');
+  if (!hits.length && !ext) return `<p class="st-note">이미 적어 두었습니다</p>`;
   return hits.map(x => `<button type="button" class="d-hire__hit" data-hireadd="${esc(rKey(x))}"
-    title="${esc(x.dept_name)} · ${esc(x.rank)} — 누르면 입사 동기로 더합니다">${esc(x.name)}<small>${esc(x.dept_name)}</small></button>`).join('');
+    title="${esc(x.dept_name)} · ${esc(x.rank)} — 누르면 입사 동기로 더합니다">${esc(x.name)}<small>${esc(x.dept_name)}</small></button>`).join('') + ext;
 }
 /* 찾은 분만 갈아 끼운다. **적는 칸은 건드리지 않는다** — 한 글자 칠 때마다 그 칸까지 다시
    그리면 한글 조합이 끊겨 자모가 흩어진다(ㅎ ㅏ ㄴ). 접촉 쪽에서 이미 겪은 자리다. */
@@ -4738,7 +4761,7 @@ function hireHtml(p) {
   if (h.out) tail.push(`비참여 ${h.out}명은 뺐습니다`);
   if (h.bad.length) tail.push(`명단에서 못 찾은 이름: ${h.bad.join(' · ')}`);
   /* 꼬리말은 **한 줄로** 모아 적는다 — 흐린 줄이 둘이면 눈에 안 들어온다 */
-  if (!h.ps.length) tail.unshift(h.has ? '함께 적어 둔 분이 명단에 없습니다' : '아직 적어 둔 분이 없습니다');
+  if (!h.ps.length && !h.ext.length) tail.unshift(h.has ? '함께 적어 둔 분이 명단에 없습니다' : '아직 적어 둔 분이 없습니다');
   const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
   /* 이름표는 분석 쪽 칩을 그대로 씁니다. 「고르기 모드」가 켜져 있으면 칩이 공략 토글 단추가
      되는데, 여기서는 눌러서 그 교수 상세로 가야 하므로 잠깐 꺼 두고 그립니다. */
@@ -4747,7 +4770,7 @@ function hireHtml(p) {
     const c = stChip(x, getRating(x));
     /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
     return HIREDIT ? c.replace('</li>', `<button type="button" class="d-hire__x" data-hiredrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 입사 동기에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
-  }).join('');
+  }).join('') + h.ext.map(k => extChip(k, HIREDIT, 'hire', '입사 동기')).join('');
   STP.pick = was;
   /* 더하는 자리는 **칩 줄 맨 뒤**입니다 (2026-11-04, 교수님 지정). 평소에는 **연필**(고치기)
      이고 — 약속 쪽 「고치기」와 같은 그림입니다 — 누르면 그 자리가
@@ -4802,7 +4825,8 @@ function hireBind(p) {
       const k = x.getAttribute('data-hiredrop'), other = state.rows.find(y => rKey(y) === k);
       hireDrop(k);
       hireRedraw();
-      flashStatus(`${other ? other.name : ''} 교수를 입사 동기에서 뺐습니다 — 다른 교수 쪽에서도 함께 빠집니다`);
+      flashStatus(other ? `${other.name} 교수를 입사 동기에서 뺐습니다 — 다른 교수 쪽에서도 함께 빠집니다`
+        : `「${extName(k)}」을 입사 동기에서 뺐습니다 — 다른 교수 쪽에서도 함께 빠집니다`);
     });
     /* 치는 동안 찾은 분만 갈아 끼운다 — 적는 칸은 그대로 두어야 한글 조합이 안 끊긴다 */
     sec.addEventListener('input', e => {
@@ -4810,16 +4834,21 @@ function hireBind(p) {
       HIREQ = e.target.value;
       hireHitsSync();
     });
-    /* 엔터 — 찾은 분이 한 분이면 그대로 더합니다. 여럿이면 고르시라 하고, 아무도 없으면
-       적으신 그대로 찾아 **무엇이 잘못인지** 말합니다. */
+    /* 엔터 — 뜬 칩이 하나면 그대로 더합니다. 명단에 없는 이름이어도 「그대로 더하기」 칩이
+       서므로, 치고 엔터만 치시면 **명단 밖 사람으로** 들어갑니다 (2026-11-12, 교수님 지정).
+       칩이 하나도 없는 길은 하나뿐입니다 — 이미 적어 두신 이름이거나, 아직 아무것도 안 치신
+       때입니다. */
     sec.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || !e.target.closest('[data-hirein]')) return;
       e.preventDefault();
-      const n = sec.querySelectorAll('[data-hireadd]');
-      if (n.length === 1) { hireTakeKey(n[0].getAttribute('data-hireadd')); return; }
-      if (n.length > 1) { flashStatus('찾은 분 가운데 한 분을 누르십시오', true); return; }
-      const r = hireFind(HIREQ);
-      flashStatus(r.err || '', true);
+      /* **명단에서 찾은 분이 먼저**입니다. 「그대로 더하기」 칩은 늘 서 있으므로 그것까지
+         세면 한 분을 찾아 놓고도 「고르십시오」가 되어 버립니다 (2026-11-12). */
+      const all = [...sec.querySelectorAll('[data-hireadd]')].map(x => x.getAttribute('data-hireadd'));
+      const inn = all.filter(k => !isExt(k));
+      if (inn.length === 1) { hireTakeKey(inn[0]); return; }
+      if (inn.length > 1) { flashStatus('찾은 분 가운데 한 분을 누르십시오', true); return; }
+      if (all.length) { hireTakeKey(all[0]); return; }   // 명단에 없는 이름 — 그대로 더한다
+      flashStatus(HIREQ.trim() ? `「${HIREQ.trim()}」은 이미 적어 두었습니다` : '더할 분의 이름을 적으십시오', true);
     });
   }
   hireRedraw();   // 단추의 +/× 와 칸을 지금 상태에 맞춘다
@@ -4828,10 +4857,12 @@ function hireBind(p) {
 /* 고르신 분을 더한다 */
 function hireTakeKey(k) {
   const me = hireWho, other = state.rows.find(x => rKey(x) === k);
-  if (!me || !other) return;
+  /* 명단 밖 분은 명단에서 찾을 것이 없습니다 — 이름만 들고 갑니다 (2026-11-12) */
+  const nm = other ? `${other.name} 교수` : (isExt(k) ? `「${extName(k)}」` : '');
+  if (!me || !nm) return;
   if (k === rKey(me)) { flashStatus('본인은 입사 동기로 더할 수 없습니다', true); return; }
   if ((hireAll().find(x => x.includes(rKey(me))) || []).includes(k)) {
-    flashStatus(`${other.name} 교수는 이미 ${me.name} 교수의 입사 동기로 적혀 있습니다`, true); return;
+    flashStatus(`${nm}는 이미 ${me.name} 교수의 입사 동기로 적혀 있습니다`, true); return;
   }
   hireAdd(rKey(me), k);
   HIREQ = '';            // 다음 분을 바로 치실 수 있게 비운다
@@ -4839,7 +4870,9 @@ function hireTakeKey(k) {
   /* 몇 명과 이어졌는지 **되읽어** 알려 드린다 — 한 분을 더했는데 넷이 되는 것이 이 칸의
      핵심이라, 그 수를 직접 보여 드려야 이어 붙음을 믿으실 수 있습니다. */
   const n = (hireAll().find(x => x.includes(k)) || []).length - 1;
-  flashStatus(`${other.name} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`);
+  flashStatus(other
+    ? `${other.name} 교수를 입사 동기로 더했습니다 — 그 교수 쪽에도 동기 ${n}명이 함께 섭니다`
+    : `${nm}을 입사 동기로 더했습니다 — 명단에 없는 분이라 이름만 적어 둡니다`);
 }
 
 /* ---------- 친한 사람 (2026-11-12, 교수님 지정) ----------
@@ -4886,10 +4919,13 @@ function palDrop(me, k) { palSave(palLines().filter(l => !(l.includes(me) && l.i
 function palsOf(p) {
   const me = rKey(p);
   const ks = [...new Set(palLines().filter(l => l.includes(me)).flat())].filter(k => k !== me);
-  const rows = ks.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
+  const ext = ks.filter(isExt);                       // 명단 밖 분 (2026-11-12)
+  const inn = ks.filter(k => !isExt(k));
+  const rows = inn.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
   return { ps: stSort(rows.filter(x => getRating(x) !== '비')),
     out: rows.filter(x => getRating(x) === '비').length,
-    gone: ks.length - rows.length };   // 명단이 바뀌어 사라진 분 — 조용히 지우지 않고 알려 드린다
+    ext,
+    gone: inn.length - rows.length };   // 명단이 바뀌어 사라진 분 — 조용히 지우지 않고 알려 드린다
 }
 
 /* 〈고치기〉가 열려 있는가. 입사 동기와 마찬가지로 상세를 열 때마다 닫힌 자리에서 시작합니다 —
@@ -4905,9 +4941,11 @@ function palHits(p) {
   const me = rKey(p);
   const hits = state.rows.filter(x => rKey(x) !== me && !isPal(me, rKey(x)) &&
     (x.name.toLowerCase().includes(q) || x.dept_name.toLowerCase().includes(q))).slice(0, 12);
-  if (!hits.length) return `<p class="st-note">명단에 없는 이름입니다</p>`;
+  /* 명단에 없는 분도 적으실 수 있습니다 (2026-11-12, 교수님 지정) — 입사 동기 쪽과 같습니다 */
+  const ext = isPal(me, extKey(PALQ)) ? '' : extHit(PALQ, 'pal', '친한 사람');
+  if (!hits.length && !ext) return `<p class="st-note">이미 적어 두었습니다</p>`;
   return hits.map(x => `<button type="button" class="d-pal__hit" data-paladd="${esc(rKey(x))}"
-    title="${esc(x.dept_name)} · ${esc(x.rank)} — 누르면 친한 사람으로 더합니다">${esc(x.name)}<small>${esc(x.dept_name)}</small></button>`).join('');
+    title="${esc(x.dept_name)} · ${esc(x.rank)} — 누르면 친한 사람으로 더합니다">${esc(x.name)}<small>${esc(x.dept_name)}</small></button>`).join('') + ext;
 }
 /* 찾은 분만 갈아 끼운다. **적는 칸은 건드리지 않는다** — 한 글자 칠 때마다 그 칸까지 다시
    그리면 한글 조합이 끊겨 자모가 흩어진다(ㅎ ㅏ ㄴ). 입사 동기·접촉에서 이미 겪은 자리다. */
@@ -4921,15 +4959,15 @@ function palHtml(p) {
   const h = palsOf(p);
   const tail = [];
   if (h.out) tail.push(`비참여 ${h.out}명은 뺐습니다`);
-  if (h.gone) tail.push(`명단에 없는 분 ${h.gone}명은 뺐습니다`);
-  if (!h.ps.length) tail.unshift('아직 적어 둔 분이 없습니다');
+  if (h.gone) tail.push(`명단에서 사라진 분 ${h.gone}명은 뺐습니다`);
+  if (!h.ps.length && !h.ext.length) tail.unshift('아직 적어 둔 분이 없습니다');
   const note = tail.length ? `<p class="st-note">${esc(tail.join(' · '))}</p>` : '';
   const was = STP.pick; STP.pick = false;
   const chips = h.ps.map(x => {
     const c = stChip(x, getRating(x));
     /* ×는 **고치는 동안에만** 답니다 — 늘 달아 두면 상세로 가려다 빼게 됩니다 */
     return PALEDIT ? c.replace('</li>', `<button type="button" class="d-pal__x" data-paldrop="${esc(rKey(x))}" title="${esc(x.name)} 교수를 친한 사람에서 뺍니다" aria-label="${esc(x.name)} 교수 빼기">×</button></li>`) : c;
-  }).join('');
+  }).join('') + h.ext.map(k => extChip(k, PALEDIT, 'pal', '친한 사람')).join('');
   STP.pick = was;
   const add = PALEDIT
     ? `<li class="d-pal__a"><input class="d-pal__in" data-palin type="text" autocomplete="off"
@@ -4973,7 +5011,8 @@ function palBind(p) {
       const k = x.getAttribute('data-paldrop'), other = state.rows.find(y => rKey(y) === k);
       palDrop(rKey(palWho), k);
       palRedraw();
-      flashStatus(`${other ? other.name : ''} 교수를 친한 사람에서 뺐습니다 — 그 교수 쪽에서도 함께 빠집니다`);
+      flashStatus(other ? `${other.name} 교수를 친한 사람에서 뺐습니다 — 그 교수 쪽에서도 함께 빠집니다`
+        : `「${extName(k)}」을 친한 사람에서 뺐습니다`);
     });
     /* 치는 동안 찾은 분만 갈아 끼운다 — 적는 칸은 그대로 두어야 한글 조합이 안 끊긴다 */
     sec.addEventListener('input', e => {
@@ -4981,17 +5020,18 @@ function palBind(p) {
       PALQ = e.target.value;
       palHitsSync();
     });
-    /* 엔터 — 찾은 분이 한 분이면 그대로 더합니다. 여럿이면 고르시라 하고, 아무도 없으면
-       적으신 그대로 찾아 **무엇이 잘못인지** 말합니다(`hireFind` 를 함께 씁니다 — 적어 주신
-       이름을 교수로 바꾸는 일은 두 칸이 똑같습니다). */
+    /* 엔터 — 입사 동기 쪽과 같습니다. 명단에 없는 이름이어도 「그대로 더하기」 칩이 서므로
+       치고 엔터만 치시면 명단 밖 사람으로 들어갑니다 (2026-11-12, 교수님 지정). */
     sec.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || !e.target.closest('[data-palin]')) return;
       e.preventDefault();
-      const n = sec.querySelectorAll('[data-paladd]');
-      if (n.length === 1) { palTakeKey(n[0].getAttribute('data-paladd')); return; }
-      if (n.length > 1) { flashStatus('찾은 분 가운데 한 분을 누르십시오', true); return; }
-      const r = hireFind(PALQ);
-      flashStatus(r.err || '', true);
+      /* 명단에서 찾은 분이 먼저 — 입사 동기 쪽과 같습니다 (2026-11-12) */
+      const all = [...sec.querySelectorAll('[data-paladd]')].map(x => x.getAttribute('data-paladd'));
+      const inn = all.filter(k => !isExt(k));
+      if (inn.length === 1) { palTakeKey(inn[0]); return; }
+      if (inn.length > 1) { flashStatus('찾은 분 가운데 한 분을 누르십시오', true); return; }
+      if (all.length) { palTakeKey(all[0]); return; }   // 명단에 없는 이름 — 그대로 더한다
+      flashStatus(PALQ.trim() ? `「${PALQ.trim()}」은 이미 적어 두었습니다` : '더할 분의 이름을 적으십시오', true);
     });
   }
   palRedraw();
@@ -5000,15 +5040,19 @@ function palBind(p) {
 /* 고르신 분을 더한다 */
 function palTakeKey(k) {
   const me = palWho, other = state.rows.find(x => rKey(x) === k);
-  if (!me || !other) return;
+  /* 명단 밖 분은 명단에서 찾을 것이 없습니다 — 이름만 들고 갑니다 (2026-11-12) */
+  const nm = other ? `${other.name} 교수` : (isExt(k) ? `「${extName(k)}」` : '');
+  if (!me || !nm) return;
   if (k === rKey(me)) { flashStatus('본인은 친한 사람으로 더할 수 없습니다', true); return; }
   if (isPal(rKey(me), k)) {
-    flashStatus(`${other.name} 교수는 이미 ${me.name} 교수의 친한 사람으로 적혀 있습니다`, true); return;
+    flashStatus(`${nm}는 이미 ${me.name} 교수의 친한 사람으로 적혀 있습니다`, true); return;
   }
   palAdd(rKey(me), k);
   PALQ = '';            // 다음 분을 바로 치실 수 있게 비운다
   palRedraw();
-  flashStatus(`${other.name} 교수를 친한 사람으로 더했습니다 — 그 교수 쪽에도 ${me.name} 교수가 섭니다`);
+  flashStatus(other
+    ? `${other.name} 교수를 친한 사람으로 더했습니다 — 그 교수 쪽에도 ${me.name} 교수가 섭니다`
+    : `${nm}을 친한 사람으로 더했습니다 — 명단에 없는 분이라 이름만 적어 둡니다`);
 }
 
 /* ---------- 동문 교수 (2026-11-02, 교수님 지정) ----------
@@ -6497,23 +6541,9 @@ function openDrawer(p, d) {
       </div>
 
 
-      ${/* 친한 사람 — **입사 동기 위**입니다 (2026-11-12, 교수님 지정). 칸 이름은 `.d-palsec`
-            으로 따로 둡니다: 입사 동기와 같은 이름을 나눠 지면 `querySelector('.d-hire')` 가
-            위에 선 이쪽을 집어 두 칸이 서로 섞입니다. */''}
-      <div class="d-section d-palsec"><h3>친한 사람</h3>
-        <div class="d-pal">${palHtml(p)}</div>
-      </div>
-
-      <div class="d-section d-hiresec"><h3>입사 동기</h3>
-        ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
-            `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
-        <div class="d-hire">${hireHtml(p)}</div>
-      </div>
-
-      <div class="d-section"><h3>동문 교수</h3>
-        <div class="d-alum" data-alum="${esc(p.slug)}">${alumHtml(p)}</div>
-      </div>
-
+      ${/* 선호도와 선호도 추가정보가 **맨 위**입니다 (2026-11-12, 교수님 지정). 상세를 여는
+            까닭이 대개 「이분을 어떻게 보고 있었나」를 보고 고치는 것이라, 사람 칸(친한 사람·
+            입사 동기·동문 교수)보다 먼저 섭니다. */''}
       <div class="d-section"><h3>선호도</h3>
         ${rateWide(p)}
       </div>
@@ -6532,6 +6562,23 @@ function openDrawer(p, d) {
           <button type="button" class="presbtn${isPres(p) ? ' on' : ''}" data-presbtn="${esc(rKey(p))}" aria-pressed="${isPres(p)}">
             ${PRES_MARK}<span>VIP</span></button>
         </div>
+      </div>
+
+      ${/* 친한 사람 — **입사 동기 위**입니다 (2026-11-12, 교수님 지정). 칸 이름은 `.d-palsec`
+            으로 따로 둡니다: 입사 동기와 같은 이름을 나눠 지면 `querySelector('.d-hire')` 가
+            위에 선 이쪽을 집어 두 칸이 서로 섞입니다. */''}
+      <div class="d-section d-palsec"><h3>친한 사람</h3>
+        <div class="d-pal">${palHtml(p)}</div>
+      </div>
+
+      <div class="d-section d-hiresec"><h3>입사 동기</h3>
+        ${/* 동문 교수의 `.d-alum` 을 같이 쓰지 **않는다** — 두 칸이 같은 이름을 지면
+            `querySelector('.d-alum')` 가 위에 선 이쪽을 집어 시험이 엉똑한 것을 봅니다. */''}
+        <div class="d-hire">${hireHtml(p)}</div>
+      </div>
+
+      <div class="d-section"><h3>동문 교수</h3>
+        <div class="d-alum" data-alum="${esc(p.slug)}">${alumHtml(p)}</div>
       </div>
 
       <div class="d-section"><h3>만난 횟수</h3>

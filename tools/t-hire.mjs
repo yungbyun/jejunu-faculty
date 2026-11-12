@@ -147,7 +147,14 @@ const plus = async () => { await page.click('.d-hiresec [data-hireedit]'); await
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('jnu-hire') || 'null'));
 const names = () => page.evaluate(() => [...document.querySelectorAll('.d-hire li a')].map(a => a.textContent.trim()));
 const status = () => page.evaluate(() => document.querySelector('.foot__status').textContent.trim());
-const hits = () => page.evaluate(() => [...document.querySelectorAll('[data-hireadd]')].map(b => b.textContent.trim()));
+/* 찾은 분 — **명단에서** 찾은 칩만 본다. 칩 줄 끝에 서는 「그대로 더하기」(명단 밖 사람,
+   열쇠가 `@…`)는 `extHit()` 로 따로 본다 (2026-11-12) */
+const hits = () => page.evaluate(() => [...document.querySelectorAll('[data-hireadd]')]
+  .filter(b => b.getAttribute('data-hireadd')[0] !== '@').map(b => b.textContent.trim()));
+const extHit = () => page.evaluate(() => {
+  const b = document.querySelector('[data-hireadd^="@"]');
+  return b ? b.textContent.trim() : '';
+});
 /* 치는 시늉 — 적는 칸은 건드리지 않고 찾은 분만 갈아 끼워야 한글 조합이 안 끊긴다 */
 const q = async v => {
   await page.evaluate(x => { const i = document.querySelector('[data-hirein]'); i.value = x;
@@ -236,8 +243,9 @@ t('본인은 찾아도 안 나온다', (await hits()).length === 0, (await hits(
 await q('김민철');
 t('이미 묶인 분도 안 나온다', (await hits()).length === 0, (await hits()).join(' '));
 await q('홍길동');
-t('없는 이름이면 그렇다고 적는다', /명단에 없는 이름/.test((await read()).note) ||
-  await page.evaluate(() => /명단에 없는 이름/.test(document.querySelector('[data-hirehits]').textContent)));
+/* 명단에 없는 이름이면 **그대로 더하는 칩**이 선다 (2026-11-12, 교수님 지정) */
+t('없는 이름이면 「그대로 더하기」 칩만 선다', (await hits()).length === 0 && /명단 밖/.test(await extHit()),
+  await extHit());
 
 /* ★ 교수님이 특히 일러 주신 자리 — 한 분을 더하면 **묶음 전체**와 이어진다 */
 await q('송왕철');
@@ -256,8 +264,13 @@ await q(far.n); await enter();
 t('엔터 — 찾은 분이 하나면 그대로 더한다', (await names()).includes(far.n), (await names()).join(' '));
 await q('김'); await enter();
 t('엔터 — 여럿이면 고르시라 한다', /한 분을 누르십시오/.test(await status()), await status());
+/* 없는 이름에 엔터는 **명단 밖 사람으로 더합니다** (2026-11-12, 교수님 지정) — 아래
+   「명단 밖 사람」 묶음에서 자세히 잽니다. 여기서는 되돌려 두기만 합니다. */
 await q('홍길동'); await enter();
-t('엔터 — 없는 이름은 그렇다고 알려 준다', /없습니다/.test(await status()), await status());
+await page.waitForTimeout(250);
+t('엔터 — 없는 이름은 명단 밖 사람으로 더한다', /명단에 없는 분이라 이름만/.test(await status()), await status());
+await page.click('.d-hire [data-hiredrop="@홍길동"]');
+await page.waitForTimeout(200);
 
 await open('송왕철');
 await page.waitForSelector('.d-hire', { timeout: 10000 });
@@ -278,6 +291,40 @@ await open('임형용');
 await page.waitForSelector('.d-hire', { timeout: 10000 });
 t('빠진 분 쪽은 빈 안내로 돌아간다', !(await names()).length, (await read()).note);
 t('빈 칸에도 + 는 그대로 있다', !!(await page.$('.d-hiresec [data-hireedit]')));
+
+
+/* ---------- 명단 밖 사람 (2026-11-12, 교수님 지정) ----------
+   본부 보직자처럼 **우리 명단에 없는 분**도 입사 동기로 적어 둘 수 있어야 한다. */
+const outs = () => page.evaluate(() => [...document.querySelectorAll('.d-hire .st-c--out')].map(x => x.textContent.trim()));
+if (!(await page.$('[data-hirein]'))) await plus();
+await q('총장님');
+t('명단에 없는 이름이면 「그대로 더하기」 칩이 선다', /명단 밖/.test(await extHit()), await extHit());
+t('그때 명단에서 찾은 칩은 없다', (await hits()).length === 0, (await hits()).join(' '));
+await page.click('[data-hireadd^="@"]');
+await page.waitForTimeout(300);
+t('누르면 이름만으로 들어간다', (await outs()).includes('총장님'), (await outs()).join(','));
+t('고리가 아니라 글자다 — 갈 상세가 없으므로', await page.evaluate(() => {
+  const el = document.querySelector('.d-hire .st-c--out');
+  return !!el && el.tagName === 'SPAN' && !document.querySelector('.d-hire a .st-c--out');
+}));
+t('저장에는 `@이름` 으로 담긴다', JSON.stringify(await saved()).includes('@총장님'), JSON.stringify(await saved()));
+t('더한 뒤 명단 밖 분이라고 알려 준다', /명단에 없는 분이라 이름만/.test(await status()), await status());
+t('고치는 동안에는 ×가 붙는다', (await page.$$('.d-hire [data-hiredrop^="@"]')).length === 1);
+await q('총장님');
+t('이미 적은 이름은 다시 안 뜬다', (await extHit()) === '');
+await q('부총장'); await enter();
+await page.waitForTimeout(250);
+t('엔터만 쳐도 들어간다 — 뜬 칩이 하나이므로', (await outs()).includes('부총장'), (await outs()).join(','));
+/* 명단 밖 분도 **이어 붙음**에 낍니다 — 같은 때 들어오셨으면 그 묶음의 한 분입니다 */
+t('명단 밖 분도 묶음에 든다', await page.evaluate(() =>
+  (hireAll().find(g => g.includes('@총장님')) || []).length >= 2),
+  JSON.stringify(await page.evaluate(() => hireAll())));
+await page.click('.d-hire [data-hiredrop="@부총장"]');
+await page.waitForTimeout(250);
+t('×로 뺀다', !(await outs()).includes('부총장'), (await outs()).join(','));
+t('뺀 것은 그 이름뿐', (await outs()).includes('총장님'), (await outs()).join(','));
+t('명단 열쇠와는 섞이지 않는다', await page.evaluate(() =>
+  !isExt(rKey(state.rows[0])) && isExt('@총장님') && extName('@총장님') === '총장님'));
 
 /* 다 지워도 씨앗으로 **되돌아가지 않는다** — `[]` 는 「다 지우셨다」는 뜻이다 */
 await page.evaluate(() => { hireSave([]); });

@@ -72,6 +72,12 @@ t('입사 동기 위에 선다', await page.evaluate(() => {
   const a = document.querySelector('.d-palsec'), h = document.querySelector('.d-hiresec');
   return !!a && !!h && a.compareDocumentPosition(h) === Node.DOCUMENT_POSITION_FOLLOWING;
 }), await page.evaluate(() => [...document.querySelectorAll('.d-body .d-section h3')].map(x => x.textContent.trim()).join(' | ')));
+/* 선호도·선호도 추가정보가 **사람 칸들보다 위**입니다 (2026-11-12, 교수님 지정) */
+t('선호도와 선호도 추가정보는 친한 사람 위에 선다', await page.evaluate(() => {
+  const s = [...document.querySelectorAll('.d-body .d-section h3')].map(x => x.textContent.trim());
+  return s.indexOf('선호도') >= 0 && s.indexOf('선호도 추가정보') === s.indexOf('선호도') + 1
+    && s.indexOf('친한 사람') === s.indexOf('선호도 추가정보') + 1;
+}), await page.evaluate(() => [...document.querySelectorAll('.d-body .d-section h3')].map(x => x.textContent.trim()).join(' | ')));
 t('두 칸은 서로 섞이지 않는다', await page.evaluate(() =>
   !document.querySelector('.d-palsec .d-hire') && !document.querySelector('.d-hiresec .d-pal')));
 t('비었어도 연필은 선다', await page.evaluate(() => !!document.querySelector('.d-palsec [data-paledit]')));
@@ -96,8 +102,13 @@ t('찾는 칸은 칩 줄 **맨 뒤**에 선다', await page.evaluate(() => {
   return [...s.querySelectorAll('.d-pal li')].pop().contains(i);
 }));
 await type('ㅋㅋ없는이름');
-t('없는 이름이면 그렇다고 적는다', await page.evaluate(() =>
-  /명단에 없는 이름/.test(document.querySelector('[data-palhits]').textContent)));
+/* 명단에 없는 이름이면 **그대로 더하는 칩**이 선다 (2026-11-12, 교수님 지정) */
+t('명단에 없는 이름이면 「그대로 더하기」 칩이 선다', await page.evaluate(() => {
+  const b = document.querySelector('[data-paladd^="@"]');
+  return !!b && /명단 밖/.test(b.textContent);
+}), await page.evaluate(() => (document.querySelector('[data-palhits]') || {}).textContent || ''));
+t('그때 명단에서 찾은 칩은 없다', await page.evaluate(() =>
+  [...document.querySelectorAll('[data-paladd]')].every(b => b.getAttribute('data-paladd')[0] === '@')));
 await type(K.nm[1]);
 t('친 대로 찾아 칩을 세운다', (await page.$$('[data-paladd]')).length >= 1,
   (await page.evaluate(() => [...document.querySelectorAll('[data-paladd]')].map(x => x.textContent.trim()).join(','))));
@@ -154,6 +165,45 @@ t('입사 동기 칸은 건드리지 않는다', await page.evaluate(() =>
   (document.querySelector('.d-hiresec h3') || {}).textContent.trim() === '입사 동기'));
 t('친한 사람을 담아도 입사 동기 줄은 그대로', await page.evaluate(() =>
   !JSON.stringify(hireLines()).includes('jnu-pals')));
+
+
+/* ---------- 명단 밖 사람 (2026-11-12, 교수님 지정) ----------
+   본부 보직자처럼 **우리 명단에 없는 분**도 이름만으로 적어 둘 수 있어야 한다. */
+const enter = () => page.evaluate(() => { const i = document.querySelector('[data-palin]');
+  i.focus(); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
+const outs = () => page.evaluate(() => [...document.querySelectorAll('.d-pal .st-c--out')].map(x => x.textContent.trim()));
+await pen();
+await type('총장님');
+t('명단에 없는 이름이면 「그대로 더하기」 칩이 선다', (await page.$$('[data-paladd^="@"]')).length === 1);
+await page.click('[data-paladd^="@"]');
+await page.waitForTimeout(250);
+const EXT = await page.evaluate(() => ({
+  tag: (document.querySelector('.d-pal .st-c--out') || {}).tagName,
+  link: !!(document.querySelector('.d-pal .st-c--out') || {}).closest,
+  inA: !!document.querySelector('.d-pal a .st-c--out'),
+  saved: localStorage.getItem('jnu-pals') || '',
+  xs: document.querySelectorAll('.d-pal [data-paldrop^="@"]').length,
+  st: (document.querySelector('.statusbar, .status, [data-status]') || {}).textContent || '',
+}));
+t('명단 밖 분이 칩으로 선다', (await outs()).includes('총장님'), (await outs()).join(','));
+t('고리가 아니라 글자다 — 갈 상세가 없으므로', EXT.tag === 'SPAN' && !EXT.inA, String(EXT.tag));
+t('저장에는 `@이름` 으로 담긴다', EXT.saved.includes('@총장님'), EXT.saved);
+t('고치는 동안에는 ×가 붙는다', EXT.xs === 1);
+t('명단에 있던 분도 그대로 남는다', (await page.evaluate(() =>
+  [...document.querySelectorAll('.d-pal li a')].length)) === 1);
+await type('총장님');
+t('이미 적은 이름은 다시 안 뜬다', (await page.$$('[data-paladd^="@"]')).length === 0);
+await type('부총장');
+await enter();
+await page.waitForTimeout(250);
+t('엔터만 쳐도 들어간다 — 뜬 칩이 하나이므로', (await outs()).includes('부총장'), (await outs()).join(','));
+await page.click('.d-pal [data-paldrop="@부총장"]');
+await page.waitForTimeout(250);
+t('×로 뺀다', !(await outs()).includes('부총장'), (await outs()).join(','));
+t('뺀 것은 그 이름뿐', (await outs()).includes('총장님'), (await outs()).join(','));
+t('앞뒤 공백은 다듬어 담는다', await page.evaluate(() => extKey('  홍  길동  ') === '@홍 길동'));
+t('명단 열쇠와는 섞이지 않는다 — 열쇠에 `/` 가 있다', await page.evaluate(() =>
+  !isExt(rKey(state.rows[0])) && isExt('@총장님')));
 
 /* ---------- 좁은 화면 ---------- */
 await page.setViewportSize({ width: 390, height: 844 });

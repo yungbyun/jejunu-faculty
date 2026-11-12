@@ -360,6 +360,19 @@ main{min-height:60vh;padding:40px 20px 72px}
 .d-hire__a,.d-pal__a{display:inline-flex;align-items:center;gap:5px}
 /* 찾은 분은 칩 줄 **아래**에 따로 깐다 — 같은 줄에 두면 이미 적힌 분과 섞여 헷갈린다 */
 .d-hire__hits,.d-pal__hits{margin-top:2px}
+
+/* ---------- 명단 밖 사람 (2026-11-12, 교수님 지정) ----------
+   친한 사람·입사 동기에는 **명단에 없는 분**도 이름만으로 적어 둘 수 있습니다.
+   갈 상세가 없으므로 칩이 고리(`<a>`)가 아니라 **글자**(`<span>`)입니다 — 그래서 칩 꼴
+   (`.rel-unames li a` 가 지던 둥글기·여백·글씨)을 여기서 다시 적어 줍니다. 테두리는
+   **점선**으로 두어 명단에 있는 분과 한눈에 가려집니다(선호도 색도 입지 않습니다). */
+.rel-unames li .st-c--out{display:inline-flex;align-items:center;padding:4px 11px;
+  border-radius:999px;border:1px dashed var(--line-2);background:var(--surface-2);
+  color:var(--ink-2);font:inherit;font-size:13px;font-weight:600;white-space:nowrap}
+/* 「그대로 더하기」 칩 — 찾은 분 뒤에 서고, 누르면 그 이름이 명단 밖 사람으로 들어갑니다.
+   테두리를 점선으로 두어 **명단에서 찾은 칩과 다른 것**임을 알립니다. */
+.d-hire__hit--new,.d-pal__hit--new{border-style:dashed;color:var(--ink-2)}
+.d-hire__hit--new small,.d-pal__hit--new small{color:var(--ink-3)}
 .d-info{display:grid;grid-template-columns:76px 1fr;gap:8px 12px;font-size:var(--fs-s);margin:0}
 .d-info dt{color:var(--ink-3);font-weight:500}
 .d-info dd{margin:0;word-break:break-all}
