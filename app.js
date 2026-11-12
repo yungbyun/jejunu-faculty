@@ -3558,6 +3558,7 @@ function bindNotes(root) {
     /* 글 쓰는 동안 innerHTML 을 다시 그리지 않는다 — 다시 그리면 한글 입력기에서 커서가 튄다 */
     const typed = () => {
       scheduleMemo(t.dataset.key, memoRead(t));
+      lifeRefresh(t.dataset.key, memoRead(t));   // 사는 곳·가족사항도 그 자리에서 함께 선다
       const st = box && box.querySelector('.memo__st');
       if (st) st.textContent = '입력 중…';
       memoMarkSync();
@@ -5781,6 +5782,61 @@ function dPhones(p) {
   a.push(dMobile(p));
   return `<div class="d-en d-phones">${a.join('<i class="d-ct__s">·</i>')}</div>`;
 }
+/* ---------- 사는 곳 · 가족사항 — 번호 줄 바로 아래 (2026-11-13, 교수님 지정) ----------
+ * 적는 자리를 따로 두지 않습니다. **메모에 적어 두신 것을 그대로 읽어** 번호 줄 아래에 세웁니다
+ *   주거지(한일베라체)  가족사항(아들 7세)  가족사항(딸 5세)
+ * 메모는 이미 비공개 시트에 저장되고 기기끼리 맞춰지므로, 새 칸·새 설정 키·서버 손질이
+ * 모두 필요 없습니다. 적는 법도 교수님이 이미 쓰고 계신 그대로입니다.
+ * - 괄호는 `( （ [ {` 어느 것으로 열어도 받고, 닫는 괄호는 없어도 됩니다 —
+ *   `주거지{한일베라체)` 처럼 한 짝이 어긋나는 일이 실제로 있기 때문입니다.
+ * - 이름은 `주거지`·`거주지`·`사는 곳` / `가족사항`·`가족관계`·`가족` 을 받습니다.
+ *   괄호가 바로 뒤에 와야 하므로 「가족 모임」 같은 보통 글은 걸리지 않습니다.
+ * - 가족사항은 **여러 번** 적으실 수 있어 모두 모아 가운뎃점으로 잇습니다(같은 말은 한 번만).
+ * - 아무것도 없으면 **줄 자체를 세우지 않습니다**(교수님 지정).
+ * - 꾸밈 표시(**굵게** `{빨강:…}`)는 `memoPlain` 으로 털어 내고 읽습니다. */
+const LIFE_OPEN = '[(\\uFF08\\[{]';
+const LIFE_SHUT = '[)\\uFF09\\]}]?';
+const lifePat = lab => new RegExp('(?:' + lab + ')\\s*' + LIFE_OPEN + '\\s*([^)\\uFF09\\]}\\n]+)\\s*' + LIFE_SHUT, 'g');
+const LIFE_HOME_RE = lifePat('주거지|거주지|사는\\s*곳');
+const LIFE_FAM_RE = lifePat('가족사항|가족관계|가족');
+/* 한 본으로 뽑은 값들 — 빈 것과 겹친 것을 걸러 차례대로 돌려준다 */
+function lifePick(re, txt) {
+  const out = [];
+  String(txt || '').replace(re, (_, v) => {
+    const x = String(v || '').replace(/\s+/g, ' ').trim();
+    if (x && !out.includes(x)) out.push(x);
+    return '';
+  });
+  return out;
+}
+const HOME_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<path d="M3.5 10.5 12 4l8.5 6.5V20a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-9.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>'
+  + '<path d="M9.5 21v-6h5v6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>';
+const FAM_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<circle cx="8.5" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/>'
+  + '<path d="M3 20v-1.5C3 16.6 5.5 15 8.5 15s5.5 1.6 5.5 3.5V20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
+  + '<circle cx="17" cy="10.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.9"/>'
+  + '<path d="M15 20v-1c0-1.5 1.5-2.6 3.3-2.6 1.3 0 2.4.5 2.7 1.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+function lifeRow(svg, what, txt) {
+  return `<div class="d-life__r" title="${esc(what)}">${svg}<span>${esc(txt)}</span></div>`;
+}
+/* 메모 글 하나를 줄로 바꾼다 — 글을 쓰는 동안에도 쓰던 글을 그대로 넘겨 다시 세운다 */
+function lifeHtml(memo) {
+  const t = memoPlain(memo || '');
+  const home = lifePick(LIFE_HOME_RE, t), fam = lifePick(LIFE_FAM_RE, t);
+  if (!home.length && !fam.length) return '';
+  return (home.length ? lifeRow(HOME_SVG, '사는 곳', home.join(' · ')) : '')
+    + (fam.length ? lifeRow(FAM_SVG, '가족사항', fam.join(' · ')) : '');
+}
+/* 메모를 쓰는 동안 이 줄만 갈아 끼운다 — 상세를 통째로 다시 그리면 커서가 날아간다.
+   지금 열려 있는 분의 메모일 때만 손댄다(핵심 메모는 `@keymemo` 라 열쇠가 다르다). */
+function lifeRefresh(key, memo) {
+  const w = $panel && $panel.querySelector('.d-lifew');
+  if (!w || w.dataset.life !== key) return;
+  const h = lifeHtml(memo);
+  if (w.innerHTML !== h) w.innerHTML = h;
+}
+
 /* 번호 줄만 갈아 끼운다 — 메모를 쓰던 중에 상세를 통째로 다시 그리면 커서가 날아간다 */
 function refreshPhones(p) {
   const box = $panel.querySelector('.d-phones');
@@ -6537,6 +6593,10 @@ function openDrawer(p, d) {
           <div class="d-eduw" data-edu="${esc(p.slug)}">${dEdu(p)}</div>
           ${dOffice(p)}
           ${dPhones(p)}
+          ${/* 사는 곳·가족사항 — 번호 줄 **바로 아래**입니다 (2026-11-13, 교수님 지정).
+                메모에 적어 두신 「주거지(…)」·「가족사항(…)」 을 읽습니다. 없으면 빕니다.
+                자리를 비워 두는 까닭은 메모를 쓰는 동안 이 줄만 갈아 끼우기 때문입니다. */''}
+          <div class="d-lifew" data-life="${esc(rKey(p))}">${lifeHtml(getMemo(p))}</div>
         </div>
       </div>
 

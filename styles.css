@@ -945,6 +945,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   border:1px solid var(--line-2);border-radius:999px;padding:1px 5px;letter-spacing:-.3px}
 .d-eduw:empty+.d-office{margin-top:-4px}
 .d-eduw:empty+.d-phones{margin-top:-6px}
+/* 사는 곳·가족사항 줄 — 연구실·번호 줄과 같은 결(2026-11-13, 교수님 지정).
+   메모에 적힌 것이 없으면 `.d-lifew` 가 비어 아래 칸이 그만큼 당겨 붙는다. */
+.d-lifew{margin:0}
+.d-life__r{display:flex;align-items:flex-start;gap:4px;margin:0 0 4px;font-size:12.5px;color:var(--ink-2)}
+.d-life__r svg{flex:none;opacity:.8;margin-top:1px}
+.d-life__r>span{min-width:0}
+.d-phones+.d-lifew .d-life__r:first-child{margin-top:-2px}
 .d-ct{display:inline-flex;align-items:center;gap:3px}
 .d-ct__n{color:inherit;text-decoration:none;font-variant-numeric:tabular-nums}
 .d-ct__n:hover,.d-ct__n:focus-visible{text-decoration:underline}
