@@ -6315,12 +6315,16 @@ function mtAteSection() {
         </li>`).join('')}</ul>`
           : `<div class="empty"><strong>아직 못 뵌 분이 없습니다</strong>명단의 모든 분을 뵈었습니다. 「모두」를 누르시면 자리들이 다시 보입니다.</div>`)
         : !all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
-          <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i>${
-            r.ate ? '' : `<b class="mt-ate__s">예정</b>`}</span>
+          ${/* 「예정」 쪽지는 **이름 끝**에 답니다 (2026-11-13 저녁, 교수님 지정).
+               날짜 뒤에 달았더니 날짜 칸이 길어져 갈래·이름이 줄마다 다른 자리에서
+               시작했습니다. 이름 끝이면 줄의 앞머리가 가지런하고, 쪽지는 **누구를**
+               뵐지 바로 옆에 섭니다. */''}
+          <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i></span>
           <span class="mt-ate__k">${mtIcon(r.slot)}${esc(MT_SLOT_NAME[r.slot] || '')}</span>
           <span class="mt-ate__p">${r.ps.map(x =>
             `<a href="#/dept/${encodeURIComponent(x.dept_id)}/prof/${encodeURIComponent(x.slug)}"
-                title="${esc(x.dept_name)} · ${esc(x.rank)}">${esc(x.name)}</a>`).join('<i>·</i>')}</span>
+                title="${esc(x.dept_name)} · ${esc(x.rank)}">${esc(x.name)}</a>`).join('<i>·</i>')}${
+            r.ate ? '' : `<b class="mt-ate__s">예정</b>`}</span>
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
         : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}

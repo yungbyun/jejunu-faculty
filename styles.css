@@ -1769,20 +1769,28 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-ate li{display:grid;grid-template-columns:auto auto auto 1fr;align-items:center;gap:10px;
   padding:7px 10px;border-radius:8px;font-size:13px}
 .mt-ate li:nth-child(odd){background:var(--surface-2)}
-/* ---------- 예정 줄은 바탕을 조금 짙게 (2026-11-13, 교수님 지정) ----------
-   앞으로의 자리는 **줄 전체가 물들어** 멀리서도 먼저 눈에 듭니다. 브랜드색을 12% 섞어
-   쓰므로 밝은 화면에서는 옅은 남색, 어두운 화면에서는 한 겹 밝은 남색이 되어 **두 화면
-   모두 보통 줄과 갈립니다**(어두운 화면에서 더 어둡게 칠하면 바탕에 묻힙니다).
-   **줄무늬(`nth-child(odd)`)를 이겨야 하므로 그 줄 바로 뒤**에 둡니다 — 힘이 같아
-   앞에 두면 홀수 줄에서만 덮입니다. 2026-11-02 에 옅은 바탕을 대 보고 「줄무늬와 섞여
-   안 보인다」며 걷었던 적이 있어, 이번에는 줄무늬보다 **또렷하게** 칠합니다. */
-.mt-ate li.is-soon{background:color-mix(in srgb,var(--brand) 12%,var(--surface))}
+/* ---------- 물든 바탕은 **치른 자리** 쪽에 (2026-11-13 저녁, 교수님 지정) ----------
+   같은 날 낮에는 예정 줄을 물들였는데, 교수님이 둘을 **맞바꾸라** 하셨습니다. 이제
+   **이미 뵌 자리가 남색으로 물들고**(해낸 자리가 쌓이는 것이 보입니다) 예정 줄은 바탕
+   없이 수수하게 섭니다. 예정은 **물든 날짜와 꽉 찬 「예정」 쪽지**로 알아봅니다 — 흰
+   바탕 위라 쪽지가 더 또렷합니다.
+   - 브랜드색 12%. 밝은 화면에서는 한 겹 짙어지고, 어두운 화면에서는 한 겹 **밝아집니다**
+     (어두운 화면에서 더 어둡게 칠하면 바탕에 묻힙니다).
+   - **줄무늬(`nth-child(odd)`)를 이겨야 하므로 그 줄 바로 뒤**에 둡니다 — 힘이 같아
+     앞에 두면 홀수 줄에서만 덮입니다.
+   - 「아직」의 **학과 줄은 건드리지 않습니다**(`:not(.mt-ate--todo)`). 그 줄들은 `is-soon`
+     이 없어, 거르지 않으면 학과 줄 전체가 물들어 버립니다. 거기서는 줄무늬가 그대로입니다. */
+.mt-ate:not(.mt-ate--todo) li:not(.is-soon){background:color-mix(in srgb,var(--brand) 12%,var(--surface))}
+.mt-ate li.is-soon{background:transparent}
 /* 「예정」 쪽지 — **꽉 찬 색**으로 (2026-11-02 저녁, 교수님 지정 A+C안).
    글자색은 `--surface` 다. 밝은 화면에서는 짙은 남색 위의 흰 글자(대비 12), 어두운 화면에서는
    연한 하늘색 위의 어두운 글자(대비 8)가 되어 **두 화면 모두 또렷합니다.**
    흰색으로 못 박으면 어두운 화면에서 대비가 2 로 떨어져 글자가 묻힙니다. */
 .mt-ate__s{font-style:normal;font-weight:800;font-size:10px;letter-spacing:-.2px;margin-left:5px;
   padding:2px 7px;border-radius:999px;color:var(--surface);background:var(--brand)}
+/* 이름 끝에 달 때는 `.mt-ate__p` 의 gap(6px)이 이미 자리를 주므로 왼쪽 여백을 걷는다
+   (2026-11-13 저녁) — 그대로 두면 이름과 쪽지 사이만 11px 로 벌어져 겉돈다. */
+.mt-ate__p>.mt-ate__s{margin-left:0}
 /* 날짜 칸 — 숫자 폭을 고정해 줄마다 자리가 흔들리지 않게 (2026-11-02).
    여기에 자바스크립트 한 줄이 잘못 섞여 들어가 있었다. 그 바람에 이 규칙은 물론
    바로 아래 `.mt-ate__k` 까지 통째로 먹혀 **두 칸이 꾸밈 없이 서 있었다.** */
@@ -2113,6 +2121,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   padding:7px 13px;font-size:13.5px;font-weight:700;border-radius:999px}
 .cal-new__b .mt-i{width:15px;height:15px;margin-right:5px}
 .cal-new__b:hover{border-color:var(--brand);color:var(--brand)}
+/* ---------- 갈래 단추는 조금 높게 (2026-11-13 저녁, 교수님 지정) ----------
+   **위아래 여백만** 늘립니다. 옆 여백을 건드리면 한 줄에 서는 수가 줄어 390px 에서 또
+   접힙니다. 폰에서 누르기도 쉬워집니다(≤520px 에서 25px → 31px).
+   `@media` 안의 `.cal-new__b.mt-f` 와 **힘이 같으므로 파일에서 더 뒤**에 있어야 이깁니다 —
+   위로 올리면 그냥 덮입니다(2026-11-02 에 같은 자리에서 한참 헤맸습니다). */
+.cal-new__b.mt-f{padding-top:9px;padding-bottom:9px}
+@media (max-width:520px){ .cal-new__b.mt-f{padding-top:7px;padding-bottom:7px} }
 /* 상태 단추는 「완료」 하나 — 누르면 만난 횟수가 오른다 (2026-10-12) */
 .cal-d--done{padding:7px 18px;font-weight:700}
 /* 흰 글자를 올리므로 테마를 타지 않는 짙은 초록으로 못 박는다 (대비 5.9) */

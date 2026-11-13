@@ -848,13 +848,14 @@ const A = await page.evaluate(() => {
   const cell = (e, k) => (e.querySelector('.mt-ate__' + k) || {}).textContent || '';
   return {
     n: li.length,
-    names: li.map(e => cell(e, 'p').trim()),
+    /* 이름 칸 끝에 「예정」 쪽지가 서므로, 이름만 보려면 떼어 낸다 (2026-11-13 저녁) */
+    names: li.map(e => cell(e, 'p').replace('예정', '').trim()),
     /* 한 줄에 여러 분이 서므로 **줄마다 이름 묶음**으로 본다 */
     peo: li.map(e => [...e.querySelectorAll('.mt-ate__p a')].map(a2 => a2.textContent.trim())),
     kinds: li.map(e => cell(e, 'k').trim()),
     depts: li.map(e => cell(e, 'u').trim()),      // 2026-11-02 저녁에 뺀 칸 — 비어 있어야 한다
-    /* 날짜 칸 안에 「예정」 쪽지가 들어 있어, 날짜만 보려면 떼어 내야 한다 */
-    dates: li.map(e => cell(e, 'd').replace('예정', '').trim()),
+    /* 2026-11-13 저녁부터 쪽지는 이름 끝에 선다 — 날짜 칸에는 날짜만 남는다 */
+    dates: li.map(e => cell(e, 'd').trim()),
     soon: li.map(e => e.classList.contains('is-soon')),
     badges: li.map(e => ((e.querySelector('.mt-ate__s') || {}).textContent || '').trim()),
     head: document.querySelector('.cal-head--ate').textContent.replace(/\s+/g, ' ').trim(),
@@ -883,6 +884,22 @@ t('예정이 맨 위에', A.soon.slice(0, 2).every(Boolean) && !A.soon.slice(2).
   A.soon.map(x => x ? '예' : '만').join(''));
 t('예정에만 「예정」 쪽지를 단다',
   A.badges.every((b2, i) => A.soon[i] ? b2 === '예정' : b2 === ''), A.badges.join('|'));
+/* 「예정」 쪽지는 **이름 끝**에 선다 (2026-11-13 저녁, 교수님 지정) — 날짜 뒤에 달면
+   날짜 칸이 길어져 갈래·이름이 줄마다 다른 자리에서 시작한다. */
+const PILLPOS = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.mt-ate li')].filter(e => e.classList.contains('is-soon'));
+  return { inName: li.every(e => !!e.querySelector('.mt-ate__p>.mt-ate__s')),
+    last: li.every(e => e.querySelector('.mt-ate__p').lastElementChild.classList.contains('mt-ate__s')),
+    inDate: li.some(e => !!e.querySelector('.mt-ate__d .mt-ate__s')),
+    /* 쪽지가 이름보다 **뒤**에 서는지 — 가로 자리로 잰다 */
+    after: li.every(e => { const a = [...e.querySelectorAll('.mt-ate__p a')].pop();
+      const s2 = e.querySelector('.mt-ate__s');
+      return a && s2 && s2.getBoundingClientRect().left >= a.getBoundingClientRect().right - 1; }),
+    n: li.length };
+});
+t('예정 쪽지가 이름 칸 안에 있다', PILLPOS.n > 0 && PILLPOS.inName && !PILLPOS.inDate,
+  `${PILLPOS.n}줄 · 날짜칸 ${PILLPOS.inDate}`);
+t('이름 끝에 선다', PILLPOS.last && PILLPOS.after);
 /* 2026-11-02 저녁, 교수님 지정 — 왼쪽 색 띠는 **괄호처럼 보여 걷었다.** 대신 줄 맨 앞의
    날짜 글자를 물들인다. 띠가 되살아나지 않게, 물든 날짜가 사라지지 않게 재 둔다. */
 const SOON = await page.evaluate(() => {
@@ -899,8 +916,9 @@ t('예정 줄에 왼쪽 띠를 두르지 않는다',
 t('예정은 날짜 빛깔로 가른다', SOON.soonCol !== SOON.metCol && Number(SOON.soonW) > Number(SOON.metW),
   `${SOON.soonCol} ${SOON.soonW} / ${SOON.metCol} ${SOON.metW}`);
 
-/* ---------- 예정 줄은 바탕을 조금 짙게 (2026-11-13, 교수님 지정) ----------
- * 줄 전체가 물들어 멀리서도 먼저 눈에 들어야 한다. **줄무늬(`nth-child(odd)`)를 이겨야**
+/* ---------- 물든 바탕은 **치른 자리** 쪽에 (2026-11-13 저녁, 교수님 지정) ----------
+ * 같은 날 낮에는 예정 줄을 물들였는데 교수님이 둘을 **맞바꾸라** 하셨다. 이제 이미 뵌
+ * 자리가 물들고, 예정 줄은 바탕 없이 수수하게 선다. **줄무늬(`nth-child(odd)`)를 이겨야**
  * 하므로 홀수 줄·짝수 줄 모두에서 같은 바탕이어야 한다. 밝은 화면은 더 짙게, 어두운
  * 화면은 한 겹 **밝게** — 어두운 화면에서 더 어둡게 칠하면 바탕에 묻힌다. */
 const SBG = await page.evaluate(() => {
@@ -915,12 +933,14 @@ const SBG = await page.evaluate(() => {
       return /rgba\(0, 0, 0, 0\)/.test(c) ? getComputedStyle(document.body).backgroundColor : c; };
     const soon = li.filter(e => e.classList.contains('is-soon'));
     const plain = li.filter(e => !e.classList.contains('is-soon'));
-    return { soon: soon.map(bg), plain: plain.map(bg), n: soon.length,
-      /* 홀·짝이 섞여 있어야 줄무늬를 이기는지 잴 수 있다 */
-      odd: soon.map(e => ([...e.parentNode.children].indexOf(e) % 2 === 0)),
-      ink: cr(getComputedStyle(soon[0].querySelector('.mt-ate__p a')).color, bg(soon[0])),
+    return { soon: soon.map(bg), plain: plain.map(bg), n: plain.length,
+      page: getComputedStyle(document.body).backgroundColor,
+      /* 홀·짝이 섞여 있어야 줄무늬를 이기는지 잴 수 있다 — 물든 쪽은 이제 **치른 줄**이다 */
+      oddP: plain.map(e => ([...e.parentNode.children].indexOf(e) % 2 === 0)),
+      /* 치른 줄의 이름은 물든 바탕 위, 예정 줄의 날짜는 수수한 바탕 위에 선다 */
+      ink: cr(getComputedStyle(plain[0].querySelector('.mt-ate__p a')).color, bg(plain[0])),
       date: cr(getComputedStyle(soon[0].querySelector('.mt-ate__d')).color, bg(soon[0])),
-      L: lum(bg(soon[0])), Lp: plain.map(bg).map(lum) };
+      L: lum(bg(plain[0])), Ls: soon.map(bg).map(lum) };
   };
   const light = look();
   document.documentElement.setAttribute('data-theme', 'dark');
@@ -928,16 +948,19 @@ const SBG = await page.evaluate(() => {
   document.documentElement.removeAttribute('data-theme');
   return { light, dark };
 });
-t('예정 줄은 바탕이 보통 줄과 다르다',
-  SBG.light.soon.every(c => !SBG.light.plain.includes(c)), `${SBG.light.soon[0]} / ${SBG.light.plain.join(' ')}`);
-t('줄무늬를 이긴다 — 홀·짝 모두 같은 바탕', new Set(SBG.light.soon).size === 1
-  && new Set(SBG.light.odd).size === 2, `${SBG.light.odd.join(',')} · ${new Set(SBG.light.soon).size}가지`);
-t('밝은 화면에서는 더 짙다', SBG.light.Lp.every(x => SBG.light.L < x), `${SBG.light.L.toFixed(3)} / ${SBG.light.Lp.map(x => x.toFixed(3)).join(' ')}`);
+t('치른 줄과 예정 줄은 바탕이 다르다',
+  SBG.light.plain.every(c => !SBG.light.soon.includes(c)), `${SBG.light.plain[0]} / ${SBG.light.soon.join(' ')}`);
+t('줄무늬를 이긴다 — 홀·짝 모두 같은 바탕', new Set(SBG.light.plain).size === 1
+  && new Set(SBG.light.oddP).size === 2, `${SBG.light.oddP.join(',')} · ${new Set(SBG.light.plain).size}가지`);
+/* 예정 줄은 **수수하게** — 쪽 바탕 그대로다. 물든 날짜와 꽉 찬 쪽지로 알아본다 */
+t('예정 줄은 바탕 없이 수수하다', new Set(SBG.light.soon).size === 1
+  && SBG.light.soon[0] === SBG.light.page, `${SBG.light.soon[0]} / ${SBG.light.page}`);
+t('밝은 화면에서는 치른 줄이 더 짙다', SBG.light.Ls.every(x => SBG.light.L < x), `${SBG.light.L.toFixed(3)} / ${SBG.light.Ls.map(x => x.toFixed(3)).join(' ')}`);
 /* 어두운 화면에서 더 어둡게 칠하면 바탕에 묻힌다 — 한 겹 **밝은** 쪽으로 간다 */
-t('어두운 화면에서는 한 겹 밝다', SBG.dark.Lp.every(x => SBG.dark.L > x), `${SBG.dark.L.toFixed(3)} / ${SBG.dark.Lp.map(x => x.toFixed(3)).join(' ')}`);
-t('예정 줄 글자가 묻히지 않는다(4.5 넘김)', SBG.light.ink >= 4.5 && SBG.dark.ink >= 4.5
+t('어두운 화면에서는 치른 줄이 한 겹 밝다', SBG.dark.Ls.every(x => SBG.dark.L > x), `${SBG.dark.L.toFixed(3)} / ${SBG.dark.Ls.map(x => x.toFixed(3)).join(' ')}`);
+t('두 줄 다 글자가 묻히지 않는다(4.5 넘김)', SBG.light.ink >= 4.5 && SBG.dark.ink >= 4.5
   && SBG.light.date >= 4.5 && SBG.dark.date >= 4.5,
-  `글 ${SBG.light.ink}/${SBG.dark.ink} · 날짜 ${SBG.light.date}/${SBG.dark.date}`);
+  `치른 줄 ${SBG.light.ink}/${SBG.dark.ink} · 예정 날짜 ${SBG.light.date}/${SBG.dark.date}`);
 
 /* ---------- 줄은 모두 펴 둔다 (2026-11-13, 교수님 지정) ----------
  * 전에는 420px 에서 끊고 칸 안에서 따로 굴렸다. 칸 안의 스크롤은 폰에서 바깥 스크롤과
@@ -1009,12 +1032,17 @@ const F = await page.evaluate(() => {
       .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(','),
     all: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || ''),
     allTip: document.querySelector('[data-ateslot=""]').getAttribute('title') || '',
+    h: Math.round(Math.min(...[...document.querySelectorAll('[data-ateslot]')]
+      .map(e => e.getBoundingClientRect().height))),
     /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 한 자리에 여러 분이면 겹치지 않게 */
     people: new Set(Object.values(meets()).filter(m => m.done !== 'no' && m.date)
       .flatMap(m => (m.who || []).filter(k => state.rows.some(x => rKey(x) === k)))).size,
     head: (document.querySelector('.cal-head--ate .st-note') || {}).textContent || '' };
 });
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
+/* 2026-11-13 저녁, 교수님 지정 — 단추를 조금 높였다. 위아래 여백만 늘렸으므로 **높이만**
+   재고 너비는 재지 않는다(옆 여백을 건드리면 폰에서 한 줄에 서는 수가 줄어든다). */
+t('갈래 단추가 조금 높다', F.h >= 38, `${F.h}px`);
 /* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
 t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
 t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea|todo', F.btns.join('|'));

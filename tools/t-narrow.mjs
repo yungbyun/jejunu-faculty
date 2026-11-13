@@ -111,6 +111,8 @@ for (const w of [320, 390]) {
       l5: new Set(bs.slice(0, 5).map(e => Math.round(e.getBoundingClientRect().top))).size,
       slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
+      /* 단추 높이 — 2026-11-13 저녁에 조금 높였다 (교수님 지정). 폰에서 누르기 쉽게. */
+      h: Math.round(Math.min(...bs.map(e => e.getBoundingClientRect().height))),
       /* 칩 안의 숫자 — 2026-11-13 부터 **폰에서도** 보인다 (교수님 지정) */
       nums: bs.map(e => [...e.querySelectorAll(':scope>i')].filter(x => !x.classList.contains('mt-i'))
         .map(x => getComputedStyle(x).display === 'none' ? '' : x.textContent.trim()).join('')),
@@ -123,6 +125,9 @@ for (const w of [320, 390]) {
      통째로 접어 한 줄을 지켰는데, 머리줄의 풀이를 걷은 뒤로는 **숫자가 그 자리를 대신하므로**
      폰에서 숨기면 몇 번·몇 명인지 볼 데가 없어진다. */
   t(`${w}px 칩 안에 숫자가 보인다`, ate.nums.every(Boolean), ate.nums.join('|'));
+  /* 위아래 여백만 늘려 **조금 높게** (2026-11-13 저녁, 교수님 지정) — 옆 여백을 건드리면
+     한 줄에 서는 수가 줄어 또 접힌다. 30px 이면 폰에서 누르기 어렵지 않다. */
+  t(`${w}px 칩이 누르기 좋게 높다`, ate.h >= 30, `${ate.h}px`);
   /* 갈래 다섯은 390px 에서 한 줄에 선다. 320px 은 숫자까지 세우면 자리가 모자라 한 번 더
      접힌다 — 숫자를 숨기는 쪽보다 접히는 쪽이 낫다. 「아직」은 갈래가 아니라 **반대쪽을 보는
      단추**라 뒤로 혼자 내려와도 된다 (이 칸은 달력 아래라 밀려날 것이 없다). */
