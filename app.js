@@ -5746,6 +5746,54 @@ function telE164(num) {
   return d;
 }
 
+/* ---------- 내 폰에 담기 — 핸드폰 번호 오른쪽의 작은 그림 (2026-11-13, 교수님 지정) ----------
+ * 누르면 그 교수 한 분의 **연락처 파일(.vcf)** 이 내려받아집니다. 폰에서 그 파일을 열면
+ * 연락처 앱이 그대로 받아 담습니다(안드로이드·아이폰 모두 vCard 를 압니다).
+ * - 이름·직급·학과·핸드폰·연구실 전화·메일·연구실 자리를 한 장에 담습니다.
+ * - 번호는 `+82` 꼴로 적습니다(`telE164`) — 0 으로 시작하는 번호를 미국 번호로 잘못 읽는
+ *   기기가 있습니다(2026-10-17 에 교수님이 겪으신 일).
+ * - 줄 끝은 **CRLF**, 글자는 UTF-8 입니다. 이것이 vCard 가 정한 꼴입니다.
+ * - `;` `,` `\` 는 vCard 에서 칸을 가르는 글자라 `\;` 처럼 앞에 빗금을 둡니다.
+ * - 시트도 서버도 부르지 않습니다 — 이 기기 안에서 파일 하나를 만들어 건넬 뿐입니다.
+ *   핸드폰 번호는 비공개 시트에만 있는 값이라 공개 파일에는 그대로 들어가지 않습니다. */
+const VCF_ESC = v => String(v == null ? '' : v).replace(/\\/g, '\\\\')
+  .replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+function vcardOf(p) {
+  const { lab, loc } = officeParts(p.office);
+  const mob = mobileOf(p);
+  const L = ['BEGIN:VCARD', 'VERSION:3.0'];
+  /* 성과 이름을 가르지 않습니다 — 「남궁·황보」처럼 두 글자 성이 있어 기계가 가르면 틀립니다 */
+  L.push(`N:${VCF_ESC(p.name)};;;;`);
+  L.push(`FN:${VCF_ESC([p.name, p.rank].filter(Boolean).join(' '))}`);
+  L.push(`ORG:${VCF_ESC('제주대학교 공과대학')};${VCF_ESC(p.dept_name || '')}`);
+  if (p.rank) L.push(`TITLE:${VCF_ESC(p.rank)}`);
+  if (mob) L.push(`TEL;TYPE=CELL,VOICE:${VCF_ESC(telE164(mob))}`);
+  if (p.phone) L.push(`TEL;TYPE=WORK,VOICE:${VCF_ESC(telE164(p.phone))}`);
+  if (p.email) L.push(`EMAIL;TYPE=INTERNET:${VCF_ESC(p.email)}`);
+  const place = [lab, loc].filter(Boolean).join(' ');
+  if (place) L.push(`ADR;TYPE=WORK:;;${VCF_ESC(place)};;;;`);
+  if (p.homepage) L.push(`URL:${VCF_ESC(p.homepage)}`);
+  L.push('END:VCARD');
+  return L.join('\r\n') + '\r\n';
+}
+/* 파일 이름은 사람이 알아볼 수 있게 — 다만 폴더 이름으로 못 쓰는 글자는 걷어 냅니다 */
+const vcfName = p => (String(p.name || '연락처').replace(/[\\/:*?"<>|]/g, '') || '연락처') + '.vcf';
+function vcardSave(p) {
+  try {
+    const url = URL.createObjectURL(new Blob([vcardOf(p)], { type: 'text/vcard;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = vcfName(p); a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    flashStatus(`${p.name} 교수 연락처를 내려받았습니다 — 그 파일을 열면 폰에 담깁니다`);
+  } catch (err) { flashStatus('연락처를 만들지 못했습니다 — ' + err.message, true); }
+}
+/* 사람 옆에 +. 「담는다」는 뜻이 그림에 그대로 보입니다 */
+const VCARD_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">'
+  + '<circle cx="9.5" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/>'
+  + '<path d="M3 19.5v-1c0-2.2 2.9-3.8 6.5-3.8.7 0 1.4.06 2 .17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
+  + '<path d="M17.5 14.5v6M14.5 17.5h6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+
 function dPhone(label, num, who, mob) {
   const tel = telE164(num);
   /* 그림이 곧 그 일이다 (2026-10-15) — **번호를 누르면 전화**, 그래서 번호 앞은 어느 쪽이든 수화기.
@@ -5755,7 +5803,9 @@ function dPhone(label, num, who, mob) {
     + `<a class="d-ct__n" href="tel:${esc(tel)}"`
     + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)} — 전화 걸기" title="전화 걸기">${TEL_SVG}${esc(num)}</a>`
     + (mob ? `<a class="d-ct__c" href="sms:${esc(tel)}" title="문자 쓰기" aria-label="${esc(who)} ${esc(label)} 문자 쓰기">${SMS_SVG}</a>`
-      + `<button type="button" class="d-ct__c" data-mobed title="번호 고치기" aria-label="${esc(who)} 핸드폰 번호 고치기">${PEN_SVG}</button>` : '')
+      + `<button type="button" class="d-ct__c" data-mobed title="번호 고치기" aria-label="${esc(who)} 핸드폰 번호 고치기">${PEN_SVG}</button>`
+      + `<button type="button" class="d-ct__c" data-vcard title="내 폰에 저장 — 연락처 파일(.vcf)을 내려받습니다"`
+      + ` aria-label="${esc(who)} 연락처를 내 폰에 저장">${VCARD_SVG}</button>` : '')
     + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
     + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
 }
@@ -5844,6 +5894,13 @@ function refreshPhones(p) {
   box.outerHTML = dPhones(p);
   bindCopyNums($panel);
   bindMobEdit(p);
+  bindVcard(p);
+}
+/* 연락처 그림 — 번호 줄을 다시 그릴 때마다 함께 맨다(`refreshPhones`) */
+function bindVcard(p) {
+  $panel.querySelector('[data-vcard]')?.addEventListener('click', e => {
+    e.stopPropagation(); e.preventDefault(); vcardSave(p);
+  });
 }
 function bindMobEdit(p) {
   $panel.querySelector('[data-mobed]')?.addEventListener('click', () => {
@@ -6682,6 +6739,7 @@ function openDrawer(p, d) {
   bindFavs($panel);
   bindCopyNums($panel);
   bindMobEdit(p);
+  bindVcard(p);
   /* 그 자리에서 오늘 날짜·이 교수로 약속을 만들고 달력으로 간다 — 날짜는 거기서 고치면 된다 */
   $panel.querySelectorAll('[data-mtnew]').forEach(b => b.addEventListener('click', () => {
     const kind = b.dataset.mtnew;

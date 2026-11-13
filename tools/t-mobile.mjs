@@ -379,6 +379,63 @@ check('번호 줄 안에서는 연구실 다음 핸드폰', await page.evaluate(
   const a = [...document.querySelectorAll('.d-ct__n')].map(x => (x.getAttribute('href') || '').replace(/\D/g, ''));
   return a.length === 2 && a[0].startsWith('8264') && a[1].startsWith('8210');
 }), await page.evaluate(() => [...document.querySelectorAll('.d-ct__n')].map(x => x.getAttribute('href')).join(' ')));
+/* ---------- 내 폰에 담기 — 핸드폰 번호 오른쪽의 작은 그림 (2026-11-13, 교수님 지정) ----------
+   누르면 연락처 파일(.vcf)이 내려받아지고, 폰에서 그 파일을 열면 연락처 앱이 받아 담는다.
+   여기서는 **담기는 글과 그림의 자리**를 잰다 — 내려받기 자체는 브라우저가 하는 일이다. */
+await page.evaluate(x => { const p = state.rows.find(y => rKey(y) === x);
+  setMobile(p, '010-1234-5678');   /* 앞 검사들이 번호를 지워 두었을 수 있다 */
+  location.hash = `#/dept/${p.dept_id}/prof/${p.slug}`; render(); }, k);
+await page.waitForSelector('[data-vcard]', { timeout: 10000 });
+const VNAME = await page.evaluate(x => state.rows.find(y => rKey(y) === x).name, k);
+const VC = await page.evaluate(x => vcardOf(state.rows.find(y => rKey(y) === x)), k);
+check('vCard 꼴로 열고 닫는다', VC.startsWith('BEGIN:VCARD\r\nVERSION:3.0\r\n') && VC.endsWith('END:VCARD\r\n'));
+check('줄 끝은 CRLF 다 — vCard 가 정한 꼴', !/[^\r]\n/.test(VC));
+check('이름을 성과 이름으로 가르지 않는다 — 두 글자 성이 있다', VC.includes(`\r\nN:${VNAME};;;;\r\n`), VC.split('\r\n')[2]);
+check('보이는 이름에 직급을 붙인다', new RegExp(`\r\nFN:${VNAME} \\S+\r\n`).test(VC), VC.split('\r\n')[3]);
+check('소속은 공과대학 · 학과', VC.includes('ORG:제주대학교 공과대학;'), VC.split('\r\n').find(l => l.startsWith('ORG')));
+check('핸드폰이 들어간다 — +82 꼴로', VC.includes('TEL;TYPE=CELL,VOICE:+821012345678'));
+check('연구실 전화도 함께 담는다', /\r\nTEL;TYPE=WORK,VOICE:\+82\d+/.test(VC));
+check('메일도 담는다', /\r\nEMAIL;TYPE=INTERNET:\S+@\S+/.test(VC));
+check('연구실 자리도 담는다', /\r\nADR;TYPE=WORK:;;\S/.test(VC));
+/* `;` `,` 는 vCard 에서 칸을 가르는 글자다 — 그대로 두면 한 줄이 두 칸으로 쪼개진다 */
+check('; 와 , 는 빗금을 앞세운다', await page.evaluate(() =>
+  vcardOf({ name: '홍;길,동', rank: '교수', dept_name: '가;나', office: '', phone: '', email: '' })
+    .includes('N:홍\\;길\\,동;;;;')));
+check('번호가 없는 분은 그 줄을 비운다', await page.evaluate(() =>
+  !vcardOf({ name: '아무개', rank: '', dept_name: '', office: '', phone: '', email: '' }).includes('TEL')));
+
+check('그림은 핸드폰 줄에만 하나 선다', await page.evaluate(() => {
+  const all = document.querySelectorAll('.d-phones [data-vcard]');
+  const mine = document.querySelector('[data-vcard]').closest('.d-ct');
+  return all.length === 1 && (mine.querySelector('.d-ct__n').getAttribute('href') || '').includes('+8210');
+}));
+check('번호 오른쪽에 선다', await page.evaluate(() => {
+  const g = document.querySelector('[data-vcard]').getBoundingClientRect();
+  const n = document.querySelector('[data-vcard]').closest('.d-ct').querySelector('.d-ct__n').getBoundingClientRect();
+  return g.left >= n.right - 1;
+}));
+check('글자 없이 그림만 둔다 — 폰에서 줄이 넘치지 않게', await page.evaluate(() => {
+  const b = document.querySelector('[data-vcard]');
+  return !b.textContent.trim() && b.firstElementChild.tagName.toLowerCase() === 'svg'
+    && !!b.getAttribute('aria-label') && !!b.getAttribute('title');
+}));
+/* 내려받기는 브라우저가 한다 — 우리가 건네는 것이 **.vcf 파일 하나**인지만 본다 */
+const DL = await page.evaluate(() => {
+  const got = [], orig = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () { got.push({ href: this.href, dl: this.download }); };
+  document.querySelector('[data-vcard]').click();
+  HTMLAnchorElement.prototype.click = orig;
+  return got;
+});
+check('누르면 파일 하나를 건넨다', DL.length === 1 && DL[0].href.startsWith('blob:'), JSON.stringify(DL));
+check('파일 이름은 「이름.vcf」', DL[0] && DL[0].dl === VNAME + '.vcf', DL[0] && DL[0].dl);
+check('번호가 없으면 그림도 없다', await page.evaluate(x => {
+  const p = state.rows.find(y => rKey(y) === x);
+  setMobile(p, ''); render();
+  const none = !document.querySelector('[data-vcard]') && !!document.querySelector('[data-mobed]');
+  setMobile(p, '010-1234-5678'); render();
+  return none;
+}, k));
 await page.evaluate(() => { mobileMap = {}; localStorage.removeItem('jnu-mobile'); });
 await page.evaluate(() => closeDrawer(false));
 
