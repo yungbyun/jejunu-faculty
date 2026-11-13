@@ -6259,7 +6259,7 @@ const mealTip = p => { const e = mealOf(p); return e
 const MT_SLOT_NAME = { meal: '식사', day: '점심', night: '저녁', tea: 'Tea', none: '시각 미정' };
 const MT_MEAL = ['day', 'night'];
 const mtAteHit = (slot, pick) => pick === 'meal' ? MT_MEAL.includes(slot) : slot === pick;
-/* 「모두」 단추의 그림 — 네 갈래를 한 줌에 쥔 모양 (2026-11-02, 교수님 지정) */
+/* 「만남」(옛 「모두」) 단추의 그림 — 네 갈래를 한 줌에 쥔 모양 (2026-11-02, 교수님 지정) */
 const MT_ALL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">'
   + '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>'
   + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>';
@@ -6295,7 +6295,7 @@ function mtDayTip(day, list, today) {
 function mtAteSection() {
   const all = mtAteRows();
   /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
-     고른 것을 다시 누르면 풀립니다.
+     「만남」으로 돌아오거나, 고른 것을 다시 누르면 풀립니다.
      ---------- 머리줄의 풀이는 걷었습니다 (2026-11-13, 교수님 지정) ----------
      「43명 · 만남 33번 · 예정 6번 · 식사 27번만 봅니다」 한 줄을 적지 않습니다. **그 숫자는
      모두 단추에 이미 붙어 있습니다** — 같은 수가 두 번 나오면 어느 쪽을 봐야 할지 흐려지고,
@@ -6317,10 +6317,22 @@ function mtAteSection() {
      그 갈래 단추와 똑같은 것이 둘 서는 셈입니다. */
   const slots = ['meal', 'day', 'night', 'tea', 'none']
     .filter(s => cnt(s) && (s !== 'meal' || MT_MEAL.every(x => cnt(x))));
-  /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정). 갈래 단추의 숫자는 **몇 번**이지만,
-     모두에서 궁금한 것은 **몇 분을 뵈었는가**입니다 — 그래서 사람 수를 적고 「명」을 붙여
+  /* ---------- 머리줄 옆의 **셈 바탕** (2026-11-14, 교수님 지정) ----------
+     「69명 − 비참여 2 − 본인 = 66명」. 「식사 외」·「아직」이 **무엇에서 센 숫자인지**를
+     밝히는 한 줄입니다 — 교수님이 「식사 외 38명이 어디서 나왔냐」 물으셨을 때, 셈의
+     바탕이 69명이 아니라 66명이라는 것이 화면에 없었습니다.
+     걷어 낸 옛 머리줄 풀이(「만남 33번 · 예정 6번 …」)와는 다릅니다 — 그것은 **단추에
+     이미 있는 숫자**를 되읊은 것이었고, 이것은 **어디에도 없던 숫자**입니다.
+     비참여가 없으면 그 마디를 적지 않습니다(「69명 − 본인 = 68명」). */
+  const outN = state.rows.filter(p => p.name !== ME.name && outOut(p)).length;
+  const meIn = state.rows.some(p => p.name === ME.name) ? 1 : 0;
+  const baseN = state.rows.length - meIn - outN;
+  /* 「만남」에 숫자를 답니다 (2026-11-05 저녁, 교수님 지정). 갈래 단추의 숫자는 **몇 번**이지만,
+     여기서 궁금한 것은 **몇 분을 뵈었는가**입니다 — 그래서 사람 수를 적고 「명」을 붙여
      번과 갈라 둡니다. 갈래를 골라도 바뀌지 않습니다 — 고른 갈래에 따라 몇 분을 뵈었는지가
-     달라 보이면 안 됩니다. 머리줄의 풀이를 걷은 뒤로는 **이 숫자가 그 자리를 대신합니다.** */
+     달라 보이면 안 됩니다. 머리줄의 풀이를 걷은 뒤로는 **이 숫자가 그 자리를 대신합니다.**
+     이름은 2026-11-14 에 「모두」에서 **「만남」**으로 바꿨습니다 (교수님 지정) — 갈래를 푸는
+     단추이기도 하지만, 거기 선 숫자는 **만나거나 만날 예정인 분의 수**이기 때문입니다. */
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
       title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
@@ -6338,8 +6350,11 @@ function mtAteSection() {
   return `
       <section class="cal-sec">
         <div class="cal-head cal-head--ate"><h2>만나거나 만날 예정인 분</h2>
+          <p class="cal-head__n" title="명단 ${state.rows.length}명에서 ${
+            outN ? `비참여 ${outN}명과 ` : ''}본인을 뺀 ${baseN}명이 뵐 분입니다 — 「식사 외」·「아직」은 이 ${baseN}명에서 셉니다"
+            >${state.rows.length}명${outN ? ` − 비참여 ${outN}` : ''}${meIn ? ' − 본인' : ''} = <b>${baseN}명</b></p>
           ${all.length || peep ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
-            ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
+            ${pick('', '만남', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
             ${slots.map(s => `${pick(s, MT_SLOT_NAME[s],
               s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))}${
               s === 'meal' ? nomB : ''}`).join('')}
@@ -6362,7 +6377,7 @@ function mtAteSection() {
                 x.soon ? `<b class="mt-todo__s">예정</b>` : ''}</a>`).join('<i>·</i>')}</span>
         </li>`).join('')}</ul>`
           : `<div class="empty"><strong>${isNom ? '함께 드시지 않은 분이 없습니다' : '아직 못 뵌 분이 없습니다'}</strong>${
-              isNom ? '명단의 모든 분과 점심이나 저녁을 하셨습니다.' : '명단의 모든 분을 뵈었습니다.'} 「모두」를 누르시면 자리들이 다시 보입니다.</div>`)
+              isNom ? '명단의 모든 분과 점심이나 저녁을 하셨습니다.' : '명단의 모든 분을 뵈었습니다.'} 「만남」을 누르시면 자리들이 다시 보입니다.</div>`)
         : !all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
           ${/* 「예정」 쪽지는 **이름 끝**에 답니다 (2026-11-13 저녁, 교수님 지정).
                날짜 뒤에 달았더니 날짜 칸이 길어져 갈래·이름이 줄마다 다른 자리에서
@@ -6376,7 +6391,7 @@ function mtAteSection() {
             r.ate ? '' : `<b class="mt-ate__s">예정</b>`}</span>
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
-        : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}
+        : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「만남」을 누르시면 다시 다 보입니다.</div>`}
         ${all.length || peep ? '' : `<div class="empty"><strong>아직 약속이 없습니다</strong>달력에서 자리를 잡으시면 여기에 쌓입니다.</div>`}
         ${/* 셈하는 규칙 풀이(「지난 날짜의 약속은 만난 것으로 봅니다 …」)는 **뺐습니다**
             (2026-11-11, 교수님 지정). 줄마다 「예정」 쪽지가 이미 서 있어 눈으로 읽히고,
