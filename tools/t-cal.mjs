@@ -925,11 +925,13 @@ t('장소도 적는다', A.place0 === '교직원식당' || A.place0 === '연동 
 t('앞으로의 약속도 예정으로 적는다', flat.includes(A.later)
   && A.soon[A.peo.findIndex(x => x.includes(A.later))] === true, flat.join(' '));
 t('「못 만남」은 뺀다', !flat.includes(A.noMet), flat.join(' '));
-t('머리글에 사람 수와 만남·예정 횟수', /8명 · 만남 5번 · 예정 2번/.test(A.head), A.head);
-/* 갈래별 수는 **고르기 단추**가 지고 있다 (2026-11-02) — 머리글에 또 적으면 같은 숫자가
-   두 번 나와 어느 쪽을 봐야 할지 흐려진다. 단추 쪽은 아래 「단추에 몇 번인지 적는다」가 본다. */
-t('갈래별 수는 머리글에 겹쳐 적지 않는다',
-  !/점심 \d/.test(A.head) && !/저녁 \d/.test(A.head), A.head);
+/* 머리줄의 풀이(「8명 · 만남 5번 · 예정 2번 · 식사 6번만 봅니다」)는 **걷었다**
+   (2026-11-13, 교수님 지정) — 그 숫자는 단추에 이미 붙어 있고, 머리줄이 길어 폰에서
+   제목이 두 줄로 접혔다. 몇 번·몇 명인지는 **단추에서** 본다. */
+t('머리줄에 풀이를 적지 않는다', !/만남 \d+번/.test(A.head) && !/예정 \d+번/.test(A.head),
+  A.head.slice(0, 80));
+t('갈래별 수도 머리줄에 적지 않는다',
+  !/점심 \d+번만/.test(A.head) && !/저녁 \d+번만/.test(A.head), A.head.slice(0, 80));
 /* 2026-11-11, 교수님 지정 — 「지난 날짜의 약속은 만난 것으로 봅니다 · …」 한 줄을 뺐다.
    줄마다 「예정」 쪽지가 이미 서 있어 눈으로 읽힌다. */
 t('셈하는 규칙 풀이는 적지 않는다', !/지난 날짜의 약속은/.test(A.sec), A.sec.slice(-120));
@@ -945,6 +947,9 @@ const F = await page.evaluate(() => {
       .map(e => (e.querySelector('i:not(.mt-i)') || {}).textContent || '').join(','),
     all: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || ''),
     allTip: document.querySelector('[data-ateslot=""]').getAttribute('title') || '',
+    /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 한 자리에 여러 분이면 겹치지 않게 */
+    people: new Set(Object.values(meets()).filter(m => m.done !== 'no' && m.date)
+      .flatMap(m => (m.who || []).filter(k => state.rows.some(x => rKey(x) === k)))).size,
     head: (document.querySelector('.cal-head--ate .st-note') || {}).textContent || '' };
 });
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
@@ -956,8 +961,7 @@ t('단추에 몇 번인지 적는다', F.cnt.split(',').slice(0, 4).join(',') ==
 /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
    「명」을 붙여 갈래 단추의 횟수와 갈라 둡니다. 머리줄의 「N명」과 같은 셈이어야 합니다. */
 t('모두 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
-t('그 숫자는 머리줄의 사람 수와 같다',
-  F.all === ((F.head.match(/(\d+)명/) || [])[1] || 'x') + '명', `${F.all} / ${F.head}`);
+t('그 숫자는 겹치지 않게 센 사람 수', F.all === `${F.people}명`, `${F.all} / ${F.people}명`);
 t('모두의 줄머리 표에도 사람 수', F.allTip === `모두 보기 — ${F.all}`, F.allTip);
 /* 머리글은 2026-11-05 저녁에 바뀌었다 (교수님 지정) — 앞으로의 자리도 이 칸에 서고
    **사람 수에도 들므로**, 「이제까지 만난 분」이면 지난 일만 적는 칸으로 읽힌다. */
@@ -977,7 +981,7 @@ const FA = await page.evaluate(() => {
   return out;
 });
 t('예정만 있는 분도 사람 수에 든다', FA.badge === '2명', `${FA.badge} / ${FA.head}`);
-t('만남과 예정은 갈라 적는다', /만남 1번 · 예정 1번/.test(FA.head), FA.head);
+t('예정이 있어도 머리줄에 풀이가 없다', FA.head === '', FA.head);
 t('식사는 점심과 저녁을 합한 수', Number(F.cnt.split(',')[0])
   === Number(F.cnt.split(',')[1]) + Number(F.cnt.split(',')[2]), F.cnt);
 
@@ -987,13 +991,13 @@ await page.waitForTimeout(250);
 const FM = await page.evaluate(() => ({
   kinds: [...document.querySelectorAll('.mt-ate li .mt-ate__k')].map(e => e.textContent.trim()),
   on: document.querySelector('[data-ateslot="meal"]').getAttribute('aria-pressed'),
-  head: document.querySelector('.cal-head--ate .st-note').textContent.trim(),
+  head: ((document.querySelector('.cal-head--ate .st-note') || {}).textContent || '').trim(),
 }));
 t('식사를 고르면 점심·저녁만 보인다', FM.kinds.length === 6
   && FM.kinds.every(k => k === '점심' || k === '저녁'), FM.kinds.join(','));
 t('식사에 점심과 저녁이 다 있다', FM.kinds.includes('점심') && FM.kinds.includes('저녁'), FM.kinds.join(','));
 t('식사 단추가 눌린 꼴', FM.on === 'true');
-t('식사 수를 따로 적는다', /식사 6번만/.test(FM.head), FM.head);
+t('고르셔도 머리줄은 비어 있다', FM.head === '', FM.head);
 await page.click('[data-ateslot="meal"]');
 await page.waitForTimeout(250);
 
@@ -1004,12 +1008,14 @@ const F2 = await page.evaluate(() => ({
   on: document.querySelector('[data-ateslot="night"]').getAttribute('aria-pressed'),
   others: [...document.querySelectorAll('[data-ateslot]')].filter(e => e.dataset.ateslot !== 'night')
     .every(e => e.getAttribute('aria-pressed') === 'false'),
-  head: document.querySelector('.cal-head--ate .st-note').textContent.trim(),
+  all: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || '').trim(),
+  head: ((document.querySelector('.cal-head--ate .st-note') || {}).textContent || '').trim(),
 }));
 t('고른 갈래만 보인다', F2.kinds.length === 3 && F2.kinds.every(k => k === '저녁'), F2.kinds.join(','));
 t('고른 단추만 눌린 꼴', F2.on === 'true' && F2.others);
-t('머리의 사람 수는 늘 전체', /8명 · 만남 5번 · 예정 2번/.test(F2.head), F2.head);
-t('고른 갈래의 수를 따로 적는다', /저녁 3번만/.test(F2.head), F2.head);
+/* 「모두」의 사람 수는 **늘 전체**다 — 고른 갈래에 따라 몇 분을 뵈었는지가 달라 보이면 안 된다 */
+t('모두의 사람 수는 갈래를 골라도 그대로', F2.all === F.all, `${F2.all} / ${F.all}`);
+t('고르셔도 머리줄은 그대로 비어 있다', F2.head === '', F2.head);
 
 await page.click('[data-ateslot="night"]');
 await page.waitForTimeout(250);
@@ -1076,9 +1082,8 @@ t('학과 줄에 그 학과 인원수', TD.cnts.every((n, i) => n === TD.names[i
   `${TD.cnts.join(',')} / ${TD.names.map(x => x.length).join(',')}`);
 t('학과 안에서 약속 없는 분이 앞에', TD.soon.every(r => r.slice().sort((a, b2) => a - b2).join() === r.join()),
   JSON.stringify(TD.soon.slice(0, 3)));
-t('머리줄에 아직 몇 명인지 적는다', TD.head.startsWith(`아직 ${TEXP.n}명`)
-  && new RegExp(`약속 없음 ${TEXP.n - TEXP.soon}명`).test(TD.head), TD.head);
-t('예정만 있는 분 수도 머리줄에', !TEXP.soon || new RegExp(`예정만 ${TEXP.soon}명`).test(TD.head), TD.head);
+/* 몇 명 남았는지는 **단추**가 지고 있다 (2026-11-13) — 머리줄에는 아무것도 적지 않는다 */
+t('아직에서도 머리줄은 비어 있다', TD.head === '', TD.head);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(TD.link || ''), TD.link);
 /* 본인·비참여는 뵐 분이 아니라 빼고, 손으로 센 만난 횟수도 뵌 것으로 본다 */
 t('본인은 빼고 센다', !TFLAT.includes('변영철'), TFLAT.slice(0, 4).join(','));
@@ -1089,14 +1094,14 @@ const TX = await page.evaluate(nm => {
   got.met = ![...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
   applyEntry(rKey(p), { met: 0 }); setRating(rKey(p), '비'); render();
   got.out = ![...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
-  got.note = ((document.querySelector('.cal-head--ate .st-note') || {}).textContent || '').trim();
+  got.chip = ((document.querySelector('[data-ateslot="todo"] i:not(.mt-i)') || {}).textContent || '').trim();
   setRating(rKey(p), ''); render();
   got.back = [...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
   return got;
 }, TFLAT[0]);
 t('만난 횟수를 손으로 올리면 빠진다', TX.met);
 t('비참여는 빠진다', TX.out);
-t('비참여를 몇 명 뺐는지 적는다', /비참여 \d+명은 뺌/.test(TX.note), TX.note);
+t('빠진 만큼 단추의 숫자도 준다', TX.chip === `${TEXP.n - 1}명`, `${TX.chip} / ${TEXP.n - 1}명`);
 t('되돌리면 다시 선다', TX.back);
 await page.click('[data-ateslot="todo"]');
 await page.waitForTimeout(250);

@@ -1936,13 +1936,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .cal-r__a{min-width:32px;min-height:30px;padding:0}
   .cal-del{margin-left:0}
 }
-/* 가장 좁은 폰(320px)에서는 단추가 다섯이라 글자를 줄여도 넘친다 — **횟수를 접는다.**
-   갈래 이름이 먼저고 숫자는 거들 뿐이라, 한 줄을 지키려면 숫자를 접는 쪽이 낫다.
+/* 가장 좁은 폰(≤340px)에서는 글자와 그림을 한 번 더 줄인다.
+   **횟수는 접지 않습니다** (2026-11-13, 교수님 지정) — 2026-11-02 에는 한 줄을 지키려고
+   숫자를 통째로 숨겼는데, 머리줄의 풀이를 걷은 뒤로는 **숫자가 그 자리를 대신하므로**
+   폰에서 숨기면 몇 번·몇 명인지 볼 데가 없어집니다. 접히면 두 줄로 섭니다.
    위 520px 묶음과 힘이 같으므로 **그 묶음 뒤에** 있어야 이긴다 (2026-11-02). */
 @media (max-width:340px){
-  .cal-new__b.mt-f{padding:4px 4px;font-size:10.5px}
+  .cal-new__b.mt-f{padding:4px 4px;font-size:10.5px;gap:1px}
   .cal-new__b.mt-f .mt-i{width:10px;height:10px;margin-right:2px}
-  .cal-new__b.mt-f>i{display:none}
 }
 
 /* 날짜 고르는 칸 — 브라우저가 칸 안에 그리는 10/13/26 은 우리가 못 바꾼다.

@@ -111,15 +111,23 @@ for (const w of [320, 390]) {
       l5: new Set(bs.slice(0, 5).map(e => Math.round(e.getBoundingClientRect().top))).size,
       slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
+      /* 칩 안의 숫자 — 2026-11-13 부터 **폰에서도** 보인다 (교수님 지정) */
+      nums: bs.map(e => [...e.querySelectorAll(':scope>i')].filter(x => !x.classList.contains('mt-i'))
+        .map(x => getComputedStyle(x).display === 'none' ? '' : x.textContent.trim()).join('')),
       wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
   /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 다섯이 되었고, 2026-11-13 에 「아직」
      (아직 뵙지 못한 분)이 끝에 붙어 **여섯**이 되었다 (교수님 지정). */
   t(`${w}px 만난 분 고르기 단추가 여섯`, ate.n === 6, ate.labels.join(' '));
-  /* 갈래 다섯은 한 줄에 서야 한다. 「아직」은 갈래가 아니라 **반대쪽을 보는 단추**라,
-     390px 에서 자리가 모자라면 뒤로 혼자 내려옵니다 — 숫자를 접어 억지로 한 줄에 넣기보다
-     줄을 하나 쓰는 쪽이 낫습니다(이 칸은 달력 아래라 밀려날 것이 없습니다). */
-  t(`${w}px 갈래 다섯은 한 줄`, ate.l5 === 1, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
+  /* **폰에서도 숫자를 보여 준다** (2026-11-13, 교수님 지정). 전에는 ≤340px 에서 숫자를
+     통째로 접어 한 줄을 지켰는데, 머리줄의 풀이를 걷은 뒤로는 **숫자가 그 자리를 대신하므로**
+     폰에서 숨기면 몇 번·몇 명인지 볼 데가 없어진다. */
+  t(`${w}px 칩 안에 숫자가 보인다`, ate.nums.every(Boolean), ate.nums.join('|'));
+  /* 갈래 다섯은 390px 에서 한 줄에 선다. 320px 은 숫자까지 세우면 자리가 모자라 한 번 더
+     접힌다 — 숫자를 숨기는 쪽보다 접히는 쪽이 낫다. 「아직」은 갈래가 아니라 **반대쪽을 보는
+     단추**라 뒤로 혼자 내려와도 된다 (이 칸은 달력 아래라 밀려날 것이 없다). */
+  t(`${w}px 갈래 다섯이 ${w <= 340 ? '두 줄 안에' : '한 줄에'}`, w <= 340 ? ate.l5 <= 2 : ate.l5 === 1,
+    `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 접혀도 두 줄까지`, ate.lines <= 2, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
   t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);

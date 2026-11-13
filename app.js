@@ -6266,16 +6266,16 @@ function mtDayTip(day, list, today) {
 function mtAteSection() {
   const all = mtAteRows();
   /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
-     고른 것을 다시 누르면 풀립니다. **머리의 숫자는 늘 전체**를 셉니다 — 고른 갈래에 따라
-     「몇 명 만났는가」가 달라 보이면 안 되기 때문입니다. 고른 때만 그 수를 따로 적습니다. */
+     고른 것을 다시 누르면 풀립니다.
+     ---------- 머리줄의 풀이는 걷었습니다 (2026-11-13, 교수님 지정) ----------
+     「43명 · 만남 33번 · 예정 6번 · 식사 27번만 봅니다」 한 줄을 적지 않습니다. **그 숫자는
+     모두 단추에 이미 붙어 있습니다** — 같은 수가 두 번 나오면 어느 쪽을 봐야 할지 흐려지고,
+     머리줄이 길어 폰에서는 제목이 두 줄로 접혔습니다. 몇 번·몇 명인지는 **단추에서** 봅니다. */
   const isTodo = CAL.ate === 'todo';                /* 아직 뵙지 못한 분만 보는 때 */
   const rows = CAL.ate && !isTodo ? all.filter(r => mtAteHit(r.slot, CAL.ate)) : isTodo ? [] : all;
   const todo = mtTodo(), tSoon = todo.filter(x => x.soon).length;
-  const outN = state.rows.filter(outOut).length;    /* 비참여 — 왜 수가 적은지 적어 둔다 */
   const people = new Set(all.flatMap(r => r.keys)).size;
   const cnt = s => all.filter(r => mtAteHit(r.slot, s)).length;
-  /* 만난 자리와 앞으로의 자리를 **갈라 적습니다** — 한 숫자로 뭉치면 몇 분을 뵈었는지 모릅니다 */
-  const met = all.filter(r => r.ate).length, soon = all.length - met;
   /* 셈에서 뺀 자리 — 「못 만남」으로 표시하신 것. 왜 안 보이는지 알 수 있게 적어 둔다 */
   const no = mtList().filter(m => m.done === 'no').length;
   /* 있는 갈래만 단추로 세웁니다 — 한 번도 없던 「시각 미정」까지 늘 보이면 군더더기입니다.
@@ -6285,16 +6285,14 @@ function mtAteSection() {
     .filter(s => cnt(s) && (s !== 'meal' || MT_MEAL.every(x => cnt(x))));
   /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정). 갈래 단추의 숫자는 **몇 번**이지만,
      모두에서 궁금한 것은 **몇 분을 뵈었는가**입니다 — 그래서 사람 수를 적고 「명」을 붙여
-     번과 갈라 둡니다. 머리줄의 「N명」과 같은 셈이며, 갈래를 골라도 바뀌지 않습니다. */
+     번과 갈라 둡니다. 갈래를 골라도 바뀌지 않습니다 — 고른 갈래에 따라 몇 분을 뵈었는지가
+     달라 보이면 안 됩니다. 머리줄의 풀이를 걷은 뒤로는 **이 숫자가 그 자리를 대신합니다.** */
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
       title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
   return `
       <section class="cal-sec">
         <div class="cal-head cal-head--ate"><h2>만나거나 만날 예정인 분</h2>
-          ${all.length || isTodo ? `<span class="st-note">${isTodo
-            ? `아직 ${todo.length}명 — 약속 없음 ${todo.length - tSoon}명${tSoon ? ` · 예정만 ${tSoon}명` : ''}${outN ? ` · 비참여 ${outN}명은 뺌` : ''}`
-            : `${people}명 · 만남 ${met}번${soon ? ` · 예정 ${soon}번` : ''}${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}`}</span>` : ''}
           ${all.length || isTodo ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
             ${slots.map(s => pick(s, MT_SLOT_NAME[s],
