@@ -950,9 +950,9 @@ const F = await page.evaluate(() => {
 t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
 /* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
 t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
-t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea', F.btns.join('|'));
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea|todo', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
-t('단추에 몇 번인지 적는다', F.cnt === '6,3,3,1', F.cnt);
+t('단추에 몇 번인지 적는다', F.cnt.split(',').slice(0, 4).join(',') === '6,3,3,1', F.cnt);
 /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
    「명」을 붙여 갈래 단추의 횟수와 갈라 둡니다. 머리줄의 「N명」과 같은 셈이어야 합니다. */
 t('모두 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
@@ -1021,6 +1021,88 @@ await page.click('[data-ateslot=""]');
 await page.waitForTimeout(250);
 t('모두를 누르면 다 보인다', await page.evaluate(() =>
   CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
+
+/* ---------- 「아직」 — 아직 뵙지 못한 분 (2026-11-13, 교수님 지정) ----------
+ * 갈래 단추 끝의 「아직」을 누르면 약속 줄 대신 **학과마다 한 줄**로 못 뵌 분이 선다.
+ * 뵌 분으로 보는 눈은 윗칸과 같다 — 치른 자리가 있거나 만난 횟수가 1 이상. */
+const TEXP = await page.evaluate(() => {
+  /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 둘이 같은 함수를 보면 틀려도 같이 틀린다 */
+  const today = mtToday(), ate = new Set(), soon = new Set();
+  Object.values(meets()).forEach(m => {
+    if (m.done === 'no' || !m.date) return;
+    ((m.done === 'met' || m.date < today) ? ate : soon).add('x');
+    (m.who || []).forEach(k => ((m.done === 'met' || m.date < today) ? ate : soon).add(k));
+  });
+  const left = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비'
+    && !(getNote(rKey(p)).met > 0) && !ate.has(rKey(p)));
+  return { n: left.length, soon: left.filter(p => soon.has(rKey(p))).length,
+    names: left.map(p => p.name).sort(), rows: state.rows.length };
+});
+await page.click('[data-ateslot="todo"]');
+await page.waitForTimeout(250);
+const TD = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.mt-ate--todo li')];
+  const as = e => [...e.querySelectorAll('.mt-ate__p a')];
+  return { lis: li.length,
+    depts: li.map(e => ((e.querySelector('.mt-ate__g') || {}).textContent || '').trim()),
+    cnts: li.map(e => Number(((e.querySelector('.mt-ate__g i') || {}).textContent || '0').trim())),
+    names: li.map(e => as(e).map(a => a.textContent.replace('예정', '').trim())),
+    soon: li.map(e => as(e).map(a => !!a.querySelector('.mt-todo__s'))),
+    head: ((document.querySelector('.cal-head--ate .st-note') || {}).textContent || '').trim(),
+    plain: document.querySelectorAll('.mt-ate:not(.mt-ate--todo) li').length,
+    link: (document.querySelector('.mt-ate--todo .mt-ate__p a') || { getAttribute: () => '' }).getAttribute('href'),
+    chip: ((document.querySelector('[data-ateslot="todo"] i:not(.mt-i)') || {}).textContent || '').trim(),
+    on: (document.querySelector('[data-ateslot="todo"]') || {}).getAttribute('aria-pressed'),
+    icon: !!document.querySelector('[data-ateslot="todo"] .mt-i--todo svg') };
+});
+const TFLAT = TD.names.flat();
+t('아직 단추가 갈래 끝에 선다', await page.evaluate(() =>
+  [...document.querySelectorAll('[data-ateslot]')].pop().dataset.ateslot === 'todo'));
+t('아직 단추에 그림과 사람 수', TD.icon && TD.chip === `${TEXP.n}명`, `${TD.chip} / ${TEXP.n}명`);
+t('누르면 눌린 꼴이 된다', TD.on === 'true');
+t('약속 줄 대신 학과 줄이 선다', TD.lis > 0 && TD.plain === 0, `${TD.lis} / ${TD.plain}`);
+t('못 뵌 분을 빠짐없이 적는다', TFLAT.slice().sort().join(',') === TEXP.names.join(','),
+  `${TFLAT.length}명 / ${TEXP.n}명`);
+t('이미 뵌 분은 없다', await page.evaluate(nm => {
+  const today = mtToday(), met = new Set();
+  Object.values(meets()).forEach(m => { if (m.done === 'no' || !m.date) return;
+    if (m.done === 'met' || m.date < today) (m.who || []).forEach(k => {
+      const p = state.rows.find(x => rKey(x) === k); if (p) met.add(p.name); }); });
+  return nm.every(x => !met.has(x));
+}, TFLAT), TFLAT.slice(0, 6).join(','));
+t('예정만 있는 분은 「예정」을 달고 선다', TD.soon.flat().filter(Boolean).length === TEXP.soon,
+  `${TD.soon.flat().filter(Boolean).length} / ${TEXP.soon}`);
+t('학과 줄에 그 학과 인원수', TD.cnts.every((n, i) => n === TD.names[i].length),
+  `${TD.cnts.join(',')} / ${TD.names.map(x => x.length).join(',')}`);
+t('학과 안에서 약속 없는 분이 앞에', TD.soon.every(r => r.slice().sort((a, b2) => a - b2).join() === r.join()),
+  JSON.stringify(TD.soon.slice(0, 3)));
+t('머리줄에 아직 몇 명인지 적는다', TD.head.startsWith(`아직 ${TEXP.n}명`)
+  && new RegExp(`약속 없음 ${TEXP.n - TEXP.soon}명`).test(TD.head), TD.head);
+t('예정만 있는 분 수도 머리줄에', !TEXP.soon || new RegExp(`예정만 ${TEXP.soon}명`).test(TD.head), TD.head);
+t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(TD.link || ''), TD.link);
+/* 본인·비참여는 뵐 분이 아니라 빼고, 손으로 센 만난 횟수도 뵌 것으로 본다 */
+t('본인은 빼고 센다', !TFLAT.includes('변영철'), TFLAT.slice(0, 4).join(','));
+const TX = await page.evaluate(nm => {
+  const p = state.rows.find(x => x.name === nm);
+  const got = {};
+  applyEntry(rKey(p), { met: 1 }); render();
+  got.met = ![...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
+  applyEntry(rKey(p), { met: 0 }); setRating(rKey(p), '비'); render();
+  got.out = ![...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
+  got.note = ((document.querySelector('.cal-head--ate .st-note') || {}).textContent || '').trim();
+  setRating(rKey(p), ''); render();
+  got.back = [...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
+  return got;
+}, TFLAT[0]);
+t('만난 횟수를 손으로 올리면 빠진다', TX.met);
+t('비참여는 빠진다', TX.out);
+t('비참여를 몇 명 뺐는지 적는다', /비참여 \d+명은 뺌/.test(TX.note), TX.note);
+t('되돌리면 다시 선다', TX.back);
+await page.click('[data-ateslot="todo"]');
+await page.waitForTimeout(250);
+t('아직을 다시 누르면 약속 줄로 돌아온다', await page.evaluate(() =>
+  CAL.ate === '' && !document.querySelector('.mt-ate--todo')
+  && document.querySelectorAll('.mt-ate li').length === 7));
 
 t('기록이 없으면 빈 안내', await page.evaluate(() => {
   meetMap = {}; render();

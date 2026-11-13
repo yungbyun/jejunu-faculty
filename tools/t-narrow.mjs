@@ -107,13 +107,20 @@ for (const w of [320, 390]) {
     const br = box.getBoundingClientRect();
     return { n: bs.length,
       lines: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size,
+      /* 갈래 다섯(모두·식사·점심·저녁·Tea)만 따로 — 「아직」은 뒤에 혼자 내려와도 된다 */
+      l5: new Set(bs.slice(0, 5).map(e => Math.round(e.getBoundingClientRect().top))).size,
       slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
       wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
-  /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 **다섯**이 되었다 (교수님 지정) */
-  t(`${w}px 만난 분 고르기 단추가 다섯`, ate.n === 5, ate.labels.join(' '));
-  t(`${w}px 그 단추가 한 줄`, ate.lines === 1, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
+  /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 다섯이 되었고, 2026-11-13 에 「아직」
+     (아직 뵙지 못한 분)이 끝에 붙어 **여섯**이 되었다 (교수님 지정). */
+  t(`${w}px 만난 분 고르기 단추가 여섯`, ate.n === 6, ate.labels.join(' '));
+  /* 갈래 다섯은 한 줄에 서야 한다. 「아직」은 갈래가 아니라 **반대쪽을 보는 단추**라,
+     390px 에서 자리가 모자라면 뒤로 혼자 내려옵니다 — 숫자를 접어 억지로 한 줄에 넣기보다
+     줄을 하나 쓰는 쪽이 낫습니다(이 칸은 달력 아래라 밀려날 것이 없습니다). */
+  t(`${w}px 갈래 다섯은 한 줄`, ate.l5 === 1, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
+  t(`${w}px 접혀도 두 줄까지`, ate.lines <= 2, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
   t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);
 

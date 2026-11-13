@@ -6129,6 +6129,51 @@ function mtAteRows() {
   return out.sort((a, b) => by(b.m.date, a.m.date) || by(b.m.time, a.m.time)
     || a.ps[0].name.localeCompare(b.ps[0].name, 'ko'));
 }
+/* ---------- 「아직」 — 아직 뵙지 못한 분 (2026-11-13, 교수님 지정) ----------
+ * 이 칸은 **뵌 분과 뵐 분**을 적습니다. 그 반대쪽, **아직 뵙지 못한 분**을 같은 자리에서
+ * 보시도록 갈래 단추 끝에 「아직」을 둡니다. 누르면 약속 줄 대신 **학과마다 한 줄**로
+ * 남은 분들의 이름이 섭니다 — 어느 학과를 더 돌아야 하는지가 한눈에 보입니다.
+ * - 뵌 분으로 보는 눈은 이 칸과 **똑같습니다** — 치른 자리가 있거나(지난 날짜이거나
+ *   「완료」를 누르신 자리) **만난 횟수가 1 이상**인 분. 약속으로 남기지 않고 손으로만
+ *   세어 두신 분도 뵌 분입니다.
+ * - 약속이 잡혀 있어도 **아직 치르지 않았으면 여기 섭니다** — 이름 뒤에 「예정」을 달아
+ *   가르고, **약속조차 없는 분이 앞**에 섭니다. 먼저 자리를 잡아야 할 분이 앞입니다.
+ * - **비참여**(선호도 '비' — 연구년 등)와 **본인**은 뺍니다. 뵐 분이 아닙니다.
+ *   「항시 제외」는 문자를 안 보낼 분이라 여기서는 빼지 않습니다 — 뵙는 것은 다른 일입니다. */
+const MT_TODO_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+  + '<circle cx="12" cy="12" r="8.4" stroke-dasharray="3 3.3"/><path d="M12 8.3v4l2.5 1.7"/></svg>';
+function mtTodo() {
+  const today = mtToday(), seen = new Map();
+  mtList().forEach(m => {
+    if (!mtKeep(m)) return;
+    const a = mtAte(m, today);
+    mtArr(m.who).forEach(k => {
+      const e = seen.get(k) || { ate: 0, soon: 0 };
+      e[a ? 'ate' : 'soon']++; seen.set(k, e);
+    });
+  });
+  const out = [];
+  state.rows.forEach(p => {
+    if (p.name === ME.name || outOut(p)) return;
+    const e = seen.get(rKey(p));
+    if (getMet(p) > 0 || (e && e.ate)) return;      /* 이미 뵌 분 */
+    out.push({ p, soon: !!(e && e.soon) });
+  });
+  return out;
+}
+/* 학과마다 한 줄 — 학과는 명단 차례대로, 이름은 약속 없는 분부터 */
+function mtTodoDepts() {
+  const g = new Map();
+  mtTodo().forEach(x => {
+    const a = g.get(x.p.dept_id) || { name: x.p.dept_name, ps: [] };
+    a.ps.push(x); g.set(x.p.dept_id, a);
+  });
+  g.forEach(a => a.ps.sort((x, y) => (x.soon ? 1 : 0) - (y.soon ? 1 : 0)
+    || x.p.name.localeCompare(y.p.name, 'ko')));
+  return [...g.values()];
+}
+
 /* ---------- 칩에 다는 점심·저녁 (2026-11-05, 교수님 지정) ----------
  * 교수 칩(`stChip`) 이름 뒤에 **점심을 드신 분은 해, 저녁을 드신 분은 달**을 조그맣게 답니다.
  * 옆의 만난 횟수(`metDots`)가 **몇 번**을 말한다면, 이것은 **무엇을 함께했는가**를 말합니다.
@@ -6223,7 +6268,10 @@ function mtAteSection() {
   /* 갈래를 하나 고르면 그것만 봅니다 (2026-11-02, 교수님 지정). 「모두」로 돌아오거나,
      고른 것을 다시 누르면 풀립니다. **머리의 숫자는 늘 전체**를 셉니다 — 고른 갈래에 따라
      「몇 명 만났는가」가 달라 보이면 안 되기 때문입니다. 고른 때만 그 수를 따로 적습니다. */
-  const rows = CAL.ate ? all.filter(r => mtAteHit(r.slot, CAL.ate)) : all;
+  const isTodo = CAL.ate === 'todo';                /* 아직 뵙지 못한 분만 보는 때 */
+  const rows = CAL.ate && !isTodo ? all.filter(r => mtAteHit(r.slot, CAL.ate)) : isTodo ? [] : all;
+  const todo = mtTodo(), tSoon = todo.filter(x => x.soon).length;
+  const outN = state.rows.filter(outOut).length;    /* 비참여 — 왜 수가 적은지 적어 둔다 */
   const people = new Set(all.flatMap(r => r.keys)).size;
   const cnt = s => all.filter(r => mtAteHit(r.slot, s)).length;
   /* 만난 자리와 앞으로의 자리를 **갈라 적습니다** — 한 숫자로 뭉치면 몇 분을 뵈었는지 모릅니다 */
@@ -6244,14 +6292,31 @@ function mtAteSection() {
   return `
       <section class="cal-sec">
         <div class="cal-head cal-head--ate"><h2>만나거나 만날 예정인 분</h2>
-          ${all.length ? `<span class="st-note">${people}명 · 만남 ${met}번${soon ? ` · 예정 ${soon}번` : ''}${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}</span>` : ''}
-          ${all.length ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
+          ${all.length || isTodo ? `<span class="st-note">${isTodo
+            ? `아직 ${todo.length}명 — 약속 없음 ${todo.length - tSoon}명${tSoon ? ` · 예정만 ${tSoon}명` : ''}${outN ? ` · 비참여 ${outN}명은 뺌` : ''}`
+            : `${people}명 · 만남 ${met}번${soon ? ` · 예정 ${soon}번` : ''}${CAL.ate ? ` · ${MT_SLOT_NAME[CAL.ate]} ${rows.length}번만 봅니다` : ''}`}</span>` : ''}
+          ${all.length || isTodo ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
             ${slots.map(s => pick(s, MT_SLOT_NAME[s],
               s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))).join('')}
+            ${/* 「아직」은 **맨 끝**에 섭니다 — 갈래가 아니라 반대쪽을 보는 단추라, 갈래 사이에
+                 끼우면 점심·저녁과 같은 줄기로 읽힙니다. 다 뵈었으면 서지 않지만, 보고 계신
+                 동안 마지막 분을 뵌 것으로 바꾸셔도 돌아올 길은 남겨 둡니다. */''}
+            ${todo.length || isTodo ? `<button type="button" class="btn cal-new__b mt-f${isTodo ? ' on' : ''}"
+              data-ateslot="todo" aria-pressed="${isTodo}"
+              title="아직 뵙지 못한 ${todo.length}명 보기${tSoon ? ` — 그중 ${tSoon}명은 약속이 잡혀 있습니다` : ''}"
+              ><i class="mt-i mt-i--todo" aria-hidden="true">${MT_TODO_SVG}</i>아직<i>${todo.length}명</i></button>` : ''}
           </div>` : ''}
         </div>
-        ${!all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
+        ${isTodo ? (todo.length ? `<ul class="mt-ate mt-ate--todo">${mtTodoDepts().map(d => `<li>
+          <span class="mt-ate__g">${esc(d.name)} <i>${d.ps.length}</i></span>
+          <span class="mt-ate__p">${d.ps.map(x =>
+            `<a href="#/dept/${encodeURIComponent(x.p.dept_id)}/prof/${encodeURIComponent(x.p.slug)}"
+                title="${esc(x.p.dept_name)} · ${esc(x.p.rank)}${x.soon ? ' · 약속은 잡혀 있습니다' : ''}">${esc(x.p.name)}${
+                x.soon ? `<b class="mt-todo__s">예정</b>` : ''}</a>`).join('<i>·</i>')}</span>
+        </li>`).join('')}</ul>`
+          : `<div class="empty"><strong>아직 못 뵌 분이 없습니다</strong>명단의 모든 분을 뵈었습니다. 「모두」를 누르시면 자리들이 다시 보입니다.</div>`)
+        : !all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
           <span class="mt-ate__d">${esc(fmtDate(r.m.date).slice(5))} <i>(${esc(dayName(r.m.date))})</i>${
             r.ate ? '' : `<b class="mt-ate__s">예정</b>`}</span>
           <span class="mt-ate__k">${mtIcon(r.slot)}${esc(MT_SLOT_NAME[r.slot] || '')}</span>
@@ -6261,7 +6326,7 @@ function mtAteSection() {
           ${r.m.place ? `<span class="mt-ate__w">${esc(r.m.place)}</span>` : ''}
         </li>`).join('')}</ul>`
         : `<div class="empty"><strong>${esc(MT_SLOT_NAME[CAL.ate] || '')} 자리는 아직 없습니다</strong>「모두」를 누르시면 다시 다 보입니다.</div>`}
-        ${all.length ? '' : `<div class="empty"><strong>아직 약속이 없습니다</strong>달력에서 자리를 잡으시면 여기에 쌓입니다.</div>`}
+        ${all.length || isTodo ? '' : `<div class="empty"><strong>아직 약속이 없습니다</strong>달력에서 자리를 잡으시면 여기에 쌓입니다.</div>`}
         ${/* 셈하는 규칙 풀이(「지난 날짜의 약속은 만난 것으로 봅니다 …」)는 **뺐습니다**
             (2026-11-11, 교수님 지정). 줄마다 「예정」 쪽지가 이미 서 있어 눈으로 읽히고,
             늘 서 있는 한 줄이라 아래 칸이 그만큼 밀렸습니다.
