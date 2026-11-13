@@ -453,6 +453,11 @@ a.ins__joined:hover{border-color:var(--dept-color,var(--accent));color:var(--dep
 .sk-prof{height:300px}
 .empty{padding:70px 20px;text-align:center;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:var(--radius);font-size:var(--fs-s)}
 .empty strong{display:block;color:var(--ink-2);font-size:var(--fs-l);margin-bottom:6px;font-weight:700}
+/* ---------- 한 줄로만 적는 빈 칸 (2026-11-13 저녁, 교수님 지정) ----------
+   `.empty` 는 위아래 70px 을 두른 큰 점선 사각형이다. 달력 아래 「이날은 약속이 없습니다」
+   처럼 **늘 보게 되는 빈 칸**에는 그만한 자리를 줄 까닭이 없다 — 점선과 여백을 걷고
+   조용한 한 줄로 둔다. 다른 빈 칸(명단·그림 등)은 그대로 큰 사각형을 쓴다. */
+.empty--slim{padding:8px 2px;border:0;text-align:left;font-size:var(--fs-s);margin:0}
 .notice{margin:0 0 18px;padding:10px 14px;border-radius:var(--radius-s);font-size:var(--fs-xs);background:#fff6e0;color:#7a4b00;border:1px solid #f3dea3}
 :root[data-theme="dark"] .notice{background:#2c2410;color:#e6b866;border-color:#4a3a14}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .notice{background:#2c2410;color:#e6b866;border-color:#4a3a14}}
@@ -1208,6 +1213,7 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
   .lnk{padding:9px 14px;min-height:40px}
   .foot{padding:18px 0 calc(28px + env(safe-area-inset-bottom));font-size:12px}
   .empty{padding:48px 16px}
+  .empty--slim{padding:8px 2px}
 }
 @media (max-width:480px){
   .brand__text{display:none}
@@ -1796,11 +1802,13 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    바로 아래 `.mt-ate__k` 까지 통째로 먹혀 **두 칸이 꾸밈 없이 서 있었다.** */
 .mt-ate__d{color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .mt-ate__d i{font-style:normal;color:var(--ink-3)}
-/* 앞으로의 약속은 「예정」 쪽지와 **날짜 빛깔**로 가른다 (2026-11-02 저녁, 교수님 지정).
-   처음에는 왼쪽에 색 띠를 둘렀는데 괄호처럼 보여 걷었다. 줄의 맨 앞이 날짜라,
-   그 글자가 물들면 테두리 없이도 눈이 먼저 간다. */
-.mt-ate li.is-soon .mt-ate__d{color:var(--brand);font-weight:800}
-.mt-ate li.is-soon .mt-ate__d i{color:var(--brand);opacity:.75}
+/* ---------- 예정 줄의 **날짜는 물들이지 않는다** (2026-11-13 저녁, 교수님 지정) ----------
+   11-02 저녁에는 날짜 글자를 브랜드색·굵게 해 두었다(그 앞에는 왼쪽 색 띠였는데 괄호처럼
+   보여 걷었다). 그런데 같은 날 저녁에 **바탕을 맞바꾸고** 나니 예정 줄만 흰 바탕으로
+   도드라져, 날짜까지 물들이면 가름표가 셋(바탕·날짜·쪽지)이 되어 줄이 요란했다.
+   이제 예정 줄은 **흰 바탕과 「예정」 쪽지** 둘로 알아보고, 날짜는 모든 줄이 같은 빛깔이다 —
+   날짜 칸이 줄마다 다른 굵기면 눈이 날짜부터 훑게 되어 사람 이름이 뒤로 밀린다.
+   `t-cal` 이 두 줄의 날짜 빛깔·굵기가 같은지 재 둔다. */
 .mt-ate__k{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);white-space:nowrap}
 /* 한 자리에 여러 분이면 **한 줄에 모아** 적는다 (2026-11-02 저녁, 교수님 지정).
    이름이 여럿일 수 있으니 자르지 말고 접히게 둔다 — 잘라 버리면 누가 함께였는지 사라진다. */
@@ -1821,8 +1829,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-todo__s{font-style:normal;font-weight:800;font-size:9.5px;letter-spacing:-.2px;margin-left:4px;
   padding:1px 5px;border-radius:999px;color:var(--brand);
   background:color-mix(in srgb,var(--brand) 14%,var(--surface))}
-.mt-i--todo{color:var(--ink-3)}
-.mt-f.on .mt-i--todo{color:var(--brand)}
+.mt-i--todo,.mt-i--nomeal{color:var(--ink-3)}
+.mt-f.on .mt-i--todo,.mt-f.on .mt-i--nomeal{color:var(--brand)}
 @media (max-width:620px){
   .mt-ate li{grid-template-columns:auto 1fr;gap:4px 8px}
   .mt-ate__p{grid-column:1/-1}

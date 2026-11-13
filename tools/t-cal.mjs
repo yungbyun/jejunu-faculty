@@ -913,7 +913,10 @@ const SOON = await page.evaluate(() => {
 t('예정 줄에 왼쪽 띠를 두르지 않는다',
   (SOON.shadow === 'none' || !/inset/.test(SOON.shadow)) && SOON.border === '0px',
   `${SOON.shadow} / ${SOON.border}`);
-t('예정은 날짜 빛깔로 가른다', SOON.soonCol !== SOON.metCol && Number(SOON.soonW) > Number(SOON.metW),
+/* 2026-11-13 저녁, 교수님 지정 — **날짜는 더 이상 물들이지 않는다.** 바탕을 맞바꾼 뒤로
+   예정 줄은 흰 바탕으로 이미 도드라지는데, 날짜까지 물들이니 가름표가 셋이 되어 요란했다.
+   이제 모든 줄의 날짜가 같은 빛깔·같은 굵기여야 한다 — 되살아나지 않게 재 둔다. */
+t('예정 줄의 날짜도 수수하다', SOON.soonCol === SOON.metCol && SOON.soonW === SOON.metW,
   `${SOON.soonCol} ${SOON.soonW} / ${SOON.metCol} ${SOON.metW}`);
 
 /* ---------- 물든 바탕은 **치른 자리** 쪽에 (2026-11-13 저녁, 교수님 지정) ----------
@@ -1045,7 +1048,7 @@ t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'))
 t('갈래 단추가 조금 높다', F.h >= 38, `${F.h}px`);
 /* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
 t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
-t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea|todo', F.btns.join('|'));
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea|nomeal|todo', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
 t('단추에 몇 번인지 적는다', F.cnt.split(',').slice(0, 4).join(',') === '6,3,3,1', F.cnt);
 /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
@@ -1203,6 +1206,83 @@ t('되돌리면 다시 선다', TX.back);
 await page.click('[data-ateslot="todo"]');
 await page.waitForTimeout(250);
 t('아직을 다시 누르면 약속 줄로 돌아온다', await page.evaluate(() =>
+  CAL.ate === '' && !document.querySelector('.mt-ate--todo')
+  && document.querySelectorAll('.mt-ate li').length === 7));
+
+/* ---------- 「식사 외」 — 아직 함께 드시지 않은 분 (2026-11-13 저녁, 교수님 지정) ----------
+ * 「아직」 **앞**에 하나 더 선다. 점심이나 저녁을 함께 하지 않은 분이면 **뵌 적이 있어도**
+ * 선다 — Tea 로만 뵌 분이 여기 서는지가 「아직」과 가르는 눈이다.
+ * 그러므로 「아직」의 분은 **모두** 이 명단 안에 있다(넓은 쪽 → 좁은 쪽). */
+const NEXP = await page.evaluate(() => {
+  /* 화면이 쓰는 `mtSlot`·`mealAll` 과 **다른 길로** 다시 센다 */
+  const today = mtToday(), ate = new Set(), soon = new Set(), teaAte = new Set();
+  const meal = m => {
+    const k = m.kind || '';
+    if (k) return k === 'lunch' || k === 'dinner';
+    const h = Number(String(m.time || '').slice(0, 2));
+    return (h >= 11 && h < 14) || (h >= 17 && h < 21);
+  };
+  Object.values(meets()).forEach(m => {
+    if (m.done === 'no' || !m.date) return;
+    const done = m.done === 'met' || m.date < today;
+    if (!meal(m)) { if (done) (m.who || []).forEach(k => teaAte.add(k)); return; }
+    (m.who || []).forEach(k => (done ? ate : soon).add(k));
+  });
+  const left = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비' && !ate.has(rKey(p)));
+  return { n: left.length, soon: left.filter(p => soon.has(rKey(p))).length,
+    names: left.map(p => p.name).sort(),
+    /* 밥은 아니지만 뵙기는 한 분 — 「아직」에는 없고 「식사 외」에는 있어야 한다 */
+    onlyTea: left.filter(p => teaAte.has(rKey(p))).map(p => p.name).sort() };
+});
+await page.click('[data-ateslot="nomeal"]');
+await page.waitForTimeout(250);
+const ND = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.mt-ate--todo li')];
+  const as = e => [...e.querySelectorAll('.mt-ate__p a')];
+  return { lis: li.length,
+    names: li.map(e => as(e).map(a => a.textContent.replace('예정', '').trim())),
+    soon: li.map(e => as(e).map(a => !!a.querySelector('.mt-todo__s'))),
+    cnts: li.map(e => Number(((e.querySelector('.mt-ate__g i') || {}).textContent || '0').trim())),
+    plain: document.querySelectorAll('.mt-ate:not(.mt-ate--todo) li').length,
+    chip: ((document.querySelector('[data-ateslot="nomeal"] i:not(.mt-i)') || {}).textContent || '').trim(),
+    on: (document.querySelector('[data-ateslot="nomeal"]') || {}).getAttribute('aria-pressed'),
+    icon: !!document.querySelector('[data-ateslot="nomeal"] .mt-i--nomeal svg'),
+    tip: (document.querySelector('[data-ateslot="nomeal"]') || {}).getAttribute('title') || '',
+    order: [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot).slice(-2).join('|'),
+    link: (document.querySelector('.mt-ate--todo .mt-ate__p a') || { getAttribute: () => '' }).getAttribute('href') };
+});
+const NFLAT = ND.names.flat();
+t('식사 외 단추가 아직 바로 앞에', ND.order === 'nomeal|todo', ND.order);
+t('식사 외 단추에 그림과 사람 수', ND.icon && ND.chip === `${NEXP.n}명`, `${ND.chip} / ${NEXP.n}명`);
+t('줄머리 표가 무엇을 보는지 말한다', /점심·저녁을 함께 하지 않은/.test(ND.tip), ND.tip);
+t('누르면 눌린 꼴이 된다', ND.on === 'true');
+t('약속 줄 대신 학과 줄이 선다', ND.lis > 0 && ND.plain === 0, `${ND.lis} / ${ND.plain}`);
+t('식사를 안 하신 분을 빠짐없이 적는다', NFLAT.slice().sort().join(',') === NEXP.names.join(','),
+  `${NFLAT.length}명 / ${NEXP.n}명`);
+t('점심·저녁을 치른 분은 없다', await page.evaluate(nm => {
+  const today = mtToday(), had = new Set();
+  Object.values(meets()).forEach(m => { if (m.done === 'no' || !m.date) return;
+    const s = mtSlot(m); if (s !== 'day' && s !== 'night') return;
+    if (m.done === 'met' || m.date < today) (m.who || []).forEach(k => {
+      const p = state.rows.find(x => rKey(x) === k); if (p) had.add(p.name); }); });
+  return nm.every(x => !had.has(x));
+}, NFLAT), NFLAT.slice(0, 6).join(','));
+t('식사 약속만 있는 분은 「예정」을 달고 선다', ND.soon.flat().filter(Boolean).length === NEXP.soon,
+  `${ND.soon.flat().filter(Boolean).length} / ${NEXP.soon}`);
+/* 「아직」은 이 명단의 **일부**다 — 얼굴도 못 뵌 분은 밥도 안 드셨으니까 */
+t('아직의 분은 모두 식사 외에도 있다', TFLAT.every(n => NFLAT.includes(n)) && NFLAT.length >= TFLAT.length,
+  `${TFLAT.length}명 ⊂ ${NFLAT.length}명`);
+t('Tea 로만 뵌 분은 아직에는 없고 식사 외에는 있다',
+  NEXP.onlyTea.length > 0 && NEXP.onlyTea.every(n => NFLAT.includes(n) && !TFLAT.includes(n)),
+  NEXP.onlyTea.join(','));
+t('학과 줄에 그 학과 인원수', ND.cnts.every((n, i) => n === ND.names[i].length),
+  `${ND.cnts.join(',')} / ${ND.names.map(x => x.length).join(',')}`);
+t('학과 안에서 식사 약속 없는 분이 앞에',
+  ND.soon.every(r => r.slice().sort((a, b2) => a - b2).join() === r.join()), JSON.stringify(ND.soon.slice(0, 3)));
+t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(ND.link || ''), ND.link);
+await page.click('[data-ateslot="nomeal"]');
+await page.waitForTimeout(250);
+t('식사 외를 다시 누르면 약속 줄로 돌아온다', await page.evaluate(() =>
   CAL.ate === '' && !document.querySelector('.mt-ate--todo')
   && document.querySelectorAll('.mt-ate li').length === 7));
 
