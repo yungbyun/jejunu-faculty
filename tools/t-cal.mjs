@@ -1048,9 +1048,11 @@ t('모두 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'))
 t('갈래 단추가 조금 높다', F.h >= 38, `${F.h}px`);
 /* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
 t('식사 단추가 모두 다음에', F.btns[1] === 'meal', F.btns.join('|'));
-t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|day|night|tea|nomeal|todo', F.btns.join('|'));
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|nomeal|day|night|tea|todo', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
-t('단추에 몇 번인지 적는다', F.cnt.split(',').slice(0, 4).join(',') === '6,3,3,1', F.cnt);
+/* 「식사 외」가 2026-11-14 부터 「식사」 바로 뒤에 끼므로, 갈래의 횟수는 그것을 빼고 본다 */
+t('단추에 몇 번인지 적는다',
+  F.cnt.split(',').filter(x => !/명$/.test(x)).join(',') === '6,3,3,1', F.cnt);
 /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
    「명」을 붙여 갈래 단추의 횟수와 갈라 둡니다. 머리줄의 「N명」과 같은 셈이어야 합니다. */
 t('모두 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
@@ -1075,8 +1077,9 @@ const FA = await page.evaluate(() => {
 });
 t('예정만 있는 분도 사람 수에 든다', FA.badge === '2명', `${FA.badge} / ${FA.head}`);
 t('예정이 있어도 머리줄에 풀이가 없다', FA.head === '', FA.head);
-t('식사는 점심과 저녁을 합한 수', Number(F.cnt.split(',')[0])
-  === Number(F.cnt.split(',')[1]) + Number(F.cnt.split(',')[2]), F.cnt);
+/* 사람 수 단추(「…명」)는 갈래가 아니므로 빼고 센다 — 2026-11-14 부터 「식사 외」가 사이에 낀다 */
+{ const c = F.cnt.split(',').filter(x => !/명$/.test(x)).map(Number);
+  t('식사는 점심과 저녁을 합한 수', c[0] === c[1] + c[2], F.cnt); }
 
 /* 식사만 보기 — 점심과 저녁만 남고 Tea 는 빠져야 한다 */
 await page.click('[data-ateslot="meal"]');
@@ -1248,11 +1251,15 @@ const ND = await page.evaluate(() => {
     on: (document.querySelector('[data-ateslot="nomeal"]') || {}).getAttribute('aria-pressed'),
     icon: !!document.querySelector('[data-ateslot="nomeal"] .mt-i--nomeal svg'),
     tip: (document.querySelector('[data-ateslot="nomeal"]') || {}).getAttribute('title') || '',
-    order: [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot).slice(-2).join('|'),
+    order: [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot),
     link: (document.querySelector('.mt-ate--todo .mt-ate__p a') || { getAttribute: () => '' }).getAttribute('href') };
 });
 const NFLAT = ND.names.flat();
-t('식사 외 단추가 아직 바로 앞에', ND.order === 'nomeal|todo', ND.order);
+/* 2026-11-14, 교수님 지정 — 「식사」 바로 옆으로 옮겼다. 이름이 한 짝이고 보는 것도
+   같은 일의 앞뒤라, 멀리 떨어뜨리면 둘을 견주기 어렵다. */
+t('식사 외 단추가 식사 바로 뒤에',
+  ND.order.indexOf('nomeal') === ND.order.indexOf('meal') + 1, ND.order.join('|'));
+t('아직은 그대로 맨 끝', ND.order[ND.order.length - 1] === 'todo', ND.order.join('|'));
 t('식사 외 단추에 그림과 사람 수', ND.icon && ND.chip === `${NEXP.n}명`, `${ND.chip} / ${NEXP.n}명`);
 t('줄머리 표가 무엇을 보는지 말한다', /점심·저녁을 함께 하지 않은/.test(ND.tip), ND.tip);
 t('누르면 눌린 꼴이 된다', ND.on === 'true');

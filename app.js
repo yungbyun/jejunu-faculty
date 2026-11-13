@@ -6328,22 +6328,25 @@ function mtAteSection() {
   const pickP = (k, name, icon, on, tip, n) => `<button type="button" class="btn cal-new__b mt-f${on ? ' on' : ''}"
       data-ateslot="${k}" aria-pressed="${on}" title="${esc(tip)}"
       >${icon}${esc(name)}<i>${n}명</i></button>`;
+  /* 「식사 외」는 **「식사」 바로 옆**에 섭니다 (2026-11-14, 교수님 지정) — 이름이 한 짝이고
+     보는 것도 같은 일의 앞뒤(드신 자리 ↔ 아직 안 드신 분)라, 멀리 떨어뜨리면 둘을 견주기
+     어렵습니다. 「식사」 단추가 없는 때(점심·저녁 중 하나만 있는 때)는 갈래 뒤에 섭니다. */
+  const nomB = nom.length || isNom ? pickP('nomeal', '식사 외',
+    `<i class="mt-i mt-i--nomeal" aria-hidden="true">${MT_NOMEAL_SVG}</i>`, isNom,
+    `아직 점심·저녁을 함께 하지 않은 ${nom.length}명 보기${nSoon ? ` — 그중 ${nSoon}명은 식사 약속이 잡혀 있습니다` : ''}`,
+    nom.length) : '';
   return `
       <section class="cal-sec">
         <div class="cal-head cal-head--ate"><h2>만나거나 만날 예정인 분</h2>
           ${all.length || peep ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '모두', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
-            ${slots.map(s => pick(s, MT_SLOT_NAME[s],
-              s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))).join('')}
-            ${/* 「식사 외」·「아직」은 **맨 끝**에 섭니다 — 갈래가 아니라 반대쪽을 보는
-                 단추라, 갈래 사이에 끼우면 점심·저녁과 같은 줄기로 읽힙니다. 다 치르셨으면
-                 서지 않지만, 보고 계신 동안 마지막 분이 빠져도 돌아올 길은 남겨 둡니다.
-                 「식사 외」가 「아직」보다 **앞**입니다 — 「아직」의 분들이 「식사 외」 안에
-                 들어 있으므로, 넓은 쪽에서 좁은 쪽으로 좁혀 가는 차례입니다. */''}
-            ${nom.length || isNom ? pickP('nomeal', '식사 외',
-              `<i class="mt-i mt-i--nomeal" aria-hidden="true">${MT_NOMEAL_SVG}</i>`, isNom,
-              `아직 점심·저녁을 함께 하지 않은 ${nom.length}명 보기${nSoon ? ` — 그중 ${nSoon}명은 식사 약속이 잡혀 있습니다` : ''}`,
-              nom.length) : ''}
+            ${slots.map(s => `${pick(s, MT_SLOT_NAME[s],
+              s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))}${
+              s === 'meal' ? nomB : ''}`).join('')}
+            ${slots.includes('meal') ? '' : nomB}
+            ${/* 「아직」은 **맨 끝**에 섭니다 — 갈래가 아니라 반대쪽을 보는 단추라, 갈래
+                 사이에 끼우면 점심·저녁과 같은 줄기로 읽힙니다. 다 뵈었으면 서지 않지만,
+                 보고 계신 동안 마지막 분이 빠져도 돌아올 길은 남겨 둡니다. */''}
             ${todo.length || isTodo ? pickP('todo', '아직',
               `<i class="mt-i mt-i--todo" aria-hidden="true">${MT_TODO_SVG}</i>`, isTodo,
               `아직 뵙지 못한 ${todo.length}명 보기${tSoon ? ` — 그중 ${tSoon}명은 약속이 잡혀 있습니다` : ''}`,

@@ -107,7 +107,8 @@ for (const w of [320, 390]) {
     const br = box.getBoundingClientRect();
     return { n: bs.length,
       lines: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size,
-      /* 갈래 다섯(모두·식사·점심·저녁·Tea)만 따로 — 「아직」은 뒤에 혼자 내려와도 된다 */
+      /* 앞의 다섯(모두·식사·**식사 외**·점심·저녁)만 따로 — 2026-11-14 부터 「식사 외」가
+         「식사」 바로 뒤에 낀다. Tea·「아직」은 뒤에 혼자 내려와도 된다 */
       l5: new Set(bs.slice(0, 5).map(e => Math.round(e.getBoundingClientRect().top))).size,
       slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
@@ -129,10 +130,10 @@ for (const w of [320, 390]) {
   /* 위아래 여백만 늘려 **조금 높게** (2026-11-13 저녁, 교수님 지정) — 옆 여백을 건드리면
      한 줄에 서는 수가 줄어 또 접힌다. 30px 이면 폰에서 누르기 어렵지 않다. */
   t(`${w}px 칩이 누르기 좋게 높다`, ate.h >= 30, `${ate.h}px`);
-  /* 갈래 다섯은 390px 에서 한 줄에 선다. 320px 은 숫자까지 세우면 자리가 모자라 한 번 더
+  /* 앞의 다섯은 390px 에서 한 줄에 선다. 320px 은 숫자까지 세우면 자리가 모자라 한 번 더
      접힌다 — 숫자를 숨기는 쪽보다 접히는 쪽이 낫다. 「아직」은 갈래가 아니라 **반대쪽을 보는
      단추**라 뒤로 혼자 내려와도 된다 (이 칸은 달력 아래라 밀려날 것이 없다). */
-  t(`${w}px 갈래 다섯이 ${w <= 340 ? '두 줄 안에' : '한 줄에'}`, w <= 340 ? ate.l5 <= 2 : ate.l5 === 1,
+  t(`${w}px 앞의 다섯이 ${w <= 340 ? '두 줄 안에' : '한 줄에'}`, w <= 340 ? ate.l5 <= 2 : ate.l5 === 1,
     `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 접혀도 두 줄까지`, ate.lines <= 2, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
