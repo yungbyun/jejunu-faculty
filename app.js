@@ -5803,13 +5803,16 @@ function dPhone(label, num, who, mob) {
     + `<a class="d-ct__n" href="tel:${esc(tel)}"`
     + ` aria-label="${esc(who)} ${esc(label)} ${esc(num)} — 전화 걸기" title="전화 걸기">${TEL_SVG}${esc(num)}</a>`
     + (mob ? `<a class="d-ct__c" href="sms:${esc(tel)}" title="문자 쓰기" aria-label="${esc(who)} ${esc(label)} 문자 쓰기">${SMS_SVG}</a>`
-      + `<button type="button" class="d-ct__c" data-mobed title="번호 고치기" aria-label="${esc(who)} 핸드폰 번호 고치기">${PEN_SVG}</button>`
       + `<button type="button" class="d-ct__c" data-vcard title="내 폰에 저장 — 연락처 파일(.vcf)을 내려받습니다"`
       + ` aria-label="${esc(who)} 연락처를 내 폰에 저장">${VCARD_SVG}</button>` : '')
     + `<button type="button" class="d-ct__c" data-copynum="${esc(num)}" title="${esc(label)} 번호 복사"`
     + ` aria-label="${esc(who)} ${esc(label)} 번호 복사">${CP_SVG}</button></span>`;
 }
-/* 핸드폰은 없으면 등록, 있으면 고칠 수 있다 — 폰에서 바로 적어 넣으시라고. */
+/* 핸드폰은 없으면 등록, 있으면 고칠 수 있다 — 폰에서 바로 적어 넣으시라고.
+   **번호 줄의 연필은 걷었습니다** (2026-11-13, 교수님 지정). 번호 하나에 그림이 넷이면
+   폰에서 줄이 빽빽합니다. 번호를 고치는 길은 그대로 남아 있습니다 — **카드의 연필**
+   (`data-mobgo`)이 상세를 열면서 번호 칸을 바로 펼칩니다. 번호가 아직 없는 분에게는
+   이 자리에 「핸드폰 등록」 단추가 서고, 그 단추가 `data-mobed` 를 지고 있습니다. */
 function dMobEdit(p) {
   const cur = mobileOf(p);
   return `<span class="d-ct d-ct--ed">`

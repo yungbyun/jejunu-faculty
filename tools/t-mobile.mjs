@@ -250,14 +250,15 @@ check('옆의 말풍선은 문자로 간다', await page.evaluate(() => {
 }));
 check('시트에도 올라간다', await page.evaluate(() =>
   JSON.parse(localStorage.getItem('jnu-mobile'))[rKey(state.rows[2])] === '010-8765-1234'));
-check('수화기 옆에 연필', await page.evaluate(() => {
-  const box = [...document.querySelectorAll('.d-ct')].pop();
-  const kids = [...box.children].map(e => e.tagName + (e.dataset.mobed !== undefined ? ':pen' : ''));
-  return kids.some(k => k.endsWith(':pen'));
-}), await page.evaluate(() => [...[...document.querySelectorAll('.d-ct')].pop().children].map(e => e.tagName).join(' ')));
+/* 번호 줄에는 연필을 두지 않는다 (2026-11-13, 교수님 지정) — 번호 하나에 그림이 넷이면
+   폰에서 줄이 빽빽하다. 고치는 길은 **카드의 연필**로 남아 있다(바로 아래에서 잰다). */
+check('번호가 있으면 줄에 연필이 없다', await page.evaluate(() =>
+  !document.querySelector('.d-phones [data-mobed]')),
+  await page.evaluate(() => [...[...document.querySelectorAll('.d-ct')].pop().children].map(e => e.tagName).join(' ')));
 
-/* 취소하면 그대로 둔다 */
-await page.click('[data-mobed]');
+/* 취소하면 그대로 둔다 — 카드의 연필이 하는 것과 같은 길로 칸을 편다 */
+await page.evaluate(() => { mobEditKey = rKey(state.rows[2]); refreshPhones(state.rows[2]); });
+await page.waitForSelector('[data-mobin]', { timeout: 5000 });
 await page.fill('[data-mobin]', '01000000000');
 await page.click('[data-mobno]');
 await page.waitForTimeout(200);
