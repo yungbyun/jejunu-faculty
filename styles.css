@@ -1766,6 +1766,14 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-ate li{display:grid;grid-template-columns:auto auto auto 1fr;align-items:center;gap:10px;
   padding:7px 10px;border-radius:8px;font-size:13px}
 .mt-ate li:nth-child(odd){background:var(--surface-2)}
+/* ---------- 예정 줄은 바탕을 조금 짙게 (2026-11-13, 교수님 지정) ----------
+   앞으로의 자리는 **줄 전체가 물들어** 멀리서도 먼저 눈에 듭니다. 브랜드색을 12% 섞어
+   쓰므로 밝은 화면에서는 옅은 남색, 어두운 화면에서는 한 겹 밝은 남색이 되어 **두 화면
+   모두 보통 줄과 갈립니다**(어두운 화면에서 더 어둡게 칠하면 바탕에 묻힙니다).
+   **줄무늬(`nth-child(odd)`)를 이겨야 하므로 그 줄 바로 뒤**에 둡니다 — 힘이 같아
+   앞에 두면 홀수 줄에서만 덮입니다. 2026-11-02 에 옅은 바탕을 대 보고 「줄무늬와 섞여
+   안 보인다」며 걷었던 적이 있어, 이번에는 줄무늬보다 **또렷하게** 칠합니다. */
+.mt-ate li.is-soon{background:color-mix(in srgb,var(--brand) 12%,var(--surface))}
 /* 「예정」 쪽지 — **꽉 찬 색**으로 (2026-11-02 저녁, 교수님 지정 A+C안).
    글자색은 `--surface` 다. 밝은 화면에서는 짙은 남색 위의 흰 글자(대비 12), 어두운 화면에서는
    연한 하늘색 위의 어두운 글자(대비 8)가 되어 **두 화면 모두 또렷합니다.**

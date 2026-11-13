@@ -898,6 +898,46 @@ t('예정 줄에 왼쪽 띠를 두르지 않는다',
   `${SOON.shadow} / ${SOON.border}`);
 t('예정은 날짜 빛깔로 가른다', SOON.soonCol !== SOON.metCol && Number(SOON.soonW) > Number(SOON.metW),
   `${SOON.soonCol} ${SOON.soonW} / ${SOON.metCol} ${SOON.metW}`);
+
+/* ---------- 예정 줄은 바탕을 조금 짙게 (2026-11-13, 교수님 지정) ----------
+ * 줄 전체가 물들어 멀리서도 먼저 눈에 들어야 한다. **줄무늬(`nth-child(odd)`)를 이겨야**
+ * 하므로 홀수 줄·짝수 줄 모두에서 같은 바탕이어야 한다. 밝은 화면은 더 짙게, 어두운
+ * 화면은 한 겹 **밝게** — 어두운 화면에서 더 어둡게 칠하면 바탕에 묻힌다. */
+const SBG = await page.evaluate(() => {
+  const lum = c => { const m = c.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/);
+    const v = m ? [+m[1], +m[2], +m[3]] : c.match(/[\d.]+/g).slice(0, 3).map(n => n / 255);
+    const f = u => u <= .03928 ? u / 12.92 : Math.pow((u + .055) / 1.055, 2.4);
+    return .2126 * f(v[0]) + .7152 * f(v[1]) + .0722 * f(v[2]); };
+  const cr = (a, b2) => +(((Math.max(lum(a), lum(b2)) + .05) / (Math.min(lum(a), lum(b2)) + .05)).toFixed(2));
+  const look = () => {
+    const li = [...document.querySelectorAll('.mt-ate li')];
+    const bg = e => { const c = getComputedStyle(e).backgroundColor;
+      return /rgba\(0, 0, 0, 0\)/.test(c) ? getComputedStyle(document.body).backgroundColor : c; };
+    const soon = li.filter(e => e.classList.contains('is-soon'));
+    const plain = li.filter(e => !e.classList.contains('is-soon'));
+    return { soon: soon.map(bg), plain: plain.map(bg), n: soon.length,
+      /* 홀·짝이 섞여 있어야 줄무늬를 이기는지 잴 수 있다 */
+      odd: soon.map(e => ([...e.parentNode.children].indexOf(e) % 2 === 0)),
+      ink: cr(getComputedStyle(soon[0].querySelector('.mt-ate__p a')).color, bg(soon[0])),
+      date: cr(getComputedStyle(soon[0].querySelector('.mt-ate__d')).color, bg(soon[0])),
+      L: lum(bg(soon[0])), Lp: plain.map(bg).map(lum) };
+  };
+  const light = look();
+  document.documentElement.setAttribute('data-theme', 'dark');
+  const dark = look();
+  document.documentElement.removeAttribute('data-theme');
+  return { light, dark };
+});
+t('예정 줄은 바탕이 보통 줄과 다르다',
+  SBG.light.soon.every(c => !SBG.light.plain.includes(c)), `${SBG.light.soon[0]} / ${SBG.light.plain.join(' ')}`);
+t('줄무늬를 이긴다 — 홀·짝 모두 같은 바탕', new Set(SBG.light.soon).size === 1
+  && new Set(SBG.light.odd).size === 2, `${SBG.light.odd.join(',')} · ${new Set(SBG.light.soon).size}가지`);
+t('밝은 화면에서는 더 짙다', SBG.light.Lp.every(x => SBG.light.L < x), `${SBG.light.L.toFixed(3)} / ${SBG.light.Lp.map(x => x.toFixed(3)).join(' ')}`);
+/* 어두운 화면에서 더 어둡게 칠하면 바탕에 묻힌다 — 한 겹 **밝은** 쪽으로 간다 */
+t('어두운 화면에서는 한 겹 밝다', SBG.dark.Lp.every(x => SBG.dark.L > x), `${SBG.dark.L.toFixed(3)} / ${SBG.dark.Lp.map(x => x.toFixed(3)).join(' ')}`);
+t('예정 줄 글자가 묻히지 않는다(4.5 넘김)', SBG.light.ink >= 4.5 && SBG.dark.ink >= 4.5
+  && SBG.light.date >= 4.5 && SBG.dark.date >= 4.5,
+  `글 ${SBG.light.ink}/${SBG.dark.ink} · 날짜 ${SBG.light.date}/${SBG.dark.date}`);
 /* 쪽지는 **꽉 찬 색**이고, 글자는 바탕색을 써서 밝은·어두운 화면 모두 또렷해야 한다
    (2026-11-02 저녁, 교수님 지정 A+C안). 흰색으로 못 박으면 어두운 화면에서 묻힌다. */
 const PILL = await page.evaluate(() => {
