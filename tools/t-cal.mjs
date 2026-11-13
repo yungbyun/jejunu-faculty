@@ -938,6 +938,28 @@ t('어두운 화면에서는 한 겹 밝다', SBG.dark.Lp.every(x => SBG.dark.L 
 t('예정 줄 글자가 묻히지 않는다(4.5 넘김)', SBG.light.ink >= 4.5 && SBG.dark.ink >= 4.5
   && SBG.light.date >= 4.5 && SBG.dark.date >= 4.5,
   `글 ${SBG.light.ink}/${SBG.dark.ink} · 날짜 ${SBG.light.date}/${SBG.dark.date}`);
+
+/* ---------- 줄은 모두 펴 둔다 (2026-11-13, 교수님 지정) ----------
+ * 전에는 420px 에서 끊고 칸 안에서 따로 굴렸다. 칸 안의 스크롤은 폰에서 바깥 스크롤과
+ * 엉키고 몇 줄이 더 있는지도 보이지 않는다. **줄을 많이 세워 두고** 잰다 — 몇 줄 안 되는
+ * 자료로 재면 끊는 규칙이 되살아나도 모른다. */
+const TALL = await page.evaluate(() => {
+  const keep = JSON.stringify(meets());
+  const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  meetMap = {}; mealCache = null;
+  for (let i = 0; i < 24; i++) meets()['tall' + i] = {
+    date: ymd(new Date(Date.now() - 864e5 * (i + 2))), time: '12:00', kind: 'lunch',
+    who: [rKey(state.rows[i % state.rows.length])], done: '', place: '교직원식당' };
+  mtSave(); CAL.ate = ''; render();
+  const ul = document.querySelector('.mt-ate'), cs = getComputedStyle(ul);
+  const out = { n: ul.children.length, max: cs.maxHeight, ov: cs.overflowY,
+    hid: ul.scrollHeight - ul.clientHeight, h: Math.round(ul.getBoundingClientRect().height) };
+  meetMap = JSON.parse(keep); mealCache = null; mtSave(); render();
+  return out;
+});
+t('줄이 420px 를 넘어도 다 편다', TALL.n === 24 && TALL.h > 420, `${TALL.n}줄 · ${TALL.h}px`);
+t('칸 안에서 따로 굴리지 않는다', TALL.max === 'none' && TALL.hid <= 1,
+  `max-height ${TALL.max} · 가려진 ${TALL.hid}px · overflow-y ${TALL.ov}`);
 /* 쪽지는 **꽉 찬 색**이고, 글자는 바탕색을 써서 밝은·어두운 화면 모두 또렷해야 한다
    (2026-11-02 저녁, 교수님 지정 A+C안). 흰색으로 못 박으면 어두운 화면에서 묻힌다. */
 const PILL = await page.evaluate(() => {
@@ -1099,7 +1121,12 @@ const TD = await page.evaluate(() => {
     link: (document.querySelector('.mt-ate--todo .mt-ate__p a') || { getAttribute: () => '' }).getAttribute('href'),
     chip: ((document.querySelector('[data-ateslot="todo"] i:not(.mt-i)') || {}).textContent || '').trim(),
     on: (document.querySelector('[data-ateslot="todo"]') || {}).getAttribute('aria-pressed'),
-    icon: !!document.querySelector('[data-ateslot="todo"] .mt-i--todo svg') };
+    icon: !!document.querySelector('[data-ateslot="todo"] .mt-i--todo svg'),
+    /* 학과 줄도 같은 칸을 쓴다 — 여기서도 칸 안에서 따로 굴리지 않아야 한다 */
+    hid: (() => { const u = document.querySelector('.mt-ate--todo');
+      return u ? u.scrollHeight - u.clientHeight : -1; })(),
+    max: (() => { const u = document.querySelector('.mt-ate--todo');
+      return u ? getComputedStyle(u).maxHeight : ''; })() };
 });
 const TFLAT = TD.names.flat();
 t('아직 단추가 갈래 끝에 선다', await page.evaluate(() =>
@@ -1125,6 +1152,8 @@ t('학과 안에서 약속 없는 분이 앞에', TD.soon.every(r => r.slice().s
 /* 몇 명 남았는지는 **단추**가 지고 있다 (2026-11-13) — 머리줄에는 아무것도 적지 않는다 */
 t('아직에서도 머리줄은 비어 있다', TD.head === '', TD.head);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(TD.link || ''), TD.link);
+t('학과 줄도 칸 안에서 굴리지 않는다', TD.max === 'none' && TD.hid <= 1,
+  `max-height ${TD.max} · 가려진 ${TD.hid}px`);
 /* 본인·비참여는 뵐 분이 아니라 빼고, 손으로 센 만난 횟수도 뵌 것으로 본다 */
 t('본인은 빼고 센다', !TFLAT.includes('변영철'), TFLAT.slice(0, 4).join(','));
 const TX = await page.evaluate(nm => {

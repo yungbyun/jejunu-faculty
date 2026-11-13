@@ -1759,7 +1759,10 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-f.on i{color:var(--brand)}
 .mt-i--all,.mt-i--meal{color:var(--ink-3)}
 .mt-f.on .mt-i--all,.mt-f.on .mt-i--meal{color:var(--brand)}
-.mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
+/* 줄은 **모두 펴 둡니다** (2026-11-13, 교수님 지정). 전에는 420px 에서 끊고 칸 안에서
+   따로 굴렸는데, 칸 안의 스크롤은 폰에서 바깥 스크롤과 엉키고 몇 줄이 더 있는지도
+   보이지 않았습니다. 이제 줄 수만큼 늘어나고 **페이지 스크롤 하나로** 봅니다. */
+.mt-ate{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
 /* 네 칸: 날짜 · 갈래 · 이름 · 장소. 앞 셋은 글자만큼만 차지해 **왼쪽에 모이고**, 남는 자리는
    장소가 받는다. 장소가 없는 줄은 마지막 칸이 비어 있을 뿐이라 줄이 안 흐트러진다.
    학과 칸은 2026-11-02 저녁에 뺐다 (교수님 지정) — 이름에 올리면 말풍선으로 나온다. */
