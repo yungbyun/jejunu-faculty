@@ -1829,8 +1829,8 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
 .mt-todo__s{font-style:normal;font-weight:800;font-size:9.5px;letter-spacing:-.2px;margin-left:4px;
   padding:1px 5px;border-radius:999px;color:var(--brand);
   background:color-mix(in srgb,var(--brand) 14%,var(--surface))}
-.mt-i--todo,.mt-i--nomeal{color:var(--ink-3)}
-.mt-f.on .mt-i--todo,.mt-f.on .mt-i--nomeal{color:var(--brand)}
+.mt-i--todo,.mt-i--nomeal,.mt-i--other{color:var(--ink-3)}
+.mt-f.on .mt-i--todo,.mt-f.on .mt-i--nomeal,.mt-f.on .mt-i--other{color:var(--brand)}
 @media (max-width:620px){
   .mt-ate li{grid-template-columns:auto 1fr;gap:4px 8px}
   .mt-ate__p{grid-column:1/-1}

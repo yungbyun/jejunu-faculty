@@ -101,15 +101,21 @@ for (const w of [320, 390]) {
     for (let i = 0; i < 13; i++) mk(day(-60 + i), who(i), 'lunch');
     for (let i = 0; i < 13; i++) mk(day(-40 + i), who(i + 20), 'dinner');
     for (let i = 0; i < 13; i++) mk(day(-9), who(i + 40), 'other');
+    /* 「기타 만남」 단추까지 세워 놓고 잰다 (2026-11-14) — 달력에 없는 분에게 **두 자리**
+       횟수를 얹는다. 교수님 자료에는 이런 분이 스무 분 넘으므로 단추가 늘 서 있다. */
+    [60, 61, 62].forEach((i, n) => applyEntry(who(i), { met: 10 + n }));
     CAL.ate = ''; location.hash = '#/cal'; render();
     const box = document.querySelector('.mt-fs');
     const bs = [...box.querySelectorAll('.mt-f')];
     const br = box.getBoundingClientRect();
     return { n: bs.length,
       lines: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size,
-      /* 앞의 다섯(모두·식사·**식사 외**·점심·저녁)만 따로 — 2026-11-14 부터 「식사 외」가
-         「식사」 바로 뒤에 낀다. Tea·「아직」은 뒤에 혼자 내려와도 된다 */
-      l5: new Set(bs.slice(0, 5).map(e => Math.round(e.getBoundingClientRect().top))).size,
+      /* **첫 줄에 몇 개가 서는가** — 2026-11-14 에 단추가 여덟이 되면서 「앞의 다섯이 한
+         줄에」는 더 이상 잴 수 없게 되었다(사람을 세는 단추 셋이 갈래 사이에 낀다).
+         대신 **첫 줄이 너무 빈약하지 않은지**를 본다 — 단추가 넓어져 한 줄에 둘셋밖에
+         못 서면 세 줄로 넘어가는 날이 온다. */
+      first: (() => { const t0 = Math.min(...bs.map(e => e.getBoundingClientRect().top));
+        return bs.filter(e => Math.abs(e.getBoundingClientRect().top - t0) < 2).length; })(),
       slack: Math.round(br.right - Math.max(...bs.map(e => e.getBoundingClientRect().right))),
       labels: bs.map(e => e.textContent.trim().replace(/\s+/g, '')),
       /* 단추 높이 — 2026-11-13 저녁에 조금 높였다 (교수님 지정). 폰에서 누르기 쉽게. */
@@ -119,10 +125,10 @@ for (const w of [320, 390]) {
         .map(x => getComputedStyle(x).display === 'none' ? '' : x.textContent.trim()).join('')),
       wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
-  /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 다섯이 되었고, 2026-11-13 에 「아직」
-     (아직 뵙지 못한 분)이, 같은 날 저녁에 「식사 외」(점심·저녁을 함께 안 하신 분)가 끝에
-     붙어 **일곱**이 되었다 (교수님 지정). 사람을 세우는 단추 둘이 뒤로 내려와도 두 줄까지다. */
-  t(`${w}px 만난 분 고르기 단추가 일곱`, ate.n === 7, ate.labels.join(' '));
+  /* 2026-11-02 저녁에 「식사」(점심+저녁)가 더해져 다섯, 2026-11-13 에 「아직」, 같은 날
+     저녁에 「식사 외」로 일곱, 2026-11-14 에 「기타 만남」(달력엔 없고 만난 횟수만 있는 분)
+     까지 **여덟**이 되었다 (교수님 지정). 그래도 두 줄까지다. */
+  t(`${w}px 만난 분 고르기 단추가 여덟`, ate.n === 8, ate.labels.join(' '));
   /* **폰에서도 숫자를 보여 준다** (2026-11-13, 교수님 지정). 전에는 ≤340px 에서 숫자를
      통째로 접어 한 줄을 지켰는데, 머리줄의 풀이를 걷은 뒤로는 **숫자가 그 자리를 대신하므로**
      폰에서 숨기면 몇 번·몇 명인지 볼 데가 없어진다. */
@@ -130,11 +136,10 @@ for (const w of [320, 390]) {
   /* 위아래 여백만 늘려 **조금 높게** (2026-11-13 저녁, 교수님 지정) — 옆 여백을 건드리면
      한 줄에 서는 수가 줄어 또 접힌다. 30px 이면 폰에서 누르기 어렵지 않다. */
   t(`${w}px 칩이 누르기 좋게 높다`, ate.h >= 30, `${ate.h}px`);
-  /* 앞의 다섯은 390px 에서 한 줄에 선다. 320px 은 숫자까지 세우면 자리가 모자라 한 번 더
-     접힌다 — 숫자를 숨기는 쪽보다 접히는 쪽이 낫다. 「아직」은 갈래가 아니라 **반대쪽을 보는
-     단추**라 뒤로 혼자 내려와도 된다 (이 칸은 달력 아래라 밀려날 것이 없다). */
-  t(`${w}px 앞의 다섯이 ${w <= 340 ? '두 줄 안에' : '한 줄에'}`, w <= 340 ? ate.l5 <= 2 : ate.l5 === 1,
-    `${ate.lines}줄 · ${ate.labels.join(' ')}`);
+  /* 첫 줄이 너무 빈약하면 다음 단추가 느는 날 세 줄이 된다. 320px 에서도 셋은 서야 한다
+     (이 칸은 달력 **아래**라 한 줄쯤 밀려도 가릴 것이 없다 — 숫자를 숨기는 쪽보다 낫다). */
+  t(`${w}px 첫 줄에 ${w <= 340 ? '셋' : '넷'} 넘게 선다`, ate.first >= (w <= 340 ? 3 : 4),
+    `첫 줄 ${ate.first}개 · ${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 접혀도 두 줄까지`, ate.lines <= 2, `${ate.lines}줄 · ${ate.labels.join(' ')}`);
   t(`${w}px 두 자리 횟수에도 자리가 남는다`, ate.slack >= 0, `${ate.slack}px 남음`);
   t(`${w}px 만난 분 칸이 가로로 안 넘침`, !ate.wide);

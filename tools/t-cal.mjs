@@ -1320,6 +1320,87 @@ t('식사 외를 다시 누르면 약속 줄로 돌아온다', await page.evalua
   CAL.ate === '' && !document.querySelector('.mt-ate--todo')
   && document.querySelectorAll('.mt-ate li').length === 7));
 
+/* ---------- 「기타 만남」 — 달력 밖에서 뵌 분 (2026-11-14, 교수님 지정) ----------
+ * 상세에서 **만난 횟수만** 올려 두신 분은 이 칸 어디에도 이름이 뜨지 않아 「안 뵌 분」처럼
+ * 보였다. 달력에는 없는데 만난 횟수는 있는 분을 따로 세운다.
+ * 달력에 이름이 뜨는 분은 횟수를 올려도 여기 서면 안 된다 — 그게 이 단추의 눈이다. */
+const OTH = await page.evaluate(() => {
+  const seen = new Set();
+  Object.values(meets()).forEach(m => { if (m.done !== 'no' && m.date) (m.who || []).forEach(k => seen.add(k)); });
+  const free = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비' && !seen.has(rKey(p)));
+  /* 차례를 재려면 **같은 학과에서 둘**이 필요하다 */
+  const dept = [...new Set(free.map(p => p.dept_id))].find(d => free.filter(p => p.dept_id === d).length >= 2);
+  const pair = free.filter(p => p.dept_id === dept);
+  const a = pair[0], b = pair[1], c = free.find(p => p.dept_id !== dept);
+  const inCal = state.rows.find(p => seen.has(rKey(p)));
+  applyEntry(rKey(a), { met: 1 });
+  applyEntry(rKey(b), { met: 3 });
+  applyEntry(rKey(inCal), { met: 2 });        /* 달력에도 있는 분 — 서면 안 된다 */
+  applyEntry(rKey(c), { met: 2 }); setRating(rKey(c), '비');   /* 비참여 — 빠진다 */
+  render();
+  const btn = document.querySelector('[data-ateslot="other"]');
+  return { a: a.name, b: b.name, cal: inCal.name, out: c.name,
+    chip: btn ? ((btn.querySelector('i:not(.mt-i)') || {}).textContent || '').trim() : '',
+    icon: !!(btn && btn.querySelector('.mt-i--other svg')),
+    tip: btn ? btn.getAttribute('title') : '',
+    order: [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot),
+    n: mtOther().length };
+});
+t('기타 만남 단추가 만남 바로 옆에', OTH.order[1] === 'other', OTH.order.join('|'));
+t('기타 만남 단추에 그림과 사람 수', OTH.icon && OTH.chip === `${OTH.n}명`, `${OTH.chip} / ${OTH.n}명`);
+t('줄머리 표가 무엇을 보는지 말한다', /달력에는 자리가 없지만/.test(OTH.tip), OTH.tip);
+await page.click('[data-ateslot="other"]');
+await page.waitForTimeout(250);
+const OD = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.mt-ate--todo li')];
+  const as = e => [...e.querySelectorAll('.mt-ate__p a')];
+  return { names: li.map(e => as(e).map(a => a.textContent.replace(/\d+번$/, '').trim())),
+    badges: li.map(e => as(e).map(a => ((a.querySelector('.mt-todo__s') || {}).textContent || '').trim())),
+    plain: document.querySelectorAll('.mt-ate:not(.mt-ate--todo) li').length,
+    tip: (document.querySelector('.mt-ate--todo .mt-ate__p a') || {}).title || '' };
+});
+const OFLAT = OD.names.flat();
+t('약속 줄 대신 학과 줄이 선다', OFLAT.length > 0 && OD.plain === 0, `${OFLAT.length} / ${OD.plain}`);
+t('만난 횟수만 있는 분이 선다', OFLAT.includes(OTH.a) && OFLAT.includes(OTH.b),
+  OFLAT.slice(0, 6).join(','));
+t('달력에 이름이 뜨는 분은 빠진다', !OFLAT.includes(OTH.cal), OTH.cal);
+t('비참여는 빠진다', !OFLAT.includes(OTH.out), OTH.out);
+t('이름 뒤에 몇 번인지 단다', OD.badges.flat().every(b2 => /^\d+번$/.test(b2)),
+  OD.badges.flat().slice(0, 6).join(','));
+/* 학과 안에서 **많이 뵌 분이 앞** — 3번이 1번보다 앞에 선다 */
+t('많이 뵌 분이 앞에', (r => r && r.indexOf(OTH.b) < r.indexOf(OTH.a))(
+  OD.names.find(r => r.includes(OTH.a) && r.includes(OTH.b))),
+  JSON.stringify(OD.names.find(r => r.includes(OTH.a)) || []));
+t('줄머리 표에 횟수와 까닭을 적는다', /만난 횟수 \d+번 — 달력에 자리는 없습니다/.test(OD.tip), OD.tip);
+/* 횟수를 지우면 그만큼 줄고, 다시 넣으면 돌아온다 */
+const OX = await page.evaluate(nm => {
+  const p = state.rows.find(x => x.name === nm), got = {};
+  applyEntry(rKey(p), { met: 0 }); render();
+  got.gone = ![...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
+  got.chip = ((document.querySelector('[data-ateslot="other"] i:not(.mt-i)') || {}).textContent || '').trim();
+  applyEntry(rKey(p), { met: 1 }); render();
+  got.back = [...document.querySelectorAll('.mt-ate--todo .mt-ate__p a')].some(a => a.textContent.includes(nm));
+  return got;
+}, OTH.a);
+t('횟수를 지우면 빠진다', OX.gone, OX.chip);
+t('빠진 만큼 단추의 숫자도 준다', OX.chip === `${OTH.n - 1}명`, `${OX.chip} / ${OTH.n - 1}명`);
+t('되돌리면 다시 선다', OX.back);
+await page.click('[data-ateslot="other"]');
+await page.waitForTimeout(250);
+t('기타 만남을 다시 누르면 약속 줄로 돌아온다', await page.evaluate(() =>
+  CAL.ate === '' && !document.querySelector('.mt-ate--todo')
+  && document.querySelectorAll('.mt-ate li').length === 7));
+/* 뒤의 시험들이 쓰도록 적어 둔 횟수와 선호도를 **되돌린다** */
+await page.evaluate(o => {
+  [o.a, o.b, o.cal, o.out].forEach(nm => {
+    const p = state.rows.find(x => x.name === nm);
+    applyEntry(rKey(p), { met: 0 }); setRating(rKey(p), '');
+  });
+  render();
+}, OTH);
+t('되돌린 뒤에는 기타 만남 단추가 서지 않는다', await page.evaluate(() =>
+  !document.querySelector('[data-ateslot="other"]') && mtOther().length === 0));
+
 t('기록이 없으면 빈 안내', await page.evaluate(() => {
   meetMap = {}; render();
   const sec = [...document.querySelectorAll('.cal-sec')].pop();
