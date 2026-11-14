@@ -1759,6 +1759,11 @@ body:not(.authed) .topbar,body:not(.authed) main,body:not(.authed) .foot{visibil
    폰에서는 줄이 길어 가로로 넘치므로, 좁아지면 이름·학과를 아랫줄로 내린다. */
 /* 갈래 고르기 단추 — 머리줄 오른쪽에 (2026-11-02, 교수님 지정) */
 .mt-fs{flex-wrap:wrap}
+/* ---------- 사람을 세는 단추와 갈래 사이의 가는 금 (2026-11-14 저녁, 교수님 지적) ----------
+   단추 높이만큼 서도록 `align-self:stretch` 를 씁니다(`.cal-new` 가 `align-items:center`
+   라 그냥 두면 1px 짜리 점이 됩니다). 양옆 여백은 `gap`(7px) 위에 2px 만 더합니다 —
+   더 벌리면 폰에서 한 줄에 서는 단추가 줄어듭니다. */
+.mt-fs__sep{width:1px;align-self:stretch;margin:2px;background:var(--line-2);border-radius:1px}
 .mt-f{gap:5px}
 .mt-f i{font-style:normal;font-weight:800;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 .mt-f.on{border-color:var(--brand);color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface))}

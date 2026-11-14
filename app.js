@@ -6145,6 +6145,16 @@ function mtInCal() {
   mtList().forEach(m => { if (mtKeep(m)) mtArr(m.who).forEach(k => s.add(k)); });
   return s;
 }
+/* 갈래마다 **그 자리에 이름이 있는 분** — 치른 자리든 앞으로의 약속이든 가리지 않습니다.
+   `mtInCal()` 과 같은 잣대이고, 갈래만 좁힌 것입니다(`mtAteHit` — 「식사」는 점심+저녁).
+   단추의 숫자가 **모두 사람 수**가 된 2026-11-14 저녁부터 이것이 그 바탕입니다. */
+function mtSlotKeys(pick) {
+  const s = new Set();
+  mtList().forEach(m => {
+    if (mtKeep(m) && mtAteHit(mtSlot(m), pick)) mtArr(m.who).forEach(k => s.add(k));
+  });
+  return s;
+}
 /* ---------- 「아직」 — 자리부터 잡아야 할 분 (2026-11-13, 교수님 지정) ----------
  * 이 칸은 **뵌 분과 뵐 분**을 적습니다. 그 반대쪽을 같은 자리에서 보시도록 「아직」을 둡니다.
  * 누르면 약속 줄 대신 **학과마다 한 줄**로 남은 분들의 이름이 섭니다 — 어느 학과를 더
@@ -6192,10 +6202,13 @@ function mtDeptRows(list) {
  * - 한 번도 뵙지 못한 분도 **여기 듭니다**(아직 식사를 안 했으니까요). 그래서 「아직」은
  *   이 명단의 일부입니다 — 「아직」은 *얼굴도 못 뵌 분*, 「식사 외」는 *밥을 못 든 분*입니다.
  * - Tea·시각 미정으로만 뵌 분은 **여기 섭니다** — 뵙기는 했지만 식사는 아닙니다.
- * - 식사 약속이 잡혀 있어도 **치르기 전이면 섭니다** — 「아직」과 똑같이 이름 뒤에 「예정」을
- *   달아 가르고, 약속조차 없는 분이 앞에 섭니다.
- * - 셈은 칩에 다는 점심·저녁(`mealAll`)을 그대로 씁니다 — 칩의 해·달과 이 명단이 어긋나면
- *   어느 쪽을 믿어야 할지 알 수 없습니다. **비참여와 본인은 뺍니다**(「아직」과 같은 잣대).
+ * - **식사 약속이 잡히면 「식사」 쪽으로 넘어갑니다** (2026-11-14 저녁, 교수님 지정 — 그
+ *   전에는 치르기 전이면 여기 세우고 「예정」 쪽지를 달았습니다). 그러면 그분이 「식사」와
+ *   **양쪽에 들어** 「식사 + 식사 외」가 66을 넘었습니다. 「아직」에서 한 것과 **같은 규칙**
+ *   입니다 — 자리가 잡히는 순간 저쪽으로 갑니다.
+ * - 그래서 셈은 **「식사 자리가 있는가」(`mtSlotKeys('meal')`) 하나**로 갈립니다. 「식사」
+ *   단추가 세는 그 사람들의 **정확한 반대쪽**이라, 둘을 더하면 늘 66입니다.
+ *   **비참여와 본인은 뺍니다**(「아직」과 같은 잣대).
  * 그림은 **엇그어 지운 숟가락** — 「식사」의 숟가락·젓가락과 한 줄기로 읽히고, 「아직」의
  * 점선 시계와는 또렷이 다릅니다. */
 const MT_NOMEAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"'
@@ -6203,12 +6216,11 @@ const MT_NOMEAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" s
   + '<path d="M9.2 4.3c1.5 0 2.5 1.3 2.5 2.9s-1 2.9-2.5 2.9-2.5-1.3-2.5-2.9.9-2.9 2.5-2.9z"/>'
   + '<path d="M9.2 10.1v9.6"/><path d="M4.2 19.8 19.8 4.2"/></svg>';
 function mtNoMeal() {
-  const g = mealAll(), out = [];
+  const seen = mtSlotKeys('meal'), out = [];
   state.rows.forEach(p => {
     if (p.name === ME.name || outOut(p)) return;
-    const e = g.get(rKey(p));
-    if (e && (e.day || e.night)) return;              /* 이미 함께 드신 분 */
-    out.push({ p, soon: !!(e && (e.dayS || e.nightS)) });
+    if (seen.has(rKey(p))) return;                    /* 드셨거나, 자리가 잡혀 있는 분 */
+    out.push({ p });
   });
   return out;
 }
@@ -6339,7 +6351,7 @@ function mtAteSection() {
   const isNom = CAL.ate === 'nomeal';               /* 아직 함께 드시지 않은 분만 보는 때 */
   const isOth = CAL.ate === 'other';                /* 달력 밖에서 뵌 분만 보는 때 */
   const todo = mtTodo();
-  const nom = mtNoMeal(), nSoon = nom.filter(x => x.soon).length;
+  const nom = mtNoMeal();
   const oth = mtOther();
   /* **사람을 세우는 단추**가 둘입니다 (「아직」·「식사 외」) — 둘 중 하나를 누르면 약속 줄
      대신 학과마다 한 줄로 이름이 섭니다. 갈래(점심·저녁…)는 약속 줄을 고르는 것입니다. */
@@ -6351,14 +6363,24 @@ function mtAteSection() {
      바탕을 보아야 머리줄의 셈이 맞습니다. */
   const inCal = mtInCal();
   const people = state.rows.filter(p => p.name !== ME.name && !outOut(p) && inCal.has(rKey(p))).length;
+  /* ---------- 단추의 숫자는 **모두 사람 수**입니다 (2026-11-14 저녁, 교수님 지정) ----------
+     교수님이 「식사 + 식사 외 = 66 이어야 하지 않느냐」 두 번 물으셨습니다. 그때까지 갈래는
+     **자리 수(번)**, 사람 단추는 **사람 수(명)**였기에 더할 수 없었습니다. 이제 여덟 단추가
+     모두 **명**이고, 잣대도 하나(`그 자리에 이름이 있는가`)입니다 — 그래서
+     **식사 + 식사 외 = 66** 과 **만남 + 기타 만남 + 아직 = 66** 이 둘 다 맞습니다.
+     몇 번인지는 **줄머리 표**에 남깁니다 — 숫자를 둘 적으면 단추가 길어져 폰에서 접힙니다.
+     주의: **점심 + 저녁 ≠ 식사**입니다. 점심도 저녁도 드신 분은 한 번만 세므로 식사 쪽이
+     작습니다 — 사람을 세면 당연한 일이고, 줄머리 표에 그 까닭을 적어 둡니다. */
   const cnt = s => all.filter(r => mtAteHit(r.slot, s)).length;
+  const cntP = s => { const k = mtSlotKeys(s);
+    return state.rows.filter(p => p.name !== ME.name && !outOut(p) && k.has(rKey(p))).length; };
   /* 셈에서 뺀 자리 — 「못 만남」으로 표시하신 것. 왜 안 보이는지 알 수 있게 적어 둔다 */
   const no = mtList().filter(m => m.done === 'no').length;
   /* 있는 갈래만 단추로 세웁니다 — 한 번도 없던 「시각 미정」까지 늘 보이면 군더더기입니다.
      「식사」는 점심·저녁을 함께 보는 묶음이라, **둘 다 있을 때만** 세웁니다 — 하나뿐이면
      그 갈래 단추와 똑같은 것이 둘 서는 셈입니다. */
   const slots = ['meal', 'day', 'night', 'tea', 'none']
-    .filter(s => cnt(s) && (s !== 'meal' || MT_MEAL.every(x => cnt(x))));
+    .filter(s => cntP(s) && (s !== 'meal' || MT_MEAL.every(x => cntP(x))));
   /* ---------- 머리줄 옆의 **셈 바탕** (2026-11-14, 교수님 지정) ----------
      「69명 − 비참여 2 − 본인 = 66명」. 「식사 외」·「아직」이 **무엇에서 센 숫자인지**를
      밝히는 한 줄입니다 — 교수님이 「식사 외 38명이 어디서 나왔냐」 물으셨을 때, 셈의
@@ -6381,12 +6403,11 @@ function mtAteSection() {
      저녁을 치르신 분이 몇 분인가*라야 하고, 그 수는 **66 − 식사 외**입니다(`mtNoMeal` 이
      바로 그 반대쪽이라 늘 맞습니다). 그래서 「식사」 줄머리 표에 **그 사람 수와 합**을
      적어 둡니다 — 숫자 자체는 번으로 둡니다(점심 + 저녁 = 식사가 깨지면 안 됩니다). */
-  const mealPpl = baseN - nom.length;
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
-      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기${s === 'meal'
-        ? ` — 드신 분은 ${mealPpl}명, 「식사 외」 ${nom.length}명과 합해 ${baseN}명입니다` : ''}`
-        : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
+      title="${esc(name)}${s ? ` 자리가 있는 ${cntP(s)}명 보기 — 자리는 ${cnt(s)}번${s === 'meal'
+        ? ` · 「식사 외」 ${nom.length}명과 합해 ${baseN}명입니다 (점심도 저녁도 드신 분은 한 번만 셉니다)` : ''}`
+        : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? `${cntP(s)}명` : `${people}명`}</i></button>`;
   /* 사람을 세우는 단추는 **몇 명**이라 「명」을 붙여 갈래의 횟수와 갈라 둡니다 */
   const pickP = (k, name, icon, on, tip, n) => `<button type="button" class="btn cal-new__b mt-f${on ? ' on' : ''}"
       data-ateslot="${k}" aria-pressed="${on}" title="${esc(tip)}"
@@ -6412,8 +6433,7 @@ function mtAteSection() {
     todo.length) : '';
   const nomB = nom.length || isNom ? pickP('nomeal', '식사 외',
     `<i class="mt-i mt-i--nomeal" aria-hidden="true">${MT_NOMEAL_SVG}</i>`, isNom,
-    `아직 점심·저녁을 함께 하지 않은 ${nom.length}명 보기${nSoon ? ` — 그중 ${nSoon}명은 식사 약속이 잡혀 있습니다` : ''}`
-    + ` · 드신 ${baseN - nom.length}명과 합해 ${baseN}명`,
+    `점심·저녁 자리가 아예 없는 ${nom.length}명 보기 — 「식사」 ${baseN - nom.length}명과 합해 ${baseN}명입니다`,
     nom.length) : '';
   return `
       <section class="cal-sec">
@@ -6424,6 +6444,14 @@ function mtAteSection() {
           ${all.length || peep ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
             ${pick('', '만남', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
             ${othB}${todoB}
+            ${/* ---------- 두 무리를 **가는 금** 하나로 가릅니다 (2026-11-14 저녁, 교수님 지적) ----------
+                 앞은 **사람을 세는** 단추(만남 · 기타 만남 · 아직)로, 명단을 한 분도 겹치지 않게
+                 가릅니다. 뒤는 **자리를 고르는** 갈래(식사 · 점심 · 저녁 · Tea)이고, 끝의
+                 「식사 외」는 그 갈래의 반대쪽이라 뒷무리에 둡니다.
+                 금은 단추가 아니므로 `.mt-f` 가 아니고, 좁은 화면에서 줄이 접히면 그 자리에서
+                 함께 접힙니다 — 그래서 **세로 금 하나**로만 둡니다(가로 줄을 그으면 접힐 때
+                 엉뚱한 데를 가릅니다). 읽어 주는 기계에는 「구분선」으로만 들립니다. */''}
+            ${all.length ? '<span class="mt-fs__sep" role="separator" aria-orientation="vertical"></span>' : ''}
             ${slots.map(s => pick(s, MT_SLOT_NAME[s],
               s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))).join('')}
             ${nomB}
@@ -6438,9 +6466,9 @@ function mtAteSection() {
                 x.n ? `<b class="mt-todo__s">${x.n}번</b>` : x.soon ? `<b class="mt-todo__s">예정</b>` : ''}</a>`).join('<i>·</i>')}</span>
         </li>`).join('')}</ul>`
           : `<div class="empty"><strong>${isOth ? '달력 밖에서 뵌 분이 없습니다'
-              : isNom ? '함께 드시지 않은 분이 없습니다' : '자리부터 잡아야 할 분이 없습니다'}</strong>${
+              : isNom ? '식사 자리가 없는 분이 없습니다' : '자리부터 잡아야 할 분이 없습니다'}</strong>${
               isOth ? '만난 횟수를 적어 두신 분은 모두 달력에도 자리가 있습니다.'
-              : isNom ? '명단의 모든 분과 점심이나 저녁을 하셨습니다.'
+              : isNom ? '명단의 모든 분과 점심이나 저녁을 하셨거나 자리를 잡아 두셨습니다.'
               : '명단의 모든 분을 뵈었거나 자리를 잡아 두셨습니다.'} 「만남」을 누르시면 자리들이 다시 보입니다.</div>`)
         : !all.length ? '' : rows.length ? `<ul class="mt-ate">${rows.map(r => `<li${r.ate ? '' : ' class="is-soon"'}>
           ${/* 「예정」 쪽지는 **이름 끝**에 답니다 (2026-11-13 저녁, 교수님 지정).

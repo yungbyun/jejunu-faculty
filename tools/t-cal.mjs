@@ -1036,6 +1036,11 @@ const F = await page.evaluate(() => {
     all: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || ''),
     allTip: document.querySelector('[data-ateslot=""]').getAttribute('title') || '',
     allName: (document.querySelector('[data-ateslot=""]').textContent || '').replace(/[\d명\s]/g, ''),
+    /* 갈래별 사람 수 — 2026-11-14 저녁부터 단추에 서는 숫자 */
+    cntN: ['meal', 'day', 'night', 'tea'].reduce((o, s2) => {
+      const e = document.querySelector(`[data-ateslot="${s2}"] i:not(.mt-i)`);
+      o[s2] = e ? Number(e.textContent.replace('명', '')) : 0; return o; }, {}),
+    mealTip: (document.querySelector('[data-ateslot="meal"]') || {}).title || '',
     h: Math.round(Math.min(...[...document.querySelectorAll('[data-ateslot]')]
       .map(e => e.getBoundingClientRect().height))),
     /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 한 자리에 여러 분이면 겹치지 않게.
@@ -1060,9 +1065,9 @@ t('갈래는 사람 단추 뒤에 한 줄기로', F.btns.slice(F.btns.indexOf('t
    (2026-11-14, 교수님 지정) */
 t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'todo|meal|day|night|tea|nomeal', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
-/* 「식사 외」가 2026-11-14 부터 「식사」 바로 뒤에 끼므로, 갈래의 횟수는 그것을 빼고 본다 */
-t('단추에 몇 번인지 적는다',
-  F.cnt.split(',').filter(x => !/명$/.test(x)).join(',') === '6,3,3,1', F.cnt);
+/* ---------- 단추의 숫자는 **모두 사람 수** (2026-11-14 저녁, 교수님 지정) ----------
+   그 전에는 갈래가 **번**, 사람 단추가 **명**이라 「식사 + 식사 외」를 더할 수 없었다. */
+t('단추마다 몇 명인지 적는다', F.cnt.split(',').every(x => /^\d+명$/.test(x)), F.cnt);
 /* 「모두」에도 숫자를 답니다 (2026-11-05 저녁, 교수님 지정) — 다만 **몇 번이 아니라 몇 명**이라
    「명」을 붙여 갈래 단추의 횟수와 갈라 둡니다. 머리줄의 「N명」과 같은 셈이어야 합니다. */
 t('만남 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
@@ -1072,23 +1077,28 @@ t('만남의 줄머리 표에도 사람 수', F.allTip === `만남 보기 — ${
    「식사 27」은 **번**, 「식사 외 38」은 **명**이라 그냥 더할 수 없다. 같은 잣대로 보려면
    *점심이나 저녁을 치르신 분이 몇 분인가*라야 한다 — 그 수를 「식사」 줄머리 표에 적어 둔다. */
 const MEALP = await page.evaluate(() => {
-  /* 화면이 쓰는 길과 **다른 길로** 다시 센다 */
-  const today = mtToday(), had = new Set();
+  /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 치른 자리든 예정이든 **자리가 있으면** 든다 */
+  const seen = new Set();
   Object.values(meets()).forEach(m => { if (m.done === 'no' || !m.date) return;
     const s2 = mtSlot(m); if (s2 !== 'day' && s2 !== 'night') return;
-    if (m.done === 'met' || m.date < today) (m.who || []).forEach(k => had.add(k)); });
+    (m.who || []).forEach(k => seen.add(k)); });
   const base = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비');
-  return { ate: base.filter(p => had.has(rKey(p))).length, base: base.length,
-    nom: mtNoMeal().length,
+  const a = base.filter(p => seen.has(rKey(p)));
+  return { meal: a.length, base: base.length, nom: mtNoMeal().length,
+    /* 겹치는 분이 없어야 한다 — 한 분이 양쪽에 들면 합이 넘는다 */
+    dup: a.filter(p => mtNoMeal().some(x => x.p === p)).length,
+    chip: ((document.querySelector('[data-ateslot="meal"] i:not(.mt-i)') || {}).textContent || '').trim(),
     tip: (document.querySelector('[data-ateslot="meal"]') || {}).title || '',
     nomTip: (document.querySelector('[data-ateslot="nomeal"]') || {}).title || '' };
 });
-t('식사를 치른 분 + 식사 외 = 머리줄의 사람 수', MEALP.ate + MEALP.nom === MEALP.base,
-  `${MEALP.ate}+${MEALP.nom} / ${MEALP.base}`);
-t('식사 줄머리 표에 그 사람 수와 합을 적는다',
-  MEALP.tip.includes(`드신 분은 ${MEALP.ate}명`) && MEALP.tip.includes(`합해 ${MEALP.base}명`), MEALP.tip);
+t('식사 + 식사 외 = 머리줄의 사람 수', MEALP.meal + MEALP.nom === MEALP.base,
+  `${MEALP.meal}+${MEALP.nom} / ${MEALP.base}`);
+t('둘이 겹치는 분이 없다', MEALP.dup === 0, `${MEALP.dup}명`);
+t('식사 단추의 숫자가 그 사람 수', MEALP.chip === `${MEALP.meal}명`, `${MEALP.chip} / ${MEALP.meal}명`);
+t('식사 줄머리 표에 합을 적는다',
+  MEALP.tip.includes(`「식사 외」 ${MEALP.nom}명과 합해 ${MEALP.base}명`), MEALP.tip);
 t('식사 외 줄머리 표에도 합을 적는다',
-  MEALP.nomTip.includes(`드신 ${MEALP.ate}명과 합해 ${MEALP.base}명`), MEALP.nomTip);
+  MEALP.nomTip.includes(`「식사」 ${MEALP.meal}명과 합해 ${MEALP.base}명`), MEALP.nomTip);
 /* 2026-11-14, 교수님 지정 — 「모두」를 **「만남」**으로 고쳤다. 거기 선 숫자가
    *만나거나 만날 예정인 분의 수*이기 때문이다. */
 t('첫 단추의 이름이 만남이다', F.allName === '만남', F.allName);
@@ -1134,9 +1144,13 @@ const FA = await page.evaluate(() => {
 });
 t('예정만 있는 분도 사람 수에 든다', FA.badge === '2명', `${FA.badge} / ${FA.head}`);
 t('예정이 있어도 머리줄에 풀이가 없다', FA.head === '', FA.head);
-/* 사람 수 단추(「…명」)는 갈래가 아니므로 빼고 센다 — 2026-11-14 부터 「식사 외」가 사이에 낀다 */
-{ const c = F.cnt.split(',').filter(x => !/명$/.test(x)).map(Number);
-  t('식사는 점심과 저녁을 합한 수', c[0] === c[1] + c[2], F.cnt); }
+/* 숫자가 **사람 수**가 된 뒤로 「식사 = 점심 + 저녁」이 아니다 (2026-11-14 저녁) —
+   점심도 저녁도 드신 분은 한 번만 세므로 식사 쪽이 **작거나 같다.** 대신 식사는
+   점심·저녁 **어느 쪽보다도 작지 않다**(합집합이므로). 줄머리 표에 그 까닭을 적어 둔다. */
+{ const c = F.cntN;
+  t('식사는 점심과 저녁의 합집합', c.meal <= c.day + c.night
+    && c.meal >= Math.max(c.day, c.night), JSON.stringify(c));
+  t('식사 줄머리 표가 겹침을 일러 준다', /한 번만 셉니다/.test(F.mealTip), F.mealTip); }
 
 /* 식사만 보기 — 점심과 저녁만 남고 Tea 는 빠져야 한다 */
 await page.click('[data-ateslot="meal"]');
@@ -1336,8 +1350,9 @@ t('본인은 아직·기타 만남에도 서지 않는다', !MEROW.inTodo && !ME
  * 선다 — Tea 로만 뵌 분이 여기 서는지가 「아직」과 가르는 눈이다.
  * 그러므로 「아직」의 분은 **모두** 이 명단 안에 있다(넓은 쪽 → 좁은 쪽). */
 const NEXP = await page.evaluate(() => {
-  /* 화면이 쓰는 `mtSlot`·`mealAll` 과 **다른 길로** 다시 센다 */
-  const today = mtToday(), ate = new Set(), soon = new Set(), teaAte = new Set();
+  /* 화면이 쓰는 `mtSlotKeys` 와 **다른 길로** 다시 센다. 2026-11-14 저녁부터 잣대는
+     「식사 **자리**가 있는가」다 — 치른 자리든 앞으로의 약속이든 가리지 않는다. */
+  const mealK = new Set(), teaAte = new Set(), today = mtToday();
   const meal = m => {
     const k = m.kind || '';
     if (k) return k === 'lunch' || k === 'dinner';
@@ -1346,13 +1361,14 @@ const NEXP = await page.evaluate(() => {
   };
   Object.values(meets()).forEach(m => {
     if (m.done === 'no' || !m.date) return;
-    const done = m.done === 'met' || m.date < today;
-    if (!meal(m)) { if (done) (m.who || []).forEach(k => teaAte.add(k)); return; }
-    (m.who || []).forEach(k => (done ? ate : soon).add(k));
+    if (meal(m)) { (m.who || []).forEach(k => mealK.add(k)); return; }
+    if (m.done === 'met' || m.date < today) (m.who || []).forEach(k => teaAte.add(k));
   });
-  const left = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비' && !ate.has(rKey(p)));
-  return { n: left.length, soon: left.filter(p => soon.has(rKey(p))).length,
-    names: left.map(p => p.name).sort(),
+  const left = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비' && !mealK.has(rKey(p)));
+  return { n: left.length, names: left.map(p => p.name).sort(),
+    /* 식사 약속만 잡힌 분 — **여기 서면 안 된다**(「식사」 쪽이다) */
+    booked: state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비'
+      && mealK.has(rKey(p))).map(p => p.name),
     /* 밥은 아니지만 뵙기는 한 분 — 「아직」에는 없고 「식사 외」에는 있어야 한다 */
     onlyTea: left.filter(p => teaAte.has(rKey(p))).map(p => p.name).sort() };
 });
@@ -1379,7 +1395,7 @@ const NFLAT = ND.names.flat();
 t('식사 외 단추가 맨 끝에', ND.order[ND.order.length - 1] === 'nomeal', ND.order.join('|'));
 t('아직은 갈래 앞에', ND.order.indexOf('todo') < ND.order.indexOf('meal'), ND.order.join('|'));
 t('식사 외 단추에 그림과 사람 수', ND.icon && ND.chip === `${NEXP.n}명`, `${ND.chip} / ${NEXP.n}명`);
-t('줄머리 표가 무엇을 보는지 말한다', /점심·저녁을 함께 하지 않은/.test(ND.tip), ND.tip);
+t('줄머리 표가 무엇을 보는지 말한다', /점심·저녁 자리가 아예 없는/.test(ND.tip), ND.tip);
 t('누르면 눌린 꼴이 된다', ND.on === 'true');
 t('약속 줄 대신 학과 줄이 선다', ND.lis > 0 && ND.plain === 0, `${ND.lis} / ${ND.plain}`);
 t('식사를 안 하신 분을 빠짐없이 적는다', NFLAT.slice().sort().join(',') === NEXP.names.join(','),
@@ -1392,8 +1408,11 @@ t('점심·저녁을 치른 분은 없다', await page.evaluate(nm => {
       const p = state.rows.find(x => rKey(x) === k); if (p) had.add(p.name); }); });
   return nm.every(x => !had.has(x));
 }, NFLAT), NFLAT.slice(0, 6).join(','));
-t('식사 약속만 있는 분은 「예정」을 달고 선다', ND.soon.flat().filter(Boolean).length === NEXP.soon,
-  `${ND.soon.flat().filter(Boolean).length} / ${NEXP.soon}`);
+/* 2026-11-14 저녁, 교수님 지정 — 식사 약속이 잡히면 「식사」 쪽으로 넘어간다.
+   「아직」에서 한 것과 같은 규칙이라, 여기에도 「예정」 쪽지는 없다. */
+t('식사 자리가 잡힌 분은 서지 않는다', NEXP.booked.length > 0
+  && NEXP.booked.every(n => !NFLAT.includes(n)), NEXP.booked.join(','));
+t('「예정」 쪽지가 뜨지 않는다', !ND.soon.flat().some(Boolean), JSON.stringify(ND.soon.slice(0, 3)));
 /* 「아직」은 이 명단의 **일부**다 — 얼굴도 못 뵌 분은 밥도 안 드셨으니까 */
 t('아직의 분은 모두 식사 외에도 있다', TFLAT.every(n => NFLAT.includes(n)) && NFLAT.length >= TFLAT.length,
   `${TFLAT.length}명 ⊂ ${NFLAT.length}명`);
