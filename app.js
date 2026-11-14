@@ -6117,8 +6117,15 @@ function mtAteRows() {
     /* **한 자리는 한 줄**입니다 (2026-11-02 저녁, 교수님 지정). 함께 뵌 분은 한 줄에 모아
        적습니다 — 사람마다 줄을 쪼개면 같은 자리가 여러 번 있었던 것처럼 보입니다.
        **명단 밖의 분은 넣지 않습니다**(같은 날 지정) — 이 칸은 교수진을 보는 자리입니다.
-       `who` 에 명단에 없는 열쇠만 남은 자리는 적을 사람이 없으므로 통째로 뺍니다. */
-    const ps = m.who.map(k => state.rows.find(x => rKey(x) === k)).filter(Boolean);
+       `who` 에 명단에 없는 열쇠만 남은 자리는 적을 사람이 없으므로 통째로 뺍니다.
+       **본인도 적지 않습니다** (2026-11-14 저녁, 교수님 지정 — 10-01 자리에 「변영철」이
+       끼어 있었습니다). 교수님이 그 자리에 계신 것은 당연하고, 이 칸이 묻는 것은 **누구를**
+       뵈었는가입니다. 사람 수를 셀 때도 이미 본인을 빼고 있었으므로(머리줄의 66명)
+       이름만 남아 있으면 **셈과 눈에 보이는 것이 어긋납니다.**
+       자리에 본인만 있으면 적을 사람이 없어 그 줄은 서지 않습니다 — 뵐 분이 없습니다.
+       (약속 **기록** 자체는 그대로입니다. 그날 약속 줄에서 손수 빼실 수 있습니다.) */
+    const ps = m.who.map(k => state.rows.find(x => rKey(x) === k))
+      .filter(p => p && p.name !== ME.name);
     if (!ps.length) return;
     out.push({ m, slot: mtSlot(m), ate: mtAte(m, today), ps, keys: ps.map(rKey) });
   });
@@ -6368,9 +6375,18 @@ function mtAteSection() {
      달라 보이면 안 됩니다. 머리줄의 풀이를 걷은 뒤로는 **이 숫자가 그 자리를 대신합니다.**
      이름은 2026-11-14 에 「모두」에서 **「만남」**으로 바꿨습니다 (교수님 지정) — 갈래를 푸는
      단추이기도 하지만, 거기 선 숫자는 **만나거나 만날 예정인 분의 수**이기 때문입니다. */
+  /* ---------- 갈래의 숫자는 **번**, 사람 단추는 **명** (2026-11-14 저녁, 교수님 지적) ----------
+     교수님이 「식사 + 식사 외 = 66 이어야 하지 않느냐」 물으셨습니다. 「식사 27」은 **자리
+     수**이고 「식사 외 38」은 **사람 수**라 단위가 다릅니다 — 같은 잣대로 보려면 *점심이나
+     저녁을 치르신 분이 몇 분인가*라야 하고, 그 수는 **66 − 식사 외**입니다(`mtNoMeal` 이
+     바로 그 반대쪽이라 늘 맞습니다). 그래서 「식사」 줄머리 표에 **그 사람 수와 합**을
+     적어 둡니다 — 숫자 자체는 번으로 둡니다(점심 + 저녁 = 식사가 깨지면 안 됩니다). */
+  const mealPpl = baseN - nom.length;
   const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
-      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기` : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
+      title="${esc(name)}${s ? ` ${cnt(s)}번만 보기${s === 'meal'
+        ? ` — 드신 분은 ${mealPpl}명, 「식사 외」 ${nom.length}명과 합해 ${baseN}명입니다` : ''}`
+        : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? cnt(s) : `${people}명`}</i></button>`;
   /* 사람을 세우는 단추는 **몇 명**이라 「명」을 붙여 갈래의 횟수와 갈라 둡니다 */
   const pickP = (k, name, icon, on, tip, n) => `<button type="button" class="btn cal-new__b mt-f${on ? ' on' : ''}"
       data-ateslot="${k}" aria-pressed="${on}" title="${esc(tip)}"
@@ -6396,7 +6412,8 @@ function mtAteSection() {
     todo.length) : '';
   const nomB = nom.length || isNom ? pickP('nomeal', '식사 외',
     `<i class="mt-i mt-i--nomeal" aria-hidden="true">${MT_NOMEAL_SVG}</i>`, isNom,
-    `아직 점심·저녁을 함께 하지 않은 ${nom.length}명 보기${nSoon ? ` — 그중 ${nSoon}명은 식사 약속이 잡혀 있습니다` : ''}`,
+    `아직 점심·저녁을 함께 하지 않은 ${nom.length}명 보기${nSoon ? ` — 그중 ${nSoon}명은 식사 약속이 잡혀 있습니다` : ''}`
+    + ` · 드신 ${baseN - nom.length}명과 합해 ${baseN}명`,
     nom.length) : '';
   return `
       <section class="cal-sec">

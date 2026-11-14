@@ -1068,6 +1068,27 @@ t('단추에 몇 번인지 적는다',
 t('만남 단추에도 숫자가 선다', /^\d+명$/.test(F.all), JSON.stringify(F.all));
 t('그 숫자는 겹치지 않게 센 사람 수', F.all === `${F.people}명`, `${F.all} / ${F.people}명`);
 t('만남의 줄머리 표에도 사람 수', F.allTip === `만남 보기 — ${F.all}`, F.allTip);
+/* ---------- 식사 + 식사 외 = 머리줄의 사람 수 (2026-11-14 저녁, 교수님 지적) ----------
+   「식사 27」은 **번**, 「식사 외 38」은 **명**이라 그냥 더할 수 없다. 같은 잣대로 보려면
+   *점심이나 저녁을 치르신 분이 몇 분인가*라야 한다 — 그 수를 「식사」 줄머리 표에 적어 둔다. */
+const MEALP = await page.evaluate(() => {
+  /* 화면이 쓰는 길과 **다른 길로** 다시 센다 */
+  const today = mtToday(), had = new Set();
+  Object.values(meets()).forEach(m => { if (m.done === 'no' || !m.date) return;
+    const s2 = mtSlot(m); if (s2 !== 'day' && s2 !== 'night') return;
+    if (m.done === 'met' || m.date < today) (m.who || []).forEach(k => had.add(k)); });
+  const base = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비');
+  return { ate: base.filter(p => had.has(rKey(p))).length, base: base.length,
+    nom: mtNoMeal().length,
+    tip: (document.querySelector('[data-ateslot="meal"]') || {}).title || '',
+    nomTip: (document.querySelector('[data-ateslot="nomeal"]') || {}).title || '' };
+});
+t('식사를 치른 분 + 식사 외 = 머리줄의 사람 수', MEALP.ate + MEALP.nom === MEALP.base,
+  `${MEALP.ate}+${MEALP.nom} / ${MEALP.base}`);
+t('식사 줄머리 표에 그 사람 수와 합을 적는다',
+  MEALP.tip.includes(`드신 분은 ${MEALP.ate}명`) && MEALP.tip.includes(`합해 ${MEALP.base}명`), MEALP.tip);
+t('식사 외 줄머리 표에도 합을 적는다',
+  MEALP.nomTip.includes(`드신 ${MEALP.ate}명과 합해 ${MEALP.base}명`), MEALP.nomTip);
 /* 2026-11-14, 교수님 지정 — 「모두」를 **「만남」**으로 고쳤다. 거기 선 숫자가
    *만나거나 만날 예정인 분의 수*이기 때문이다. */
 t('첫 단추의 이름이 만남이다', F.allName === '만남', F.allName);
@@ -1276,6 +1297,39 @@ await page.waitForTimeout(250);
 t('아직을 다시 누르면 약속 줄로 돌아온다', await page.evaluate(() =>
   CAL.ate === '' && !document.querySelector('.mt-ate--todo')
   && document.querySelectorAll('.mt-ate li').length === 7));
+
+/* ---------- 본인은 명단에 적지 않는다 (2026-11-14 저녁, 교수님 지정) ----------
+ * 10-01 자리에 「변영철」이 끼어 있었다. 교수님이 그 자리에 계신 것은 당연하고, 이 칸이
+ * 묻는 것은 **누구를** 뵈었는가다. 사람 수는 이미 본인을 빼고 세므로(머리줄의 66명),
+ * 이름만 남아 있으면 셈과 눈에 보이는 것이 어긋난다. */
+const MEROW = await page.evaluate(() => {
+  const keep = JSON.stringify(meets());
+  const me = state.rows.find(p => p.name === '변영철');
+  const other = state.rows.find(p => p.name !== '변영철');
+  const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const was = mtAteRows().length;
+  meets()['me1'] = { date: ymd(new Date(Date.now() - 864e5 * 5)), time: '18:30',
+    kind: 'dinner', who: [rKey(other), rKey(me)], done: 'met' };
+  meets()['me2'] = { date: ymd(new Date(Date.now() - 864e5 * 6)), time: '12:00',
+    kind: 'lunch', who: [rKey(me)], done: 'met' };     /* 본인만 있는 자리 */
+  mtSave(); mealCache = null; CAL.ate = ''; render();
+  const txt = [...document.querySelectorAll('.mt-ate li .mt-ate__p')].map(e => e.textContent);
+  const out = { other: other.name, was, now: mtAteRows().length,
+    hasMe: txt.some(s2 => s2.includes('변영철')),
+    withOther: txt.some(s2 => s2.includes(other.name)),
+    people: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || '').trim(),
+    /* 본인은 「아직」·「기타 만남」에도 서지 않는다 */
+    inTodo: mtTodo().some(x => x.p.name === '변영철'),
+    inOther: mtOther().some(x => x.p.name === '변영철') };
+  meetMap = JSON.parse(keep); mealCache = null; mtSave(); render();
+  return out;
+});
+t('본인은 명단에 적지 않는다', !MEROW.hasMe && MEROW.withOther,
+  `본인 ${MEROW.hasMe} · 함께 뵌 분 ${MEROW.withOther}`);
+/* 본인만 있는 자리는 적을 사람이 없어 **줄이 서지 않는다** — 뵐 분이 없는 자리다 */
+t('본인만 있는 자리는 줄이 서지 않는다', MEROW.now === MEROW.was + 1,
+  `${MEROW.was} → ${MEROW.now} (두 자리를 넣었다)`);
+t('본인은 아직·기타 만남에도 서지 않는다', !MEROW.inTodo && !MEROW.inOther);
 
 /* ---------- 「식사 외」 — 아직 함께 드시지 않은 분 (2026-11-13 저녁, 교수님 지정) ----------
  * 「아직」 **앞**에 하나 더 선다. 점심이나 저녁을 함께 하지 않은 분이면 **뵌 적이 있어도**
