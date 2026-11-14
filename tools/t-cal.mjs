@@ -1038,18 +1038,27 @@ const F = await page.evaluate(() => {
     allName: (document.querySelector('[data-ateslot=""]').textContent || '').replace(/[\d명\s]/g, ''),
     h: Math.round(Math.min(...[...document.querySelectorAll('[data-ateslot]')]
       .map(e => e.getBoundingClientRect().height))),
-    /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 한 자리에 여러 분이면 겹치지 않게 */
+    /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 한 자리에 여러 분이면 겹치지 않게.
+       2026-11-14 저녁부터 **본인·비참여는 빼고** 센다 — 머리줄의 66명과 같은 바탕이라야
+       「만남 + 기타 만남 + 아직 = 66」이 맞는다 (교수님 지적). */
     people: new Set(Object.values(meets()).filter(m => m.done !== 'no' && m.date)
-      .flatMap(m => (m.who || []).filter(k => state.rows.some(x => rKey(x) === k)))).size,
+      .flatMap(m => (m.who || []).filter(k => {
+        const p = state.rows.find(x => rKey(x) === k);
+        return p && p.name !== '변영철' && getRating(p) !== '비';
+      }))).size,
     head: (document.querySelector('.cal-head--ate .st-note') || {}).textContent || '' };
 });
 t('만남 단추가 맨 앞에', F.hasAll && F.btns[0] === '', F.btns.join('|'));
 /* 2026-11-13 저녁, 교수님 지정 — 단추를 조금 높였다. 위아래 여백만 늘렸으므로 **높이만**
    재고 너비는 재지 않는다(옆 여백을 건드리면 폰에서 한 줄에 서는 수가 줄어든다). */
 t('갈래 단추가 조금 높다', F.h >= 38, `${F.h}px`);
-/* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 모두 다음, 점심 앞에 선다 (교수님 지정) */
-t('식사 단추가 만남 다음에', F.btns[1] === 'meal', F.btns.join('|'));
-t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'meal|nomeal|day|night|tea|todo', F.btns.join('|'));
+/* 「식사」(점심+저녁)는 2026-11-02 저녁에 더했다 — 점심 앞에 선다 (교수님 지정).
+   2026-11-14 부터 **사람을 세는 단추 뒤**가 갈래의 자리다. */
+t('갈래는 사람 단추 뒤에 한 줄기로', F.btns.slice(F.btns.indexOf('todo') + 1).join('|')
+  === 'meal|day|night|tea|nomeal', F.btns.join('|'));
+/* 사람을 세는 단추(기타 만남·아직)가 **앞에 모여** 서고, 갈래가 뒤, 「식사 외」가 맨 끝이다
+   (2026-11-14, 교수님 지정) */
+t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'todo|meal|day|night|tea|nomeal', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
 /* 「식사 외」가 2026-11-14 부터 「식사」 바로 뒤에 끼므로, 갈래의 횟수는 그것을 빼고 본다 */
 t('단추에 몇 번인지 적는다',
@@ -1151,20 +1160,22 @@ await page.waitForTimeout(250);
 t('만남을 누르면 다 보인다', await page.evaluate(() =>
   CAL.ate === '' && document.querySelectorAll('.mt-ate li').length === 7));
 
-/* ---------- 「아직」 — 아직 뵙지 못한 분 (2026-11-13, 교수님 지정) ----------
- * 갈래 단추 끝의 「아직」을 누르면 약속 줄 대신 **학과마다 한 줄**로 못 뵌 분이 선다.
- * 뵌 분으로 보는 눈은 윗칸과 같다 — 치른 자리가 있거나 만난 횟수가 1 이상. */
+/* ---------- 「아직」 — 자리부터 잡아야 할 분 (2026-11-13, 교수님 지정) ----------
+ * 「아직」을 누르면 약속 줄 대신 **학과마다 한 줄**로 남은 분이 선다.
+ * 2026-11-14 저녁부터 **달력에 자리가 아예 없고**(예정도 없고) 만난 횟수도 없는 분이다
+ * (교수님 지정) — 약속이 잡히면 「만남」 쪽으로 넘어간다. 그래야 세 단추의 합이 맞는다. */
 const TEXP = await page.evaluate(() => {
   /* 화면이 쓰는 길과 **다른 길로** 다시 센다 — 둘이 같은 함수를 보면 틀려도 같이 틀린다 */
-  const today = mtToday(), ate = new Set(), soon = new Set();
+  const cal = new Set();
   Object.values(meets()).forEach(m => {
     if (m.done === 'no' || !m.date) return;
-    ((m.done === 'met' || m.date < today) ? ate : soon).add('x');
-    (m.who || []).forEach(k => ((m.done === 'met' || m.date < today) ? ate : soon).add(k));
+    (m.who || []).forEach(k => cal.add(k));
   });
-  const left = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비'
-    && !(getNote(rKey(p)).met > 0) && !ate.has(rKey(p)));
-  return { n: left.length, soon: left.filter(p => soon.has(rKey(p))).length,
+  const base = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비');
+  const left = base.filter(p => !(getNote(rKey(p)).met > 0) && !cal.has(rKey(p)));
+  return { n: left.length, base: base.length,
+    /* 약속만 잡히고 아직 치르지 않은 분 — **여기 서면 안 된다** */
+    booked: base.filter(p => cal.has(rKey(p))).map(p => p.name),
     names: left.map(p => p.name).sort(), rows: state.rows.length };
 });
 await page.click('[data-ateslot="todo"]');
@@ -1190,8 +1201,13 @@ const TD = await page.evaluate(() => {
       return u ? getComputedStyle(u).maxHeight : ''; })() };
 });
 const TFLAT = TD.names.flat();
-t('아직 단추가 갈래 끝에 선다', await page.evaluate(() =>
-  [...document.querySelectorAll('[data-ateslot]')].pop().dataset.ateslot === 'todo'));
+/* 2026-11-14, 교수님 지정 — 「아직」을 맨 끝에서 **앞쪽 사람 단추 무리**로 옮겼다.
+   「기타 만남」이 없는 때(만난 횟수만 있는 분이 없을 때)는 「만남」 바로 뒤가 그 자리다. */
+t('아직 단추가 사람 단추 무리에 선다', await page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-ateslot]')].map(e => e.dataset.ateslot);
+  const i = b.indexOf('todo'), o = b.indexOf('other');
+  return i === (o >= 0 ? o + 1 : 1) && b.indexOf('meal') === i + 1;
+}));
 t('아직 단추에 그림과 사람 수', TD.icon && TD.chip === `${TEXP.n}명`, `${TD.chip} / ${TEXP.n}명`);
 t('누르면 눌린 꼴이 된다', TD.on === 'true');
 t('약속 줄 대신 학과 줄이 선다', TD.lis > 0 && TD.plain === 0, `${TD.lis} / ${TD.plain}`);
@@ -1204,12 +1220,34 @@ t('이미 뵌 분은 없다', await page.evaluate(nm => {
       const p = state.rows.find(x => rKey(x) === k); if (p) met.add(p.name); }); });
   return nm.every(x => !met.has(x));
 }, TFLAT), TFLAT.slice(0, 6).join(','));
-t('예정만 있는 분은 「예정」을 달고 선다', TD.soon.flat().filter(Boolean).length === TEXP.soon,
-  `${TD.soon.flat().filter(Boolean).length} / ${TEXP.soon}`);
+/* 2026-11-14 저녁, 교수님 지정 — 약속이 잡힌 분은 「만남」 쪽이다. 여기에는 **자리부터
+   잡아야 할 분**만 남으므로 「예정」 쪽지도 더는 없다. */
+t('약속이 잡힌 분은 서지 않는다', TEXP.booked.length > 0
+  && TEXP.booked.every(n => !TFLAT.includes(n)), TEXP.booked.join(','));
+t('「예정」 쪽지가 뜨지 않는다', !TD.soon.flat().some(Boolean), JSON.stringify(TD.soon.slice(0, 3)));
 t('학과 줄에 그 학과 인원수', TD.cnts.every((n, i) => n === TD.names[i].length),
   `${TD.cnts.join(',')} / ${TD.names.map(x => x.length).join(',')}`);
-t('학과 안에서 약속 없는 분이 앞에', TD.soon.every(r => r.slice().sort((a, b2) => a - b2).join() === r.join()),
-  JSON.stringify(TD.soon.slice(0, 3)));
+/* ---------- **만남 + 기타 만남 + 아직 = 66** (2026-11-14 저녁, 교수님 지적) ----------
+   사람을 세는 단추 셋이 명단을 **한 분도 겹치지 않게, 한 분도 빠뜨리지 않고** 가른다 —
+   달력에 자리가 있는 분 · 달력 밖에서 뵌 분 · 자리부터 잡아야 할 분.
+   머리줄의 「66명」이 바로 그 합이라야 한다. 본인·비참여는 셋 모두에서 뺀다. */
+const SUM = await page.evaluate(() => {
+  const cal = new Set();
+  Object.values(meets()).forEach(m => { if (m.done !== 'no' && m.date) (m.who || []).forEach(k => cal.add(k)); });
+  const base = state.rows.filter(p => p.name !== '변영철' && getRating(p) !== '비');
+  const a = base.filter(p => cal.has(rKey(p))).map(p => p.name);
+  const b2 = mtOther().map(x => x.p.name), c = mtTodo().map(x => x.p.name);
+  const all3 = [...a, ...b2, ...c];
+  return { base: base.length, a: a.length, b: b2.length, c: c.length,
+    chip: ((document.querySelector('[data-ateslot=""] i:not(.mt-i)') || {}).textContent || '').trim(),
+    dup: all3.length !== new Set(all3).size,
+    missing: base.map(p => p.name).filter(n => !all3.includes(n)) };
+});
+t('만남 + 기타 만남 + 아직 = 머리줄의 사람 수',
+  SUM.a + SUM.b + SUM.c === SUM.base, `${SUM.a}+${SUM.b}+${SUM.c} / ${SUM.base}`);
+t('셋이 겹치지도, 빠뜨리지도 않는다', !SUM.dup && !SUM.missing.length,
+  `겹침 ${SUM.dup} · 빠짐 ${SUM.missing.slice(0, 5).join(',')}`);
+t('만남 단추의 숫자가 그 첫째 몫', SUM.chip === `${SUM.a}명`, `${SUM.chip} / ${SUM.a}명`);
 /* 몇 명 남았는지는 **단추**가 지고 있다 (2026-11-13) — 머리줄에는 아무것도 적지 않는다 */
 t('아직에서도 머리줄은 비어 있다', TD.head === '', TD.head);
 t('이름을 누르면 그 교수 상세로', /^#\/dept\/.+\/prof\/.+/.test(TD.link || ''), TD.link);
@@ -1282,11 +1320,10 @@ const ND = await page.evaluate(() => {
     link: (document.querySelector('.mt-ate--todo .mt-ate__p a') || { getAttribute: () => '' }).getAttribute('href') };
 });
 const NFLAT = ND.names.flat();
-/* 2026-11-14, 교수님 지정 — 「식사」 바로 옆으로 옮겼다. 이름이 한 짝이고 보는 것도
-   같은 일의 앞뒤라, 멀리 떨어뜨리면 둘을 견주기 어렵다. */
-t('식사 외 단추가 식사 바로 뒤에',
-  ND.order.indexOf('nomeal') === ND.order.indexOf('meal') + 1, ND.order.join('|'));
-t('아직은 그대로 맨 끝', ND.order[ND.order.length - 1] === 'todo', ND.order.join('|'));
+/* 2026-11-14 저녁, 교수님 지정 — **맨 끝**이 「식사 외」의 자리다. 사람을 세는 단추이긴
+   하나 앞의 셋처럼 전체를 가르는 것이 아니라 밥 한 끼라는 다른 잣대이고, 숫자도 가장 크다. */
+t('식사 외 단추가 맨 끝에', ND.order[ND.order.length - 1] === 'nomeal', ND.order.join('|'));
+t('아직은 갈래 앞에', ND.order.indexOf('todo') < ND.order.indexOf('meal'), ND.order.join('|'));
 t('식사 외 단추에 그림과 사람 수', ND.icon && ND.chip === `${NEXP.n}명`, `${ND.chip} / ${NEXP.n}명`);
 t('줄머리 표가 무엇을 보는지 말한다', /점심·저녁을 함께 하지 않은/.test(ND.tip), ND.tip);
 t('누르면 눌린 꼴이 된다', ND.on === 'true');
@@ -1347,6 +1384,7 @@ const OTH = await page.evaluate(() => {
     n: mtOther().length };
 });
 t('기타 만남 단추가 만남 바로 옆에', OTH.order[1] === 'other', OTH.order.join('|'));
+t('아직이 기타 만남 오른쪽에', OTH.order[2] === 'todo', OTH.order.join('|'));
 t('기타 만남 단추에 그림과 사람 수', OTH.icon && OTH.chip === `${OTH.n}명`, `${OTH.chip} / ${OTH.n}명`);
 t('줄머리 표가 무엇을 보는지 말한다', /달력에는 자리가 없지만/.test(OTH.tip), OTH.tip);
 await page.click('[data-ateslot="other"]');
