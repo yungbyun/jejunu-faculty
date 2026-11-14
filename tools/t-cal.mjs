@@ -1090,7 +1090,8 @@ const GRP = await page.evaluate(() => {
       ws: ['', 'todo', 'meal'].filter(el).map(bw),
       page: getComputedStyle(document.body).backgroundColor,
       ink: cr(getComputedStyle(e).color, bg('')),
-      /* 테두리가 단추 바탕 위에서 보이는지 — 1.4 는 가는 선이 눈에 들어오는 가늠자다 */
+      /* 테두리가 단추 바탕 위에서 보이는지 — 2026-11-14 저녁에 교수님이 **더 진하게**
+         하라 하셔서 3.0 을 바닥으로 둔다(그 전에는 1.4 였다). */
       edge: cr(bd(''), bg('')), edgeSlot: cr(bd('meal'), bg('meal')) };
   };
   CAL.ate = 'tea'; render();
@@ -1111,7 +1112,7 @@ t('바탕은 여덟이 모두 같다', new Set(GRP.light.bgs).size === 1 && new 
 /* 굵기도 같아야 한다 — 굵히면 단추 크기가 달라져 폰에서 한 줄에 서는 수가 준다 */
 t('테두리 굵기는 모두 같다', new Set(GRP.light.ws).size === 1, GRP.light.ws.join(' / '));
 /* 가는 선이라 보이려면 바탕과 어느 만큼은 갈려야 하고, 여린 쪽보다 **또렷해야** 한다 */
-t('무리 테두리가 두 화면 모두에서 보인다', GRP.light.edge >= 1.4 && GRP.dark.edge >= 1.4,
+t('무리 테두리가 두 화면 모두에서 또렷하다', GRP.light.edge >= 3 && GRP.dark.edge >= 3,
   `${GRP.light.edge} / ${GRP.dark.edge}`);
 t('여린 테두리보다 또렷하다', GRP.light.edge > GRP.light.edgeSlot && GRP.dark.edge > GRP.dark.edgeSlot,
   `무리 ${GRP.light.edge}/${GRP.dark.edge} · 갈래 ${GRP.light.edgeSlot}/${GRP.dark.edgeSlot}`);
