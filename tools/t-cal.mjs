@@ -1065,6 +1065,54 @@ t('갈래는 사람 단추 뒤에 한 줄기로', F.btns.slice(F.btns.indexOf('t
    (2026-11-14, 교수님 지정) */
 t('있는 갈래만 단추로', F.btns.slice(1).join('|') === 'todo|meal|day|night|tea|nomeal', F.btns.join('|'));
 t('단추마다 아이콘', F.icons);
+/* ---------- 두 무리를 **바탕색**으로 가른다 (2026-11-14 저녁, 교수님 지정) ----------
+ * 사람을 세는 단추 셋(만남 · 기타 만남 · 아직)만 옅은 잿빛이고, 갈래와 「식사 외」는 흰
+ * 바탕이다. 고른 단추(`.on`)는 브랜드색이라 **셋이 서로 달라야** 한다 —
+ * 무리 표시까지 브랜드색이면 고른 것과 안 고른 것이 헷갈린다. */
+const GRP = await page.evaluate(() => {
+  const lum = c => { const m = c.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/);
+    const v = m ? [+m[1], +m[2], +m[3]] : c.match(/[\d.]+/g).slice(0, 3).map(n => n / 255);
+    const f = u => u <= .03928 ? u / 12.92 : Math.pow((u + .055) / 1.055, 2.4);
+    return .2126 * f(v[0]) + .7152 * f(v[1]) + .0722 * f(v[2]); };
+  const cr = (a, b2) => +(((Math.max(lum(a), lum(b2)) + .05) / (Math.min(lum(a), lum(b2)) + .05)).toFixed(2));
+  const el = s2 => document.querySelector(`[data-ateslot="${s2}"]`);
+  const bg = s2 => { const e = el(s2); return e ? getComputedStyle(e).backgroundColor : ''; };
+  /* **「Tea」를 골라 둔 채로** 잰다 — 아무것도 안 고르면 「만남」이 `.on` 이라
+     무리 바탕이 아니라 고른 단추의 바탕이 잡힌다(2026-11-14 저녁에 한 번 걸렸다). */
+  const look = () => {
+    const ppl = ['', 'other', 'todo'].filter(el).map(bg);
+    const slot = ['meal', 'day', 'night', 'nomeal'].filter(el).map(bg);
+    const e = el('');
+    return { ppl, slot, on: bg('tea'), page: getComputedStyle(document.body).backgroundColor,
+      ink: cr(getComputedStyle(e).color, bg('')),
+      L: lum(bg('')), Lpage: lum(getComputedStyle(document.body).backgroundColor) };
+  };
+  CAL.ate = 'tea'; render();
+  const light = look();
+  document.documentElement.setAttribute('data-theme', 'dark');
+  const dark = look();
+  document.documentElement.removeAttribute('data-theme');
+  CAL.ate = ''; render();
+  return { light, dark, on: light.on };
+});
+t('사람 단추 셋은 같은 바탕', new Set(GRP.light.ppl).size === 1 && GRP.light.ppl.length >= 2,
+  GRP.light.ppl.join(' / '));
+t('갈래와 식사 외는 다른 바탕', new Set(GRP.light.slot).size === 1
+  && !GRP.light.slot.includes(GRP.light.ppl[0]), `${GRP.light.slot[0]} / ${GRP.light.ppl[0]}`);
+/* 밝은 화면에서는 쪽 바탕보다 한 겹 짙고, 어두운 화면에서는 한 겹 밝아야 한다 —
+   어두운 화면에서 더 어둡게 깔면 쪽 바탕에 묻힌다 */
+t('밝은 화면에서 한 겹 짙다', GRP.light.L < GRP.light.Lpage,
+  `${GRP.light.L.toFixed(3)} / ${GRP.light.Lpage.toFixed(3)}`);
+t('어두운 화면에서 한 겹 밝다', GRP.dark.L > GRP.dark.Lpage,
+  `${GRP.dark.L.toFixed(3)} / ${GRP.dark.Lpage.toFixed(3)}`);
+t('두 화면 모두 글자가 묻히지 않는다(4.5 넘김)', GRP.light.ink >= 4.5 && GRP.dark.ink >= 4.5,
+  `${GRP.light.ink} / ${GRP.dark.ink}`);
+/* 고른 단추는 **브랜드색**이라 무리 표시와 갈린다 — `:not(.on)` 이 비켜서는지 보는 시험이다 */
+t('고른 단추는 또 다른 바탕', GRP.on !== GRP.light.ppl[0] && GRP.on !== GRP.light.slot[0],
+  `${GRP.on} / 무리 ${GRP.light.ppl[0]} / 갈래 ${GRP.light.slot[0]}`);
+/* 가는 세로 금은 바탕색으로 갈음해 **걷었다** (같은 날 저녁) */
+t('가는 세로 금은 두지 않는다', await page.evaluate(() => !document.querySelector('.mt-fs__sep')));
+
 /* ---------- 단추의 숫자는 **모두 사람 수** (2026-11-14 저녁, 교수님 지정) ----------
    그 전에는 갈래가 **번**, 사람 단추가 **명**이라 「식사 + 식사 외」를 더할 수 없었다. */
 t('단추마다 몇 명인지 적는다', F.cnt.split(',').every(x => /^\d+명$/.test(x)), F.cnt);

@@ -6403,18 +6403,29 @@ function mtAteSection() {
      저녁을 치르신 분이 몇 분인가*라야 하고, 그 수는 **66 − 식사 외**입니다(`mtNoMeal` 이
      바로 그 반대쪽이라 늘 맞습니다). 그래서 「식사」 줄머리 표에 **그 사람 수와 합**을
      적어 둡니다 — 숫자 자체는 번으로 둡니다(점심 + 저녁 = 식사가 깨지면 안 됩니다). */
-  const pick = (s, name, icon) => `<button type="button" class="btn cal-new__b mt-f${CAL.ate === s ? ' on' : ''}"
+  const pick = (s, name, icon, grp) => `<button type="button" class="btn cal-new__b mt-f${grp || ''}${CAL.ate === s ? ' on' : ''}"
       data-ateslot="${esc(s)}" aria-pressed="${CAL.ate === s}"
       title="${esc(name)}${s ? ` 자리가 있는 ${cntP(s)}명 보기 — 자리는 ${cnt(s)}번${s === 'meal'
         ? ` · 「식사 외」 ${nom.length}명과 합해 ${baseN}명입니다 (점심도 저녁도 드신 분은 한 번만 셉니다)` : ''}`
         : ` 보기 — ${people}명`}">${icon}${esc(name)}<i>${s ? `${cntP(s)}명` : `${people}명`}</i></button>`;
   /* 사람을 세우는 단추는 **몇 명**이라 「명」을 붙여 갈래의 횟수와 갈라 둡니다 */
-  const pickP = (k, name, icon, on, tip, n) => `<button type="button" class="btn cal-new__b mt-f${on ? ' on' : ''}"
+  const pickP = (k, name, icon, on, tip, n, grp) => `<button type="button" class="btn cal-new__b mt-f${grp || ''}${on ? ' on' : ''}"
       data-ateslot="${k}" aria-pressed="${on}" title="${esc(tip)}"
       >${icon}${esc(name)}<i>${n}명</i></button>`;
   /* 「식사 외」는 **「식사」 바로 옆**에 섭니다 (2026-11-14, 교수님 지정) — 이름이 한 짝이고
      보는 것도 같은 일의 앞뒤(드신 자리 ↔ 아직 안 드신 분)라, 멀리 떨어뜨리면 둘을 견주기
      어렵습니다. 「식사」 단추가 없는 때(점심·저녁 중 하나만 있는 때)는 갈래 뒤에 섭니다. */
+  /* ---------- 두 무리를 **바탕색**으로 가릅니다 (2026-11-14 저녁, 교수님 지정) ----------
+     **사람을 세는 단추 셋**(만남 · 기타 만남 · 아직)만 옅은 잿빛(`--surface-2`)을 깝니다.
+     갈래와 「식사 외」는 흰 바탕 그대로입니다 — 교수님이 「두 그룹을 칩 배경색으로 구분하는
+     것은 어떠냐」 하셨습니다.
+     - 잿빛을 고른 것은 **고른 단추(`.on`)가 브랜드색**이기 때문입니다. 무리 표시까지
+       브랜드색이면 **고른 것과 안 고른 것이 헷갈립니다.**
+     - 이것으로 가름이 또렷해져, 바로 앞에 두었던 **가는 세로 금은 걷었습니다** — 같은 일을
+       두 가지로 말하면 머리줄이 번잡합니다.
+     - 「식사 외」는 사람을 세지만 **갈래 쪽 무리**입니다(교수님이 그렇게 묶으셨고,
+       「식사」와 짝이기 때문입니다). 그래서 바탕을 깔지 않습니다. */
+  const PPL = ' mt-f--ppl';
   /* ---------- 단추의 차례 (2026-11-14, 교수님 지정) ----------
      **만남 · 기타 만남 · 아직** | 식사 · 점심 · 저녁 · Tea | **식사 외**
      - 앞의 셋은 **사람을 세는 단추**입니다. 달력에서 뵌 분 · 달력 밖에서 뵌 분 · 아직 못 뵌
@@ -6426,11 +6437,11 @@ function mtAteSection() {
       「아직」을 「기타 만남」 오른쪽으로, 「식사 외」를 맨 끝으로 옮기라 하셨습니다.) */
   const othB = oth.length || isOth ? pickP('other', '기타 만남',
     `<i class="mt-i mt-i--other" aria-hidden="true">${MT_OTHER_SVG}</i>`, isOth,
-    `달력에는 자리가 없지만 만난 횟수를 적어 두신 ${oth.length}명 보기`, oth.length) : '';
+    `달력에는 자리가 없지만 만난 횟수를 적어 두신 ${oth.length}명 보기`, oth.length, PPL) : '';
   const todoB = todo.length || isTodo ? pickP('todo', '아직',
     `<i class="mt-i mt-i--todo" aria-hidden="true">${MT_TODO_SVG}</i>`, isTodo,
     `아직 뵙지도, 자리를 잡지도 못한 ${todo.length}명 보기 — 「만남」과 「기타 만남」을 더하면 ${baseN}명입니다`,
-    todo.length) : '';
+    todo.length, PPL) : '';
   const nomB = nom.length || isNom ? pickP('nomeal', '식사 외',
     `<i class="mt-i mt-i--nomeal" aria-hidden="true">${MT_NOMEAL_SVG}</i>`, isNom,
     `점심·저녁 자리가 아예 없는 ${nom.length}명 보기 — 「식사」 ${baseN - nom.length}명과 합해 ${baseN}명입니다`,
@@ -6442,16 +6453,8 @@ function mtAteSection() {
             outN ? `비참여 ${outN}명과 ` : ''}본인을 뺀 ${baseN}명이 뵐 분입니다 — 「식사 외」·「아직」은 이 ${baseN}명에서 셉니다"
             >${state.rows.length}명${outN ? ` − 비참여 ${outN}` : ''}${meIn ? ' − 본인' : ''} = <b>${baseN}명</b></p>
           ${all.length || peep ? `<div class="cal-new mt-fs" role="group" aria-label="갈래 고르기">
-            ${pick('', '만남', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`)}
+            ${pick('', '만남', `<i class="mt-i mt-i--all" aria-hidden="true">${MT_ALL_SVG}</i>`, PPL)}
             ${othB}${todoB}
-            ${/* ---------- 두 무리를 **가는 금** 하나로 가릅니다 (2026-11-14 저녁, 교수님 지적) ----------
-                 앞은 **사람을 세는** 단추(만남 · 기타 만남 · 아직)로, 명단을 한 분도 겹치지 않게
-                 가릅니다. 뒤는 **자리를 고르는** 갈래(식사 · 점심 · 저녁 · Tea)이고, 끝의
-                 「식사 외」는 그 갈래의 반대쪽이라 뒷무리에 둡니다.
-                 금은 단추가 아니므로 `.mt-f` 가 아니고, 좁은 화면에서 줄이 접히면 그 자리에서
-                 함께 접힙니다 — 그래서 **세로 금 하나**로만 둡니다(가로 줄을 그으면 접힐 때
-                 엉뚱한 데를 가릅니다). 읽어 주는 기계에는 「구분선」으로만 들립니다. */''}
-            ${all.length ? '<span class="mt-fs__sep" role="separator" aria-orientation="vertical"></span>' : ''}
             ${slots.map(s => pick(s, MT_SLOT_NAME[s],
               s === 'meal' ? `<i class="mt-i mt-i--meal" aria-hidden="true">${MT_MEAL_SVG}</i>` : mtIcon(s))).join('')}
             ${nomB}
